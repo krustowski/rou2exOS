@@ -10,6 +10,11 @@ struct Command {
 
 static COMMANDS: &[Command] = &[
     Command {
+        name: b"beep",
+        description: b"beeps",
+        function: cmd_beep,
+    },
+    Command {
         name: b"cls",
         description: b"clears the screen",
         function: cmd_clear,
@@ -90,6 +95,75 @@ fn split_cmd(input: &[u8]) -> (&[u8], &[u8]) {
 //  COMMAND FUNCTIONS
 //
 
+fn cmd_beep(_args: &[u8], _vga_index: &mut isize) {
+    beep(5000);
+
+    for _ in 0..3_000_000 {
+        unsafe { core::arch::asm!("nop"); }
+    }
+
+    stop_beep();
+}
+
+fn beep(frequency: u32) {
+    let divisor = 1_193_180 / frequency; // PIT runs at 1.19318 MHz
+
+    unsafe {
+        // Set PIT to mode 3 (square wave generator)
+        core::arch::asm!(
+            "out dx, al",
+            in("dx") 0x43,
+            in("al") 0b10110110u8,
+        );
+
+        // Set frequency divisor (low byte first, then high byte)
+        core::arch::asm!(
+            "out dx, al",
+            in("dx") 0x42,
+            in("al") (divisor & 0xFF) as u8,
+        );
+        core::arch::asm!(
+            "out dx, al",
+            in("dx") 0x42,
+            in("al") (divisor >> 8) as u8,
+        );
+
+        // Enable speaker
+        let mut tmp: u8;
+        core::arch::asm!(
+            "in al, dx",
+            in("dx") 0x61,
+            out("al") tmp,
+        );
+        if (tmp & 3) != 3 {
+            tmp |= 3;
+            core::arch::asm!(
+                "out dx, al",
+                in("dx") 0x61,
+                in("al") tmp,
+            );
+        }
+    }
+}
+
+fn stop_beep() {
+    // Stop the beep.
+    unsafe {
+        let mut tmp: u8;
+        core::arch::asm!(
+            "in al, dx",
+            in("dx") 0x61,
+            out("al") tmp,
+        );
+        tmp &= !3;
+        core::arch::asm!(
+            "out dx, al",
+            in("dx") 0x61,
+            in("al") tmp,
+        );
+    }
+}
+
 fn cmd_clear(_args: &[u8], vga_index: &mut isize) {
     vga::screen::clear(vga_index);
 }
@@ -115,6 +189,7 @@ fn cmd_help(_args: &[u8], vga_index: &mut isize) {
 fn cmd_shutdown(_args: &[u8], vga_index: &mut isize) {
     vga::write::newline(vga_index);
     vga::write::string(vga_index, b" --- Shutting down", 0xb);
+
     for _ in 0..3 {
         for _ in 0..3_500_000 {
             unsafe {

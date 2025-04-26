@@ -1,5 +1,7 @@
 use crate::vga;
 
+const KERNEL_VERSION: &[u8] = b"0.2.0";
+
 struct Command {
     name: &'static [u8],
     description: &'static [u8],
@@ -22,28 +24,17 @@ static COMMANDS: &[Command] = &[
         description: b"shows this output",
         function: cmd_help,
     },
+    Command {
+        name: b"shutdown",
+        description: b"shuts down the system",
+        function: cmd_shutdown,
+    },
+    Command {
+        name: b"version",
+        description: b"prints the kernel version",
+        function: cmd_version,
+    },
 ];
-
-fn find_cmd(name: &[u8]) -> Option<&'static Command> {
-    for cmd in COMMANDS {
-        if cmd.name == name {
-            return Some(cmd);
-        }
-    }
-    None
-}
-
-fn split_cmd(input: &[u8]) -> (&[u8], &[u8]) {
-    // Find the first space
-    if let Some(pos) = input.iter().position(|&c| c == b' ') {
-        let (cmd, args) = input.split_at(pos);
-        // skip the space character for args
-        (cmd, &args[1..])
-    } else {
-        // No space found, entire input is the command
-        (input, &[])
-    }
-}
 
 pub fn handle(input: &[u8], vga_index: &mut isize) {
     // Only for strings!
@@ -67,6 +58,31 @@ pub fn handle(input: &[u8], vga_index: &mut isize) {
             vga::write::string(vga_index, cmd_name, 0x0f);
             vga::write::newline(vga_index);
         }
+    }
+}
+
+//
+//  HELPER FUNCTIONS
+//
+
+fn find_cmd(name: &[u8]) -> Option<&'static Command> {
+    for cmd in COMMANDS {
+        if cmd.name == name {
+            return Some(cmd);
+        }
+    }
+    None
+}
+
+fn split_cmd(input: &[u8]) -> (&[u8], &[u8]) {
+    // Find the first space
+    if let Some(pos) = input.iter().position(|&c| c == b' ') {
+        let (cmd, args) = input.split_at(pos);
+        // skip the space character for args
+        (cmd, &args[1..])
+    } else {
+        // No space found, entire input is the command
+        (input, &[])
     }
 }
 
@@ -96,3 +112,23 @@ fn cmd_help(_args: &[u8], vga_index: &mut isize) {
     }
 }
 
+fn cmd_shutdown(_args: &[u8], _vga_index: &mut isize) {
+    unsafe {
+        // QEMU "isa-debug-exit" trick
+        let port = 0x604;
+        let value: u32 = 0x2000; // qemu: power off
+
+        core::arch::asm!(
+            "out dx, eax",
+            in("dx") port,
+            in("eax") value,
+            options(noreturn),
+        );
+    }
+}
+
+fn cmd_version(_args: &[u8], vga_index: &mut isize) {
+    vga::write::string(vga_index, b"Version: ", 0x0f);
+    vga::write::string(vga_index, KERNEL_VERSION, 0x0f);
+    vga::write::newline(vga_index);
+}

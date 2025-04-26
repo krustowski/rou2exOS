@@ -5,3 +5,10 @@ edition = "2024"
 
 [dependencies]
 bootloader = "0.9"
+
+[[bin]]
+name = "x86_64-r2"
+path = "src/main.rs"
+test = false
+doctest = false
+bench = false

@@ -23,13 +23,7 @@ pub extern "C" fn _start() -> ! {
     let mut input_len = 0;
 
     // Write prompt
-    for byte in PROMPT {
-        unsafe {
-            *VGA_BUFFER.offset(vga_index) = *byte;
-            *VGA_BUFFER.offset(vga_index + 1) = 0x0f; // white text
-            vga_index += 2;
-        }
-    }
+    write_string(&mut vga_index, PROMPT, 0xa);
 
     loop {
         // Wait for a keypress
@@ -73,14 +67,25 @@ pub extern "C" fn _start() -> ! {
                 newline(&mut vga_index);
 
                 // Echo back the input
-                write_string(&mut vga_index, b"Echo: ");
-                write_string(&mut vga_index, &input_buffer[..input_len]);
+                write_string(&mut vga_index, b"unknown: ", 0xc);
+                write_string(&mut vga_index, &input_buffer[..input_len], 0x0f);
                 newline(&mut vga_index);
 
                 // Clear input buffer
                 input_len = 0;
                 // Show new prompt
-                write_string(&mut vga_index, PROMPT);
+                write_string(&mut vga_index, PROMPT, 0xa);
+                continue;
+            }
+            0x0E => { // backspace
+                if input_len > 0 {
+                    input_len -= 1;
+                    unsafe {
+                        vga_index -= 2; // move cursor back one character
+                        *VGA_BUFFER.offset(vga_index) = b' ';
+                        *VGA_BUFFER.offset(vga_index + 1) = 0x0f;
+                    }
+                }
                 continue;
             }
             _ => continue, // ignore unknown keys
@@ -119,11 +124,11 @@ fn keyboard_read_scancode() -> u8 {
 }
 
 /// Write a whole string to screen
-fn write_string(vga_index: &mut isize, string: &[u8]) {
+fn write_string(vga_index: &mut isize, string: &[u8], color: u8) {
     for &byte in string {
         unsafe {
             *VGA_BUFFER.offset(*vga_index) = byte;
-            *VGA_BUFFER.offset(*vga_index + 1) = 0x0f;
+            *VGA_BUFFER.offset(*vga_index + 1) = color;
             *vga_index += 2;
         }
     }

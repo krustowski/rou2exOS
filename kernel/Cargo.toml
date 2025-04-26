@@ -1,8 +1,15 @@
 [package]
 name = "kernel"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2024"
 
 [dependencies]
 bootloader = "0.9"
 x86_64 = "0.14"
+
+[[bin]]
+name = "x86_64-r2"
+path = "src/main.rs"
+test = false
+doctest = false
+bench = false

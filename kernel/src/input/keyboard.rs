@@ -3,7 +3,20 @@ use crate::vga;
 use crate::input::cmd;
 
 const INPUT_BUFFER_SIZE: usize = 128;
-const PROMPT: &[u8] = b"guest@rou2ex:/ > ";
+
+const USER: &[u8] = b"guest";
+const HOST: &[u8] = b"rou2ex";
+const PATH: &[u8] = b"/";
+
+fn prompt(vga_index: &mut isize) {
+    vga::write::string(vga_index, b"[", 0xa);
+    vga::write::string(vga_index, USER, 0xe);
+    vga::write::string(vga_index, b"@", 0xa);
+    vga::write::string(vga_index, HOST, 0xe);
+    vga::write::string(vga_index, b":", 0xa);
+    vga::write::string(vga_index, PATH, 0xe);
+    vga::write::string(vga_index, b"] > ", 0xa);
+}
 
 //use x86_64::instructions::port::Port;
 //let mut port60 = Port::new(0x60);
@@ -76,8 +89,12 @@ pub fn keyboard_loop(vga_index: &mut isize) {
     let mut input_buffer = [0u8; INPUT_BUFFER_SIZE];
     let mut input_len = 0;
 
+    vga::write::string(vga_index, b"Starting prompt...", 0x0f);
+    vga::write::newline(vga_index);
+    vga::write::newline(vga_index);
+
     // Write prompt
-    vga::write::string(vga_index, PROMPT, 0xa);
+    prompt(vga_index);
     move_cursor_index(vga_index);
     vga::screen::scroll(vga_index);
 
@@ -128,7 +145,7 @@ pub fn keyboard_loop(vga_index: &mut isize) {
                 input_len = 0;
 
                 // Show new prompt
-                vga::write::string(vga_index, PROMPT, 0xa);
+                prompt(vga_index);
                 move_cursor_index(vga_index);
 
                 continue;

@@ -20,6 +20,7 @@ pub extern "C" fn _start() {
     vga::screen::clear(&mut vga_index);
 
     // Show color palette.
+    init::ascii::ascii_art(&mut vga_index);
     init::color::color_demo(&mut vga_index);
 
     // Run prompt loop.

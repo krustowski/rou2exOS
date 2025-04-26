@@ -2,6 +2,8 @@
 #![no_main] // disable all Rust-level entry points
 
 use core::panic::PanicInfo;
+use core::ptr;
+
 //use x86_64::instructions::port::Port;
 //let mut port60 = Port::new(0x60);
 
@@ -13,6 +15,9 @@ fn panic(_info: &PanicInfo) -> ! {
 
 const VGA_BUFFER: *mut u8 = 0xb8000 as *mut u8;
 const INPUT_BUFFER_SIZE: usize = 128;
+
+const BUFFER_WIDTH: usize = 80;
+const BUFFER_HEIGHT: usize = 25;
 
 const PROMPT: &[u8] = b"guest@rou2ex:/ > ";
 
@@ -29,6 +34,8 @@ pub extern "C" fn _start() -> ! {
 
     // Write prompt
     write_string(&mut vga_index, PROMPT, 0xa);
+    move_cursor_index(&mut vga_index);
+    scroll_screen(&mut vga_index);
 
     loop {
         // Wait for a keypress
@@ -78,8 +85,11 @@ pub extern "C" fn _start() -> ! {
 
                 // Clear input buffer
                 input_len = 0;
+
                 // Show new prompt
                 write_string(&mut vga_index, PROMPT, 0xa);
+                move_cursor_index(&mut vga_index);
+
                 continue;
             }
             0x0E => { // backspace
@@ -90,6 +100,7 @@ pub extern "C" fn _start() -> ! {
                         *VGA_BUFFER.offset(vga_index) = b' ';
                         *VGA_BUFFER.offset(vga_index + 1) = 0x0f;
                     }
+                    move_cursor_index(&mut vga_index);
                 }
                 continue;
             }
@@ -107,6 +118,7 @@ pub extern "C" fn _start() -> ! {
                 *VGA_BUFFER.offset(vga_index + 1) = 0x0f;
                 vga_index += 2;
             }
+            move_cursor_index(&mut vga_index);
         }
     }
 }
@@ -130,6 +142,8 @@ fn keyboard_read_scancode() -> u8 {
 
 /// Write a whole string to screen
 fn write_string(vga_index: &mut isize, string: &[u8], color: u8) {
+    scroll_screen(vga_index);
+
     for &byte in string {
         unsafe {
             *VGA_BUFFER.offset(*vga_index) = byte;
@@ -143,6 +157,30 @@ fn write_string(vga_index: &mut isize, string: &[u8], color: u8) {
 fn newline(vga_index: &mut isize) {
     // VGA 80x25: each line is 80 chars * 2 bytes per char
     *vga_index += (80 * 2) - (*vga_index % (80 * 2));
+}
+
+fn scroll_screen(vga_index: &mut isize) {
+    if (*vga_index / 2) / 80 < BUFFER_HEIGHT as isize {
+        return;
+    }
+
+    unsafe {
+        // Copy 24 rows * 80 cols * 2 bytes = 3840 bytes
+        ptr::copy(
+            VGA_BUFFER.offset((BUFFER_WIDTH * 2) as isize), // from row 1
+            VGA_BUFFER,
+            (BUFFER_WIDTH * (BUFFER_HEIGHT - 1) * 2) as usize, // size: 24 rows
+        );
+
+        // Clear last line (row 24)
+        let last_line = VGA_BUFFER.offset((BUFFER_WIDTH * (BUFFER_HEIGHT - 1) * 2) as isize);
+        for i in 0..BUFFER_WIDTH {
+            *last_line.offset((i * 2) as isize) = b' ';
+            *last_line.offset((i * 2 + 1) as isize) = 0x07; // Light gray on black
+        }
+    }
+
+    *vga_index = BUFFER_WIDTH as isize * (BUFFER_HEIGHT as isize - 1) * 2;
 }
 
 pub fn color_demo(vga_index: &mut isize) {
@@ -174,5 +212,36 @@ pub fn color_demo(vga_index: &mut isize) {
             *vga_index += 4;
         }
         col += 1;
+    }
+}
+
+fn move_cursor_index(vga_index: &mut isize) {
+    let row = (*vga_index / 2) / 80;
+    let col = (*vga_index / 2) % 80;
+                                             
+    move_cursor(row as u16, col as u16);
+}
+
+/// Move the hardware cursor to (row, col)
+pub fn move_cursor(row: u16, col: u16) {
+    let pos: u16 = row * 80 + col; // 80 columns wide
+
+        // Set high byte
+        port_write(0x3D4, 0x0E);
+        port_write(0x3D5, (pos >> 8) as u8);
+
+        // Set low byte
+        port_write(0x3D4, 0x0F);
+        port_write(0x3D5, (pos & 0xFF) as u8);
+}
+
+/// Writes a byte to a port (needs inline assembly)
+fn port_write(port: u16, value: u8) {
+    unsafe {
+    core::arch::asm!(
+        "out dx, al",
+        in("dx") port,
+        in("al") value,
+    );
     }
 }

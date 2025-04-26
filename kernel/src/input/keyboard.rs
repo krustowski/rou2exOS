@@ -10,11 +10,11 @@ const PATH: &[u8] = b"/";
 
 fn prompt(vga_index: &mut isize) {
     vga::write::string(vga_index, b"[", 0xa);
-    vga::write::string(vga_index, USER, 0xe);
+    vga::write::string(vga_index, USER, 0xa);
     vga::write::string(vga_index, b"@", 0xa);
-    vga::write::string(vga_index, HOST, 0xe);
+    vga::write::string(vga_index, HOST, 0xa);
     vga::write::string(vga_index, b":", 0xa);
-    vga::write::string(vga_index, PATH, 0xe);
+    vga::write::string(vga_index, PATH, 0x09);
     vga::write::string(vga_index, b"] > ", 0xa);
 }
 

@@ -34,13 +34,13 @@ static COMMANDS: &[Command] = &[
         description: b"prints the kernel version",
         function: cmd_version,
     },
-];
+    ];
 
 pub fn handle(input: &[u8], vga_index: &mut isize) {
     // Only for strings!
     /*let mut parts = input.splitn(2, ' ');
-    let cmd_name = parts.next().unwrap_or("");
-    let cmd_args = parts.next().unwrap_or("");*/
+      let cmd_name = parts.next().unwrap_or("");
+      let cmd_args = parts.next().unwrap_or("");*/
 
     let (cmd_name, cmd_args) = split_cmd(input);
 
@@ -112,18 +112,41 @@ fn cmd_help(_args: &[u8], vga_index: &mut isize) {
     }
 }
 
-fn cmd_shutdown(_args: &[u8], _vga_index: &mut isize) {
+fn cmd_shutdown(_args: &[u8], vga_index: &mut isize) {
+    vga::write::newline(vga_index);
+    vga::write::string(vga_index, b" --- Shutting down", 0xb);
+    for _ in 0..3 {
+        for _ in 0..3_500_000 {
+            unsafe {
+                core::arch::asm!("nop");
+            }
+        }
+        vga::write::string(vga_index, b".", 0xb);
+    }
+
     unsafe {
-        // QEMU "isa-debug-exit" trick
-        let port = 0x604;
-        let value: u32 = 0x2000; // qemu: power off
+        // ACPI shutdown port (common for Bochs/QEMU/VirtualBox)
+        const SLP_TYPA: u16 = 0x2000;
+        const SLP_EN: u16 = 1 << 13;
+
+        // Fallback PM1a control port address
+        const PM1A_CNT_PORT: u16 = 0x604;
+
+        // Write shutdown command
+        let value = SLP_TYPA | SLP_EN;
 
         core::arch::asm!(
-            "out dx, eax",
-            in("dx") port,
-            in("eax") value,
-            options(noreturn),
+            "out dx, ax",
+            in("dx") PM1A_CNT_PORT,
+            in("ax") value,
         );
+    }
+
+    // Freeze in case of the shutdown failure (no ACPI).
+    loop {
+        unsafe {
+            core::arch::asm!("hlt");
+        }
     }
 }
 

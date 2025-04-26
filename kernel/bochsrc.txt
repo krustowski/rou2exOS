@@ -1,0 +1,10 @@
+megs: 32
+romimage: file=/usr/share/bochs/BIOS-bochs-latest
+vgaromimage: file=/usr/share/bochs/VGABIOS-lgpl-latest
+boot: a
+floppya: 1_44="boot.img", status=inserted
+log: bochslog.txt
+cpu: reset_on_triple_fault=1
+mouse: enabled=0
+display_library: sdl2
+

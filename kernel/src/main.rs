@@ -22,6 +22,11 @@ pub extern "C" fn _start() -> ! {
     let mut input_buffer = [0u8; INPUT_BUFFER_SIZE];
     let mut input_len = 0;
 
+    color_demo(&mut vga_index);
+
+    newline(&mut vga_index);
+    newline(&mut vga_index);
+
     // Write prompt
     write_string(&mut vga_index, PROMPT, 0xa);
 
@@ -138,4 +143,36 @@ fn write_string(vga_index: &mut isize, string: &[u8], color: u8) {
 fn newline(vga_index: &mut isize) {
     // VGA 80x25: each line is 80 chars * 2 bytes per char
     *vga_index += (80 * 2) - (*vga_index % (80 * 2));
+}
+
+pub fn color_demo(vga_index: &mut isize) {
+    let colors: [u8; 16] = [
+        0x0, 0x1, 0x2, 0x3,
+        0x4, 0x5, 0x6, 0x7,
+        0x8, 0x9, 0xA, 0xB,
+        0xC, 0xD, 0xE, 0xF,
+    ];
+
+    write_string(vga_index, b"Color test:", 0x0f);
+    newline(vga_index);
+
+    let mut col = 0;
+    for &color in colors.iter() {
+        if col % 8 == 0 {
+            newline(vga_index);
+            col = 0;
+        }
+
+        unsafe {
+            let offset = (col * 2) as isize;
+            *VGA_BUFFER.offset(*vga_index + offset) = b' ';
+            *VGA_BUFFER.offset(*vga_index + offset + 1) =  color << 4 | 0xf;
+            *VGA_BUFFER.offset(*vga_index + offset + 2) = b' ';
+            *VGA_BUFFER.offset(*vga_index + offset + 3) =  color << 4 | 0xf;
+            //*VGA_BUFFER.offset(*vga_index + offset + 2) = b'*';
+            //*VGA_BUFFER.offset(*vga_index + offset + 3) =  color;
+            *vga_index += 4;
+        }
+        col += 1;
+    }
 }

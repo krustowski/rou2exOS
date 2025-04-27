@@ -1,3 +1,5 @@
+use crate::sound;
+use crate::time;
 use crate::vga;
 
 const KERNEL_VERSION: &[u8] = b"0.2.0";
@@ -33,6 +35,16 @@ static COMMANDS: &[Command] = &[
         name: b"shutdown",
         description: b"shuts down the system",
         function: cmd_shutdown,
+    },
+    Command {
+        name: b"time",
+        description: b"prints system time and date",
+        function: cmd_time,
+    },
+    Command {
+        name: b"uptime",
+        description: b"prints system uptime",
+        function: cmd_uptime,
     },
     Command {
         name: b"version",
@@ -96,72 +108,13 @@ fn split_cmd(input: &[u8]) -> (&[u8], &[u8]) {
 //
 
 fn cmd_beep(_args: &[u8], _vga_index: &mut isize) {
-    beep(5000);
+    sound::beep::beep(5000);
 
     for _ in 0..3_000_000 {
         unsafe { core::arch::asm!("nop"); }
     }
 
-    stop_beep();
-}
-
-fn beep(frequency: u32) {
-    let divisor = 1_193_180 / frequency; // PIT runs at 1.19318 MHz
-
-    unsafe {
-        // Set PIT to mode 3 (square wave generator)
-        core::arch::asm!(
-            "out dx, al",
-            in("dx") 0x43,
-            in("al") 0b10110110u8,
-        );
-
-        // Set frequency divisor (low byte first, then high byte)
-        core::arch::asm!(
-            "out dx, al",
-            in("dx") 0x42,
-            in("al") (divisor & 0xFF) as u8,
-        );
-        core::arch::asm!(
-            "out dx, al",
-            in("dx") 0x42,
-            in("al") (divisor >> 8) as u8,
-        );
-
-        // Enable speaker
-        let mut tmp: u8;
-        core::arch::asm!(
-            "in al, dx",
-            in("dx") 0x61,
-            out("al") tmp,
-        );
-        if (tmp & 3) != 3 {
-            tmp |= 3;
-            core::arch::asm!(
-                "out dx, al",
-                in("dx") 0x61,
-                in("al") tmp,
-            );
-        }
-    }
-}
-
-fn stop_beep() {
-    // Stop the beep.
-    unsafe {
-        let mut tmp: u8;
-        core::arch::asm!(
-            "in al, dx",
-            in("dx") 0x61,
-            out("al") tmp,
-        );
-        tmp &= !3;
-        core::arch::asm!(
-            "out dx, al",
-            in("dx") 0x61,
-            in("al") tmp,
-        );
-    }
+    sound::beep::stop_beep();
 }
 
 fn cmd_clear(_args: &[u8], vga_index: &mut isize) {
@@ -223,6 +176,75 @@ fn cmd_shutdown(_args: &[u8], vga_index: &mut isize) {
             core::arch::asm!("hlt");
         }
     }
+}
+
+fn cmd_time(_args: &[u8], vga_index: &mut isize) {
+    let (y, mo, d, h, m, s) = time::rtc::read_rtc_full();
+
+    vga::write::string(vga_index, b"RTC Time: ", 0x0f);
+    vga::write::number(vga_index, &mut (h as u64));
+
+    vga::write::string(vga_index, b":", 0x0f);
+
+    if m < 10 { 
+        vga::write::string(vga_index, b"0", 0x0f); 
+    }
+    vga::write::number(vga_index, &mut (m as u64));
+
+    vga::write::string(vga_index, b":", 0x0f);
+
+    if s < 10 { 
+        vga::write::string(vga_index, b"0", 0x0f); 
+    }
+    vga::write::number(vga_index, &mut (s as u64));
+
+    vga::write::newline(vga_index);
+
+    vga::write::string(vga_index, b"RTC Date: ", 0x0f);
+
+    if d < 10 {
+        vga::write::string(vga_index, b"0", 0x0f); 
+    }
+    vga::write::number(vga_index, &mut (d as u64));
+    vga::write::string(vga_index, b"-", 0x0f);
+
+    if mo < 10 {
+        vga::write::string(vga_index, b"0", 0x0f); 
+    }
+    vga::write::number(vga_index, &mut (mo as u64));
+    vga::write::string(vga_index, b"-", 0x0f);
+
+    vga::write::number(vga_index, &mut (y as u64));
+
+    vga::write::newline(vga_index);
+}
+
+fn cmd_uptime(_args: &[u8], vga_index: &mut isize) {
+    let total_seconds = time::acpi::get_uptime_seconds();
+
+    let mut hours = total_seconds / 3600;
+    let mut minutes = (total_seconds % 3600) / 60;
+    let mut seconds = total_seconds % 60;
+
+    // Print formatted
+    vga::write::string(vga_index, b"Uptime: ", 0x0f);
+    vga::write::number(vga_index, &mut hours);
+    vga::write::string(vga_index, b":", 0x0f);
+
+    if minutes < 10 {
+        vga::write::string(vga_index, b"0", 0x0f);
+    }
+
+    vga::write::number(vga_index, &mut minutes);
+    vga::write::string(vga_index, b":", 0x0f);
+
+    if seconds < 10 {
+        vga::write::string(vga_index, b"0", 0x0f);
+    }
+
+    vga::write::number(vga_index, &mut seconds);
+
+    vga::write::newline(vga_index);
 }
 
 fn cmd_version(_args: &[u8], vga_index: &mut isize) {

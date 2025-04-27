@@ -9,10 +9,12 @@ init:
 
 build:
 	@cargo build --target x86_64-r2.json --release && \
-	 cargo bootimage
+		cargo bootimage
 
 run:
-	@qemu-system-x86_64 -drive format=raw,file=target/x86_64-r2/debug/bootimage-x86_64-r2.bin
+	@qemu-system-x86_64 \
+		-serial pty \
+		-drive format=raw,file=target/x86_64-r2/debug/bootimage-x86_64-r2.bin
 
 run_iso: iso
 	@qemu-system-x86_64 -cdrom r2.iso

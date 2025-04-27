@@ -1,4 +1,5 @@
 use crate::acpi;
+use crate::net;
 use crate::sound;
 use crate::time;
 use crate::vga;
@@ -31,6 +32,11 @@ static COMMANDS: &[Command] = &[
         name: b"help",
         description: b"shows this output",
         function: cmd_help,
+    },
+    Command {
+        name: b"ping",
+        description: b"pings the host over the serial line (ICMP/SLIP)",
+        function: cmd_ping,
     },
     Command {
         name: b"shutdown",
@@ -138,6 +144,28 @@ fn cmd_help(_args: &[u8], vga_index: &mut isize) {
         vga::write::string(vga_index, cmd.description, 0x0f);
         vga::write::newline(vga_index);
     }
+}
+
+fn cmd_ping(_args: &[u8], vga_index: &mut isize) {
+    /*let mut serial = unsafe { 
+        net::serial::SerialPort::new(0x3F8) 
+    };
+    serial.init();*/
+
+    let src_ip = [192, 168, 3, 2];
+    let dst_ip = [192, 168, 3, 1];
+    let identifier = 42;
+    let sequence = 0;
+    let payload = b"ping from r2"; // optional payload
+
+    let mut packet_buf = [0u8; 1500];
+
+    vga::write::string(vga_index, b"Sending a ping packet...", 0x0f);
+    vga::write::newline(vga_index);
+
+    //let packet_len = net::ipv4::create_ping_packet(src_ip, dst_ip, identifier, sequence, payload, &mut packet_buf);
+
+    //net::ipv4::send_ipv4_packet(&mut serial, &packet_buf[..packet_len]);
 }
 
 fn cmd_shutdown(_args: &[u8], vga_index: &mut isize) {

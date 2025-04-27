@@ -1,6 +1,6 @@
-use core;
 use crate::vga;
 use crate::input::cmd;
+use crate::input::port;
 
 const INPUT_BUFFER_SIZE: usize = 128;
 
@@ -22,33 +22,6 @@ fn prompt(vga_index: &mut isize) {
 //let mut port60 = Port::new(0x60);
 
 //
-//  PORT HANDLING
-//
-
-fn port_read(port: u16) -> u8 {
-    let data: u8;
-    unsafe {
-        core::arch::asm!(
-            "in al, dx", 
-            in("dx") port, 
-            out("al") data
-        );
-    }
-    data
-}
-
-/// Writes a byte to a port (needs inline assembly)
-fn port_write(port: u16, value: u8) {
-    unsafe {
-        core::arch::asm!(
-            "out dx, al",
-            in("dx") port,
-            in("al") value,
-        );
-    }
-}
-
-//
 //  HARDWARE CURSOR HANDLING
 //
 
@@ -64,12 +37,12 @@ pub fn move_cursor(row: u16, col: u16) {
     let pos: u16 = row * 80 + col; // 80 columns wide
 
     // Set high byte
-    port_write(0x3D4, 0x0E);
-    port_write(0x3D5, (pos >> 8) as u8);
+    port::write(0x3D4, 0x0E);
+    port::write(0x3D5, (pos >> 8) as u8);
 
     // Set low byte
-    port_write(0x3D4, 0x0F);
-    port_write(0x3D5, (pos & 0xFF) as u8);
+    port::write(0x3D4, 0x0F);
+    port::write(0x3D5, (pos & 0xFF) as u8);
 }
 
 //
@@ -77,12 +50,12 @@ pub fn move_cursor(row: u16, col: u16) {
 //
 
 fn keyboard_wait_read() {
-    while port_read(0x64) & 1 == 0 {}
+    while port::read(0x64) & 1 == 0 {}
 }
 
 fn keyboard_read_scancode() -> u8 {
     keyboard_wait_read();
-    port_read(0x60)
+    port::read(0x60)
 }
 
 pub fn keyboard_loop(vga_index: &mut isize) {

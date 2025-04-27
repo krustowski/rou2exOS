@@ -9,10 +9,10 @@ pub struct Ipv4Header {
     identification: u16,
     flags_fragment_offset: u16,
     ttl: u8,
-    protocol: u8,
+    pub protocol: u8,
     header_checksum: u16,
-    source_ip: [u8; 4],
-    dest_ip: [u8; 4],
+    pub source_ip: [u8; 4],
+    pub dest_ip: [u8; 4],
 }
 
 //
@@ -29,7 +29,7 @@ pub fn create_packet(
     let header_len = 20;
     let total_len = (header_len + payload.len()) as u16;
 
-    let mut header = Ipv4Header {
+    let header = Ipv4Header {
         version_ihl: (4 << 4) | 5, // Version 4, IHL=5 (20 bytes)
         dscp_ecn: 0,
         total_length: total_len.to_be(),
@@ -121,7 +121,7 @@ pub fn send_packet(packet: &[u8]) {
 }
 
 /// Called when you receive a new serial byte
-pub fn receive_loop() {
+pub fn receive_loop(callback: fn(packet: &[u8]) -> u8) -> u8 {
     let mut temp_buf: [u8; 2048] = [0; 2048];
     let mut packet_buf: [u8; 2048] = [0; 2048];
     let mut temp_len: usize = 0;
@@ -130,22 +130,16 @@ pub fn receive_loop() {
 
     loop {
         if serial::ready() {
-            unsafe {
-                if temp_len < temp_buf.len() {
-                    temp_buf[temp_len] = serial::read();
-                    temp_len += 1;
+            if temp_len <= temp_buf.len() {
+                temp_buf[temp_len] = serial::read();
+                temp_len += 1;
 
-                    if let Some(packet_len) = slip::decode(&mut temp_buf[..temp_len], &mut packet_buf) {
-                        // Full packet decoded
-                        handle_packet(&packet_buf[..packet_len]);
-
-                        temp_len = 0; // Clear buffer for next packet
-                    }
+                if let Some(packet_len) = slip::decode(&mut temp_buf[..temp_len], &mut packet_buf) {
+                    // Full packet decoded
+                    return callback(&packet_buf[..packet_len]);
                 }
             }
         }
     }
 }
 
-fn handle_packet(_packet: &[u8]) {
-}

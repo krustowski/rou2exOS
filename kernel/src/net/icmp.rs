@@ -1,12 +1,10 @@
-use crate::net::ipv4;
-
 #[repr(C, packed)]
 pub struct IcmpHeader {
-    icmp_type: u8,
-    icmp_code: u8,
-    checksum: u16,
-    identifier: u16,
-    sequence_number: u16,
+    pub icmp_type: u8,
+    pub icmp_code: u8,
+    pub checksum: u16,
+    pub identifier: u16,
+    pub sequence_number: u16,
 }
 
 pub fn create_packet(
@@ -16,17 +14,17 @@ pub fn create_packet(
     payload: &[u8],
     out_buffer: &mut [u8],
 ) -> usize {
-    let header_len = 8; // ICMP header is always 8 bytes
+    let header_len = 8; // ICMP header is 8 bytes
 
-    let mut header = IcmpHeader {
+    let header = IcmpHeader {
         icmp_type: packet_type,
-        icmp_code: 0, // Usually 0 for Echo Request/Reply
-        checksum: 0,  // will calculate checksum later
+        icmp_code: 0, // Usually 0
+        checksum: 0,  // Fill later
         identifier,
         sequence_number,
     };
 
-    // Copy header into buffer
+    // Copy header
     unsafe {
         let header_bytes = core::slice::from_raw_parts(
             &header as *const _ as *const u8,
@@ -35,38 +33,44 @@ pub fn create_packet(
         out_buffer[..header_bytes.len()].copy_from_slice(header_bytes);
     }
 
-    // Calculate checksum
-    let checksum = get_checksum(&out_buffer[..header_len]);
-    out_buffer[2..4].copy_from_slice(&checksum.to_be_bytes());
-
-    // Copy payload (data) to buffer
+    // Copy payload
     out_buffer[header_len..header_len + payload.len()].copy_from_slice(payload);
+
+    // Calculate checksum (over full packet: header + payload)
+    let checksum = get_checksum(&out_buffer[..header_len + payload.len()]);
+
+    // Store checksum (Big Endian / Network order!)
+    out_buffer[2..4].copy_from_slice(&checksum.to_be_bytes());
 
     header_len + payload.len()
 }
 
-fn get_checksum(data: &[u8]) -> u16 {
+fn get_checksum(packet: &[u8]) -> u16 {
     let mut sum = 0u32;
-    let mut chunks = data.chunks_exact(2);
+    let mut i = 0;
 
-    // Sum the 16-bit words
-    for chunk in &mut chunks {
-        let word = u16::from_be_bytes([chunk[0], chunk[1]]) as u32;
-        sum = sum.wrapping_add(word);
+    while i + 1 < packet.len() {
+        let word = if i == 2 {
+            0u16 // Skip checksum field (2..=3)
+        } else {
+            u16::from_be_bytes([packet[i], packet[i + 1]])
+        };
+        sum = sum.wrapping_add(word as u32);
+        i += 2;
     }
 
-    // Handle the odd byte (if any)
-    if let Some(&byte) = chunks.remainder().first() {
-        let word = (byte as u16) << 8;
+    if i < packet.len() {
+        // Odd length: last byte padded with 0
+        let word = (packet[i] as u16) << 8;
         sum = sum.wrapping_add(word as u32);
     }
 
-    // Fold any overflow into the lower 16 bits
+    // Fold overflows
     while (sum >> 16) != 0 {
-        sum = (sum & 0xFFFF) + (sum >> 16);
+        sum = (sum & 0xffff) + (sum >> 16);
     }
 
-    !(sum as u16)  // Final negation for checksum
+    !(sum as u16)
 }
 
 pub fn parse_packet(packet: &[u8]) -> Option<(IcmpHeader, &[u8])> {

@@ -39,6 +39,11 @@ static COMMANDS: &[Command] = &[
         function: cmd_ping,
     },
     Command {
+        name: b"response",
+        description: b"waits for ICMP/SLIP request to come, then sends a response back",
+        function: cmd_response,
+    },
+    Command {
         name: b"shutdown",
         description: b"shuts down the system",
         function: cmd_shutdown,
@@ -165,6 +170,51 @@ fn cmd_ping(_args: &[u8], vga_index: &mut isize) {
     vga::write::newline(vga_index);
 
     net::ipv4::send_packet(&ipv4_buf[..ipv4_len]);
+}
+
+fn cmd_response(_args: &[u8], vga_index: &mut isize) {
+    fn callback(packet: &[u8]) -> u8 {
+        if let Some((ipv4_header, ipv4_payload)) = net::ipv4::parse_packet(packet) {
+            if ipv4_header.protocol != 1 {
+                return 1;
+            }
+
+            if let Some((icmp_header, icmp_payload)) = net::icmp::parse_packet(&ipv4_payload) {
+                if icmp_header.icmp_type != 8 {
+                    return 2;
+                }
+
+                let mut icmp_buf = [0u8; 64];
+                let mut ipv4_buf = [0u8; 1500];
+
+                let icmp_len = net::icmp::create_packet(0, icmp_header.identifier, icmp_header.sequence_number, icmp_payload, &mut icmp_buf);
+                let ipv4_len = net::ipv4::create_packet([192, 168, 3, 2], ipv4_header.source_ip, ipv4_header.protocol, &icmp_buf[..icmp_len], &mut ipv4_buf);
+
+                net::ipv4::send_packet(&ipv4_buf[..ipv4_len]);
+            }
+        }
+        0
+    }
+
+    vga::write::newline(vga_index);
+    vga::write::string(vga_index, b"Waiting for an ICMP echo request...", 0x0f);
+    vga::write::newline(vga_index);
+
+    loop {
+        let ret = net::ipv4::receive_loop(callback);
+
+        if ret == 0 {
+            vga::write::string(vga_index, b"Received a ping request, sending response...", 0x0f);
+            vga::write::newline(vga_index);
+            break;
+        } else if ret == 1 {
+            vga::write::string(vga_index, b"Wrong IPv4 protocol (not ICMP) received", 0xc);
+            vga::write::newline(vga_index);
+        } else {
+            vga::write::string(vga_index, b"Received a non-request ICMP packet", 0xc);
+            vga::write::newline(vga_index);
+        }
+    }
 }
 
 fn cmd_shutdown(_args: &[u8], vga_index: &mut isize) {

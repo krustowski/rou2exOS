@@ -16,6 +16,7 @@ Listen for SLIP packets and create a `sl0` interface:
 
 ```
 sudo slattach -L -p slip -s 115200 /dev/pts/3
+sudo ifconfig sl0 192.168.3.1 pointopoint 192.168.3.2 up
 ```
 
 Catch packets using `tcpdump`:

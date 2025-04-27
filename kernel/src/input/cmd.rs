@@ -1,4 +1,5 @@
 use crate::acpi;
+use crate::app;
 use crate::net;
 use crate::sound;
 use crate::time;
@@ -157,7 +158,33 @@ fn cmd_help(_args: &[u8], vga_index: &mut isize) {
 }
 
 fn cmd_http(_args: &[u8], vga_index: &mut isize) {
+    fn callback(packet: &[u8]) -> u8 {
+        if let Some((ipv4_header, ipv4_payload)) = net::ipv4::parse_packet(packet) {
+            if ipv4_header.protocol != 17 {
+                return 1;
+            }
 
+            return app::http_server::udp_handler(&ipv4_header, ipv4_payload);
+        }
+        0
+    }
+
+    vga::write::newline(vga_index);
+    vga::write::string(vga_index, b"Starting a simple HTTP/UDP handler (hit any key to interrupt)...", 0x0f);
+    vga::write::newline(vga_index);
+
+    loop {
+        let ret = net::ipv4::receive_loop(callback);
+
+        if ret == 0 {
+            vga::write::string(vga_index, b"Received a HTTP request, sending response", 0x0f);
+            vga::write::newline(vga_index);
+        } else if ret == 3 {
+            vga::write::string(vga_index, b"Keyboard interrupt", 0x0f);
+            vga::write::newline(vga_index);
+            break;
+        }
+    }
 }
 
 fn cmd_ping(_args: &[u8], vga_index: &mut isize) {

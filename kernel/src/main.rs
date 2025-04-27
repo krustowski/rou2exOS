@@ -6,6 +6,7 @@ use core::panic::PanicInfo;
 //mod multiboot2_header;
 
 mod acpi;
+mod app;
 mod init;
 mod input;
 mod net;

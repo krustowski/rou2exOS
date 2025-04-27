@@ -8,9 +8,8 @@ init:
 		cargo install bootimage
 
 build:
-	@. "${HOME}/.cargo/env" && \
-		cargo build --target x86_64-r2.json --release && \
-		cargo bootimage
+	@cargo build --target x86_64-r2.json --release && \
+	 cargo bootimage
 
 run:
 	@qemu-system-x86_64 -drive format=raw,file=target/x86_64-r2/debug/bootimage-x86_64-r2.bin

@@ -4,7 +4,7 @@ use crate::sound;
 use crate::time;
 use crate::vga;
 
-const KERNEL_VERSION: &[u8] = b"0.3.0";
+const KERNEL_VERSION: &[u8] = b"0.4.0";
 
 struct Command {
     name: &'static [u8],
@@ -32,6 +32,11 @@ static COMMANDS: &[Command] = &[
         name: b"help",
         description: b"shows this output",
         function: cmd_help,
+    },
+    Command {
+        name: b"http",
+        description: b"runs a simple HTTP/UDP handler",
+        function: cmd_http,
     },
     Command {
         name: b"ping",
@@ -151,6 +156,10 @@ fn cmd_help(_args: &[u8], vga_index: &mut isize) {
     }
 }
 
+fn cmd_http(_args: &[u8], vga_index: &mut isize) {
+
+}
+
 fn cmd_ping(_args: &[u8], vga_index: &mut isize) {
     let src_ip = [192, 168, 3, 2];
     let dst_ip = [192, 168, 3, 1];
@@ -230,7 +239,7 @@ fn cmd_shutdown(_args: &[u8], vga_index: &mut isize) {
                 core::arch::asm!("nop");
             }
         }
-        vga::write::string(vga_index, b".", 0xb);
+        vga::write::string(vga_index, b". ", 0xb);
     }
 
     acpi::shutdown::shutdown();

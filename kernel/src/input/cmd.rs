@@ -196,6 +196,8 @@ fn cmd_response(_args: &[u8], vga_index: &mut isize) {
         0
     }
 
+    let mut counter = 0;
+
     vga::write::newline(vga_index);
     vga::write::string(vga_index, b"Waiting for an ICMP echo request...", 0x0f);
     vga::write::newline(vga_index);
@@ -206,13 +208,21 @@ fn cmd_response(_args: &[u8], vga_index: &mut isize) {
         if ret == 0 {
             vga::write::string(vga_index, b"Received a ping request, sending response...", 0x0f);
             vga::write::newline(vga_index);
-            break;
+            counter += 1;
         } else if ret == 1 {
             vga::write::string(vga_index, b"Wrong IPv4 protocol (not ICMP) received", 0xc);
             vga::write::newline(vga_index);
+        } else if ret == 3 {
+            vga::write::string(vga_index, b"Keyboard interrupt", 0x0f);
+            vga::write::newline(vga_index);
+            break;
         } else {
             vga::write::string(vga_index, b"Received a non-request ICMP packet", 0xc);
             vga::write::newline(vga_index);
+        }
+
+        if counter > 4 {
+            break;
         }
     }
 }

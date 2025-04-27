@@ -1,3 +1,4 @@
+use crate::input::port;
 use crate::net::serial;
 use crate::net::slip;
 
@@ -129,17 +130,26 @@ pub fn receive_loop(callback: fn(packet: &[u8]) -> u8) -> u8 {
     serial::init();
 
     loop {
-        if serial::ready() {
-            if temp_len <= temp_buf.len() {
-                temp_buf[temp_len] = serial::read();
-                temp_len += 1;
+        // While the keyboard is idle...
+        while port::read(0x64) & 1 == 0 {
+            if serial::ready() {
+                if temp_len <= temp_buf.len() {
+                    temp_buf[temp_len] = serial::read();
+                    temp_len += 1;
 
-                if let Some(packet_len) = slip::decode(&mut temp_buf[..temp_len], &mut packet_buf) {
-                    // Full packet decoded
-                    return callback(&packet_buf[..packet_len]);
+                    if let Some(packet_len) = slip::decode(&mut temp_buf[..temp_len], &mut packet_buf) {
+                        // Full packet decoded
+                        return callback(&packet_buf[..packet_len]);
+                    }
                 }
             }
         }
+
+        // If any key is pressed, break the loop and return.
+        if port::read(0x60) & 0x80 == 0 {
+            break;
+        }
     }
+    3
 }
 

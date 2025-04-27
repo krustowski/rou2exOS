@@ -5,13 +5,14 @@ use core::panic::{PanicInfo};
 
 //mod multiboot2_header;
 
+mod acpi;
 mod init;
 mod input;
 mod sound;
 mod time;
 mod vga;
 
-#[entry]
+//#[entry]
 #[unsafe(no_mangle)]
 pub extern "C" fn _start() { 
     let vga_index: &mut isize = &mut 0;

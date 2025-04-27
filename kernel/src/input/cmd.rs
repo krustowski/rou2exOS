@@ -51,8 +51,8 @@ static COMMANDS: &[Command] = &[
         name: b"version",
         description: b"prints the kernel version",
         function: cmd_version,
-    },
-    ];
+    }
+];
 
 pub fn handle(input: &[u8], vga_index: &mut isize) {
     // Only for strings!

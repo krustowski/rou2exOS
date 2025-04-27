@@ -147,25 +147,24 @@ fn cmd_help(_args: &[u8], vga_index: &mut isize) {
 }
 
 fn cmd_ping(_args: &[u8], vga_index: &mut isize) {
-    /*let mut serial = unsafe { 
-        net::serial::SerialPort::new(0x3F8) 
-    };
-    serial.init();*/
-
     let src_ip = [192, 168, 3, 2];
     let dst_ip = [192, 168, 3, 1];
-    let identifier = 42;
-    let sequence = 0;
-    let payload = b"ping from r2"; // optional payload
+    let protocol = 1;
+    let identifier = 1342;
+    let sequence_no = 1;
+    let payload = b"ping from r2"; // optional payload*/
 
-    let mut packet_buf = [0u8; 1500];
+    let mut icmp_buf = [0u8; 256];
+    let mut ipv4_buf = [0u8; 1500];
+
+    // Create ICMP packet and encapsulate it in the IPv4 packet.
+    let icmp_len = net::icmp::create_packet(8, identifier, sequence_no, payload, &mut icmp_buf);
+    let ipv4_len = net::ipv4::create_packet(src_ip, dst_ip, protocol, &icmp_buf[..icmp_len], &mut ipv4_buf);
 
     vga::write::string(vga_index, b"Sending a ping packet...", 0x0f);
     vga::write::newline(vga_index);
 
-    //let packet_len = net::ipv4::create_ping_packet(src_ip, dst_ip, identifier, sequence, payload, &mut packet_buf);
-
-    //net::ipv4::send_ipv4_packet(&mut serial, &packet_buf[..packet_len]);
+    net::ipv4::send_packet(&ipv4_buf[..ipv4_len]);
 }
 
 fn cmd_shutdown(_args: &[u8], vga_index: &mut isize) {

@@ -8,6 +8,7 @@ use core::panic::PanicInfo;
 mod acpi;
 mod init;
 mod input;
+mod net;
 mod sound;
 mod time;
 mod vga;

@@ -19,7 +19,7 @@ pub struct Ipv4Header {
 //  CREATE/HANDLE PACKET
 //
 
-pub fn create_ipv4_packet(
+pub fn create_packet(
     source: [u8; 4],
     dest: [u8; 4],
     protocol: u8,
@@ -61,7 +61,7 @@ pub fn create_ipv4_packet(
     header_len + payload.len()
 }
 
-pub fn parse_ipv4_packet(packet: &[u8]) -> Option<(Ipv4Header, &[u8])> {
+pub fn parse_packet(packet: &[u8]) -> Option<(Ipv4Header, &[u8])> {
     if packet.len() < 20 {
         return None;
     }
@@ -112,6 +112,8 @@ pub fn send_packet(packet: &[u8]) {
     let mut encoded_buf = [0u8; 4096];
 
     if let Some(encoded_len) = slip::encode(packet, &mut encoded_buf) {
+        serial::init();
+
         for &b in &encoded_buf[..encoded_len] {
             serial::write(b);
         }
@@ -123,6 +125,8 @@ pub fn receive_loop() {
     let mut temp_buf: [u8; 2048] = [0; 2048];
     let mut packet_buf: [u8; 2048] = [0; 2048];
     let mut temp_len: usize = 0;
+
+    serial::init();
 
     loop {
         if serial::ready() {

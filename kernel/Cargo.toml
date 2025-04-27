@@ -1,10 +1,13 @@
 [package]
 name = "kernel"
+description = ""
 version = "0.3.0"
 edition = "2024"
+authors = ["krusty <krusty@vxn.dev>"]
 
 [dependencies]
 bootloader = "0.9"
+#bootloader_api = "*"
 x86_64 = "0.14"
 
 [[bin]]

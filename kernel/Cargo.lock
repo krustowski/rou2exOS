@@ -21,10 +21,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "974e79cf1b0b737839f01330fb5393095daf1124d52693696494e32523ae9ef5"
 
 [[package]]
+name = "bootloader_api"
+version = "0.11.10"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "77fadafc2a2fa690f4f14a2e2a41c65d9e810b7fe959245bdf6d3b9c6d7e4bf1"
+
+[[package]]
 name = "kernel"
-version = "0.1.1"
+version = "0.3.0"
 dependencies = [
  "bootloader",
+ "bootloader_api",
  "x86_64",
 ]
 

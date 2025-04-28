@@ -59,3 +59,40 @@ pub fn parse_packet(packet: &[u8]) -> Option<(u16, u16, &[u8])> {
     Some((source_port, dest_port, payload))
 }
 
+/// Calculate UDP checksum including IPv4 pseudo-header
+pub fn get_checksum(
+    src_ip: [u8; 4],
+    dst_ip: [u8; 4],
+    udp_packet: &[u8], // whole UDP header + data
+) -> u16 {
+    let mut sum = 0u32;
+
+    // --- Pseudo-header ---
+    sum += u16::from_be_bytes([src_ip[0], src_ip[1]]) as u32;
+    sum += u16::from_be_bytes([src_ip[2], src_ip[3]]) as u32;
+    sum += u16::from_be_bytes([dst_ip[0], dst_ip[1]]) as u32;
+    sum += u16::from_be_bytes([dst_ip[2], dst_ip[3]]) as u32;
+    sum += (0x11u8 as u32); // Protocol (UDP = 17 decimal)
+    sum += udp_packet.len() as u32; // UDP length
+
+    // --- UDP header + payload ---
+    let mut i = 0;
+    while i + 1 < udp_packet.len() {
+        let word = u16::from_be_bytes([udp_packet[i], udp_packet[i + 1]]);
+        sum = sum.wrapping_add(word as u32);
+        i += 2;
+    }
+
+    if i < udp_packet.len() {
+        let word = (udp_packet[i] as u16) << 8; // pad last byte
+        sum = sum.wrapping_add(word as u32);
+    }
+
+    // Fold carries
+    while (sum >> 16) != 0 {
+        sum = (sum & 0xFFFF) + (sum >> 16);
+    }
+
+    !(sum as u16)
+}
+

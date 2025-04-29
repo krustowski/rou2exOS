@@ -55,6 +55,11 @@ static COMMANDS: &[Command] = &[
         function: cmd_shutdown,
     },
     Command {
+        name: b"tcp",
+        description: b"tests the TCP implementation",
+        function: cmd_tcp,
+    },
+    Command {
         name: b"time",
         description: b"prints system time and date",
         function: cmd_time,
@@ -270,6 +275,92 @@ fn cmd_shutdown(_args: &[u8], vga_index: &mut isize) {
     }
 
     acpi::shutdown::shutdown();
+}
+
+fn cmd_tcp(_args: &[u8], vga_index: &mut isize) {
+    fn callback(packet: &[u8]) -> u8 {
+        if let Some((ipv4_header, ipv4_payload)) = net::ipv4::parse_packet(packet) {
+
+            if let Some((tcp_header, payload)) = net::tcp::parse_packet(ipv4_payload) {
+
+                /*let mut conn = net::tcp::TcpConnection{
+                    state: net::tcp::TcpState::Listen,
+                    src_ip: ipv4_header.source_ip,
+                    dst_ip: ipv4_header.dest_ip,
+                    src_port: tcp_header.source_port,
+                    dst_port: tcp_header.dest_port,
+                    seq_num: tcp_header.seq_num,
+                    ack_num: tcp_header.ack_num,
+                };
+                
+                app::tcp_handler::handle_tcp_packet(&mut conn, &tcp_header, &payload);*/
+
+                let flags = u16::from_be(tcp_header.data_offset_reserved_flags) & 0x01FF;
+
+                if flags & 0x002 == 0x002 {
+                    // SYN received, reply with SYN+ACK
+                    let seq = 0x12345678;
+                    let ack = u32::from_be(tcp_header.seq_num).wrapping_add(1);
+
+                    let mut out_buf = [0u8; 500];
+                    let mut ipv4_buf = [0u8; 1500];
+
+                    /*let tcp_len = net::tcp::build_response(
+                        ipv4_header.dest_ip,
+                        ipv4_header.source_ip,
+                        u16::from_be(tcp_header.source_port),
+                        u16::from_be(tcp_header.dest_port),
+                        seq,
+                        ack,
+                        0x012, // SYN + ACK
+                        1024,  // Window size
+                        &[],
+                        &mut out_buf[20..], // reserve for IP header
+                    );*/
+
+                    let tcp_len = net::tcp::create_packet(
+                        u16::from_be(tcp_header.dest_port),
+                        u16::from_be(tcp_header.source_port),
+                        0x12345678,
+                        u32::from_be(tcp_header.seq_num).wrapping_add(1),
+                        0x012,
+                        1024,
+                        payload,
+                        ipv4_header.dest_ip,
+                        ipv4_header.source_ip,
+                        &mut out_buf,
+                    );
+
+                    //let ipv4_len = net::ipv4::create_packet([192, 168, 3, 2], ipv4_header.source_ip, ipv4_header.protocol, &out_buf[20..20 + tcp_len], &mut ipv4_buf);
+                    let ipv4_len = net::ipv4::create_packet([192, 168, 3, 2], ipv4_header.source_ip, ipv4_header.protocol, &out_buf[..tcp_len], &mut ipv4_buf);
+
+                    net::ipv4::send_packet(&ipv4_buf[..ipv4_len]);
+                }
+            }
+
+
+        } else {
+            return 1;
+        }
+        0
+    }
+
+    vga::write::newline(vga_index);
+    vga::write::string(vga_index, b"Starting a simple TCP tester (hit any key to interrupt)...", 0x0f);
+    vga::write::newline(vga_index);
+
+    loop {
+        let ret = net::ipv4::receive_loop(callback);
+
+        if ret == 0 {
+            vga::write::string(vga_index, b"Received a TCP packet", 0x0f);
+            vga::write::newline(vga_index);
+        } else if ret == 3 {
+            vga::write::string(vga_index, b"Keyboard interrupt", 0x0f);
+            vga::write::newline(vga_index);
+            break;
+        }
+    }
 }
 
 fn cmd_time(_args: &[u8], vga_index: &mut isize) {

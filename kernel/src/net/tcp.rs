@@ -140,12 +140,14 @@ pub fn parse_packet(packet: &[u8]) -> Option<(TcpHeader, &[u8])> {
     Some((header, payload))
 }
 
-fn parse_flags(header: &TcpHeader) -> (bool, bool, bool, bool) {
-    let flags = header.data_offset_reserved_flags & 0x01FF;
-    let syn = flags & 0x002 != 0;
-    let ack = flags & 0x010 != 0;
+pub fn parse_flags(header: &TcpHeader) -> (bool, bool, bool, bool) {
+    //let flags = header.data_offset_reserved_flags & 0x01FF;
+    let flags = u16::from_be(header.data_offset_reserved_flags) & 0x01FF;
+
     let fin = flags & 0x001 != 0;
+    let syn = flags & 0x002 != 0;
     let rst = flags & 0x004 != 0;
+    let ack = flags & 0x010 != 0;
     (syn, ack, fin, rst)
 }
 

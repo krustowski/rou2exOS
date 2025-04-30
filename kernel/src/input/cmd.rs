@@ -247,17 +247,17 @@ fn cmd_response(_args: &[u8], vga_index: &mut isize) {
         if ret == 0 {
             vga::write::string(vga_index, b"Received a ping request, sending a response", 0x0f);
             vga::write::newline(vga_index);
-        /*} else if ret == 1 {
-            vga::write::string(vga_index, b"Wrong IPv4 protocol (not ICMP) received", 0xc);
-            vga::write::newline(vga_index);*/
-        } else if ret == 2 {
-            vga::write::string(vga_index, b"Received a non-request ICMP packet", 0xc);
-            vga::write::newline(vga_index);
-        } else if ret == 3 {
-            vga::write::string(vga_index, b"Keyboard interrupt", 0x0f);
-            vga::write::newline(vga_index);
-            break;
-        }
+            /*} else if ret == 1 {
+              vga::write::string(vga_index, b"Wrong IPv4 protocol (not ICMP) received", 0xc);
+              vga::write::newline(vga_index);*/
+    } else if ret == 2 {
+        vga::write::string(vga_index, b"Received a non-request ICMP packet", 0xc);
+        vga::write::newline(vga_index);
+    } else if ret == 3 {
+        vga::write::string(vga_index, b"Keyboard interrupt", 0x0f);
+        vga::write::newline(vga_index);
+        break;
+    }
     }
 }
 
@@ -280,50 +280,24 @@ fn cmd_shutdown(_args: &[u8], vga_index: &mut isize) {
 fn cmd_tcp(_args: &[u8], vga_index: &mut isize) {
     fn callback(packet: &[u8]) -> u8 {
         if let Some((ipv4_header, ipv4_payload)) = net::ipv4::parse_packet(packet) {
-
             if let Some((tcp_header, payload)) = net::tcp::parse_packet(ipv4_payload) {
+                let (syn, ack, fin, rst) = net::tcp::parse_flags(&tcp_header);
 
-                /*let mut conn = net::tcp::TcpConnection{
-                    state: net::tcp::TcpState::Listen,
-                    src_ip: ipv4_header.source_ip,
-                    dst_ip: ipv4_header.dest_ip,
-                    src_port: tcp_header.source_port,
-                    dst_port: tcp_header.dest_port,
-                    seq_num: tcp_header.seq_num,
-                    ack_num: tcp_header.ack_num,
-                };
-                
-                app::tcp_handler::handle_tcp_packet(&mut conn, &tcp_header, &payload);*/
+                let mut out_buf = [0u8; 500];
+                let mut ipv4_buf = [0u8; 1500];
 
-                let flags = u16::from_be(tcp_header.data_offset_reserved_flags) & 0x01FF;
+                let mut tcp_len = 0;
 
-                if flags & 0x002 == 0x002 {
+                //if flags & 0x002 == 0x002 {
+                if syn && !ack {
                     // SYN received, reply with SYN+ACK
-                    let seq = 0x12345678;
-                    let ack = u32::from_be(tcp_header.seq_num).wrapping_add(1);
-
-                    let mut out_buf = [0u8; 500];
-                    let mut ipv4_buf = [0u8; 1500];
-
-                    /*let tcp_len = net::tcp::build_response(
-                        ipv4_header.dest_ip,
-                        ipv4_header.source_ip,
-                        u16::from_be(tcp_header.source_port),
-                        u16::from_be(tcp_header.dest_port),
-                        seq,
-                        ack,
-                        0x012, // SYN + ACK
-                        1024,  // Window size
-                        &[],
-                        &mut out_buf[20..], // reserve for IP header
-                    );*/
-
-                    let tcp_len = net::tcp::create_packet(
+                    tcp_len = net::tcp::create_packet(
                         u16::from_be(tcp_header.dest_port),
                         u16::from_be(tcp_header.source_port),
-                        0x12345678,
+                        1,
                         u32::from_be(tcp_header.seq_num).wrapping_add(1),
-                        0x012,
+                        //0x012,
+                        net::tcp::SYN | net::tcp::ACK,
                         1024,
                         payload,
                         ipv4_header.dest_ip,
@@ -331,109 +305,162 @@ fn cmd_tcp(_args: &[u8], vga_index: &mut isize) {
                         &mut out_buf,
                     );
 
-                    //let ipv4_len = net::ipv4::create_packet([192, 168, 3, 2], ipv4_header.source_ip, ipv4_header.protocol, &out_buf[20..20 + tcp_len], &mut ipv4_buf);
                     let ipv4_len = net::ipv4::create_packet([192, 168, 3, 2], ipv4_header.source_ip, ipv4_header.protocol, &out_buf[..tcp_len], &mut ipv4_buf);
-
                     net::ipv4::send_packet(&ipv4_buf[..ipv4_len]);
+
+                    return 0;
+
+                } else if ack {
+                    // Ready to receive/send data
+                    // state = net::tcp::TcpState::Established;
+                    tcp_len = net::tcp::create_packet(
+                        u16::from_be(tcp_header.dest_port),
+                        u16::from_be(tcp_header.source_port),
+                        2,
+                        u32::from_be(tcp_header.seq_num),
+                        net::tcp::ACK,
+                        1024,
+                        b"ALE VITAJ PICA",
+                        ipv4_header.dest_ip,
+                        ipv4_header.source_ip,
+                        &mut out_buf,
+                    );
+
+                    let ipv4_len = net::ipv4::create_packet([192, 168, 3, 2], ipv4_header.source_ip, ipv4_header.protocol, &out_buf[..tcp_len], &mut ipv4_buf);
+                    net::ipv4::send_packet(&ipv4_buf[..ipv4_len]);
+
+                    let pl = b"ALE VITAJ SA";
+
+                    tcp_len = net::tcp::create_packet(
+                        u16::from_be(tcp_header.dest_port),
+                        u16::from_be(tcp_header.source_port),
+                        (1 + pl.len()) as u32,
+                        2,
+                        //u32::from_be(tcp_header.seq_num).wrapping_add(1),
+                        //u32::from_be(tcp_header.seq_num),
+                        net::tcp::ACK | net::tcp::PSH,
+                        1024,
+                        pl,
+                        ipv4_header.dest_ip,
+                        ipv4_header.source_ip,
+                        &mut out_buf,
+                    );
+
+                    let ipv4_len = net::ipv4::create_packet([192, 168, 3, 2], ipv4_header.source_ip, ipv4_header.protocol, &out_buf[..tcp_len], &mut ipv4_buf);
+                    net::ipv4::send_packet(&ipv4_buf[..ipv4_len]);
+
+                    return 1;
+
                 }
             }
-
-
-        } else {
-            return 1;
         }
-        0
+        2
     }
 
-    vga::write::newline(vga_index);
-    vga::write::string(vga_index, b"Starting a simple TCP tester (hit any key to interrupt)...", 0x0f);
-    vga::write::newline(vga_index);
+            let mut conn: net::tcp::TcpConnection;
 
-    loop {
-        let ret = net::ipv4::receive_loop(callback);
-
-        if ret == 0 {
-            vga::write::string(vga_index, b"Received a TCP packet", 0x0f);
             vga::write::newline(vga_index);
-        } else if ret == 3 {
-            vga::write::string(vga_index, b"Keyboard interrupt", 0x0f);
+            vga::write::string(vga_index, b"Starting a simple TCP tester (hit any key to interrupt)...", 0x0f);
             vga::write::newline(vga_index);
-            break;
-        }
-    }
-}
 
-fn cmd_time(_args: &[u8], vga_index: &mut isize) {
-    let (y, mo, d, h, m, s) = time::rtc::read_rtc_full();
+            loop {
+                let ret = net::ipv4::receive_loop(callback);
 
-    vga::write::string(vga_index, b"RTC Time: ", 0x0f);
-    vga::write::number(vga_index, &mut (h as u64));
+                if ret == 0 {
+                    vga::write::string(vga_index, b"Received SYN", 0x0f);
+                    vga::write::newline(vga_index);
 
-    vga::write::string(vga_index, b":", 0x0f);
+                    /*conn = net::tcp::TcpConnection{
+                        state: net::tcp::TcpState::SynReceived,
+                        src_ip: [192, 168, 3, 1],
+                        dst_ip: [192, 168, 3, 2],
+                        //pub src_port: u16,
+                        //pub dst_port: u16,
+                        //pub seq_num: u32,
+                        //pub ack_num: u32,
+                    };*/
+                } else if ret == 1 {
+                    vga::write::string(vga_index, b"Received ACK", 0x0f);
+                    vga::write::newline(vga_index);
+                } else if ret == 3 {
+                    vga::write::string(vga_index, b"Keyboard interrupt", 0x0f);
+                    vga::write::newline(vga_index);
+                    break;
+                }
+            }
+            }
 
-    if m < 10 { 
-        vga::write::string(vga_index, b"0", 0x0f); 
-    }
-    vga::write::number(vga_index, &mut (m as u64));
+            fn cmd_time(_args: &[u8], vga_index: &mut isize) {
+                let (y, mo, d, h, m, s) = time::rtc::read_rtc_full();
 
-    vga::write::string(vga_index, b":", 0x0f);
+                vga::write::string(vga_index, b"RTC Time: ", 0x0f);
+                vga::write::number(vga_index, &mut (h as u64));
 
-    if s < 10 { 
-        vga::write::string(vga_index, b"0", 0x0f); 
-    }
-    vga::write::number(vga_index, &mut (s as u64));
+                vga::write::string(vga_index, b":", 0x0f);
 
-    vga::write::newline(vga_index);
+                if m < 10 { 
+                    vga::write::string(vga_index, b"0", 0x0f); 
+                }
+                vga::write::number(vga_index, &mut (m as u64));
 
-    vga::write::string(vga_index, b"RTC Date: ", 0x0f);
+                vga::write::string(vga_index, b":", 0x0f);
 
-    if d < 10 {
-        vga::write::string(vga_index, b"0", 0x0f); 
-    }
-    vga::write::number(vga_index, &mut (d as u64));
-    vga::write::string(vga_index, b"-", 0x0f);
+                if s < 10 { 
+                    vga::write::string(vga_index, b"0", 0x0f); 
+                }
+                vga::write::number(vga_index, &mut (s as u64));
 
-    if mo < 10 {
-        vga::write::string(vga_index, b"0", 0x0f); 
-    }
-    vga::write::number(vga_index, &mut (mo as u64));
-    vga::write::string(vga_index, b"-", 0x0f);
+                vga::write::newline(vga_index);
 
-    vga::write::number(vga_index, &mut (y as u64));
+                vga::write::string(vga_index, b"RTC Date: ", 0x0f);
 
-    vga::write::newline(vga_index);
-}
+                if d < 10 {
+                    vga::write::string(vga_index, b"0", 0x0f); 
+                }
+                vga::write::number(vga_index, &mut (d as u64));
+                vga::write::string(vga_index, b"-", 0x0f);
 
-fn cmd_uptime(_args: &[u8], vga_index: &mut isize) {
-    let total_seconds = time::acpi::get_uptime_seconds();
+                if mo < 10 {
+                    vga::write::string(vga_index, b"0", 0x0f); 
+                }
+                vga::write::number(vga_index, &mut (mo as u64));
+                vga::write::string(vga_index, b"-", 0x0f);
 
-    let mut hours = total_seconds / 3600;
-    let mut minutes = (total_seconds % 3600) / 60;
-    let mut seconds = total_seconds % 60;
+                vga::write::number(vga_index, &mut (y as u64));
 
-    // Print formatted
-    vga::write::string(vga_index, b"Uptime: ", 0x0f);
-    vga::write::number(vga_index, &mut hours);
-    vga::write::string(vga_index, b":", 0x0f);
+                vga::write::newline(vga_index);
+            }
 
-    if minutes < 10 {
-        vga::write::string(vga_index, b"0", 0x0f);
-    }
+            fn cmd_uptime(_args: &[u8], vga_index: &mut isize) {
+                let total_seconds = time::acpi::get_uptime_seconds();
 
-    vga::write::number(vga_index, &mut minutes);
-    vga::write::string(vga_index, b":", 0x0f);
+                let mut hours = total_seconds / 3600;
+                let mut minutes = (total_seconds % 3600) / 60;
+                let mut seconds = total_seconds % 60;
 
-    if seconds < 10 {
-        vga::write::string(vga_index, b"0", 0x0f);
-    }
+                // Print formatted
+                vga::write::string(vga_index, b"Uptime: ", 0x0f);
+                vga::write::number(vga_index, &mut hours);
+                vga::write::string(vga_index, b":", 0x0f);
 
-    vga::write::number(vga_index, &mut seconds);
+                if minutes < 10 {
+                    vga::write::string(vga_index, b"0", 0x0f);
+                }
 
-    vga::write::newline(vga_index);
-}
+                vga::write::number(vga_index, &mut minutes);
+                vga::write::string(vga_index, b":", 0x0f);
 
-fn cmd_version(_args: &[u8], vga_index: &mut isize) {
-    vga::write::string(vga_index, b"Version: ", 0x0f);
-    vga::write::string(vga_index, KERNEL_VERSION, 0x0f);
-    vga::write::newline(vga_index);
-}
+                if seconds < 10 {
+                    vga::write::string(vga_index, b"0", 0x0f);
+                }
+
+                vga::write::number(vga_index, &mut seconds);
+
+                vga::write::newline(vga_index);
+            }
+
+            fn cmd_version(_args: &[u8], vga_index: &mut isize) {
+                vga::write::string(vga_index, b"Version: ", 0x0f);
+                vga::write::string(vga_index, KERNEL_VERSION, 0x0f);
+                vga::write::newline(vga_index);
+            }

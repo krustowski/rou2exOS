@@ -278,7 +278,7 @@ fn cmd_shutdown(_args: &[u8], vga_index: &mut isize) {
 }
 
 fn cmd_tcp(_args: &[u8], vga_index: &mut isize) {
-    fn callback(packet: &[u8]) -> u8 {
+    fn callback(conn: &mut net::tcp::TcpConnection, packet: &[u8]) -> u8 {
         if let Some((ipv4_header, ipv4_payload)) = net::ipv4::parse_packet(packet) {
             if let Some((tcp_header, payload)) = net::tcp::parse_packet(ipv4_payload) {
                 let (syn, ack, fin, rst) = net::tcp::parse_flags(&tcp_header);
@@ -291,12 +291,15 @@ fn cmd_tcp(_args: &[u8], vga_index: &mut isize) {
                 //if flags & 0x002 == 0x002 {
                 if syn && !ack {
                     // SYN received, reply with SYN+ACK
+                    conn.state = net::tcp::TcpState::SynReceived;
+                    conn.seq_num = 1;
+                    conn.ack_num = u32::from_be(tcp_header.seq_num).wrapping_add(1);
+
                     tcp_len = net::tcp::create_packet(
                         u16::from_be(tcp_header.dest_port),
                         u16::from_be(tcp_header.source_port),
-                        1,
-                        u32::from_be(tcp_header.seq_num).wrapping_add(1),
-                        //0x012,
+                        conn.seq_num,
+                        conn.ack_num,
                         net::tcp::SYN | net::tcp::ACK,
                         1024,
                         payload,
@@ -310,9 +313,12 @@ fn cmd_tcp(_args: &[u8], vga_index: &mut isize) {
 
                     return 0;
 
-                } else if ack {
+                } else if ack && conn.state == net::tcp::TcpState::SynReceived {
                     // Ready to receive/send data
-                    // state = net::tcp::TcpState::Established;
+                    conn.state = net::tcp::TcpState::Established;
+                    conn.seq_num += 1;
+                    conn.ack_num = u32::from_be(tcp_header.seq_num);
+
                     tcp_len = net::tcp::create_packet(
                         u16::from_be(tcp_header.dest_port),
                         u16::from_be(tcp_header.source_port),
@@ -357,28 +363,27 @@ fn cmd_tcp(_args: &[u8], vga_index: &mut isize) {
         2
     }
 
-            let mut conn: net::tcp::TcpConnection;
+    let mut conn = net::tcp::TcpConnection{
+        state: net::tcp::TcpState::Listen,
+        src_ip: [192, 168, 3, 1],
+        dst_ip: [192, 168, 3, 2],
+        src_port: 0,
+        dst_port: 0,
+        seq_num: 0,
+        ack_num: 0,
+    };
 
             vga::write::newline(vga_index);
             vga::write::string(vga_index, b"Starting a simple TCP tester (hit any key to interrupt)...", 0x0f);
             vga::write::newline(vga_index);
 
             loop {
-                let ret = net::ipv4::receive_loop(callback);
+                let ret = net::ipv4::receive_loop_tcp(&mut conn, callback);
 
                 if ret == 0 {
                     vga::write::string(vga_index, b"Received SYN", 0x0f);
                     vga::write::newline(vga_index);
 
-                    /*conn = net::tcp::TcpConnection{
-                        state: net::tcp::TcpState::SynReceived,
-                        src_ip: [192, 168, 3, 1],
-                        dst_ip: [192, 168, 3, 2],
-                        //pub src_port: u16,
-                        //pub dst_port: u16,
-                        //pub seq_num: u32,
-                        //pub ack_num: u32,
-                    };*/
                 } else if ret == 1 {
                     vga::write::string(vga_index, b"Received ACK", 0x0f);
                     vga::write::newline(vga_index);

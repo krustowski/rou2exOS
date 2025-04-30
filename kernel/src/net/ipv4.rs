@@ -1,6 +1,7 @@
 use crate::input::port;
 use crate::net::serial;
 use crate::net::slip;
+use crate::net::tcp;
 
 #[repr(C, packed)]
 pub struct Ipv4Header {
@@ -140,6 +141,38 @@ pub fn receive_loop(callback: fn(packet: &[u8]) -> u8) -> u8 {
                     if let Some(packet_len) = slip::decode(&mut temp_buf[..temp_len], &mut packet_buf) {
                         // Full packet decoded
                         return callback(&packet_buf[..packet_len]);
+                    }
+                }
+            }
+        }
+
+        // If any key is pressed, break the loop and return.
+        if port::read(0x60) & 0x80 == 0 {
+            break;
+        }
+    }
+    3
+}
+
+/// Called when you receive a new serial byte
+pub fn receive_loop_tcp(conn: &mut tcp::TcpConnection, callback: fn(conn: &mut tcp::TcpConnection, packet: &[u8]) -> u8) -> u8 {
+    let mut temp_buf: [u8; 2048] = [0; 2048];
+    let mut packet_buf: [u8; 2048] = [0; 2048];
+    let mut temp_len: usize = 0;
+
+    serial::init();
+
+    loop {
+        // While the keyboard is idle...
+        while port::read(0x64) & 1 == 0 {
+            if serial::ready() {
+                if temp_len <= temp_buf.len() {
+                    temp_buf[temp_len] = serial::read();
+                    temp_len += 1;
+
+                    if let Some(packet_len) = slip::decode(&mut temp_buf[..temp_len], &mut packet_buf) {
+                        // Full packet decoded
+                        return callback(conn, &packet_buf[..packet_len]);
                     }
                 }
             }

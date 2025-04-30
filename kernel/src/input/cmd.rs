@@ -335,7 +335,7 @@ fn cmd_tcp(_args: &[u8], vga_index: &mut isize) {
                     let ipv4_len = net::ipv4::create_packet([192, 168, 3, 2], ipv4_header.source_ip, ipv4_header.protocol, &out_buf[..tcp_len], &mut ipv4_buf);
                     net::ipv4::send_packet(&ipv4_buf[..ipv4_len]);
 
-                    let pl = b"ALE VITAJ SA";
+                    let pl = b"Hello from rou2rexOS!";
 
                     tcp_len = net::tcp::create_packet(
                         u16::from_be(tcp_header.dest_port),
@@ -373,99 +373,99 @@ fn cmd_tcp(_args: &[u8], vga_index: &mut isize) {
         ack_num: 0,
     };
 
+    vga::write::newline(vga_index);
+    vga::write::string(vga_index, b"Starting a simple TCP tester (hit any key to interrupt)...", 0x0f);
+    vga::write::newline(vga_index);
+
+    loop {
+        let ret = net::ipv4::receive_loop_tcp(&mut conn, callback);
+
+        if ret == 0 {
+            vga::write::string(vga_index, b"Received SYN", 0x0f);
             vga::write::newline(vga_index);
-            vga::write::string(vga_index, b"Starting a simple TCP tester (hit any key to interrupt)...", 0x0f);
+
+        } else if ret == 1 {
+            vga::write::string(vga_index, b"Received ACK", 0x0f);
             vga::write::newline(vga_index);
+        } else if ret == 3 {
+            vga::write::string(vga_index, b"Keyboard interrupt", 0x0f);
+            vga::write::newline(vga_index);
+            break;
+        }
+    }
+}
 
-            loop {
-                let ret = net::ipv4::receive_loop_tcp(&mut conn, callback);
+fn cmd_time(_args: &[u8], vga_index: &mut isize) {
+    let (y, mo, d, h, m, s) = time::rtc::read_rtc_full();
 
-                if ret == 0 {
-                    vga::write::string(vga_index, b"Received SYN", 0x0f);
-                    vga::write::newline(vga_index);
+    vga::write::string(vga_index, b"RTC Time: ", 0x0f);
+    vga::write::number(vga_index, &mut (h as u64));
 
-                } else if ret == 1 {
-                    vga::write::string(vga_index, b"Received ACK", 0x0f);
-                    vga::write::newline(vga_index);
-                } else if ret == 3 {
-                    vga::write::string(vga_index, b"Keyboard interrupt", 0x0f);
-                    vga::write::newline(vga_index);
-                    break;
-                }
-            }
-            }
+    vga::write::string(vga_index, b":", 0x0f);
 
-            fn cmd_time(_args: &[u8], vga_index: &mut isize) {
-                let (y, mo, d, h, m, s) = time::rtc::read_rtc_full();
+    if m < 10 { 
+        vga::write::string(vga_index, b"0", 0x0f); 
+    }
+    vga::write::number(vga_index, &mut (m as u64));
 
-                vga::write::string(vga_index, b"RTC Time: ", 0x0f);
-                vga::write::number(vga_index, &mut (h as u64));
+    vga::write::string(vga_index, b":", 0x0f);
 
-                vga::write::string(vga_index, b":", 0x0f);
+    if s < 10 { 
+        vga::write::string(vga_index, b"0", 0x0f); 
+    }
+    vga::write::number(vga_index, &mut (s as u64));
 
-                if m < 10 { 
-                    vga::write::string(vga_index, b"0", 0x0f); 
-                }
-                vga::write::number(vga_index, &mut (m as u64));
+    vga::write::newline(vga_index);
 
-                vga::write::string(vga_index, b":", 0x0f);
+    vga::write::string(vga_index, b"RTC Date: ", 0x0f);
 
-                if s < 10 { 
-                    vga::write::string(vga_index, b"0", 0x0f); 
-                }
-                vga::write::number(vga_index, &mut (s as u64));
+    if d < 10 {
+        vga::write::string(vga_index, b"0", 0x0f); 
+    }
+    vga::write::number(vga_index, &mut (d as u64));
+    vga::write::string(vga_index, b"-", 0x0f);
 
-                vga::write::newline(vga_index);
+    if mo < 10 {
+        vga::write::string(vga_index, b"0", 0x0f); 
+    }
+    vga::write::number(vga_index, &mut (mo as u64));
+    vga::write::string(vga_index, b"-", 0x0f);
 
-                vga::write::string(vga_index, b"RTC Date: ", 0x0f);
+    vga::write::number(vga_index, &mut (y as u64));
 
-                if d < 10 {
-                    vga::write::string(vga_index, b"0", 0x0f); 
-                }
-                vga::write::number(vga_index, &mut (d as u64));
-                vga::write::string(vga_index, b"-", 0x0f);
+    vga::write::newline(vga_index);
+}
 
-                if mo < 10 {
-                    vga::write::string(vga_index, b"0", 0x0f); 
-                }
-                vga::write::number(vga_index, &mut (mo as u64));
-                vga::write::string(vga_index, b"-", 0x0f);
+fn cmd_uptime(_args: &[u8], vga_index: &mut isize) {
+    let total_seconds = time::acpi::get_uptime_seconds();
 
-                vga::write::number(vga_index, &mut (y as u64));
+    let mut hours = total_seconds / 3600;
+    let mut minutes = (total_seconds % 3600) / 60;
+    let mut seconds = total_seconds % 60;
 
-                vga::write::newline(vga_index);
-            }
+    // Print formatted
+    vga::write::string(vga_index, b"Uptime: ", 0x0f);
+    vga::write::number(vga_index, &mut hours);
+    vga::write::string(vga_index, b":", 0x0f);
 
-            fn cmd_uptime(_args: &[u8], vga_index: &mut isize) {
-                let total_seconds = time::acpi::get_uptime_seconds();
+    if minutes < 10 {
+        vga::write::string(vga_index, b"0", 0x0f);
+    }
 
-                let mut hours = total_seconds / 3600;
-                let mut minutes = (total_seconds % 3600) / 60;
-                let mut seconds = total_seconds % 60;
+    vga::write::number(vga_index, &mut minutes);
+    vga::write::string(vga_index, b":", 0x0f);
 
-                // Print formatted
-                vga::write::string(vga_index, b"Uptime: ", 0x0f);
-                vga::write::number(vga_index, &mut hours);
-                vga::write::string(vga_index, b":", 0x0f);
+    if seconds < 10 {
+        vga::write::string(vga_index, b"0", 0x0f);
+    }
 
-                if minutes < 10 {
-                    vga::write::string(vga_index, b"0", 0x0f);
-                }
+    vga::write::number(vga_index, &mut seconds);
 
-                vga::write::number(vga_index, &mut minutes);
-                vga::write::string(vga_index, b":", 0x0f);
+    vga::write::newline(vga_index);
+}
 
-                if seconds < 10 {
-                    vga::write::string(vga_index, b"0", 0x0f);
-                }
-
-                vga::write::number(vga_index, &mut seconds);
-
-                vga::write::newline(vga_index);
-            }
-
-            fn cmd_version(_args: &[u8], vga_index: &mut isize) {
-                vga::write::string(vga_index, b"Version: ", 0x0f);
-                vga::write::string(vga_index, KERNEL_VERSION, 0x0f);
-                vga::write::newline(vga_index);
-            }
+fn cmd_version(_args: &[u8], vga_index: &mut isize) {
+    vga::write::string(vga_index, b"Version: ", 0x0f);
+    vga::write::string(vga_index, KERNEL_VERSION, 0x0f);
+    vga::write::newline(vga_index);
+}

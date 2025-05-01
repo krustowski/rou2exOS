@@ -136,13 +136,50 @@ fn handle_tcp_packet(conn: &mut tcp::TcpConnection, tcp_header: &tcp::TcpHeader,
         conn.ack_num = u32::from_be(tcp_header.seq_num);
         conn.seq_num += 1;
 
-        send_response(conn, tcp::ACK, b"Connection established\r\n");
+        //send_response(conn, tcp::ACK, b"Connection established\r\n");
+        send_response(conn, tcp::ACK, &[]);
         return 1;
 
     } else if conn.state == tcp::TcpState::Established {
         if payload.len() > 0 {
             conn.ack_num = u32::from_be(tcp_header.seq_num).wrapping_add(payload.len() as u32);
 
+            // Try to parse a minimal GET request
+            if payload.starts_with(b"GET / ") {
+                let body = b"<html><body><h1>Hello from RoureXOS</h1></body></html>";
+                let body_len = body.len();
+
+                let mut http_response = [0u8; 512];
+
+                // Build the HTTP header manually
+                let header = b"HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nContent-Length: ";
+                let header_len = header.len();
+                http_response[..header_len].copy_from_slice(header);
+
+                // Manually convert body_len to ASCII (e.g., "48")
+                let len_start = header_len;
+                let len_end = len_start + u32_to_ascii(body_len as u32, &mut http_response[len_start..]);
+
+                // Add \r\n\r\n
+                http_response[len_end] = b'\r';
+                http_response[len_end + 1] = b'\n';
+                http_response[len_end + 2] = b'\r';
+                http_response[len_end + 3] = b'\n';
+                let headers_end = len_end + 4;
+
+                // Copy the body after headers
+                http_response[headers_end..headers_end + body_len].copy_from_slice(body);
+
+                // Send full response
+                send_response(conn, tcp::ACK | tcp::PSH | tcp::FIN, &http_response[..headers_end + body_len]);
+
+                conn.seq_num += (headers_end + body_len) as u32;
+                //conn.state = tcp::TcpState::Close;
+                conn.state = tcp::TcpState::CloseWait;
+                return 2;
+            }
+
+            // Fallback: Echo
             let mut reply = [0u8; 128];
             let msg = b"Echo: ";
             reply[..msg.len()].copy_from_slice(msg);
@@ -197,3 +234,21 @@ fn send_response(conn: &mut tcp::TcpConnection, flags: u16, payload: &[u8]) {
     ipv4::send_packet(&ipv4_buf[..ipv4_len]);
 }
 
+fn u32_to_ascii(mut num: u32, buf: &mut [u8]) -> usize {
+    let mut digits = [0u8; 10];
+    let mut i = 0;
+    if num == 0 {
+        buf[0] = b'0';
+        return 1;
+    }
+    while num > 0 {
+        digits[i] = b'0' + (num % 10) as u8;
+        num /= 10;
+        i += 1;
+    }
+    // Reverse digits into buf
+    for j in 0..i {
+        buf[j] = digits[i - j - 1];
+    }
+    i
+}

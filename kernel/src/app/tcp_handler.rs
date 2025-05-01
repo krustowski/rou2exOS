@@ -2,10 +2,8 @@ use crate::net::ipv4;
 use crate::net::tcp;
 use crate::vga;
 
-const MAX_CONNS: usize = 4;
-
 pub fn handle(vga_index: &mut isize) {
-    fn callback(conns: &mut [Option<tcp::TcpConnection>; MAX_CONNS], packet: &[u8]) -> u8 {
+    fn callback(conns: &mut [Option<tcp::TcpConnection>; ipv4::MAX_CONNS], packet: &[u8]) -> u8 {
         if let Some((ipv4_header, ipv4_payload)) = ipv4::parse_packet(packet) {
             if let Some((tcp_header, payload)) = tcp::parse_packet(ipv4_payload) {
                 let (syn, ack, _fin, _rst) = tcp::parse_flags(&tcp_header);
@@ -17,14 +15,20 @@ pub fn handle(vga_index: &mut isize) {
 
                 for conn in conns.iter_mut() {
                     if let Some(c) = conn {
-                        if c.state == tcp::TcpState::Closed || c.state == tcp::TcpState::CloseWait || c.state == tcp::TcpState::FinWait1 || c.state == tcp::TcpState::FinWait2 || c.state == tcp::TcpState::Closing || c.state == tcp::TcpState::TimeWait || c.state == tcp::TcpState::LastAck {
+                        if c.state == tcp::TcpState::Closed || 
+                            c.state == tcp::TcpState::CloseWait || 
+                                c.state == tcp::TcpState::FinWait1 || 
+                                c.state == tcp::TcpState::FinWait2 || 
+                                c.state == tcp::TcpState::Closing || 
+                                c.state == tcp::TcpState::TimeWait || 
+                                c.state == tcp::TcpState::LastAck {
                             *conn = None;
+                            return 253;
                         }
                     }
                 }
 
                 // Find a conn
-
                 let maybe_existing = conns.iter_mut().find(|entry| {
                     if let Some(conn) = entry {
                         conn.src_ip == src_ip &&
@@ -67,7 +71,8 @@ pub fn handle(vga_index: &mut isize) {
         2
     }
 
-    let mut conns: [Option<tcp::TcpConnection>; MAX_CONNS] = [None, None, None, None];
+    //let mut conns: [Option<tcp::TcpConnection>; ipv4::MAX_CONNS] = [None, None, None, None];
+    let mut conns: [Option<tcp::TcpConnection>; ipv4::MAX_CONNS] = Default::default();
 
     vga::write::newline(vga_index);
     vga::write::string(vga_index, b"Starting a simple TCP tester (hit any key to interrupt)...", 0x0f);
@@ -93,6 +98,12 @@ pub fn handle(vga_index: &mut isize) {
             break;
         } else if ret == 253 {
             vga::write::string(vga_index, b"Freed socket", 0x0f);
+            vga::write::newline(vga_index);
+        } else if ret == 254 {
+            vga::write::string(vga_index, b"Unknown conn", 0x0f);
+            vga::write::newline(vga_index);
+        } else if ret == 255 {
+            vga::write::string(vga_index, b"No free slots", 0x0f);
             vga::write::newline(vga_index);
         }
     }
@@ -208,49 +219,89 @@ fn u32_to_ascii(mut num: u32, buf: &mut [u8]) -> usize {
     i
 }
 
-fn http_router(payload: &[u8], http_response: &mut [u8]) -> usize {
-        let body: &str;
-        let mut content_type: &str = "";
+/*fn write_u32(buf: &mut [u8], mut idx: usize, mut num: u32) -> usize {
+    //let start = idx;
+    let mut rev = [0u8; 10]; // max digits in u32
+    let mut i = 0;
 
-        if payload.starts_with(b"GET / ") || payload.starts_with(b"GET / HTTP/1.1") {
-            body = "<html><body><h1>Welcome to RoureXOS</h1></body></html>";
-            content_type = "text/html";
+    if num == 0 {
+        buf[idx] = b'0';
+        return idx + 1;
+    }
 
-        } else if payload.starts_with(b"GET /hello") {
-            body = "Hello World from RoureXOS!";
-            content_type = "text/plain";
+    while num > 0 {
+        rev[i] = b'0' + (num % 10) as u8;
+        num /= 10;
+        i += 1;
+    }
 
-        } else if payload.starts_with(b"GET /json") {
-            body = "{\"message\":\"Hello JSON\"}";
-            content_type = "application/json";
+    while i > 0 {
+        i -= 1;
+        buf[idx] = rev[i];
+        idx += 1;
+    }
 
-        } else {
-            body = "404 Not Found";
+    idx
+}*/
+
+fn match_path(payload: &[u8], path: &[u8]) -> bool {
+    if payload.starts_with(b"GET ") {
+        let slice = &payload[4..];
+        let mut i = 0;
+        while i < slice.len() && slice[i] != b' ' {
+            i += 1;
         }
+        &slice[..i] == path
+    } else {
+        false
+    }
+}
 
-        let body_len = body.len();
-        let header = b"HTTP/1.1 200 OK\r\nContent-Type: ";
-        let mut pos = 0;
+fn http_router(payload: &[u8], http_response: &mut [u8]) -> usize {
+    let body: &str;
+    let mut content_type: &str = "text/plain";
 
-        http_response[..header.len()].copy_from_slice(header);
-        pos += header.len();
+    if match_path(payload, b"/") || payload.starts_with(b"GET / HTTP/1.1") {
+        body = "<html><body><h1>Welcome to rou2exOS HTTP server</h1></body></html>";
+        content_type = "text/html";
 
-        http_response[pos..pos + content_type.len()].copy_from_slice(content_type.as_bytes());
-        pos += content_type.len();
+    } else if match_path(payload, b"/hello") {
+        body = "Hello World from rou2exOS!";
+        content_type = "text/plain";
 
-        http_response[pos..pos + 2].copy_from_slice(b"\r\n");
-        pos += 2;
+    } else if match_path(payload, b"/json") {
+        body = "{\"message\":\"Hello JSON\"}";
+        content_type = "application/json";
 
-        http_response[pos..pos + 16].copy_from_slice(b"Content-Length: ");
-        pos += 16;
+    } else {
+        body = "404 Not Found";
+    }
 
-        pos += u32_to_ascii(body_len as u32, &mut http_response[pos..]);
+    let body_len = body.len();
+    let header = b"HTTP/1.1 200 OK\r\nContent-Type: ";
+    let mut pos = 0;
 
-        http_response[pos..pos + 4].copy_from_slice(b"\r\n\r\n");
-        pos += 4;
+    http_response[..header.len()].copy_from_slice(header);
+    pos += header.len();
 
-        http_response[pos..pos + body_len].copy_from_slice(body.as_bytes());
-        pos += body_len;
+    http_response[pos..pos + content_type.len()].copy_from_slice(content_type.as_bytes());
+    pos += content_type.len();
 
-        pos
+    http_response[pos..pos + 2].copy_from_slice(b"\r\n");
+    pos += 2;
+
+    http_response[pos..pos + 16].copy_from_slice(b"Content-Length: ");
+    pos += 16;
+
+    pos += u32_to_ascii(body_len as u32, &mut http_response[pos..]);
+
+    http_response[pos..pos + 4].copy_from_slice(b"\r\n\r\n");
+    pos += 4;
+
+    http_response[pos..pos + body_len].copy_from_slice(body.as_bytes());
+    pos += body_len;
+    //http_response[pos..pos + body_pos].copy_from_slice(&body_slice);
+    //pos += body_pos;
+
+    pos
 }

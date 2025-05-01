@@ -3,6 +3,8 @@ use crate::net::serial;
 use crate::net::slip;
 use crate::net::tcp;
 
+pub const MAX_CONNS: usize = 10;
+
 #[repr(C, packed)]
 pub struct Ipv4Header {
     version_ihl: u8,
@@ -155,7 +157,7 @@ pub fn receive_loop(callback: fn(packet: &[u8]) -> u8) -> u8 {
 }
 
 /// Called when you receive a new serial byte
-pub fn receive_loop_tcp(conns: &mut [Option<tcp::TcpConnection>; 4], callback: fn(conn: &mut [Option<tcp::TcpConnection>; 4], packet: &[u8]) -> u8) -> u8 {
+pub fn receive_loop_tcp(conns: &mut [Option<tcp::TcpConnection>; MAX_CONNS], callback: fn(conns: &mut [Option<tcp::TcpConnection>; MAX_CONNS], packet: &[u8]) -> u8) -> u8 {
     let mut temp_buf: [u8; 2048] = [0; 2048];
     let mut packet_buf: [u8; 2048] = [0; 2048];
     let mut temp_len: usize = 0;

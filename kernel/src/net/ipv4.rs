@@ -52,15 +52,26 @@ pub fn create_packet(
             &header as *const _ as *const u8,
             core::mem::size_of::<Ipv4Header>(),
         );
-        out_buffer[..header_bytes.len()].copy_from_slice(header_bytes);
+
+        if let Some(slice) = out_buffer.get_mut(..header_bytes.len()) {
+            slice.copy_from_slice(header_bytes);
+        }
     }
 
     // Calculate checksum
-    let checksum = ipv4_checksum(&out_buffer[..header_len]);
-    out_buffer[10..12].copy_from_slice(&checksum.to_be_bytes());
+
+    let out_slice = out_buffer.get(..header_len).unwrap_or(&[]);
+    let checksum = ipv4_checksum(out_slice);
+
+    if let Some(slice) = out_buffer.get_mut(10..12) {
+        slice.copy_from_slice(&checksum.to_be_bytes());
+    }
 
     // Copy payload
-    out_buffer[header_len..header_len + payload.len()].copy_from_slice(payload);
+    
+    if let Some(slice) = out_buffer.get_mut(header_len..header_len + payload.len()) {
+        slice.copy_from_slice(payload);
+    }
 
     header_len + payload.len()
 }
@@ -80,9 +91,9 @@ pub fn parse_packet(packet: &[u8]) -> Option<(Ipv4Header, &[u8])> {
         return None;
     }
 
-    let payload = &packet[header_len as usize..];
+    let payload_slice = packet.get(header_len as usize..).unwrap_or(&[]);
 
-    Some((header, payload))
+    Some((header, payload_slice))
 }
 
 
@@ -92,8 +103,11 @@ fn ipv4_checksum(data: &[u8]) -> u16 {
     let mut chunks = data.chunks_exact(2);
 
     for chunk in &mut chunks {
-        let word = u16::from_be_bytes([chunk[0], chunk[1]]) as u32;
-        sum = sum.wrapping_add(word);
+        if let Some(w1) = chunk.first() {
+            if let Some(w2) = chunk.get(1) {
+                sum = sum.wrapping_add( u16::from_be_bytes([*w1, *w2]) as u32 );
+            }
+        }
     }
     if let Some(&byte) = chunks.remainder().first() {
         let word = (byte as u16) << 8;
@@ -118,7 +132,8 @@ pub fn send_packet(packet: &[u8]) {
     if let Some(encoded_len) = slip::encode(packet, &mut encoded_buf) {
         serial::init();
 
-        for &b in &encoded_buf[..encoded_len] {
+        let encoded_slice = encoded_buf.get(..encoded_len).unwrap_or(&[]);
+        for &b in encoded_slice {
             serial::write(b);
         }
     }
@@ -134,16 +149,20 @@ pub fn receive_loop(callback: fn(packet: &[u8]) -> u8) -> u8 {
 
     loop {
         // While the keyboard is idle...
-        while port::read(0x64) & 1 == 0 {
-            if serial::ready() {
-                if temp_len <= temp_buf.len() {
-                    temp_buf[temp_len] = serial::read();
-                    temp_len += 1;
+        while port::read(0x64) & 1 == 0 && serial::ready() {
+            if temp_len <= temp_buf.len() {
 
-                    if let Some(packet_len) = slip::decode(&mut temp_buf[..temp_len], &mut packet_buf) {
-                        // Full packet decoded
-                        return callback(&packet_buf[..packet_len]);
-                    }
+                if let Some(p) = temp_buf.get_mut(temp_len) {
+                    *p = serial::read();
+                }
+                temp_len += 1;
+
+                let temp_slice = temp_buf.get(..temp_len).unwrap_or(&[]);
+
+                if let Some(packet_len) = slip::decode(temp_slice, &mut packet_buf) {
+                    // Full packet decoded
+                    let packet_slice = packet_buf.get(..packet_len).unwrap_or(&[]);
+                    return callback(packet_slice);
                 }
             }
         }
@@ -166,16 +185,20 @@ pub fn receive_loop_tcp(conns: &mut [Option<tcp::TcpConnection>; MAX_CONNS], cal
 
     loop {
         // While the keyboard is idle...
-        while port::read(0x64) & 1 == 0 {
-            if serial::ready() {
-                if temp_len <= temp_buf.len() {
-                    temp_buf[temp_len] = serial::read();
-                    temp_len += 1;
+        while port::read(0x64) & 1 == 0 && serial::ready() {
+            if temp_len <= temp_buf.len() {
 
-                    if let Some(packet_len) = slip::decode(&mut temp_buf[..temp_len], &mut packet_buf) {
-                        // Full packet decoded
-                        return callback(conns, &packet_buf[..packet_len]);
-                    }
+                if let Some(p) = temp_buf.get_mut(temp_len) {
+                    *p = serial::read();
+                }
+                temp_len += 1;
+
+                let temp_slice = temp_buf.get(..temp_len).unwrap_or(&[]);
+
+                if let Some(packet_len) = slip::decode(temp_slice, &mut packet_buf) {
+                    // Full packet decoded
+                    let packet_slice = packet_buf.get(..packet_len).unwrap_or(&[]);
+                    return callback(conns, packet_slice);
                 }
             }
         }

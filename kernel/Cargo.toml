@@ -6,12 +6,19 @@ edition = "2024"
 authors = ["krusty <krusty@vxn.dev>"]
 
 [dependencies]
-bootloader = "0.9"
+#bootloader = "0.9"
 #bootloader_api = "*"
-x86_64 = "0.14"
+x86_64 = { version = "0.14", default-features = false }
+
+[profile.dev]
+panic = "abort"
+
+[profile.release]
+lto = false
+panic = "abort"
 
 [[bin]]
-name = "x86_64-r2"
+name = "kernel"
 path = "src/main.rs"
 test = false
 doctest = false

@@ -1,1 +1,3 @@
 /target
+/iso/boot/kernel.*
+/kernel.*

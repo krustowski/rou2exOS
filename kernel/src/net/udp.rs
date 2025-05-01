@@ -29,11 +29,15 @@ pub fn create_packet(
             &header as *const _ as *const u8,
             core::mem::size_of::<UdpHeader>(),
         );
-        out_buffer[..header_bytes.len()].copy_from_slice(header_bytes);
+        if let Some(slice) = out_buffer.get_mut(..header_bytes.len()) {
+            slice.copy_from_slice(header_bytes);
+        }
     }
 
     // Copy payload
-    out_buffer[8..8 + payload.len()].copy_from_slice(payload);
+    if let Some(slice) = out_buffer.get_mut(8..8 + payload.len()) {
+        slice.copy_from_slice(payload);
+    }
 
     // Calculate checksum (optional in UDP, but some OSes expect it!)
     // For now: leave checksum 0.
@@ -46,17 +50,41 @@ pub fn parse_packet(packet: &[u8]) -> Option<(u16, u16, &[u8])> {
         return None;
     }
 
-    let source_port = u16::from_be_bytes([packet[0], packet[1]]);
-    let dest_port = u16::from_be_bytes([packet[2], packet[3]]);
-    let length = u16::from_be_bytes([packet[4], packet[5]]);
-    let _checksum = u16::from_be_bytes([packet[6], packet[7]]);
+    let (mut source_port, mut dest_port, mut length): (u16, u16, u16) = (0, 0, 0);
+
+    if let Some(w1) = packet.first() {
+        if let Some(w2) = packet.get(1) {
+            source_port = u16::from_be_bytes([*w1, *w2]);
+        }
+    }
+    if let Some(w1) = packet.get(2) {
+        if let Some(w2) = packet.get(3) {
+            dest_port = u16::from_be_bytes([*w1, *w2]);
+        }
+    }
+    if let Some(w1) = packet.get(4) {
+        if let Some(w2) = packet.get(5) {
+            length = u16::from_be_bytes([*w1, *w2]);
+        }
+    }
+    /*if let Some(w1) = packet.get(6) {
+        if let Some(w2) = packet.get(7) {
+            _checksum = u16::from_be_bytes([*w1, *w2]);
+        }
+    }*/
+
+    //let source_port = u16::from_be_bytes([packet[0], packet[1]]);
+    //let dest_port = u16::from_be_bytes([packet[2], packet[3]]);
+    //let length = u16::from_be_bytes([packet[4], packet[5]]);
+    //let _checksum = u16::from_be_bytes([packet[6], packet[7]]);
 
     if packet.len() < length as usize {
         return None;
     }
 
-    let payload = &packet[8..length as usize];
-    Some((source_port, dest_port, payload))
+    let payload_slice = packet.get(8..length as usize).unwrap_or(&[]);
+    //let payload = &packet[8..length as usize];
+    Some((source_port, dest_port, payload_slice))
 }
 
 /// Calculate UDP checksum including IPv4 pseudo-header
@@ -68,24 +96,47 @@ pub fn get_checksum(
     let mut sum = 0u32;
 
     // --- Pseudo-header ---
-    sum += u16::from_be_bytes([src_ip[0], src_ip[1]]) as u32;
-    sum += u16::from_be_bytes([src_ip[2], src_ip[3]]) as u32;
-    sum += u16::from_be_bytes([dst_ip[0], dst_ip[1]]) as u32;
-    sum += u16::from_be_bytes([dst_ip[2], dst_ip[3]]) as u32;
+    
+    if let Some(w1) = src_ip.first() {
+        if let Some(w2) = src_ip.get(1) {
+            sum += u16::from_be_bytes([*w1, *w2]) as u32;
+        }
+    }
+    if let Some(w1) = src_ip.get(2) {
+        if let Some(w2) = src_ip.get(3) {
+            sum += u16::from_be_bytes([*w1, *w2]) as u32;
+        }
+    }
+
+    if let Some(w1) = dst_ip.first() {
+        if let Some(w2) = dst_ip.get(1) {
+            sum += u16::from_be_bytes([*w1, *w2]) as u32;
+        }
+    }
+    if let Some(w1) = dst_ip.get(2) {
+        if let Some(w2) = dst_ip.get(3) {
+            sum += u16::from_be_bytes([*w1, *w2]) as u32;
+        }
+    }
+
     sum += 0x11u8 as u32; // Protocol (UDP = 17 decimal)
     sum += udp_packet.len() as u32; // UDP length
 
     // --- UDP header + payload ---
     let mut i = 0;
     while i + 1 < udp_packet.len() {
-        let word = u16::from_be_bytes([udp_packet[i], udp_packet[i + 1]]);
-        sum = sum.wrapping_add(word as u32);
+        if let Some(w1) = udp_packet.get(i) {
+            if let Some(w2) = udp_packet.get(i+1) {
+                sum = sum.wrapping_add( u16::from_be_bytes([*w1, *w2]) as u32 );
+            }
+        }
         i += 2;
     }
 
     if i < udp_packet.len() {
-        let word = (udp_packet[i] as u16) << 8; // pad last byte
-        sum = sum.wrapping_add(word as u32);
+        if let Some(w) = udp_packet.get(i) {
+            sum = sum.wrapping_add(((*w as u16) << 8) as u32);
+        }
     }
 
     // Fold carries

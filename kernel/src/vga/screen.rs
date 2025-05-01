@@ -6,8 +6,11 @@ pub fn clear(vga_index: &mut isize) {
         for row in 0..buffer::HEIGHT {
             for col in 0..buffer::WIDTH {
                 let idx = (row * buffer::WIDTH + col) * 2;
-                *buffer::VGA_BUFFER.offset(idx as isize) = b' '; // Character byte
-                *buffer::VGA_BUFFER.offset(idx as isize + 1) = 0x07; // Attribute byte
+                let mut offset: isize = idx as isize;
+
+                *buffer::VGA_BUFFER.offset(offset) = b' '; // Character byte
+                offset += 1;
+                *buffer::VGA_BUFFER.offset(offset) = 0x07; // Attribute byte
             }
         }
 
@@ -21,18 +24,24 @@ pub fn scroll(vga_index: &mut isize) {
     }
 
     unsafe {
+        let mut offset: isize = buffer::WIDTH as isize * 2;
+
         // Copy 24 rows * 80 cols * 2 bytes = 3840 bytes
         ptr::copy(
-            buffer::VGA_BUFFER.offset((buffer::WIDTH * 2) as isize), // from row 1
+            buffer::VGA_BUFFER.offset(offset), // from row 1
             buffer::VGA_BUFFER,
-            (buffer::WIDTH * (buffer::HEIGHT - 1) * 2) as usize, // size: 24 rows
+            buffer::WIDTH * (buffer::HEIGHT - 1) * 2, // size: 24 rows
         );
 
+        offset = buffer::WIDTH as isize * (buffer::WIDTH as isize - 1) * 2;
+
         // Clear last line (row 24)
-        let last_line = buffer::VGA_BUFFER.offset((buffer::WIDTH * (buffer::HEIGHT - 1) * 2) as isize);
+        let last_line = buffer::VGA_BUFFER.offset(offset);
         for i in 0..buffer::WIDTH {
-            *last_line.offset((i * 2) as isize) = b' ';
-            *last_line.offset((i * 2 + 1) as isize) = 0x07; // Light gray on black
+            let mut offset: isize = i as isize * 2;
+            *last_line.offset(offset) = b' ';
+            offset += 1;
+            *last_line.offset(offset) = 0x07; // Light gray on black
         }
     }
 

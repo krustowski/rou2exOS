@@ -22,8 +22,8 @@ pub fn handle(vga_index: &mut isize) {
                                 c.state == tcp::TcpState::Closing || 
                                 c.state == tcp::TcpState::TimeWait || 
                                 c.state == tcp::TcpState::LastAck {
-                            *conn = None;
-                            return 253;
+                                    *conn = None;
+                                    return 253;
                         }
                     }
                 }
@@ -41,29 +41,36 @@ pub fn handle(vga_index: &mut isize) {
                 });
 
                 let conn = if let Some(slot) = maybe_existing {
-                    slot.as_mut().unwrap()
+                    match slot.as_mut() {
+                        Some(c) => c,
+                        None => return 253, // Unexpected: maybe_existing was Some, but inner value was None
+                    }
                 } else if syn && !ack {
                     // New connection
-                    if let Some(empty_slot) = conns.iter_mut().find(|c| c.is_none()) {
-                        *empty_slot = Some(tcp::TcpConnection {
-                            state: tcp::TcpState::Listen,
-                            src_ip: src_ip,
-                            dst_ip: dst_ip,
-                            src_port: dst_port,
-                            dst_port: src_port,
-                            seq_num: 0,
-                            ack_num: 0,
-                            //peer_seq_num: 0,
-                        });
-                        empty_slot.as_mut().unwrap()
-                    } else {
-                        // No free slot — drop the packet
-                        return 255;
+                    match conns.iter_mut().find(|c| c.is_none()) {
+                        Some(empty_slot) => {
+                            *empty_slot = Some(tcp::TcpConnection {
+                                state: tcp::TcpState::Listen,
+                                src_ip,
+                                dst_ip,
+                                src_port: dst_port,
+                                dst_port: src_port,
+                                seq_num: 0,
+                                ack_num: 0,
+                            });
+
+                            match empty_slot.as_mut() {
+                                Some(c) => c,
+                                None => return 252, // This shouldn't happen, just inserted Some
+                            }
+                        }
+                        None => return 255, // No free slot — drop the packet
                     }
                 } else {
                     // Packet for unknown connection — drop
                     return 254;
                 };
+
 
                 return handle_tcp_packet(conn, &tcp_header, payload);
             }
@@ -110,7 +117,7 @@ pub fn handle(vga_index: &mut isize) {
 }
 
 fn handle_tcp_packet(conn: &mut tcp::TcpConnection, tcp_header: &tcp::TcpHeader, payload: &[u8]) -> u8 {
-    let (syn, ack, fin, _rst) = tcp::parse_flags(&tcp_header);
+    let (syn, ack, fin, _rst) = tcp::parse_flags(tcp_header);
 
     if syn && !ack {
         conn.src_port = u16::from_be(tcp_header.dest_port);
@@ -136,15 +143,16 @@ fn handle_tcp_packet(conn: &mut tcp::TcpConnection, tcp_header: &tcp::TcpHeader,
         return 1;
 
     } else if conn.state == tcp::TcpState::Established {
-        if payload.len() > 0 {
+        if payload.is_empty() {
             conn.ack_num = u32::from_be(tcp_header.seq_num).wrapping_add(payload.len() as u32);
 
             // Try to parse a minimal GET request
             if payload.starts_with(b"GET /") {
                 let mut http_response = [0u8; 1024];
-                let http_len = http_router(&payload, &mut http_response);
+                let http_len = http_router(payload, &mut http_response);
 
-                send_response(conn, tcp::ACK | tcp::PSH | tcp::FIN, &http_response[..http_len]);
+                let http_slice = http_response.get(..http_len).unwrap_or(&[]);
+                send_response(conn, tcp::ACK | tcp::PSH | tcp::FIN, http_slice);
                 conn.seq_num += http_len as u32;
 
                 conn.state = tcp::TcpState::CloseWait;
@@ -154,11 +162,20 @@ fn handle_tcp_packet(conn: &mut tcp::TcpConnection, tcp_header: &tcp::TcpHeader,
             // Fallback: Echo
             let mut reply = [0u8; 128];
             let msg = b"Echo: ";
-            reply[..msg.len()].copy_from_slice(msg);
-            let len = core::cmp::min(payload.len(), reply.len() - msg.len());
-            reply[msg.len()..msg.len() + len].copy_from_slice(&payload[..len]);
 
-            send_response(conn, tcp::ACK | tcp::PSH, &reply[..msg.len() + len]);
+            if let Some(slice) = reply.get_mut(..msg.len()) {
+                slice.copy_from_slice(msg);
+            }
+
+            let len = core::cmp::min(payload.len(), reply.len() - msg.len());
+
+            if let Some(slice) = reply.get_mut(msg.len()..msg.len() + len) {
+                let payload_slice = payload.get(..len).unwrap_or(&[]);
+                slice.copy_from_slice(payload_slice);
+            }
+
+            let reply_slice = reply.get(..msg.len() + len).unwrap_or(&[]);
+            send_response(conn, tcp::ACK | tcp::PSH, reply_slice);
 
             conn.seq_num += (msg.len() + len) as u32;
         } else {
@@ -176,7 +193,7 @@ fn handle_tcp_packet(conn: &mut tcp::TcpConnection, tcp_header: &tcp::TcpHeader,
         }
     }
 
-    return 1
+    1
 }
 
 fn send_response(conn: &mut tcp::TcpConnection, flags: u16, payload: &[u8]) {
@@ -196,62 +213,79 @@ fn send_response(conn: &mut tcp::TcpConnection, flags: u16, payload: &[u8]) {
         &mut out_buf
     );
 
-    let ipv4_len = ipv4::create_packet(conn.dst_ip, conn.src_ip, 6, &out_buf[..tcp_len], &mut ipv4_buf);
-    ipv4::send_packet(&ipv4_buf[..ipv4_len]);
+    let tcp_slice = out_buf.get(..tcp_len).unwrap_or(&[]);
+    let ipv4_len = ipv4::create_packet(conn.dst_ip, conn.src_ip, 6, tcp_slice, &mut ipv4_buf);
+
+    let ipv4_slice = ipv4_buf.get(..ipv4_len).unwrap_or(&[]);
+    ipv4::send_packet(ipv4_slice);
 }
 
 fn u32_to_ascii(mut num: u32, buf: &mut [u8]) -> usize {
     let mut digits = [0u8; 10];
     let mut i = 0;
     if num == 0 {
-        buf[0] = b'0';
+        if let Some(c) = buf.get_mut(0) {
+            *c = b'0';
+        }
         return 1;
     }
     while num > 0 {
-        digits[i] = b'0' + (num % 10) as u8;
+        if let Some(d) = digits.get_mut(i) {
+            *d = b'0' + (num % 10) as u8;
+        }
         num /= 10;
         i += 1;
     }
     // Reverse digits into buf
     for j in 0..i {
-        buf[j] = digits[i - j - 1];
+        if let Some(c) = buf.get_mut(j) {
+            if let Some(d) = digits.get(i - j - 1) {
+                *c = *d;
+            }
+        }
     }
     i
 }
 
 /*fn write_u32(buf: &mut [u8], mut idx: usize, mut num: u32) -> usize {
-    //let start = idx;
-    let mut rev = [0u8; 10]; // max digits in u32
-    let mut i = 0;
+//let start = idx;
+let mut rev = [0u8; 10]; // max digits in u32
+let mut i = 0;
 
-    if num == 0 {
-        buf[idx] = b'0';
-        return idx + 1;
-    }
+if num == 0 {
+buf[idx] = b'0';
+return idx + 1;
+}
 
-    while num > 0 {
-        rev[i] = b'0' + (num % 10) as u8;
-        num /= 10;
-        i += 1;
-    }
+while num > 0 {
+rev[i] = b'0' + (num % 10) as u8;
+num /= 10;
+i += 1;
+}
 
-    while i > 0 {
-        i -= 1;
-        buf[idx] = rev[i];
-        idx += 1;
-    }
+while i > 0 {
+i -= 1;
+buf[idx] = rev[i];
+idx += 1;
+}
 
-    idx
+idx
 }*/
 
 fn match_path(payload: &[u8], path: &[u8]) -> bool {
     if payload.starts_with(b"GET ") {
-        let slice = &payload[4..];
+        let slice = payload.get(4..).unwrap_or(&[]);
+
         let mut i = 0;
-        while i < slice.len() && slice[i] != b' ' {
-            i += 1;
+
+        if let Some(w) = slice.get(i) {
+            while i < slice.len() && *w != b' ' {
+                i += 1;
+            }
         }
-        &slice[..i] == path
+
+        let sl = slice.get(..i).unwrap_or(&[]);
+        sl == path
     } else {
         false
     }
@@ -281,24 +315,37 @@ fn http_router(payload: &[u8], http_response: &mut [u8]) -> usize {
     let header = b"HTTP/1.1 200 OK\r\nContent-Type: ";
     let mut pos = 0;
 
-    http_response[..header.len()].copy_from_slice(header);
+    if let Some(slice) = http_response.get_mut(..header.len()) {
+        slice.copy_from_slice(header);
+    }
     pos += header.len();
 
-    http_response[pos..pos + content_type.len()].copy_from_slice(content_type.as_bytes());
+    if let Some(slice) = http_response.get_mut(pos..pos + content_type.len()) {
+        slice.copy_from_slice(content_type.as_bytes());
+    }
     pos += content_type.len();
 
-    http_response[pos..pos + 2].copy_from_slice(b"\r\n");
+    if let Some(slice) = http_response.get_mut(pos..pos + 2) {
+        slice.copy_from_slice(b"\r\n");
+    }
     pos += 2;
 
-    http_response[pos..pos + 16].copy_from_slice(b"Content-Length: ");
+    if let Some(slice) = http_response.get_mut(pos..pos + 16) {
+        slice.copy_from_slice(b"Content-Length: ");
+    }
     pos += 16;
 
-    pos += u32_to_ascii(body_len as u32, &mut http_response[pos..]);
+    let response_slice = http_response.get_mut(pos..).unwrap_or(&mut []);
+    pos += u32_to_ascii(body_len as u32, response_slice);
 
-    http_response[pos..pos + 4].copy_from_slice(b"\r\n\r\n");
+    if let Some(slice) = http_response.get_mut(pos..pos + 4) {
+        slice.copy_from_slice(b"\r\n\r\n");
+    }
     pos += 4;
 
-    http_response[pos..pos + body_len].copy_from_slice(body.as_bytes());
+    if let Some(slice) = http_response.get_mut(pos..pos + body_len) {
+        slice.copy_from_slice(body.as_bytes());
+    }
     pos += body_len;
     //http_response[pos..pos + body_pos].copy_from_slice(&body_slice);
     //pos += body_pos;

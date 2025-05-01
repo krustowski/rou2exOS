@@ -13,11 +13,14 @@ pub fn number(vga_index: &mut isize, num: &mut u64) {
 
     while *num > 0 {
         i -= 1;
-        buf[i] = b'0' + (*num % 10) as u8;
+        if let Some(b) = buf.get_mut(i) {
+            *b = b'0' + (*num % 10) as u8;
+        }
         *num /= 10;
     }
 
-    string(vga_index, &buf[i..] as &[u8], 0x0f);
+    let buf_slice = buf.get(i..).unwrap_or(&[]);
+    string(vga_index, buf_slice as &[u8], 0x0f);
 }
 
 /// Write a whole string to screen

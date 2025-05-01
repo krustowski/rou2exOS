@@ -42,6 +42,7 @@ pub struct TcpConnection {
     //pub peer_seq_num: u32,
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn create_packet(
     src_port: u16,
     dst_port: u16,
@@ -55,6 +56,7 @@ pub fn create_packet(
     out: &mut [u8],
 ) -> usize {
     let data_offset = 5u16 << 12; // 5 * 4 = 20 bytes, no options
+                                  //
     let tcp_header = TcpHeader {
         source_port: src_port.to_be(),
         dest_port: dst_port.to_be(),
@@ -73,12 +75,25 @@ pub fn create_packet(
         )
     };
 
-    out[..header_bytes.len()].copy_from_slice(header_bytes);
-    out[20..20 + payload.len()].copy_from_slice(payload);
+    if let Some(slice) = out.get_mut(..header_bytes.len()) {
+        slice.copy_from_slice(header_bytes);
+    }
+    if let Some(slice) = out.get_mut(20..20 + payload.len()) {
+        slice.copy_from_slice(payload);
+    }
 
-    let checksum = get_checksum(src_ip, dst_ip, &out[..20 + payload.len()]);
-    out[16] = (checksum >> 8) as u8;
-    out[17] = (checksum & 0xff) as u8;
+    let mut checksum: u16 = 0;
+
+    if let Some(out_slice) = out.get_mut(..20 + payload.len()) {
+        checksum = get_checksum(src_ip, dst_ip, out_slice);
+    }
+
+    if let Some(w) = out.get_mut(16) {
+        *w = (checksum >> 8) as u8;
+    }
+    if let Some(w) = out.get_mut(17) {
+        *w = (checksum & 0xff) as u8;
+    }
 
     20 + payload.len()
 }
@@ -98,8 +113,9 @@ pub fn parse_packet(packet: &[u8]) -> Option<(TcpHeader, &[u8])> {
         return None;
     }
 
-    let payload = &packet[data_offset as usize..];
-    Some((header, payload))
+    //let payload = &packet[data_offset as usize..];
+    let payload_slice = packet.get(data_offset as usize..).unwrap_or(&[]);
+    Some((header, payload_slice))
 }
 
 pub fn parse_flags(header: &TcpHeader) -> (bool, bool, bool, bool) {
@@ -121,10 +137,28 @@ pub fn get_checksum(
     let mut sum: u32 = 0;
 
     // Pseudo-header: Source IP (4), Dest IP (4), zero (1), protocol (1), TCP length (2)
-    sum += u16::from_be_bytes([src_ip[0], src_ip[1]]) as u32;
-    sum += u16::from_be_bytes([src_ip[2], src_ip[3]]) as u32;
-    sum += u16::from_be_bytes([dst_ip[0], dst_ip[1]]) as u32;
-    sum += u16::from_be_bytes([dst_ip[2], dst_ip[3]]) as u32;
+
+    if let Some(w1) = src_ip.first() {
+        if let Some(w2) = src_ip.get(1) {
+            sum += u16::from_be_bytes([*w1, *w2]) as u32;
+        }
+    }
+    if let Some(w1) = src_ip.get(2) {
+        if let Some(w2) = src_ip.get(3) {
+            sum += u16::from_be_bytes([*w1, *w2]) as u32;
+        }
+    }
+
+    if let Some(w1) = dst_ip.first() {
+        if let Some(w2) = dst_ip.get(1) {
+            sum += u16::from_be_bytes([*w1, *w2]) as u32;
+        }
+    }
+    if let Some(w1) = dst_ip.get(2) {
+        if let Some(w2) = dst_ip.get(3) {
+            sum += u16::from_be_bytes([*w1, *w2]) as u32;
+        }
+    }
 
     sum += 0x0006u16 as u32; // Protocol: TCP = 6
     sum += tcp_packet.len() as u32;
@@ -138,15 +172,21 @@ pub fn get_checksum(
             continue;
         }
 
-        let word = u16::from_be_bytes([tcp_packet[i], tcp_packet[i + 1]]);
-        sum = sum.wrapping_add(word as u32);
+        if let Some(w1) = tcp_packet.get(i) {
+            if let Some(w2) = tcp_packet.get(i+1) {
+                sum = sum.wrapping_add(u16::from_be_bytes([*w1, *w2]) as u32);
+            }
+        }
         i += 2;
     }
 
     if i < tcp_packet.len() {
         // Odd byte at the end
-        let word = (tcp_packet[i] as u16) << 8;
-        sum = sum.wrapping_add(word as u32);
+        if let Some(w) = tcp_packet.get(i) {
+            sum = sum.wrapping_add(((*w as u16) << 8) as u32);
+        }
+        //let word = (tcp_packet[i] as u16) << 8;
+        //sum = sum.wrapping_add(word as u32);
     }
 
     // Fold 32-bit sum to 16 bits

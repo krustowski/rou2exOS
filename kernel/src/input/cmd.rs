@@ -89,7 +89,7 @@ pub fn handle(input: &[u8], vga_index: &mut isize) {
             (cmd.function)(cmd_args, vga_index);
         }
         None => {
-            if input.len() == 0 {
+            if input.is_empty() {
                 return;
             }
 
@@ -105,6 +105,7 @@ pub fn handle(input: &[u8], vga_index: &mut isize) {
 //  HELPER FUNCTIONS
 //
 
+#[allow(clippy::manual_find)]
 fn find_cmd(name: &[u8]) -> Option<&'static Command> {
     for cmd in COMMANDS {
         if cmd.name == name {
@@ -119,7 +120,8 @@ fn split_cmd(input: &[u8]) -> (&[u8], &[u8]) {
     if let Some(pos) = input.iter().position(|&c| c == b' ') {
         let (cmd, args) = input.split_at(pos);
         // skip the space character for args
-        (cmd, &args[1..])
+        let args_slice = args.get(1..).unwrap_or(&[]);
+        (cmd, args_slice)
     } else {
         // No space found, entire input is the command
         (input, &[])
@@ -205,12 +207,15 @@ fn cmd_ping(_args: &[u8], vga_index: &mut isize) {
 
     // Create ICMP packet and encapsulate it in the IPv4 packet.
     let icmp_len = net::icmp::create_packet(8, identifier, sequence_no, payload, &mut icmp_buf);
-    let ipv4_len = net::ipv4::create_packet(src_ip, dst_ip, protocol, &icmp_buf[..icmp_len], &mut ipv4_buf);
+    let icmp_slice = icmp_buf.get(..icmp_len).unwrap_or(&[]);
+
+    let ipv4_len = net::ipv4::create_packet(src_ip, dst_ip, protocol, icmp_slice, &mut ipv4_buf);
+    let ipv4_slice = ipv4_buf.get(..ipv4_len).unwrap_or(&[]);
 
     vga::write::string(vga_index, b"Sending a ping packet...", 0x0f);
     vga::write::newline(vga_index);
 
-    net::ipv4::send_packet(&ipv4_buf[..ipv4_len]);
+    net::ipv4::send_packet(ipv4_slice);
 }
 
 fn cmd_response(_args: &[u8], vga_index: &mut isize) {
@@ -220,7 +225,7 @@ fn cmd_response(_args: &[u8], vga_index: &mut isize) {
                 return 1;
             }
 
-            if let Some((icmp_header, icmp_payload)) = net::icmp::parse_packet(&ipv4_payload) {
+            if let Some((icmp_header, icmp_payload)) = net::icmp::parse_packet(ipv4_payload) {
                 if icmp_header.icmp_type != 8 {
                     return 2;
                 }
@@ -229,9 +234,12 @@ fn cmd_response(_args: &[u8], vga_index: &mut isize) {
                 let mut ipv4_buf = [0u8; 1500];
 
                 let icmp_len = net::icmp::create_packet(0, icmp_header.identifier, icmp_header.sequence_number, icmp_payload, &mut icmp_buf);
-                let ipv4_len = net::ipv4::create_packet([192, 168, 3, 2], ipv4_header.source_ip, ipv4_header.protocol, &icmp_buf[..icmp_len], &mut ipv4_buf);
+                let icmp_slice = icmp_buf.get(..icmp_len).unwrap_or(&[]);
 
-                net::ipv4::send_packet(&ipv4_buf[..ipv4_len]);
+                let ipv4_len = net::ipv4::create_packet([192, 168, 3, 2], ipv4_header.source_ip, ipv4_header.protocol, icmp_slice, &mut ipv4_buf);
+                let ipv4_slice = ipv4_buf.get(..ipv4_len).unwrap_or(&[]);
+
+                net::ipv4::send_packet(ipv4_slice);
             }
         }
         0

@@ -112,7 +112,8 @@ pub fn keyboard_loop(vga_index: &mut isize) {
                 // ENTER key pressed
                 vga::write::newline(vga_index);
 
-                cmd::handle(&input_buffer[..input_len], vga_index);
+                let input_slice = input_buffer.get(..input_len).unwrap_or(&[]);
+                cmd::handle(input_slice, vga_index);
 
                 // Clear input buffer
                 input_len = 0;
@@ -140,7 +141,10 @@ pub fn keyboard_loop(vga_index: &mut isize) {
 
         // If we have room, add to buffer
         if input_len < INPUT_BUFFER_SIZE {
-            input_buffer[input_len] = c;
+            if let Some(w) = input_buffer.get_mut(input_len) {
+                *w = c
+            }
+
             input_len += 1;
 
             // Draw it on screen

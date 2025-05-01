@@ -12,7 +12,11 @@ pub fn encode(input: &[u8], output: &mut [u8]) -> Option<usize> {
     if out_pos >= output.len() {
         return None;
     }
-    output[out_pos] = SLIP_END;
+
+    if let Some(p) = output.get_mut(out_pos) {
+        *p = SLIP_END;
+    }
+
     out_pos += 1;
 
     for &b in input {
@@ -21,23 +25,39 @@ pub fn encode(input: &[u8], output: &mut [u8]) -> Option<usize> {
                 if out_pos + 2 > output.len() {
                     return None;
                 }
-                output[out_pos] = SLIP_ESC;
-                output[out_pos + 1] = SLIP_ESC_END;
+
+                if let Some(p) = output.get_mut(out_pos) {
+                    *p = SLIP_ESC;
+                }
+                if let Some(p) = output.get_mut(out_pos + 1) {
+                    *p = SLIP_ESC_END;
+                }
+
                 out_pos += 2;
             }
             SLIP_ESC => {
                 if out_pos + 2 > output.len() {
                     return None;
                 }
-                output[out_pos] = SLIP_ESC;
-                output[out_pos + 1] = SLIP_ESC_ESC;
+
+                if let Some(p) = output.get_mut(out_pos) {
+                    *p = SLIP_ESC;
+                }
+                if let Some(p) = output.get_mut(out_pos + 1) {
+                    *p = SLIP_ESC_ESC;
+                }
+
                 out_pos += 2;
             }
             _ => {
                 if out_pos >= output.len() {
                     return None;
                 }
-                output[out_pos] = b;
+
+                if let Some(p) = output.get_mut(out_pos) {
+                    *p = b
+                }
+
                 out_pos += 1;
             }
         }
@@ -47,7 +67,11 @@ pub fn encode(input: &[u8], output: &mut [u8]) -> Option<usize> {
     if out_pos >= output.len() {
         return None;
     }
-    output[out_pos] = SLIP_END;
+
+    if let Some(p) = output.get_mut(out_pos) {
+        *p = SLIP_END;
+    }
+
     out_pos += 1;
 
     Some(out_pos)

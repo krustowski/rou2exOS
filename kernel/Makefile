@@ -7,20 +7,23 @@ init:
 		rustup component add rust-src llvm-tools-preview && \
 		cargo install bootimage
 
+#@cargo rustc --release --target x86_64-r2.json -- -C relocation-model=static --emit=obj
 build:
-	@cargo build --target x86_64-r2.json --release && \
-		cargo bootimage
+	@cargo rustc --release -Z build-std=core,compiler_builtins --target x86_64-r2.json -- --emit=obj
+	@ld.lld -T linker.ld -n --gc-sections -o iso/boot/kernel.elf target/x86_64-r2/release/deps/kernel-*.o
+	@grub2-mkrescue -o r2.iso iso/
 
 run:
 	@qemu-system-x86_64 \
 		-serial pty \
 		-drive format=raw,file=target/x86_64-r2/debug/bootimage-x86_64-r2.bin
 
-run_iso: iso
+run_iso: 
 	@qemu-system-x86_64 -cdrom r2.iso
 
-iso:
-	@cp target/x86_64-r2/debug/bootimage-x86_64-r2.bin isodir/boot/kernel.bin
-#@cp target/x86_64-r2/debug/x86_64-r2 isodir/boot/kernel.bin
-	@cp target/x86_64-r2/release/x86_64-r2 isodir/boot/kernel.bin
-	@grub2-mkrescue -o r2.iso isodir/
+clean:
+	@cargo clean
+
+clippy:
+	@cargo clippy --release --target x86_64-r2.json --no-default-features -- -D warnings
+

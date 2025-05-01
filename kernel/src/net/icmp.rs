@@ -30,17 +30,24 @@ pub fn create_packet(
             &header as *const _ as *const u8,
             core::mem::size_of::<IcmpHeader>(),
         );
-        out_buffer[..header_bytes.len()].copy_from_slice(header_bytes);
+        if let Some(slice) = out_buffer.get_mut(..header_bytes.len()) {
+            slice.copy_from_slice(header_bytes);
+        }
     }
 
     // Copy payload
-    out_buffer[header_len..header_len + payload.len()].copy_from_slice(payload);
+    if let Some(slice) = out_buffer.get_mut(header_len..header_len + payload.len()) {
+        slice.copy_from_slice(payload);
+    }
 
     // Calculate checksum (over full packet: header + payload)
-    let checksum = get_checksum(&out_buffer[..header_len + payload.len()]);
+    let out_slice = out_buffer.get(..header_len + payload.len()).unwrap_or(&[]);
+    let checksum = get_checksum(out_slice);
 
     // Store checksum (Big Endian / Network order!)
-    out_buffer[2..4].copy_from_slice(&checksum.to_be_bytes());
+    if let Some(slice) = out_buffer.get_mut(2..4) {
+        slice.copy_from_slice(&checksum.to_be_bytes());
+    }
 
     header_len + payload.len()
 }
@@ -53,7 +60,15 @@ fn get_checksum(packet: &[u8]) -> u16 {
         let word = if i == 2 {
             0u16 // Skip checksum field (2..=3)
         } else {
-            u16::from_be_bytes([packet[i], packet[i + 1]])
+            let mut ret: u16 = 0;
+
+            if let Some(w1) = packet.get(i) {
+                if let Some(w2) = packet.get(i + 1) {
+                    ret = u16::from_be_bytes([*w1, *w2]);
+                }
+            }
+
+            ret
         };
         sum = sum.wrapping_add(word as u32);
         i += 2;
@@ -61,8 +76,9 @@ fn get_checksum(packet: &[u8]) -> u16 {
 
     if i < packet.len() {
         // Odd length: last byte padded with 0
-        let word = (packet[i] as u16) << 8;
-        sum = sum.wrapping_add(word as u32);
+        if let Some(w) = packet.get(i) {
+            sum = sum.wrapping_add(((*w as u16) << 8) as u32);
+        }
     }
 
     // Fold overflows
@@ -84,8 +100,8 @@ pub fn parse_packet(packet: &[u8]) -> Option<(IcmpHeader, &[u8])> {
     };
 
     let header_len = 8; // ICMP header length is always 8 bytes
-    let payload = &packet[header_len..];
+    let payload_slice = packet.get(header_len..).unwrap_or(&[]);
 
-    Some((header, payload))
+    Some((header, payload_slice))
 }
 

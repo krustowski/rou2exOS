@@ -155,7 +155,7 @@ pub fn receive_loop(callback: fn(packet: &[u8]) -> u8) -> u8 {
 }
 
 /// Called when you receive a new serial byte
-pub fn receive_loop_tcp(conn: &mut tcp::TcpConnection, callback: fn(conn: &mut tcp::TcpConnection, packet: &[u8]) -> u8) -> u8 {
+pub fn receive_loop_tcp(conns: &mut [Option<tcp::TcpConnection>; 4], callback: fn(conn: &mut [Option<tcp::TcpConnection>; 4], packet: &[u8]) -> u8) -> u8 {
     let mut temp_buf: [u8; 2048] = [0; 2048];
     let mut packet_buf: [u8; 2048] = [0; 2048];
     let mut temp_len: usize = 0;
@@ -172,7 +172,7 @@ pub fn receive_loop_tcp(conn: &mut tcp::TcpConnection, callback: fn(conn: &mut t
 
                     if let Some(packet_len) = slip::decode(&mut temp_buf[..temp_len], &mut packet_buf) {
                         // Full packet decoded
-                        return callback(conn, &packet_buf[..packet_len]);
+                        return callback(conns, &packet_buf[..packet_len]);
                     }
                 }
             }

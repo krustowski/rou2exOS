@@ -7,8 +7,8 @@ pub struct UdpHeader {
 }
 
 pub fn create_packet(
-    source_ip: [u8; 4],
-    dest_ip: [u8; 4],
+    _source_ip: [u8; 4],
+    _dest_ip: [u8; 4],
     source_port: u16,
     dest_port: u16,
     payload: &[u8],
@@ -72,7 +72,7 @@ pub fn get_checksum(
     sum += u16::from_be_bytes([src_ip[2], src_ip[3]]) as u32;
     sum += u16::from_be_bytes([dst_ip[0], dst_ip[1]]) as u32;
     sum += u16::from_be_bytes([dst_ip[2], dst_ip[3]]) as u32;
-    sum += (0x11u8 as u32); // Protocol (UDP = 17 decimal)
+    sum += 0x11u8 as u32; // Protocol (UDP = 17 decimal)
     sum += udp_packet.len() as u32; // UDP length
 
     // --- UDP header + payload ---

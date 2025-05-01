@@ -2,25 +2,22 @@ use crate::net::ipv4;
 use crate::net::tcp;
 use crate::vga;
 
+const MAX_CONNS: usize = 4;
+
 pub fn handle(vga_index: &mut isize) {
-    fn callback(conns: &mut [Option<tcp::TcpConnection>; 4], packet: &[u8]) -> u8 {
+    fn callback(conns: &mut [Option<tcp::TcpConnection>; MAX_CONNS], packet: &[u8]) -> u8 {
         if let Some((ipv4_header, ipv4_payload)) = ipv4::parse_packet(packet) {
             if let Some((tcp_header, payload)) = tcp::parse_packet(ipv4_payload) {
-                let (syn, ack, fin, rst) = tcp::parse_flags(&tcp_header);
+                let (syn, ack, _fin, _rst) = tcp::parse_flags(&tcp_header);
 
                 let src_ip = ipv4_header.source_ip;
                 let dst_ip = ipv4_header.dest_ip;
                 let src_port = u16::from_be(tcp_header.source_port);
                 let dst_port = u16::from_be(tcp_header.dest_port);
 
-                let mut out_buf = [0u8; 500];
-                let mut ipv4_buf = [0u8; 1500];
-
-                let mut tcp_len = 0;
-
                 for conn in conns.iter_mut() {
                     if let Some(c) = conn {
-                        if c.state == tcp::TcpState::Closed || c.state == tcp::TcpState::CloseWait {
+                        if c.state == tcp::TcpState::Closed || c.state == tcp::TcpState::CloseWait || c.state == tcp::TcpState::FinWait1 || c.state == tcp::TcpState::FinWait2 || c.state == tcp::TcpState::Closing || c.state == tcp::TcpState::TimeWait || c.state == tcp::TcpState::LastAck {
                             *conn = None;
                         }
                     }
@@ -52,7 +49,7 @@ pub fn handle(vga_index: &mut isize) {
                             dst_port: src_port,
                             seq_num: 0,
                             ack_num: 0,
-                            peer_seq_num: 0,
+                            //peer_seq_num: 0,
                         });
                         empty_slot.as_mut().unwrap()
                     } else {
@@ -70,20 +67,7 @@ pub fn handle(vga_index: &mut isize) {
         2
     }
 
-    /*let mut conn = tcp::TcpConnection{
-      state: tcp::TcpState::Listen,
-      src_ip: [192, 168, 3, 1],
-      dst_ip: [192, 168, 3, 2],
-      src_port: 0,
-      dst_port: 0,
-      seq_num: 0,
-      ack_num: 0,
-      peer_seq_num: 0,
-      };*/
-
-    const MAX_CONNS: usize = 4;
-    //let mut conns: [Option<tcp::TcpConnection>; MAX_CONNS] = Default::default();
-    let mut conns: [Option<tcp::TcpConnection>; 4] = [None, None, None, None];
+    let mut conns: [Option<tcp::TcpConnection>; MAX_CONNS] = [None, None, None, None];
 
     vga::write::newline(vga_index);
     vga::write::string(vga_index, b"Starting a simple TCP tester (hit any key to interrupt)...", 0x0f);
@@ -115,7 +99,7 @@ pub fn handle(vga_index: &mut isize) {
 }
 
 fn handle_tcp_packet(conn: &mut tcp::TcpConnection, tcp_header: &tcp::TcpHeader, payload: &[u8]) -> u8 {
-    let (syn, ack, fin, rst) = tcp::parse_flags(&tcp_header);
+    let (syn, ack, fin, _rst) = tcp::parse_flags(&tcp_header);
 
     if syn && !ack {
         conn.src_port = u16::from_be(tcp_header.dest_port);
@@ -188,13 +172,9 @@ fn send_response(conn: &mut tcp::TcpConnection, flags: u16, payload: &[u8]) {
     let mut out_buf = [0u8; 500];
     let mut ipv4_buf = [0u8; 1500];
 
-    let mut tcp_len = 0;
-
-    tcp_len = tcp::create_packet(
+    let tcp_len = tcp::create_packet(
         conn.src_port,
         conn.dst_port,
-        //u16::from_be(tcp_header.dest_port),
-        //u16::from_be(tcp_header.source_port),
         conn.seq_num,
         conn.ack_num,
         flags,
@@ -202,8 +182,6 @@ fn send_response(conn: &mut tcp::TcpConnection, flags: u16, payload: &[u8]) {
         payload,
         conn.src_ip,
         conn.dst_ip,
-        //ipv4_header.dest_ip,
-        //ipv4_header.source_ip,
         &mut out_buf
     );
 
@@ -231,7 +209,7 @@ fn u32_to_ascii(mut num: u32, buf: &mut [u8]) -> usize {
 }
 
 fn http_router(payload: &[u8], http_response: &mut [u8]) -> usize {
-        let mut body: &str = "";
+        let body: &str;
         let mut content_type: &str = "";
 
         if payload.starts_with(b"GET / ") || payload.starts_with(b"GET / HTTP/1.1") {

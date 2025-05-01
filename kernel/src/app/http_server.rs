@@ -1,15 +1,15 @@
 use crate::net::ipv4;
-use crate::net::tcp;
+//use crate::net::tcp;
 use crate::net::udp;
 
-const LISTEN_PORT: u16 = 8080;
+//const LISTEN_PORT: u16 = 8080;
 
-fn handle_http_request(request: &[u8]) -> &[u8] {
+/*fn handle_http_request(request: &[u8]) -> &[u8] {
     if request.starts_with(b"GET / HTTP/1.1") {
         return b"HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\n\r\nHello from tiny Rust kernel!";
     }
     b"HTTP/1.1 404 Not Found\r\nContent-Type: text/plain\r\n\r\nPage Not Found"
-}
+}*/
 
 /*pub fn listen_for_http() {
     // Main loop

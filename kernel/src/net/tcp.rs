@@ -1,6 +1,6 @@
 pub const FIN: u16 = 0x01;
 pub const SYN: u16 = 0x02;
-pub const RST: u16 = 0x04;
+//pub const RST: u16 = 0x04;
 pub const PSH: u16 = 0x08;
 pub const ACK: u16 = 0x10;
 
@@ -39,7 +39,7 @@ pub struct TcpConnection {
     pub dst_port: u16,
     pub seq_num: u32,
     pub ack_num: u32,
-    pub peer_seq_num: u32,
+    //pub peer_seq_num: u32,
 }
 
 pub fn create_packet(
@@ -54,8 +54,8 @@ pub fn create_packet(
     dst_ip: [u8; 4],
     out: &mut [u8],
 ) -> usize {
-    let data_offset = (5u16 << 12); // 5 * 4 = 20 bytes, no options
-    let mut tcp_header = TcpHeader {
+    let data_offset = 5u16 << 12; // 5 * 4 = 20 bytes, no options
+    let tcp_header = TcpHeader {
         source_port: src_port.to_be(),
         dest_port: dst_port.to_be(),
         seq_num: seq_num.to_be(),

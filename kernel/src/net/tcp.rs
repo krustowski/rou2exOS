@@ -39,6 +39,7 @@ pub struct TcpConnection {
     pub dst_port: u16,
     pub seq_num: u32,
     pub ack_num: u32,
+    pub peer_seq_num: u32,
 }
 
 pub fn create_packet(
@@ -83,45 +84,6 @@ pub fn create_packet(
 }
 
 
-fn build_tcp_segment(
-    src_port: u16,
-    dst_port: u16,
-    seq: u32,
-    ack: u32,
-    flags: u16,
-    payload: &[u8],
-    buffer: &mut [u8],
-) -> usize {
-    // Build header with placeholder checksum
-    let header = TcpHeader {
-        source_port: src_port.to_be(),
-        dest_port: dst_port.to_be(),
-        seq_num: seq.to_be(),
-        ack_num: ack.to_be(),
-        data_offset_reserved_flags: (5 << 12 | flags).to_be(), // 5*4=20 byte header
-        window_size: 0xFFFFu16.to_be(),
-        checksum: 0, // calculated later
-        urgent_pointer: 0,
-    };
-
-    // Serialize and copy header
-    unsafe {
-        let header_bytes = core::slice::from_raw_parts(
-            &header as *const _ as *const u8,
-            core::mem::size_of::<TcpHeader>(),
-        );
-        buffer[..header_bytes.len()].copy_from_slice(header_bytes);
-    }
-
-    // Copy payload
-    let header_len = 20;
-    buffer[header_len..header_len + payload.len()].copy_from_slice(payload);
-
-    // Calculate checksum here (include pseudo-header!)
-
-    header_len + payload.len()
-}
-
 pub fn parse_packet(packet: &[u8]) -> Option<(TcpHeader, &[u8])> {
     if packet.len() < 20 {
         return None;
@@ -149,54 +111,6 @@ pub fn parse_flags(header: &TcpHeader) -> (bool, bool, bool, bool) {
     let rst = flags & 0x004 != 0;
     let ack = flags & 0x010 != 0;
     (syn, ack, fin, rst)
-}
-
-pub fn build_response(
-    src_ip: [u8; 4],
-    dest_ip: [u8; 4],
-    src_port: u16,
-    dest_port: u16,
-    seq: u32,
-    ack: u32,
-    flags: u16,
-    window_size: u16,
-    payload: &[u8],
-    out_buf: &mut [u8],
-) -> usize {
-    let data_offset = 5u8; // No options
-    let header_len = 20;
-
-    // Create header
-    let mut header = TcpHeader {
-        source_port: dest_port.to_be(),
-        dest_port: src_port.to_be(),
-        seq_num: seq.to_be(),
-        ack_num: ack.to_be(),
-        data_offset_reserved_flags: ((data_offset as u16) << 12 | flags).to_be(),
-        window_size: window_size.to_be(),
-        checksum: 0,
-        urgent_pointer: 0,
-    };
-
-    // Write header
-    unsafe {
-        let header_bytes = core::slice::from_raw_parts(
-            &header as *const _ as *const u8,
-            core::mem::size_of::<TcpHeader>(),
-        );
-        out_buf[..header_len].copy_from_slice(header_bytes);
-    }
-
-    // Copy payload
-    let total_len = header_len + payload.len();
-    out_buf[header_len..total_len].copy_from_slice(payload);
-
-    // Compute checksum (with pseudo-header)
-    let checksum = get_checksum(src_ip, dest_ip, &out_buf[..total_len]);
-    out_buf[16] = (checksum >> 8) as u8;
-    out_buf[17] = (checksum & 0xff) as u8;
-
-    total_len
 }
 
 pub fn get_checksum(

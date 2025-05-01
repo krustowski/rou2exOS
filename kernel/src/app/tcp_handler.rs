@@ -160,18 +160,47 @@ pub fn handle(vga_index: &mut isize) {
                     conn.ack_num = u32::from_be(tcp_header.seq_num).wrapping_add(1);
 
                     send_response(conn, tcp::SYN | tcp::ACK, payload);
-
                     return 0;
+                } 
 
-                } else if ack && conn.state == tcp::TcpState::SynReceived {
+                if ack && conn.state == tcp::TcpState::SynReceived {
                     // Ready to receive/send data
                     conn.state = tcp::TcpState::Established;
-                    conn.seq_num += 1;
                     conn.ack_num = u32::from_be(tcp_header.seq_num);
+                    conn.seq_num += 1;
 
-                    send_response(conn, tcp::ACK, b"Ale vitaj ne\r\n");
-
+                    send_response(conn, tcp::ACK, b"Connection established\r\n");
                     return 1;
+
+                } else if conn.state == tcp::TcpState::Established {
+                    if payload.len() > 0 {
+                        conn.ack_num = u32::from_be(tcp_header.seq_num).wrapping_add(payload.len() as u32);
+        
+                        let mut reply = [0u8; 128];
+                        let msg = b"Echo: ";
+                        reply[..msg.len()].copy_from_slice(msg);
+                        let len = core::cmp::min(payload.len(), reply.len() - msg.len());
+                        reply[msg.len()..msg.len() + len].copy_from_slice(&payload[..len]);
+
+                        send_response(conn, tcp::ACK | tcp::PSH, &reply[..msg.len() + len]);
+
+                        conn.seq_num += (msg.len() + len) as u32;
+                    } else {
+                        if fin {
+                            conn.state = tcp::TcpState::CloseWait;
+                            //conn.ack_num = u32::from_be(tcp_header.seq_num).wrapping_add(1);
+                            conn.ack_num = u32::from_be(tcp_header.seq_num);
+                            //send_response(conn, tcp::ACK, &[]);
+                            send_response(conn, tcp::FIN | tcp::ACK, &[]);
+                            return 2;
+                        }
+
+                        // Just ACK to keep connection alive
+                        conn.ack_num = u32::from_be(tcp_header.seq_num);
+                        send_response(conn, tcp::ACK, &[]);
+                    }
+
+                    return 1
                 }
             }
         }
@@ -203,6 +232,10 @@ pub fn handle(vga_index: &mut isize) {
         } else if ret == 1 {
             vga::write::string(vga_index, b"Received ACK", 0x0f);
             vga::write::newline(vga_index);
+        } else if ret == 2 {
+            vga::write::string(vga_index, b"Received FIN", 0x0f);
+            vga::write::newline(vga_index);
+            //break;
         } else if ret == 3 {
             vga::write::string(vga_index, b"Keyboard interrupt", 0x0f);
             vga::write::newline(vga_index);

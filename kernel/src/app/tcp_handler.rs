@@ -20,7 +20,7 @@ pub fn handle(vga_index: &mut isize) {
 
                 for conn in conns.iter_mut() {
                     if let Some(c) = conn {
-                        if c.state == tcp::TcpState::Closed {
+                        if c.state == tcp::TcpState::Closed || c.state == tcp::TcpState::CloseWait {
                             *conn = None;
                         }
                     }
@@ -145,36 +145,13 @@ fn handle_tcp_packet(conn: &mut tcp::TcpConnection, tcp_header: &tcp::TcpHeader,
             conn.ack_num = u32::from_be(tcp_header.seq_num).wrapping_add(payload.len() as u32);
 
             // Try to parse a minimal GET request
-            if payload.starts_with(b"GET / ") {
-                let body = b"<html><body><h1>Hello from RoureXOS</h1></body></html>";
-                let body_len = body.len();
+            if payload.starts_with(b"GET /") {
+                let mut http_response = [0u8; 1024];
+                let http_len = http_router(&payload, &mut http_response);
 
-                let mut http_response = [0u8; 512];
+                send_response(conn, tcp::ACK | tcp::PSH | tcp::FIN, &http_response[..http_len]);
+                conn.seq_num += http_len as u32;
 
-                // Build the HTTP header manually
-                let header = b"HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nContent-Length: ";
-                let header_len = header.len();
-                http_response[..header_len].copy_from_slice(header);
-
-                // Manually convert body_len to ASCII (e.g., "48")
-                let len_start = header_len;
-                let len_end = len_start + u32_to_ascii(body_len as u32, &mut http_response[len_start..]);
-
-                // Add \r\n\r\n
-                http_response[len_end] = b'\r';
-                http_response[len_end + 1] = b'\n';
-                http_response[len_end + 2] = b'\r';
-                http_response[len_end + 3] = b'\n';
-                let headers_end = len_end + 4;
-
-                // Copy the body after headers
-                http_response[headers_end..headers_end + body_len].copy_from_slice(body);
-
-                // Send full response
-                send_response(conn, tcp::ACK | tcp::PSH | tcp::FIN, &http_response[..headers_end + body_len]);
-
-                conn.seq_num += (headers_end + body_len) as u32;
-                //conn.state = tcp::TcpState::Close;
                 conn.state = tcp::TcpState::CloseWait;
                 return 2;
             }
@@ -251,4 +228,51 @@ fn u32_to_ascii(mut num: u32, buf: &mut [u8]) -> usize {
         buf[j] = digits[i - j - 1];
     }
     i
+}
+
+fn http_router(payload: &[u8], http_response: &mut [u8]) -> usize {
+        let mut body: &str = "";
+        let mut content_type: &str = "";
+
+        if payload.starts_with(b"GET / ") || payload.starts_with(b"GET / HTTP/1.1") {
+            body = "<html><body><h1>Welcome to RoureXOS</h1></body></html>";
+            content_type = "text/html";
+
+        } else if payload.starts_with(b"GET /hello") {
+            body = "Hello World from RoureXOS!";
+            content_type = "text/plain";
+
+        } else if payload.starts_with(b"GET /json") {
+            body = "{\"message\":\"Hello JSON\"}";
+            content_type = "application/json";
+
+        } else {
+            body = "404 Not Found";
+        }
+
+        let body_len = body.len();
+        let header = b"HTTP/1.1 200 OK\r\nContent-Type: ";
+        let mut pos = 0;
+
+        http_response[..header.len()].copy_from_slice(header);
+        pos += header.len();
+
+        http_response[pos..pos + content_type.len()].copy_from_slice(content_type.as_bytes());
+        pos += content_type.len();
+
+        http_response[pos..pos + 2].copy_from_slice(b"\r\n");
+        pos += 2;
+
+        http_response[pos..pos + 16].copy_from_slice(b"Content-Length: ");
+        pos += 16;
+
+        pos += u32_to_ascii(body_len as u32, &mut http_response[pos..]);
+
+        http_response[pos..pos + 4].copy_from_slice(b"\r\n\r\n");
+        pos += 4;
+
+        http_response[pos..pos + body_len].copy_from_slice(body.as_bytes());
+        pos += body_len;
+
+        pos
 }

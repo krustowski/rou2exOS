@@ -29,8 +29,11 @@ pub fn string(vga_index: &mut isize, string: &[u8], color: u8) {
 
     for &byte in string {
         unsafe {
-            *buffer::VGA_BUFFER.offset(*vga_index) = byte;
-            *buffer::VGA_BUFFER.offset(*vga_index + 1) = color;
+            core::ptr::write_volatile(buffer::VGA_BUFFER.offset(*vga_index), byte);
+            core::ptr::write_volatile(buffer::VGA_BUFFER.offset(*vga_index + 1), color);
+
+            //*buffer::VGA_BUFFER.offset(*vga_index) = byte;
+            //*buffer::VGA_BUFFER.offset(*vga_index + 1) = color;
             *vga_index += 2;
         }
     }

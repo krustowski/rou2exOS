@@ -8,8 +8,6 @@
 #![feature(abi_x86_interrupt)]
 #![feature(lang_items)]
 #![feature(asm_const)]
-#![feature(offset_of)]
-
 
 #[unsafe(no_mangle)]
 #[unsafe(link_section = ".multiboot2_header")]
@@ -22,7 +20,7 @@ pub static MULTIBOOT2_HEADER: [u32; 8] = [
     0, 8,       // end tag (type = 0, size = 8)
 ];
 
-mod int;
+//mod int;
 
 mod acpi;
 mod app;
@@ -47,10 +45,29 @@ use x86_64::{
 use core::panic::PanicInfo;
 use core::ptr;
 
+use no_panic::no_panic;
+
 use mem::bump::BumpAllocator;
 
 #[global_allocator]
 static mut ALLOCATOR: BumpAllocator = BumpAllocator::new();
+
+// Constants
+const DOUBLE_FAULT_IST_INDEX: usize = 0;
+const STACK_SIZE: usize = 4096 * 5;
+
+#[repr(C, packed)]
+struct DescriptorTablePointer {
+    limit: u16,
+    base: u64,
+}
+
+#[unsafe(link_section = ".bss.stack")]
+static mut STACK: [u8; STACK_SIZE] = [0; STACK_SIZE];
+
+#[repr(align(16))]
+struct AlignedTss(TaskStateSegment);
+static mut TSS: AlignedTss = AlignedTss(TaskStateSegment::new());
 
 /// This function is called on panic.
 #[panic_handler]
@@ -60,31 +77,30 @@ fn panic(info: &PanicInfo) -> ! {
     let _ = info; // silence unused var warning
     loop {}
 }
-
 /*#[panic_handler]
-  fn panic(info: &PanicInfo) -> ! {
-  let vga_index: &mut isize = &mut 0;
+fn panic(info: &PanicInfo) -> ! {
+    let vga_index: &mut isize = &mut 0;
 
-  init_heap_allocator();
+    init_heap_allocator();
 
-  vga::screen::clear(vga_index);
+    vga::screen::clear(vga_index);
 
-  if let Some(location) = info.location() {
-  print_string(vga_index, location.file());
-  print_string(vga_index, ":");
-  print_num(vga_index, location.line());
-  vga::write::newline(vga_index);
-  } else {
-  vga::write::string(vga_index, b"No location", 0xc);
-  vga::write::newline(vga_index);
-  }
+    if let Some(location) = info.location() {
+        print_string(vga_index, location.file());
+        print_string(vga_index, ":");
+        print_num(vga_index, location.line());
+        vga::write::newline(vga_index);
+    } else {
+        vga::write::string(vga_index, b"No location", 0xc);
+        vga::write::newline(vga_index);
+    }
 
-  loop {
-  unsafe {
-  core::arch::asm!("hlt");
-  }
-  }
-  }*/
+    loop {
+        unsafe {
+            core::arch::asm!("hlt");
+        }
+    }
+}*/
 
 #[lang = "eh_personality"]
 extern "C" fn eh_personality() {}
@@ -95,11 +111,54 @@ pub extern "C" fn rust_begin_unwind(_: &core::panic::PanicInfo) {
 }
 
 //#[entry]
+#[no_panic]
 #[unsafe(no_mangle)]
-pub extern "C" fn _start() -> ! { 
-    int::load_gdt();
-    int::load_idt();
-    int::set_segment_selectors();
+pub extern "C" fn _start() { 
+    unsafe {
+        // === STACK AND TSS ===
+        //let stack_start = VirtAddr::from_ptr(STACK.as_ptr());
+        let stack_start = VirtAddr::from_ptr(unsafe { &mut *(STACK.as_mut_ptr()) });
+        //let stack_start = VirtAddr::from_ptr(unsafe { STACK.as_mut_ptr() });
+        let stack_end = stack_start + (STACK_SIZE as u64);
+
+        //let tss_ptr: *mut TaskStateSegment = &raw mut TSS;
+        
+        let tss_ptr = &mut *(core::ptr::addr_of_mut!(TSS.0) as *mut TaskStateSegment);
+        let ist_ptr = tss_ptr.interrupt_stack_table.as_mut_ptr();
+
+        //let ist_ptr = TSS.0.interrupt_stack_table.as_mut_ptr();
+        ptr::write_unaligned(ist_ptr.add(DOUBLE_FAULT_IST_INDEX), stack_end);
+        //(*tss_ptr).interrupt_stack_table[DOUBLE_FAULT_IST_INDEX] = stack_end;
+
+        //tss.interrupt_stack_table[DOUBLE_FAULT_IST_INDEX] = stack_end;
+
+        // === GDT ===
+        let mut gdt = GlobalDescriptorTable::new();
+        gdt.append(Descriptor::kernel_code_segment());
+        //let tss_selector: SegmentSelector = gdt.append(Descriptor::tss_segment(&tss));
+        let tss_selector = gdt.append(Descriptor::tss_segment(&TSS.0));
+
+
+        let gdt_len = gdt.entries().len();
+        let gdt_ptr = DescriptorTablePointer {
+            limit: (gdt_len * core::mem::size_of::<u64>() - 1) as u16,
+            base: &gdt as *const _ as u64,
+        };
+
+        asm!("lgdt [{}]", in(reg) &gdt_ptr, options(readonly, nostack, preserves_flags));
+        asm!("ltr ax", in("ax") tss_selector.0, options(nostack, preserves_flags));
+
+        // === IDT ===
+        let mut idt = InterruptDescriptorTable::new();
+        // idt.double_fault.set_handler_fn(...).set_stack_index(DOUBLE_FAULT_IST_INDEX);
+
+        let idt_ptr = DescriptorTablePointer {
+            limit: (core::mem::size_of::<InterruptDescriptorTable>() - 1) as u16,
+            base: &idt as *const _ as u64,
+        };
+
+        asm!("lidt [{}]", in(reg) &idt_ptr, options(readonly, nostack, preserves_flags));
+    }
 
     /*loop {
       unsafe {

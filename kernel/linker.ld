@@ -25,8 +25,14 @@ SECTIONS {
         *(COMMON)
     }
 
+    /* Stack */
+    . = ALIGN(16);
+    stack_bottom = .;
+    . = . + 16K; /* 16 KiB */
+    stack_top = .;
+
     /* Define a symbol for the start of the heap */
-    . = ALIGN(8);
+    . = ALIGN(16);
     __heap_start = .;
     . = . + 64K; /* Reserve 64 KiB for heap */
     __heap_end = .;

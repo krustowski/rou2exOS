@@ -8,9 +8,11 @@ init:
 		cargo install bootimage
 
 #@cargo rustc --release --target x86_64-r2.json -- -C relocation-model=static --emit=obj
+#@nasm -f elf64 -o asm/gdt.o asm/gdt.asm
+#@nasm -f elf64 -o asm/idt.o asm/idt.asm
 build:
 	@cargo rustc --release -Z build-std=core,compiler_builtins --target x86_64-r2.json -- --emit=obj
-	@ld.lld -T linker.ld -n --gc-sections -o iso/boot/kernel.elf target/x86_64-r2/release/deps/kernel-*.o
+	@ld.lld --verbose -T linker.ld -n --gc-sections -o iso/boot/kernel.elf target/x86_64-r2/release/deps/kernel-*.o
 	@grub2-mkrescue -o r2.iso iso/
 
 run:
@@ -19,7 +21,7 @@ run:
 		-drive format=raw,file=target/x86_64-r2/debug/bootimage-x86_64-r2.bin
 
 run_iso: 
-	@qemu-system-x86_64 -cdrom r2.iso
+	@qemu-system-x86_64 -cdrom r2.iso -d int,cpu_reset -no-reboot -serial stdio
 
 clean:
 	@cargo clean

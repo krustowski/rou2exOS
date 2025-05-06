@@ -43,7 +43,7 @@ fn panic(info: &PanicInfo) -> ! {
         print_num(vga_index, location.line());
         vga::write::newline(vga_index);
     } else {
-        vga::write::string(vga_index, b"No location", 0xc);
+        vga::write::string(vga_index, b"No location", vga::buffer::Color::Red);
         vga::write::newline(vga_index);
     }
 
@@ -52,7 +52,7 @@ fn panic(info: &PanicInfo) -> ! {
 
 fn print_string(vga_index: &mut isize, s: &str) {
     for byte in s.bytes() {
-        vga::write::string(vga_index, &[byte], 0xc);
+        vga::write::string(vga_index, &[byte], vga::buffer::Color::Red);
     }
 }
 
@@ -61,7 +61,7 @@ fn print_num(vga_index: &mut isize, mut num: u32) {
     let mut i = buf.len();
 
     if num == 0 {
-        vga::write::string(vga_index, b"0", 0xc);
+        vga::write::string(vga_index, b"0", vga::buffer::Color::Red);
         return;
     }
 
@@ -72,6 +72,6 @@ fn print_num(vga_index: &mut isize, mut num: u32) {
     }
 
     for b in &buf[i..] {
-        vga::write::string(vga_index, &[*b], 0xc);
+        vga::write::string(vga_index, &[*b], vga::buffer::Color::Red);
     }
 }

@@ -39,6 +39,12 @@ run_iso:
 	@qemu-system-x86_64 \
 		-m 4G \
 		-cdrom r2.iso \
+		-serial pty
+
+run_iso_debug: 
+	@qemu-system-x86_64 \
+		-m 4G \
+		-cdrom r2.iso \
 		-d int,cpu_reset \
 		-no-reboot \
 		-serial stdio

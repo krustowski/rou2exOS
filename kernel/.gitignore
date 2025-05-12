@@ -1,4 +1,5 @@
 /target
 /iso/boot/kernel.*
+/iso/boot/*.o
 /kernel.*
-/*/*/*.o
+/r2.iso

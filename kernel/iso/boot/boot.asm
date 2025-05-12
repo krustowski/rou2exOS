@@ -338,7 +338,7 @@ long_mode_entry:
     ;ltr ax
 
     ; Clear the stack (assume we got 1MB+ memory)
-    ;mov rsp, 0x80000
+    mov rsp, 0x80000
     call rust_main
 
     hlt

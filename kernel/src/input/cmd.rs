@@ -294,21 +294,21 @@ fn cmd_time(_args: &[u8], vga_index: &mut isize) {
     let (y, mo, d, h, m, s) = time::rtc::read_rtc_full();
 
     vga::write::string(vga_index, b"RTC Time: ", vga::buffer::Color::White);
-    vga::write::number(vga_index, &mut (h as u64));
+    vga::write::number(vga_index, h as u64);
 
     vga::write::string(vga_index, b":", vga::buffer::Color::White);
 
     if m < 10 { 
         vga::write::string(vga_index, b"0", vga::buffer::Color::White); 
     }
-    vga::write::number(vga_index, &mut (m as u64));
+    vga::write::number(vga_index, m as u64);
 
     vga::write::string(vga_index, b":", vga::buffer::Color::White);
 
     if s < 10 { 
         vga::write::string(vga_index, b"0", vga::buffer::Color::White); 
     }
-    vga::write::number(vga_index, &mut (s as u64));
+    vga::write::number(vga_index, s as u64);
 
     vga::write::newline(vga_index);
 
@@ -317,16 +317,16 @@ fn cmd_time(_args: &[u8], vga_index: &mut isize) {
     if d < 10 {
         vga::write::string(vga_index, b"0", vga::buffer::Color::White); 
     }
-    vga::write::number(vga_index, &mut (d as u64));
+    vga::write::number(vga_index, d as u64);
     vga::write::string(vga_index, b"-", vga::buffer::Color::White);
 
     if mo < 10 {
         vga::write::string(vga_index, b"0", vga::buffer::Color::White); 
     }
-    vga::write::number(vga_index, &mut (mo as u64));
+    vga::write::number(vga_index, mo as u64);
     vga::write::string(vga_index, b"-", vga::buffer::Color::White);
 
-    vga::write::number(vga_index, &mut (y as u64));
+    vga::write::number(vga_index, y as u64);
 
     vga::write::newline(vga_index);
 }
@@ -340,21 +340,21 @@ fn cmd_uptime(_args: &[u8], vga_index: &mut isize) {
 
     // Print formatted
     vga::write::string(vga_index, b"Uptime: ", vga::buffer::Color::White);
-    vga::write::number(vga_index, &mut hours);
+    vga::write::number(vga_index, hours);
     vga::write::string(vga_index, b":", vga::buffer::Color::White);
 
     if minutes < 10 {
         vga::write::string(vga_index, b"0", vga::buffer::Color::White);
     }
 
-    vga::write::number(vga_index, &mut minutes);
+    vga::write::number(vga_index, minutes);
     vga::write::string(vga_index, b":", vga::buffer::Color::White);
 
     if seconds < 10 {
         vga::write::string(vga_index, b"0", vga::buffer::Color::White);
     }
 
-    vga::write::number(vga_index, &mut seconds);
+    vga::write::number(vga_index, seconds);
 
     vga::write::newline(vga_index);
 }

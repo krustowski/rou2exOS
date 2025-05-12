@@ -9,11 +9,8 @@ authors = ["krusty <krusty@vxn.dev>"]
 nasm = "0.0.1"
 
 [dependencies]
-compiler_builtins = { version = "0.1", features = ["mem"] }
+#compiler_builtins = { version = "0.1", features = ["mem"] }
 x86_64 = { version = "0.15.2", default-features = false, features = ["instructions", "abi_x86_interrupt"] }
-spin = { version = "0.9", default-features = false }
-#no-panic = "0.1.24"
-panic-halt = "0.2"
 
 [dependencies.lazy_static]
 version = "1.0"

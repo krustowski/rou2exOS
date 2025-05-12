@@ -1,22 +1,24 @@
 use crate::vga::buffer;
 use crate::vga::screen;
 
-pub fn number(vga_index: &mut isize, num: &mut u64) {
+pub fn number(vga_index: &mut isize, num: u64) {
     // Dumb print without heap, just very basic
     let mut buf = [0u8; 20];
     let mut i = buf.len();
 
-    if *num == 0 {
+    if num == 0 {
         string(vga_index, b"0", buffer::Color::White);
         return;
     }
 
-    while *num > 0 {
+    let mut n = num;
+
+    while n > 0 {
         i -= 1;
         if let Some(b) = buf.get_mut(i) {
-            *b = b'0' + (*num % 10) as u8;
+            *b = b'0' + (n % 10) as u8;
         }
-        *num /= 10;
+        n /= 10;
     }
 
     string(vga_index, buf.get(i..).unwrap_or(&[]) as &[u8], buffer::Color::White);

@@ -15,20 +15,11 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5c8214115b7bf84099f1309324e63141d4c5d7cc26862f97a0a857dbefe165bd"
 
 [[package]]
-name = "compiler_builtins"
-version = "0.1.156"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c1ffbd2789fe5bb95b96a2e22cbe3128239dc46ff0374e0d38e9f102062d7055"
-
-[[package]]
 name = "kernel"
 version = "0.4.0"
 dependencies = [
- "compiler_builtins",
  "lazy_static",
  "nasm",
- "panic-halt",
- "spin",
  "x86_64",
 ]
 
@@ -46,12 +37,6 @@ name = "nasm"
 version = "0.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e94c0a4df47a3bb6ed27c447abdeadb2c72e179a727bbf3be9d692a235788536"
-
-[[package]]
-name = "panic-halt"
-version = "0.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "de96540e0ebde571dc55c73d60ef407c653844e6f9a1e2fdbd40c07b9252d812"
 
 [[package]]
 name = "rustversion"

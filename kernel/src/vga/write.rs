@@ -7,7 +7,7 @@ pub fn number(vga_index: &mut isize, num: &mut u64) {
     let mut i = buf.len();
 
     if *num == 0 {
-        string(vga_index, b"0", 0x0f);
+        string(vga_index, b"0", buffer::Color::White);
         return;
     }
 
@@ -19,21 +19,17 @@ pub fn number(vga_index: &mut isize, num: &mut u64) {
         *num /= 10;
     }
 
-    let buf_slice = buf.get(i..).unwrap_or(&[]);
-    string(vga_index, buf_slice as &[u8], 0x0f);
+    string(vga_index, buf.get(i..).unwrap_or(&[]) as &[u8], buffer::Color::White);
 }
 
 /// Write a whole string to screen
-pub fn string(vga_index: &mut isize, string: &[u8], color: u8) {
+pub fn string(vga_index: &mut isize, string: &[u8], color: buffer::Color) {
     screen::scroll(vga_index);
 
     for &byte in string {
         unsafe {
-            core::ptr::write_volatile(buffer::VGA_BUFFER.offset(*vga_index), byte);
-            core::ptr::write_volatile(buffer::VGA_BUFFER.offset(*vga_index + 1), color);
-
-            //*buffer::VGA_BUFFER.offset(*vga_index) = byte;
-            //*buffer::VGA_BUFFER.offset(*vga_index + 1) = color;
+            *buffer::VGA_BUFFER.offset(*vga_index) = byte;
+            *buffer::VGA_BUFFER.offset(*vga_index + 1) = color as u8;
             *vga_index += 2;
         }
     }

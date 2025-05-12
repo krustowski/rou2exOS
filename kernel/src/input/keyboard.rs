@@ -9,13 +9,13 @@ const HOST: &[u8] = b"rou2ex";
 const PATH: &[u8] = b"/";
 
 fn prompt(vga_index: &mut isize) {
-    vga::write::string(vga_index, b"[", 0xa);
-    vga::write::string(vga_index, USER, 0xa);
-    vga::write::string(vga_index, b"@", 0xa);
-    vga::write::string(vga_index, HOST, 0xa);
-    vga::write::string(vga_index, b":", 0xa);
-    vga::write::string(vga_index, PATH, 0x09);
-    vga::write::string(vga_index, b"] > ", 0xa);
+    vga::write::string(vga_index, b"[", vga::buffer::Color::Green);
+    vga::write::string(vga_index, USER, vga::buffer::Color::Green);
+    vga::write::string(vga_index, b"@", vga::buffer::Color::Green);
+    vga::write::string(vga_index, HOST, vga::buffer::Color::Green);
+    vga::write::string(vga_index, b":", vga::buffer::Color::Green);
+    vga::write::string(vga_index, PATH, vga::buffer::Color::Blue);
+    vga::write::string(vga_index, b"] > ", vga::buffer::Color::Green);
 }
 
 //use x86_64::instructions::port::Port;
@@ -62,7 +62,7 @@ pub fn keyboard_loop(vga_index: &mut isize) {
     let mut input_buffer = [0u8; INPUT_BUFFER_SIZE];
     let mut input_len = 0;
 
-    vga::write::string(vga_index, b"Starting prompt...", 0x0f);
+    vga::write::string(vga_index, b"Starting prompt...", vga::buffer::Color::White);
     vga::write::newline(vga_index);
     vga::write::newline(vga_index);
 
@@ -130,7 +130,7 @@ pub fn keyboard_loop(vga_index: &mut isize) {
                     unsafe {
                         *vga_index -= 2; // move cursor back one character
                         *vga::buffer::VGA_BUFFER.offset(*vga_index) = b' ';
-                        *vga::buffer::VGA_BUFFER.offset(*vga_index + 1) = 0x0f;
+                        *vga::buffer::VGA_BUFFER.offset(*vga_index + 1) = vga::buffer::Color::White as u8;
                     }
                     move_cursor_index(vga_index);
                 }
@@ -150,7 +150,7 @@ pub fn keyboard_loop(vga_index: &mut isize) {
             // Draw it on screen
             unsafe {
                 *vga::buffer::VGA_BUFFER.offset(*vga_index) = c;
-                *vga::buffer::VGA_BUFFER.offset(*vga_index + 1) = 0x0f;
+                *vga::buffer::VGA_BUFFER.offset(*vga_index + 1) = vga::buffer::Color::White as u8;
                 *vga_index += 2;
             }
             move_cursor_index(vga_index);

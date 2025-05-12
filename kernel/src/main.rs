@@ -47,44 +47,10 @@ use x86_64::{
 use core::panic::PanicInfo;
 use core::ptr;
 
-//use mem::bump::BumpAllocator;
+use mem::bump::BumpAllocator;
 
-//#[global_allocator]
-//static mut ALLOCATOR: BumpAllocator = BumpAllocator::new();
-
-/// This function is called on panic.
-#[panic_handler]
-fn panic(info: &PanicInfo) -> ! {
-    // You could write to a serial port here
-    // or display a panic message on-screen (if you have VGA/text mode setup)
-    let _ = info; // silence unused var warning
-    loop {}
-}
-
-/*#[panic_handler]
-  fn panic(info: &PanicInfo) -> ! {
-  let vga_index: &mut isize = &mut 0;
-
-  init_heap_allocator();
-
-  vga::screen::clear(vga_index);
-
-  if let Some(location) = info.location() {
-  print_string(vga_index, location.file());
-  print_string(vga_index, ":");
-  print_num(vga_index, location.line());
-  vga::write::newline(vga_index);
-  } else {
-  vga::write::string(vga_index, b"No location", 0xc);
-  vga::write::newline(vga_index);
-  }
-
-  loop {
-  unsafe {
-  core::arch::asm!("hlt");
-  }
-  }
-  }*/
+#[global_allocator]
+static mut ALLOCATOR: BumpAllocator = BumpAllocator::new();
 
 #[lang = "eh_personality"]
 extern "C" fn eh_personality() {}
@@ -97,6 +63,8 @@ pub extern "C" fn rust_begin_unwind(_: &core::panic::PanicInfo) {
 //#[entry]
 #[unsafe(no_mangle)]
 pub extern "C" fn rust_main() -> ! { 
+    init_heap_allocator();
+
     // VGA buffer position
     let vga_index: &mut isize = &mut 0;
 
@@ -108,21 +76,37 @@ pub extern "C" fn rust_main() -> ! {
     // Run prompt loop.
     input::keyboard::keyboard_loop(vga_index);
 
-    loop {
-        unsafe {
-            core::arch::asm!("hlt");
-        }
+    loop {}
+}
+
+/// This function is called on panic.
+#[panic_handler]
+fn panic(info: &PanicInfo) -> ! {
+    let vga_index: &mut isize = &mut 0;
+
+    vga::screen::clear(vga_index);
+
+    if let Some(location) = info.location() {
+        print_string(vga_index, location.file());
+        print_string(vga_index, ":");
+        print_num(vga_index, location.line());
+        vga::write::newline(vga_index);
+    } else {
+        vga::write::string(vga_index, b"No location", vga::buffer::Color::Red);
+        vga::write::newline(vga_index);
     }
+
+    loop {}
 }
 
 /*#![alloc_error_handler]
-  fn alloc_error_handler(_layout: Layout) {
-//loop {}
+fn alloc_error_handler(_layout: Layout) {
+    loop {}
 }*/
 
 fn print_string(vga_index: &mut isize, s: &str) {
-    for b in s.as_bytes() {
-        vga::write::string(vga_index, &[*b], 0xc);
+    for byte in s.bytes() {
+        vga::write::string(vga_index, &[byte], vga::buffer::Color::Red);
     }
 }
 
@@ -131,7 +115,7 @@ fn print_num(vga_index: &mut isize, mut num: u32) {
     let mut i = buf.len();
 
     if num == 0 {
-        vga::write::string(vga_index, b"0", 0xc);
+        vga::write::string(vga_index, b"0", vga::buffer::Color::Red);
         return;
     }
 
@@ -144,24 +128,24 @@ fn print_num(vga_index: &mut isize, mut num: u32) {
     }
 
     for b in buf.get(i..).unwrap_or(&[]) {
-        vga::write::string(vga_index, &[*b], 0xc);
+        vga::write::string(vga_index, &[*b], vga::buffer::Color::Red);
     }
 }
 
-/*fn init_heap_allocator() {
-  unsafe {
-  unsafe extern "C" {
-  static __heap_start: u8;
-  static __heap_end: u8;
-  }
+fn init_heap_allocator() {
+    unsafe {
+        unsafe extern "C" {
+            static __heap_start: u8;
+            static __heap_end: u8;
+        }
 
-  let heap_start = &__heap_start as *const u8 as usize;
-  let heap_end = &__heap_end as *const u8 as usize;
-  let heap_size = heap_end - heap_start;
+        let heap_start = &__heap_start as *const u8 as usize;
+        let heap_end = &__heap_end as *const u8 as usize;
+        let heap_size = heap_end - heap_start;
 
-//#![allow(static_mut_refs)]
-let allocator_ptr = ptr::addr_of_mut!(ALLOCATOR);
-(*allocator_ptr).init(heap_start, heap_size);
+        //#![allow(static_mut_refs)]
+        let allocator_ptr = ptr::addr_of_mut!(ALLOCATOR);
+        (*allocator_ptr).init(heap_start, heap_size);
+    }
 }
-}*/
 

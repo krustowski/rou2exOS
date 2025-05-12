@@ -82,35 +82,35 @@ pub fn handle(vga_index: &mut isize) {
     let mut conns: [Option<tcp::TcpConnection>; ipv4::MAX_CONNS] = Default::default();
 
     vga::write::newline(vga_index);
-    vga::write::string(vga_index, b"Starting a simple TCP tester (hit any key to interrupt)...", 0x0f);
+    vga::write::string(vga_index, b"Starting a simple TCP tester (hit any key to interrupt)...", vga::buffer::Color::White);
     vga::write::newline(vga_index);
 
     loop {
         let ret = ipv4::receive_loop_tcp(&mut conns, callback);
 
         if ret == 0 {
-            vga::write::string(vga_index, b"Received SYN", 0x0f);
+            vga::write::string(vga_index, b"Received SYN", vga::buffer::Color::White);
             vga::write::newline(vga_index);
 
         } else if ret == 1 {
-            vga::write::string(vga_index, b"Received ACK", 0x0f);
+            vga::write::string(vga_index, b"Received ACK", vga::buffer::Color::White);
             vga::write::newline(vga_index);
         } else if ret == 2 {
-            vga::write::string(vga_index, b"Received FIN", 0x0f);
+            vga::write::string(vga_index, b"Received FIN", vga::buffer::Color::White);
             vga::write::newline(vga_index);
             //break;
         } else if ret == 3 {
-            vga::write::string(vga_index, b"Keyboard interrupt", 0x0f);
+            vga::write::string(vga_index, b"Keyboard interrupt", vga::buffer::Color::White);
             vga::write::newline(vga_index);
             break;
         } else if ret == 253 {
-            vga::write::string(vga_index, b"Freed socket", 0x0f);
+            vga::write::string(vga_index, b"Freed socket", vga::buffer::Color::White);
             vga::write::newline(vga_index);
         } else if ret == 254 {
-            vga::write::string(vga_index, b"Unknown conn", 0x0f);
+            vga::write::string(vga_index, b"Unknown conn", vga::buffer::Color::White);
             vga::write::newline(vga_index);
         } else if ret == 255 {
-            vga::write::string(vga_index, b"No free slots", 0x0f);
+            vga::write::string(vga_index, b"No free slots", vga::buffer::Color::White);
             vga::write::newline(vga_index);
         }
     }
@@ -148,8 +148,8 @@ fn handle_tcp_packet(conn: &mut tcp::TcpConnection, tcp_header: &tcp::TcpHeader,
 
             // Try to parse a minimal GET request
             if payload.starts_with(b"GET /") {
-                let mut http_response = [0u8; 1024];
-                let http_len = http_router(payload, &mut http_response);
+                let mut http_response = [0u8; 1420];
+                let http_len = http_router(&payload, &mut http_response);
 
                 let http_slice = http_response.get(..http_len).unwrap_or(&[]);
                 send_response(conn, tcp::ACK | tcp::PSH | tcp::FIN, http_slice);
@@ -197,7 +197,7 @@ fn handle_tcp_packet(conn: &mut tcp::TcpConnection, tcp_header: &tcp::TcpHeader,
 }
 
 fn send_response(conn: &mut tcp::TcpConnection, flags: u16, payload: &[u8]) {
-    let mut out_buf = [0u8; 500];
+    let mut out_buf = [0u8; 1420];
     let mut ipv4_buf = [0u8; 1500];
 
     let tcp_len = tcp::create_packet(
@@ -299,9 +299,9 @@ fn http_router(payload: &[u8], http_response: &mut [u8]) -> usize {
         body = "<html><body><h1>Welcome to rou2exOS HTTP server</h1></body></html>";
         content_type = "text/html";
 
-    } else if match_path(payload, b"/hello") {
-        body = "Hello World from rou2exOS!";
-        content_type = "text/plain";
+    } else if match_path(payload, b"/rouring") {
+        body = "<html><head><style>.index {width: 800px;margin-top: 70px;font-family: Helvetica;}.lefts2 {width: 200px;float: left;}.rights2 {width: 590px;float: right;}.foot {width: 550px;margin-top: 200px;font-family: Helvetica;clear: both;}</style><meta http-equiv=\"Content-Type\" content=\"text/html; charset=UTF-8\"><meta http-equiv=\"Content-language\" content=\"cs, en\"><title>The RouRa Project</title></head><body><center><div class=\"index\"><div class=\"lefts2\"><br><img src=\"https://rouring.net/plug.png\" width=\"200\"></div><div class=\"rights2\"><br><p style=\"font-size: 42px\">The RouRa Project</p><p style=\"font-size: 20px\">Už bude zase dobře</p></div></div><div class=\"foot\"><br><br><br><br>Rouring.net & ReRour 2k16</div></body></center></html>";
+        content_type = "text/html";
 
     } else if match_path(payload, b"/json") {
         body = "{\"message\":\"Hello JSON\"}";

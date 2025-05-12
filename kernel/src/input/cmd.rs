@@ -94,8 +94,8 @@ pub fn handle(input: &[u8], vga_index: &mut isize) {
             }
 
             // Echo back the input
-            vga::write::string(vga_index, b"unknown command: ", 0xc);
-            vga::write::string(vga_index, cmd_name, 0x0f);
+            vga::write::string(vga_index, b"unknown command: ", vga::buffer::Color::Red);
+            vga::write::string(vga_index, cmd_name, vga::buffer::Color::White);
             vga::write::newline(vga_index);
         }
     }
@@ -147,19 +147,19 @@ fn cmd_clear(_args: &[u8], vga_index: &mut isize) {
 }
 
 fn cmd_echo(args: &[u8], vga_index: &mut isize) {
-    vga::write::string(vga_index, args, 0x0f);
+    vga::write::string(vga_index, args, vga::buffer::Color::White);
     vga::write::newline(vga_index);
 }
 
 fn cmd_help(_args: &[u8], vga_index: &mut isize) {
-    vga::write::string(vga_index, b"List of commands:", 0x0f);
+    vga::write::string(vga_index, b"List of commands:", vga::buffer::Color::White);
     vga::write::newline(vga_index);
 
     for cmd in COMMANDS {
-        vga::write::string(vga_index, b" - ", 0x09);
-        vga::write::string(vga_index, cmd.name, 0x09);
-        vga::write::string(vga_index, b": ", 0x09);
-        vga::write::string(vga_index, cmd.description, 0x0f);
+        vga::write::string(vga_index, b" - ", vga::buffer::Color::Blue);
+        vga::write::string(vga_index, cmd.name, vga::buffer::Color::Blue);
+        vga::write::string(vga_index, b": ", vga::buffer::Color::Blue);
+        vga::write::string(vga_index, cmd.description, vga::buffer::Color::White);
         vga::write::newline(vga_index);
     }
 }
@@ -177,17 +177,17 @@ fn cmd_http(_args: &[u8], vga_index: &mut isize) {
     }
 
     vga::write::newline(vga_index);
-    vga::write::string(vga_index, b"Starting a simple HTTP/UDP handler (hit any key to interrupt)...", 0x0f);
+    vga::write::string(vga_index, b"Starting a simple HTTP/UDP handler (hit any key to interrupt)...", vga::buffer::Color::White);
     vga::write::newline(vga_index);
 
     loop {
         let ret = net::ipv4::receive_loop(callback);
 
         if ret == 0 {
-            vga::write::string(vga_index, b"Received a HTTP request, sending response", 0x0f);
+            vga::write::string(vga_index, b"Received a HTTP request, sending response", vga::buffer::Color::White);
             vga::write::newline(vga_index);
         } else if ret == 3 {
-            vga::write::string(vga_index, b"Keyboard interrupt", 0x0f);
+            vga::write::string(vga_index, b"Keyboard interrupt", vga::buffer::Color::White);
             vga::write::newline(vga_index);
             break;
         }
@@ -212,7 +212,7 @@ fn cmd_ping(_args: &[u8], vga_index: &mut isize) {
     let ipv4_len = net::ipv4::create_packet(src_ip, dst_ip, protocol, icmp_slice, &mut ipv4_buf);
     let ipv4_slice = ipv4_buf.get(..ipv4_len).unwrap_or(&[]);
 
-    vga::write::string(vga_index, b"Sending a ping packet...", 0x0f);
+    vga::write::string(vga_index, b"Sending a ping packet...", vga::buffer::Color::White);
     vga::write::newline(vga_index);
 
     net::ipv4::send_packet(ipv4_slice);
@@ -236,6 +236,7 @@ fn cmd_response(_args: &[u8], vga_index: &mut isize) {
                 let icmp_len = net::icmp::create_packet(0, icmp_header.identifier, icmp_header.sequence_number, icmp_payload, &mut icmp_buf);
                 let icmp_slice = icmp_buf.get(..icmp_len).unwrap_or(&[]);
 
+                //let ipv4_len = net::ipv4::create_packet(ipv4_header.dest_ip, ipv4_header.source_ip, ipv4_header.protocol, &icmp_buf[..icmp_len], &mut ipv4_buf);
                 let ipv4_len = net::ipv4::create_packet([192, 168, 3, 2], ipv4_header.source_ip, ipv4_header.protocol, icmp_slice, &mut ipv4_buf);
                 let ipv4_slice = ipv4_buf.get(..ipv4_len).unwrap_or(&[]);
 
@@ -246,23 +247,23 @@ fn cmd_response(_args: &[u8], vga_index: &mut isize) {
     }
 
     vga::write::newline(vga_index);
-    vga::write::string(vga_index, b"Waiting for an ICMP echo request (hit any key to interrupt)...", 0x0f);
+    vga::write::string(vga_index, b"Waiting for an ICMP echo request (hit any key to interrupt)...", vga::buffer::Color::White);
     vga::write::newline(vga_index);
 
     loop {
         let ret = net::ipv4::receive_loop(callback);
 
         if ret == 0 {
-            vga::write::string(vga_index, b"Received a ping request, sending a response", 0x0f);
+            vga::write::string(vga_index, b"Received a ping request, sending a response", vga::buffer::Color::White);
             vga::write::newline(vga_index);
             /*} else if ret == 1 {
-              vga::write::string(vga_index, b"Wrong IPv4 protocol (not ICMP) received", 0xc);
+              vga::write::string(vga_index, b"Wrong IPv4 protocol (not ICMP) received", vga::buffer::Color::Green);
               vga::write::newline(vga_index);*/
     } else if ret == 2 {
-        vga::write::string(vga_index, b"Received a non-request ICMP packet", 0xc);
+        vga::write::string(vga_index, b"Received a non-request ICMP packet", vga::buffer::Color::Green);
         vga::write::newline(vga_index);
     } else if ret == 3 {
-        vga::write::string(vga_index, b"Keyboard interrupt", 0x0f);
+        vga::write::string(vga_index, b"Keyboard interrupt", vga::buffer::Color::White);
         vga::write::newline(vga_index);
         break;
     }
@@ -271,7 +272,7 @@ fn cmd_response(_args: &[u8], vga_index: &mut isize) {
 
 fn cmd_shutdown(_args: &[u8], vga_index: &mut isize) {
     vga::write::newline(vga_index);
-    vga::write::string(vga_index, b" --- Shutting down", 0xb);
+    vga::write::string(vga_index, b" --- Shutting down", vga::buffer::Color::Cyan);
 
     for _ in 0..3 {
         for _ in 0..3_500_000 {
@@ -279,7 +280,7 @@ fn cmd_shutdown(_args: &[u8], vga_index: &mut isize) {
                 core::arch::asm!("nop");
             }
         }
-        vga::write::string(vga_index, b". ", 0xb);
+        vga::write::string(vga_index, b". ", vga::buffer::Color::Cyan);
     }
 
     acpi::shutdown::shutdown();
@@ -292,38 +293,38 @@ fn cmd_tcp(_args: &[u8], vga_index: &mut isize) {
 fn cmd_time(_args: &[u8], vga_index: &mut isize) {
     let (y, mo, d, h, m, s) = time::rtc::read_rtc_full();
 
-    vga::write::string(vga_index, b"RTC Time: ", 0x0f);
+    vga::write::string(vga_index, b"RTC Time: ", vga::buffer::Color::White);
     vga::write::number(vga_index, &mut (h as u64));
 
-    vga::write::string(vga_index, b":", 0x0f);
+    vga::write::string(vga_index, b":", vga::buffer::Color::White);
 
     if m < 10 { 
-        vga::write::string(vga_index, b"0", 0x0f); 
+        vga::write::string(vga_index, b"0", vga::buffer::Color::White); 
     }
     vga::write::number(vga_index, &mut (m as u64));
 
-    vga::write::string(vga_index, b":", 0x0f);
+    vga::write::string(vga_index, b":", vga::buffer::Color::White);
 
     if s < 10 { 
-        vga::write::string(vga_index, b"0", 0x0f); 
+        vga::write::string(vga_index, b"0", vga::buffer::Color::White); 
     }
     vga::write::number(vga_index, &mut (s as u64));
 
     vga::write::newline(vga_index);
 
-    vga::write::string(vga_index, b"RTC Date: ", 0x0f);
+    vga::write::string(vga_index, b"RTC Date: ", vga::buffer::Color::White);
 
     if d < 10 {
-        vga::write::string(vga_index, b"0", 0x0f); 
+        vga::write::string(vga_index, b"0", vga::buffer::Color::White); 
     }
     vga::write::number(vga_index, &mut (d as u64));
-    vga::write::string(vga_index, b"-", 0x0f);
+    vga::write::string(vga_index, b"-", vga::buffer::Color::White);
 
     if mo < 10 {
-        vga::write::string(vga_index, b"0", 0x0f); 
+        vga::write::string(vga_index, b"0", vga::buffer::Color::White); 
     }
     vga::write::number(vga_index, &mut (mo as u64));
-    vga::write::string(vga_index, b"-", 0x0f);
+    vga::write::string(vga_index, b"-", vga::buffer::Color::White);
 
     vga::write::number(vga_index, &mut (y as u64));
 
@@ -338,19 +339,19 @@ fn cmd_uptime(_args: &[u8], vga_index: &mut isize) {
     let mut seconds = total_seconds % 60;
 
     // Print formatted
-    vga::write::string(vga_index, b"Uptime: ", 0x0f);
+    vga::write::string(vga_index, b"Uptime: ", vga::buffer::Color::White);
     vga::write::number(vga_index, &mut hours);
-    vga::write::string(vga_index, b":", 0x0f);
+    vga::write::string(vga_index, b":", vga::buffer::Color::White);
 
     if minutes < 10 {
-        vga::write::string(vga_index, b"0", 0x0f);
+        vga::write::string(vga_index, b"0", vga::buffer::Color::White);
     }
 
     vga::write::number(vga_index, &mut minutes);
-    vga::write::string(vga_index, b":", 0x0f);
+    vga::write::string(vga_index, b":", vga::buffer::Color::White);
 
     if seconds < 10 {
-        vga::write::string(vga_index, b"0", 0x0f);
+        vga::write::string(vga_index, b"0", vga::buffer::Color::White);
     }
 
     vga::write::number(vga_index, &mut seconds);
@@ -359,7 +360,7 @@ fn cmd_uptime(_args: &[u8], vga_index: &mut isize) {
 }
 
 fn cmd_version(_args: &[u8], vga_index: &mut isize) {
-    vga::write::string(vga_index, b"Version: ", 0x0f);
-    vga::write::string(vga_index, KERNEL_VERSION, 0x0f);
+    vga::write::string(vga_index, b"Version: ", vga::buffer::Color::White);
+    vga::write::string(vga_index, KERNEL_VERSION, vga::buffer::Color::White);
     vga::write::newline(vga_index);
 }

@@ -2,8 +2,8 @@ use core::arch::asm;
 use crate::vga;
 
 pub fn print_mode(vga_index: &mut isize) {
-    vga::write::string(vga_index, b"CPU mode: ", 0x0f);
-    vga::write::string(vga_index, check_cpu_mode().as_bytes(), 0x0f);
+    vga::write::string(vga_index, b"CPU mode: ", vga::buffer::Color::White);
+    vga::write::string(vga_index, check_cpu_mode().as_bytes(), vga::buffer::Color::Green);
 
     vga::write::newline(vga_index);
     vga::write::newline(vga_index);

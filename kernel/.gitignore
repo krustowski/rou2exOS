@@ -1,3 +1,4 @@
 /target
 /iso/boot/kernel.*
 /kernel.*
+/*/*/*.o

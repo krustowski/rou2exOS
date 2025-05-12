@@ -7,13 +7,28 @@ init:
 		rustup component add rust-src llvm-tools-preview && \
 		cargo install bootimage
 
+#
+#  BUILD
+#
+
+build: compile_kernel nasm link build_iso
+
 #@cargo rustc --release --target x86_64-r2.json -- -C relocation-model=static --emit=obj
-#@nasm -f elf64 -o asm/gdt.o asm/gdt.asm
-#@nasm -f elf64 -o asm/idt.o asm/idt.asm
-build:
+compile_kernel:
 	@cargo rustc --release -Z build-std=core,compiler_builtins --target x86_64-r2.json -- --emit=obj
-	@ld.lld --verbose -T linker.ld -n --gc-sections -o iso/boot/kernel.elf target/x86_64-r2/release/deps/kernel-*.o
+
+nasm:
+	@nasm -f elf64 -o iso/boot/boot.o iso/boot/boot.asm
+
+link:
+	@ld.lld --verbose -T linker.ld -n --gc-sections -o iso/boot/kernel.elf target/x86_64-r2/release/deps/kernel-*.o iso/boot/boot.o
+
+build_iso:
 	@grub2-mkrescue -o r2.iso iso/
+
+#
+#  RUN
+#
 
 run:
 	@qemu-system-x86_64 \
@@ -21,7 +36,16 @@ run:
 		-drive format=raw,file=target/x86_64-r2/debug/bootimage-x86_64-r2.bin
 
 run_iso: 
-	@qemu-system-x86_64 -cdrom r2.iso -d int,cpu_reset -no-reboot -serial stdio
+	@qemu-system-x86_64 \
+		-m 4G \
+		-cdrom r2.iso \
+		-d int,cpu_reset \
+		-no-reboot \
+		-serial stdio
+
+#
+#  HELPERS
+#
 
 clean:
 	@cargo clean

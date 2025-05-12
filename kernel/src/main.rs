@@ -47,10 +47,10 @@ use x86_64::{
 use core::panic::PanicInfo;
 use core::ptr;
 
-use mem::bump::BumpAllocator;
+//use mem::bump::BumpAllocator;
 
-#[global_allocator]
-static mut ALLOCATOR: BumpAllocator = BumpAllocator::new();
+//#[global_allocator]
+//static mut ALLOCATOR: BumpAllocator = BumpAllocator::new();
 
 /// This function is called on panic.
 #[panic_handler]
@@ -96,18 +96,7 @@ pub extern "C" fn rust_begin_unwind(_: &core::panic::PanicInfo) {
 
 //#[entry]
 #[unsafe(no_mangle)]
-pub extern "C" fn _start() -> ! { 
-    int::load_gdt();
-    int::load_idt();
-    int::set_segment_selectors();
-
-    /*loop {
-      unsafe {
-      x86_64::instructions::interrupts::disable();
-      core::arch::asm!("hlt");
-      }
-      }*/
-
+pub extern "C" fn rust_main() -> ! { 
     // VGA buffer position
     let vga_index: &mut isize = &mut 0;
 
@@ -159,20 +148,20 @@ fn print_num(vga_index: &mut isize, mut num: u32) {
     }
 }
 
-fn init_heap_allocator() {
-    unsafe {
-        unsafe extern "C" {
-            static __heap_start: u8;
-            static __heap_end: u8;
-        }
+/*fn init_heap_allocator() {
+  unsafe {
+  unsafe extern "C" {
+  static __heap_start: u8;
+  static __heap_end: u8;
+  }
 
-        let heap_start = &__heap_start as *const u8 as usize;
-        let heap_end = &__heap_end as *const u8 as usize;
-        let heap_size = heap_end - heap_start;
+  let heap_start = &__heap_start as *const u8 as usize;
+  let heap_end = &__heap_end as *const u8 as usize;
+  let heap_size = heap_end - heap_start;
 
-        //#![allow(static_mut_refs)]
-        let allocator_ptr = ptr::addr_of_mut!(ALLOCATOR);
-        (*allocator_ptr).init(heap_start, heap_size);
-    }
+//#![allow(static_mut_refs)]
+let allocator_ptr = ptr::addr_of_mut!(ALLOCATOR);
+(*allocator_ptr).init(heap_start, heap_size);
 }
+}*/
 

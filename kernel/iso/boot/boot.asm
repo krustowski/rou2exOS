@@ -44,6 +44,15 @@ tss:
     resb 104
 tss_end:
 
+align 4
+global multiboot_ptr
+multiboot_ptr:
+    resd 1
+
+;align 4
+;multiboot_ptr:
+;    resd 1
+
 ;align 16
 ;tss:
     ; IST pointers (7 entries), each 8 bytes
@@ -72,6 +81,8 @@ extern pt_table
 global _start
 
 _start:
+    mov [multiboot_ptr], ebx
+
     cli
 
     ;call setup_paging

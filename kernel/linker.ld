@@ -23,6 +23,7 @@ SECTIONS {
     .bss : {
         *(.bss*)
         *(COMMON)
+	KEEP(*(.multiboot_ptr))
     }
 
     /*.tss : AT(0x1000) {

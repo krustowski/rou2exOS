@@ -46,21 +46,24 @@ pub extern "C" fn rust_begin_unwind(_: &core::panic::PanicInfo) {
     //loop {}
 }
 
+extern "C" {
+    static multiboot_ptr: u32;
+}
+
 #[unsafe(no_mangle)]
-pub extern "C" fn rust_main() -> ! { 
+pub extern "C" fn rust_main() { 
     // VGA buffer position
     let vga_index: &mut isize = &mut 0;
 
     init_heap_allocator();
     vga::screen::clear(vga_index);
 
-    // Show color palette.
-    init::init(vga_index);
+    unsafe {
+        init::init(vga_index, multiboot_ptr);
+    }
 
     // Run prompt loop.
     input::keyboard::keyboard_loop(vga_index);
-
-    loop {}
 }
 
 //

@@ -334,9 +334,9 @@ fn cmd_time(_args: &[u8], vga_index: &mut isize) {
 fn cmd_uptime(_args: &[u8], vga_index: &mut isize) {
     let total_seconds = time::acpi::get_uptime_seconds();
 
-    let mut hours = total_seconds / 3600;
-    let mut minutes = (total_seconds % 3600) / 60;
-    let mut seconds = total_seconds % 60;
+    let hours = total_seconds / 3600;
+    let minutes = (total_seconds % 3600) / 60;
+    let seconds = total_seconds % 60;
 
     // Print formatted
     vga::write::string(vga_index, b"Uptime: ", vga::buffer::Color::White);

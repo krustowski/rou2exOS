@@ -6,7 +6,6 @@ pub fn print_mode(vga_index: &mut isize) {
     vga::write::string(vga_index, check_cpu_mode().as_bytes(), vga::buffer::Color::Green);
 
     vga::write::newline(vga_index);
-    vga::write::newline(vga_index);
 }
 
 /// Function to check CPU mode using CPUID instruction

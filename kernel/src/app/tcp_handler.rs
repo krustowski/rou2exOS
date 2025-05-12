@@ -149,7 +149,7 @@ fn handle_tcp_packet(conn: &mut tcp::TcpConnection, tcp_header: &tcp::TcpHeader,
             // Try to parse a minimal GET request
             if payload.starts_with(b"GET /") {
                 let mut http_response = [0u8; 1420];
-                let http_len = http_router(&payload, &mut http_response);
+                let http_len = http_router(payload, &mut http_response);
 
                 let http_slice = http_response.get(..http_len).unwrap_or(&[]);
                 send_response(conn, tcp::ACK | tcp::PSH | tcp::FIN, http_slice);

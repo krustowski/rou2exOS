@@ -47,6 +47,7 @@ run_iso_debug:
 		-cdrom r2.iso \
 		-d int,cpu_reset \
 		-no-reboot \
+		-no-shutdown \
 		-serial stdio
 
 #

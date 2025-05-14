@@ -47,7 +47,7 @@ pub extern "C" fn rust_begin_unwind(_: &core::panic::PanicInfo) {
 }
 
 extern "C" {
-    static multiboot_ptr: u32;
+    static multiboot_ptr: u64;
 }
 
 #[unsafe(no_mangle)]

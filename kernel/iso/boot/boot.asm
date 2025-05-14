@@ -29,9 +29,9 @@ p3_table:
     resb 4096
 p2_table:
     resb 4096
-stack_bottom:
-    resb 64
-stack_top:
+;stack_bottom:
+;    resb 64
+;stack_top:
 
 align 16
 ist1_stack:
@@ -47,7 +47,7 @@ tss_end:
 align 4
 global multiboot_ptr
 multiboot_ptr:
-    resd 1
+    resq 1
 
 ;align 4
 ;multiboot_ptr:

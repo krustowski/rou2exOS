@@ -28,12 +28,16 @@ pub fn number(vga_index: &mut isize, num: u64) {
 pub fn string(vga_index: &mut isize, string: &[u8], color: buffer::Color) {
     screen::scroll(vga_index);
 
-    for &byte in string {
-        unsafe {
-            *buffer::VGA_BUFFER.offset(*vga_index) = byte;
-            *buffer::VGA_BUFFER.offset(*vga_index + 1) = color as u8;
-            *vga_index += 2;
-        }
+    for &b in string {
+        byte(vga_index, b, color);
+    }
+}
+
+pub fn byte(vga_index: &mut isize, b: u8, color: buffer::Color) {
+    unsafe {
+        *buffer::VGA_BUFFER.offset(*vga_index) = b;
+        *buffer::VGA_BUFFER.offset(*vga_index + 1) = color as u8;
+        *vga_index += 2;
     }
 }
 

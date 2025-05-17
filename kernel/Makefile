@@ -48,7 +48,7 @@ run_iso_debug:
 	@qemu-system-x86_64 \
 		-boot d \
 		-m 2G \
-		-vga cirrus \
+		-vga std \
 		-cdrom r2.iso \
 		-d int,cpu_reset \
 		-no-reboot \

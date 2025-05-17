@@ -136,6 +136,55 @@ fn delay() {
     }
 }
 
+fn simple_hash(x: usize) -> usize {
+    (x ^ 0x5f5f5f5f).wrapping_mul(2654435761)
+}
+
+fn draw_string(mut x: usize, y: usize, s: &[u8], color: crate::vga::buffer::Color, vga_index: &mut isize) {
+    for &c in s {
+        draw_char(x, y, c, color, vga_index);
+        x += 1;
+    }
+}
+
+fn write_number(mut x: usize, y: usize, mut value: usize, vga_index: &mut isize) {
+    // Handle 0 explicitly
+    if value == 0 {
+        draw_char(x, y, b'0', crate::vga::buffer::Color::White, vga_index);
+        return;
+    }
+
+    let mut digits = [0u8; 10]; // up to 10 digits
+    let mut i = 0;
+
+    while value > 0 {
+        if let Some(d) = digits.get_mut(i) {
+            *d = (value % 10) as u8 + b'0';
+        }
+
+        value /= 10;
+        i += 1;
+    }
+
+    // Print in reverse order
+    while i > 0 {
+        i -= 1;
+
+        if let Some(d) = digits.get(i) {
+            draw_char(x, y, *d, crate::vga::buffer::Color::White, vga_index);
+        }
+
+        x += 1;
+    }
+}
+
+fn draw_char(x: usize, y: usize, ch: u8, color: crate::vga::buffer::Color, vga_index: &mut isize) {
+    let index = 2 * (y * WIDTH as usize + x);
+
+    *vga_index = 2 * (y as isize * WIDTH + x as isize);
+    crate::vga::write::byte(vga_index, ch, color);
+}
+
 //
 //
 //
@@ -167,14 +216,17 @@ pub fn run(vga_index: &mut isize) {
                     snake.len += 1;
                 }
 
-                // Simple food reposition (not random yet)
-                food_x = (food_x + 8) % WIDTH as usize;
-                food_y = (food_y + 4) % HEIGHT as usize;
+                let seed = x * 13 + y * 31;
+                food_x = simple_hash(seed) % WIDTH as usize;
+                food_y = simple_hash(seed.wrapping_add(1)) % HEIGHT as usize;
             }
         }
 
         snake.draw(vga_index);
         draw_food(food_x, food_y, vga_index);
+
+        draw_string(0, 0, b"Score: ", crate::vga::buffer::Color::White, vga_index);
+        write_number(7, 0, snake.len - 3, vga_index);
 
         delay();
     }
@@ -212,3 +264,4 @@ pub fn run_old(vga_index: &mut isize) {
         }
     }
 }
+

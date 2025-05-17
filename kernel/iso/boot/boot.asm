@@ -3,23 +3,34 @@
 
 BITS 32
 
-section .multiboot_header
-align 8
-MB2_MAGIC        equ 0xe85250d6
-MB2_ARCH         equ 0x0
-MB2_HEADER_LEN   equ header_end - header_start
-MB2_CHECKSUM     equ -(MB2_MAGIC + MB2_ARCH + MB2_HEADER_LEN)
+;section .multiboot2_header
+;align 8
 
-header_start:
-    dd MB2_MAGIC
-    dd MB2_ARCH
-    dd MB2_HEADER_LEN
-    dd MB2_CHECKSUM
+;MB2_MAGIC        equ 0xe85250d6
+;MB2_ARCH         equ 0x0
+;MB2_HEADER_LEN   equ header_end - header_start
+;MB2_CHECKSUM     equ -(MB2_MAGIC + MB2_ARCH + MB2_HEADER_LEN)
+
+;header_start:
+;    dd MB2_MAGIC
+;    dd MB2_ARCH
+;    dd MB2_HEADER_LEN
+;    dd MB2_CHECKSUM
+
+   ; Framebuffer tag
+    ;dw 5 	; type (framebuffer)
+    ;dw 0        ; flags
+    ;dd 24	; size
+    ;dd 1024	; width
+    ;dd 768	; height
+    ;dd 32	; depth
+    ;dd 0
+
     ; End tag (type = 0, size = 8)
-    dw 0
-    dw 0
-    dd 8
-header_end:
+;    dw 0
+;    dw 0
+;    dd 8
+;header_end:
 
 section .bss
 align 4096
@@ -48,10 +59,6 @@ align 4
 global multiboot_ptr
 multiboot_ptr:
     resq 1
-
-;align 4
-;multiboot_ptr:
-;    resd 1
 
 ;align 16
 ;tss:

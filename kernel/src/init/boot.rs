@@ -89,7 +89,7 @@ pub unsafe fn parse_multiboot2_info(vga_index: &mut isize, base_addr: usize) {
             }
             6 => {
                 //log_fn("  Memory map");
-                let mmap_tag = &*(addr as *const MemoryMapTag);
+                let mmap_tag = &*(ptr as *const MemoryMapTag);
                 let entries_start = (addr + core::mem::size_of::<MemoryMapTag>()) as *const u8;
                 let entry_size = mmap_tag.entry_size as usize;
 
@@ -101,7 +101,6 @@ pub unsafe fn parse_multiboot2_info(vga_index: &mut isize, base_addr: usize) {
                         let entry = &*entry_ptr;
 
                         if entry.typ == 1 {
-                            continue;
                             vga::write::newline(vga_index);
                             vga::write::string(vga_index, b"Usable mem region: ", vga::buffer::Color::White);
                             vga::write::number(vga_index, entry.base_addr as u64);

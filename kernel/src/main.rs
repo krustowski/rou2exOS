@@ -9,16 +9,7 @@
 //#![feature(lang_items)]
 #![feature(alloc_error_handler)]
 
-#[unsafe(no_mangle)]
-#[unsafe(link_section = ".multiboot2_header")]
-pub static MULTIBOOT2_HEADER: [u32; 8] = [
-    0xE85250D6, // magic
-    0,          // architecture (0 = i386)
-    8 * 4,      // header length in bytes (8 entries * 4 bytes)
-    0xFFFFFFFFu32 - (0xE85250D6u32 + (8 * 4)) + 1, // checksum
-    0, 0,       // dummy tag (type = 0, size = 0, will be ignored)
-    0, 8,       // end tag (type = 0, size = 8)
-];
+mod multiboot2;
 
 mod acpi;
 mod app;
@@ -29,6 +20,7 @@ mod net;
 mod sound;
 mod time;
 mod vga;
+//mod video;
 
 use core::panic::PanicInfo;
 use core::ptr;

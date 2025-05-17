@@ -30,6 +30,11 @@ static COMMANDS: &[Command] = &[
         function: cmd_echo,
     },
     Command {
+        name: b"game",
+        description: b"runs a simple VGA text mode game",
+        function: cmd_game,
+    },
+    Command {
         name: b"help",
         description: b"shows this output",
         function: cmd_help,
@@ -162,6 +167,11 @@ fn cmd_help(_args: &[u8], vga_index: &mut isize) {
         vga::write::string(vga_index, cmd.description, vga::buffer::Color::White);
         vga::write::newline(vga_index);
     }
+}
+
+fn cmd_game(_args: &[u8], vga_index: &mut isize) {
+    vga::screen::clear(vga_index);
+    app::game::run(vga_index);
 }
 
 fn cmd_http(_args: &[u8], vga_index: &mut isize) {

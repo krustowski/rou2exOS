@@ -5,6 +5,7 @@ pub const HEIGHT: usize = 25;
 
 #[derive(Debug, Clone, Copy)]
 pub enum Color {
+    Black = 0x00,
     Blue = 0x09,
     White = 0x0f,
     Green = 0xa,

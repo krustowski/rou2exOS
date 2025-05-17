@@ -42,6 +42,20 @@ struct MemoryMapEntry {
     reserved: u32,  // must be 0
 }
 
+#[repr(C, packed)]
+pub struct FramebufferTag {
+    typ: u32,
+    pub size: u32,
+    pub addr: u64,
+    pub pitch: u32,
+    pub width: u32,
+    pub height: u32,
+    pub bpp: u8,
+    fb_type: u8,
+    reserved: u16,
+    // followed by palette or color info
+}
+
 //pub unsafe fn parse_multiboot2_info(base_addr: usize, mut log_fn: impl FnMut(&str)) {
 pub unsafe fn parse_multiboot2_info(vga_index: &mut isize, base_addr: usize) {
     // Ensure alignment (Multiboot2 requires 8-byte aligned structure)
@@ -114,6 +128,17 @@ pub unsafe fn parse_multiboot2_info(vga_index: &mut isize, base_addr: usize) {
                         }
                     }
                 }
+            }
+            8 => {
+                let fb_tag = &*(ptr as *const FramebufferTag);
+
+                vga::write::newline(vga_index);
+                vga::write::string(vga_index, b"Frame buf (bpp + res): ", vga::buffer::Color::White);
+                vga::write::number(vga_index, fb_tag.bpp as u64);
+                vga::write::string(vga_index, b" + ", vga::buffer::Color::White);
+                vga::write::number(vga_index, fb_tag.width as u64);
+                vga::write::string(vga_index, b"x", vga::buffer::Color::White);
+                vga::write::number(vga_index, fb_tag.height as u64);
             }
             _ => {
                 //log_fn("  Unknown tag")

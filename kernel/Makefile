@@ -11,7 +11,7 @@ init:
 #  BUILD
 #
 
-build: compile_kernel nasm link build_iso
+build: compile_kernel nasm link build_iso 
 
 #@cargo rustc --release --target x86_64-r2.json -- -C relocation-model=static --emit=obj
 compile_kernel:
@@ -26,6 +26,12 @@ link:
 build_iso:
 	@grub2-mkrescue -o r2.iso iso/ \
 		--modules="multiboot2 vbe video video_bochs video_cirrus gfxterm all_video"
+
+build_floppy:
+	@dd if=/dev/zero of=fat.img bs=512 count=2880
+	@mkfs.fat -F 12 fat.img
+	@echo "Hello from floppy!" > /tmp/hello.txt
+	@mcopy -i fat.img /tmp/hello.txt ::HELLO.TXT
 
 #
 #  RUN
@@ -44,7 +50,7 @@ run_iso:
 		-cdrom r2.iso \
 		-serial pty
 
-run_iso_floppy: 
+run_iso_floppy: build_floppy
 	@qemu-system-x86_64 \
 		-boot d \
 		-m 2G \

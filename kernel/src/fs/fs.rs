@@ -123,6 +123,42 @@ impl<'a, D: BlockDevice> Fs<'a, D> {
         entry & 0x0FFF
     }
 
+    pub fn list_dir(&self, start_cluster: u16, vga_index: &mut isize) {
+        let entry_size = core::mem::size_of::<Entry>();
+        let entries_per_sector = 512 / entry_size;
+        let mut buf = [0u8; 512];
+
+        let mut current_cluster = start_cluster;
+
+        loop {
+            //let sector_start = self.cluster_to_lba(current_cluster);
+
+            for i in 0..self.boot_sector.sectors_per_cluster {
+                self.device.read_sector(current_cluster as u64 + i as u64, &mut buf, vga_index);
+
+                let entries_ptr = buf.as_ptr() as *const Entry;
+                for entry_index in 0..entries_per_sector {
+                    let entry = unsafe { &*entries_ptr.add(entry_index) };
+
+                    if entry.name[0] == 0x00 {
+                        return;
+                    }
+
+                    if entry.name[0] == 0xE5 || entry.attr & 0x08 != 0 {
+                        continue;
+                    }
+
+                    self.print_name(entry, vga_index);
+                }
+            }
+
+            current_cluster = self.read_fat12_entry(current_cluster, vga_index);
+            if current_cluster >= 0xFF8 {
+                break;
+            }
+        }
+    }
+
     pub fn list_root_dir(&self, vga_index: &mut isize) {
         let entry_size = core::mem::size_of::<Entry>();
         let entries_per_sector = 512 / entry_size;
@@ -167,15 +203,9 @@ impl<'a, D: BlockDevice> Fs<'a, D> {
 
                 self.print_name(entry, vga_index);
 
-                if debug_enabled() {
+                /*if debug_enabled() {
                     self.read_file(entry.start_cluster, vga_index);
-                }
-
-                /*self.read_file(entry.start_cluster, |data| {
-                  for i in 0..data.len() - 1 {
-                  crate::vga::write::byte(vga_index, data[i], crate::vga::buffer::Color::Yellow);
-                  }
-                  }, vga_index);*/
+                }*/
             }
         }
     }
@@ -183,7 +213,7 @@ impl<'a, D: BlockDevice> Fs<'a, D> {
     fn print_name(&self, entry: &Entry, vga_index: &mut isize) {
         let mut printed_dot = false;
 
-        crate::vga::write::string(vga_index, b"File: ", crate::vga::buffer::Color::White);
+        crate::vga::write::string(vga_index, b" ", crate::vga::buffer::Color::White);
 
         for &b in &entry.name {
             if b == b' ' {
@@ -204,6 +234,10 @@ impl<'a, D: BlockDevice> Fs<'a, D> {
                 break;
             }
             crate::vga::write::byte(vga_index, b, crate::vga::buffer::Color::Pink);
+        }
+
+        if entry.attr & 0x10 != 0 {
+            crate::vga::write::string(vga_index, b" => DIR", crate::vga::buffer::Color::White);
         }
 
         crate::vga::write::newline(vga_index);

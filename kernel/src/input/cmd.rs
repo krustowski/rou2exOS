@@ -1,5 +1,7 @@
 use crate::acpi;
 use crate::app;
+use crate::init::config;
+use crate::fs;
 use crate::net;
 use crate::sound;
 use crate::time;
@@ -23,6 +25,11 @@ static COMMANDS: &[Command] = &[
         name: b"cls",
         description: b"clears the screen",
         function: cmd_clear,
+    },
+    Command {
+        name: b"dir",
+        description: b"lists the current directory",
+        function: cmd_dir,
     },
     Command {
         name: b"echo",
@@ -149,6 +156,20 @@ fn cmd_beep(_args: &[u8], _vga_index: &mut isize) {
 
 fn cmd_clear(_args: &[u8], vga_index: &mut isize) {
     vga::screen::clear(vga_index);
+}
+
+fn cmd_dir(_args: &[u8], vga_index: &mut isize) {
+    let floppy = fs::block::Floppy;
+
+    match fs::fs::Fs::new(&floppy, vga_index) {
+        Ok(fs) => {
+            fs.list_dir(19, vga_index);
+        }
+        Err(e) => {
+            crate::vga::write::string(vga_index, e.as_bytes(), crate::vga::buffer::Color::Red);
+            crate::vga::write::newline(vga_index);
+        }
+    }
 }
 
 fn cmd_echo(args: &[u8], vga_index: &mut isize) {

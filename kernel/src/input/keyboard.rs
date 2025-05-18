@@ -1,12 +1,9 @@
 use crate::vga;
 use crate::input::cmd;
 use crate::input::port;
+use crate::init::config::{HOST, PATH, USER};
 
 const INPUT_BUFFER_SIZE: usize = 128;
-
-const USER: &[u8] = b"guest";
-const HOST: &[u8] = b"rou2ex";
-const PATH: &[u8] = b"/";
 
 fn prompt(vga_index: &mut isize) {
     vga::write::string(vga_index, b"[", vga::buffer::Color::Green);
@@ -14,7 +11,9 @@ fn prompt(vga_index: &mut isize) {
     vga::write::string(vga_index, b"@", vga::buffer::Color::Green);
     vga::write::string(vga_index, HOST, vga::buffer::Color::Green);
     vga::write::string(vga_index, b":", vga::buffer::Color::Green);
-    vga::write::string(vga_index, PATH, vga::buffer::Color::Blue);
+    unsafe {
+        vga::write::string(vga_index, PATH, vga::buffer::Color::Blue);
+    }
     vga::write::string(vga_index, b"] > ", vga::buffer::Color::Green);
 }
 

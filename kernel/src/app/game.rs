@@ -196,7 +196,14 @@ pub fn run(vga_index: &mut isize) {
     let mut food_y = 10;
 
     loop {
-        if read_scancode() == 0xE0 {
+        let code = read_scancode();
+
+        if code == 0x01 {
+            crate::vga::screen::clear(vga_index);
+            break;
+        }
+
+        if code == 0xE0 {
             match read_scancode() {
                 0x48 => snake.set_dir(Dir::Up),
                 0x50 => snake.set_dir(Dir::Down),
@@ -229,39 +236,6 @@ pub fn run(vga_index: &mut isize) {
         write_number(7, 0, snake.len - 3, vga_index);
 
         delay();
-    }
-}
-
-pub fn run_old(vga_index: &mut isize) {
-    let mut x = 40;
-    let mut y = 12;
-
-    loop {
-        *vga_index = 2 * (y * WIDTH + x);
-        crate::vga::write::string(vga_index, b"@", crate::vga::buffer::Color::Yellow);
-        //draw(x, y, b'@', 0x1f); // draw white '@' on blue
-
-        let code = read_scancode();
-
-        if code == 27 {
-            break;
-        }
-
-        if code == 0xE0 {
-            let next = read_scancode();
-
-            *vga_index -= 2;
-            crate::vga::write::string(vga_index, b"@", crate::vga::buffer::Color::Black);
-            //draw(x, y, b' ', 0x0f); // erase old position
-
-            match next {
-                KEY_UP => if y > 0         { y -= 1; },       // Up
-                KEY_DOWN => if y < HEIGHT-1 { y += 1; },       // Down
-                KEY_LEFT => if x > 0         { x -= 1; },       // Left
-                KEY_RIGHT => if x < WIDTH-1  { x += 1; },       // Right
-                _ => {}
-            }
-        }
     }
 }
 

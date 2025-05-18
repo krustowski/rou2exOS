@@ -163,7 +163,9 @@ fn cmd_dir(_args: &[u8], vga_index: &mut isize) {
 
     match fs::fs::Fs::new(&floppy, vga_index) {
         Ok(fs) => {
-            fs.list_dir(19, vga_index);
+            unsafe {
+                fs.list_dir(config::PATH_CLUSTER, vga_index);
+            }
         }
         Err(e) => {
             crate::vga::write::string(vga_index, e.as_bytes(), crate::vga::buffer::Color::Red);

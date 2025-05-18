@@ -130,14 +130,19 @@ impl<'a, D: BlockDevice> Fs<'a, D> {
 
         let mut current_cluster = start_cluster;
 
-        loop {
-            //let sector_start = self.cluster_to_lba(current_cluster);
+        if start_cluster == 0 {
+            let total_entries = self.boot_sector.root_entry_count as usize;
+            let total_sectors = (total_entries * entry_size + 511) / 512;
 
-            for i in 0..self.boot_sector.sectors_per_cluster {
-                self.device.read_sector(current_cluster as u64 + i as u64, &mut buf, vga_index);
+            for sector_index in 0..total_sectors {
+                self.device.read_sector(self.root_dir_start_lba + sector_index as u64, &mut buf, vga_index);
 
                 let entries_ptr = buf.as_ptr() as *const Entry;
                 for entry_index in 0..entries_per_sector {
+                    if sector_index * entries_per_sector + entry_index >= total_entries {
+                        return;
+                    }
+
                     let entry = unsafe { &*entries_ptr.add(entry_index) };
 
                     if entry.name[0] == 0x00 {
@@ -151,10 +156,33 @@ impl<'a, D: BlockDevice> Fs<'a, D> {
                     self.print_name(entry, vga_index);
                 }
             }
+        } else {
+            loop {
+                let sector_start = self.cluster_to_lba(current_cluster);
 
-            current_cluster = self.read_fat12_entry(current_cluster, vga_index);
-            if current_cluster >= 0xFF8 {
-                break;
+                for i in 0..self.boot_sector.sectors_per_cluster {
+                    self.device.read_sector(sector_start as u64 + i as u64, &mut buf, vga_index);
+
+                    let entries_ptr = buf.as_ptr() as *const Entry;
+                    for entry_index in 0..entries_per_sector {
+                        let entry = unsafe { &*entries_ptr.add(entry_index) };
+
+                        if entry.name[0] == 0x00 {
+                            return;
+                        }
+
+                        if entry.name[0] == 0xE5 || entry.attr & 0x08 != 0 {
+                            continue;
+                        }
+
+                        self.print_name(entry, vga_index);
+                    }
+                }
+
+                current_cluster = self.read_fat12_entry(current_cluster, vga_index);
+                if current_cluster >= 0xFF8 {
+                    break;
+                }
             }
         }
     }
@@ -204,8 +232,8 @@ impl<'a, D: BlockDevice> Fs<'a, D> {
                 self.print_name(entry, vga_index);
 
                 /*if debug_enabled() {
-                    self.read_file(entry.start_cluster, vga_index);
-                }*/
+                  self.read_file(entry.start_cluster, vga_index);
+                  }*/
             }
         }
     }
@@ -237,7 +265,8 @@ impl<'a, D: BlockDevice> Fs<'a, D> {
         }
 
         if entry.attr & 0x10 != 0 {
-            crate::vga::write::string(vga_index, b" => DIR", crate::vga::buffer::Color::White);
+            crate::vga::write::string(vga_index, b" => DIR => ", crate::vga::buffer::Color::White);
+            crate::vga::write::number(vga_index, entry.start_cluster as u64);
         }
 
         crate::vga::write::newline(vga_index);

@@ -2,7 +2,7 @@ pub const USER: &[u8] = b"guest";
 pub const HOST: &[u8] = b"rou2ex";
 
 pub static mut PATH: &[u8] = b"/";
-pub static mut PATH_CLUSTER: u16 = 19;
+pub static mut PATH_CLUSTER: u16 = 0;
 
 //
 //

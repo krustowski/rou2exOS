@@ -8,6 +8,18 @@ pub fn print_mode(vga_index: &mut isize) {
     vga::write::newline(vga_index);
 }
 
+pub fn check_mode() -> crate::init::result::InitResult {
+
+    let mode = check_cpu_mode();
+
+    if mode.as_bytes().len() > 5 && mode.as_bytes()[0..4] == *b"Long" {
+        return crate::init::result::InitResult::Passed;
+    }
+
+
+    crate::init::result::InitResult::Failed
+}
+
 /// Function to check CPU mode using CPUID instruction
 fn check_cpu_mode() -> &'static str {
     let cpuid_supported = cpuid(0x1);

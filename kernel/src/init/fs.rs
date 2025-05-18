@@ -1,5 +1,24 @@
 use crate::fs::block::Floppy;
 use crate::fs::fs::Fs;
+use crate::init::result;
+
+pub fn check_floppy(vga_index: &mut isize) -> result::InitResult {
+    let floppy = Floppy;
+    Floppy::init();
+
+    let res: result::InitResult;
+
+    match Fs::new(&floppy, vga_index) {
+        Ok(_) => {
+            res = result::InitResult::Passed
+        }
+        Err(_) => {
+            res = result::InitResult::Skipped
+        }
+    }
+
+    res
+} 
 
 pub fn print_info(vga_index: &mut isize) {
     let floppy = Floppy;
@@ -8,6 +27,13 @@ pub fn print_info(vga_index: &mut isize) {
     crate::vga::write::string(vga_index, b"Reading floppy...", crate::vga::buffer::Color::White);
     crate::vga::write::newline(vga_index);
 
-    let fs = Fs::new(&floppy, vga_index);
-    fs.list_root_dir(vga_index);
+    match Fs::new(&floppy, vga_index) {
+        Ok(fs) => {
+            fs.list_root_dir(vga_index);
+        }
+        Err(e) => {
+            crate::vga::write::string(vga_index, e.as_bytes(), crate::vga::buffer::Color::Red);
+            crate::vga::write::newline(vga_index);
+        }
+    }
 }

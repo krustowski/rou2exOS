@@ -1,19 +1,23 @@
 use crate::vga;
+use crate::init::result::InitResult;
 
-pub fn print_info(vga_index: &mut isize, multiboot_ptr: u64) {
-    vga::write::string(vga_index, b"Multiboot2 pointer: ", vga::buffer::Color::White);
-    vga::write::number(vga_index, (multiboot_ptr as u32) as u64);
-
+pub fn print_info(vga_index: &mut isize, multiboot_ptr: u64) -> InitResult {
     unsafe {
         /*parse_multiboot2_info(multiboot_ptr as usize, |msg| {
-            for b in msg.as_bytes() {
-                vga::write::byte(vga_index, *b, vga::buffer::Color::Yellow);
-            }
-        });*/
-        parse_multiboot2_info(vga_index, (multiboot_ptr as u32) as usize);
+          for b in msg.as_bytes() {
+          vga::write::byte(vga_index, *b, vga::buffer::Color::Yellow);
+          }
+          });*/
+        if parse_multiboot2_info(vga_index, (multiboot_ptr as u32) as usize) > 0 {
+            return InitResult::Passed;
+        }
     }
 
+    vga::write::string(vga_index, b"Multiboot2 pointer: ", vga::buffer::Color::White);
+    vga::write::number(vga_index, (multiboot_ptr as u32) as u64);
     vga::write::newline(vga_index);
+
+    InitResult::Failed
 }
 
 #[repr(C)]
@@ -30,7 +34,7 @@ struct MemoryMapTag {
     size: u32,          // size of this tag including entries
     entry_size: u32,    // size of each entry (usually 24 bytes)
     entry_version: u32, // usually 0
-    // followed by [MemoryMapEntry]...
+                        // followed by [MemoryMapEntry]...
 }
 
 #[repr(C, packed)]
@@ -57,7 +61,7 @@ pub struct FramebufferTag {
 }
 
 //pub unsafe fn parse_multiboot2_info(base_addr: usize, mut log_fn: impl FnMut(&str)) {
-pub unsafe fn parse_multiboot2_info(vga_index: &mut isize, base_addr: usize) {
+pub unsafe fn parse_multiboot2_info(vga_index: &mut isize, base_addr: usize) -> usize {
     // Ensure alignment (Multiboot2 requires 8-byte aligned structure)
     let addr = align_up(base_addr, 8);
 
@@ -115,16 +119,11 @@ pub unsafe fn parse_multiboot2_info(vga_index: &mut isize, base_addr: usize) {
                         let entry = &*entry_ptr;
 
                         if entry.typ == 1 {
-                            vga::write::newline(vga_index);
-                            vga::write::string(vga_index, b"Usable mem region: ", vga::buffer::Color::White);
+                            /*vga::write::string(vga_index, b"Usable mem region: ", vga::buffer::Color::White);
                             vga::write::number(vga_index, entry.base_addr as u64);
                             vga::write::string(vga_index, b" - ", vga::buffer::Color::White);
                             vga::write::number(vga_index, entry.length as u64);
-                            /*vga_println!(
-                              "Usable region: base = {:#x}, length = {:#x}",
-                              entry.base_addr,
-                              entry.length
-                              );*/
+                            vga::write::newline(vga_index);*/
                         }
                     }
                 }
@@ -132,13 +131,14 @@ pub unsafe fn parse_multiboot2_info(vga_index: &mut isize, base_addr: usize) {
             8 => {
                 let fb_tag = &*(ptr as *const FramebufferTag);
 
-                vga::write::newline(vga_index);
-                vga::write::string(vga_index, b"Frame buf (bpp + res): ", vga::buffer::Color::White);
+                /*vga::write::string(vga_index, b"Frame buf (bpp + res): ", vga::buffer::Color::White);
                 vga::write::number(vga_index, fb_tag.bpp as u64);
                 vga::write::string(vga_index, b" + ", vga::buffer::Color::White);
                 vga::write::number(vga_index, fb_tag.width as u64);
                 vga::write::string(vga_index, b"x", vga::buffer::Color::White);
                 vga::write::number(vga_index, fb_tag.height as u64);
+                vga::write::newline(vga_index);*/
+
             }
             _ => {
                 //log_fn("  Unknown tag")
@@ -153,6 +153,8 @@ pub unsafe fn parse_multiboot2_info(vga_index: &mut isize, base_addr: usize) {
             break;
         }
     }
+
+    tag_count
 }
 
 fn align_up(x: usize, align: usize) -> usize {

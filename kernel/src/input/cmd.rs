@@ -5,7 +5,7 @@ use crate::sound;
 use crate::time;
 use crate::vga;
 
-const KERNEL_VERSION: &[u8] = b"0.4.0";
+const KERNEL_VERSION: &[u8] = b"0.6.0";
 
 struct Command {
     name: &'static [u8],

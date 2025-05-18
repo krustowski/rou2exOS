@@ -208,25 +208,27 @@ impl Floppy {
         let sector = Floppy::read_byte();
         let bytesize = Floppy::read_byte(); // sector size as N where size = 128 << N
 
-        crate::vga::write::string(vga_index, b"ST0: ", crate::vga::buffer::Color::Pink);
+        /*crate::vga::write::string(vga_index, b"ST0: ", crate::vga::buffer::Color::Pink);
         crate::vga::write::number(vga_index, st0 as u64);
         crate::vga::write::string(vga_index, b", ST1: ", crate::vga::buffer::Color::Pink);
         crate::vga::write::number(vga_index, st1 as u64);
         crate::vga::write::string(vga_index, b", ST2: ", crate::vga::buffer::Color::Pink);
         crate::vga::write::number(vga_index, st2 as u64);
-        crate::vga::write::newline(vga_index);
+        crate::vga::write::newline(vga_index);*/
     }
 
     pub fn read_sector_dma(lba: u64, buffer: &mut [u8; 512], vga_index: &mut isize) {
         let (c, h, s) = lba_to_chs(lba);
 
+        /*crate::vga::write::string(vga_index, b"LBA: ", crate::vga::buffer::Color::Cyan);
+        crate::vga::write::number(vga_index, lba);
         crate::vga::write::string(vga_index, b"; CHS: ", crate::vga::buffer::Color::Cyan);
         crate::vga::write::number(vga_index, c as u64);
         crate::vga::write::string(vga_index, b", ", crate::vga::buffer::Color::Cyan);
         crate::vga::write::number(vga_index, h as u64);
         crate::vga::write::string(vga_index, b", ", crate::vga::buffer::Color::Cyan);
         crate::vga::write::number(vga_index, s as u64);
-        crate::vga::write::newline(vga_index);
+        crate::vga::write::newline(vga_index);*/
 
         unsafe {
             dma_init(DMA_BUFFER.as_ptr() as u32, 512);
@@ -253,82 +255,10 @@ impl Floppy {
         }
     }
 
-
-    pub fn read_sector_chs(c: u8, h: u8, s: u8, buffer: &mut [u8; 512]) {
-        motor_on();
-
-        // Send READ DATA command (0x46 = MFM, skip errors)
-        floppy_write_cmd(0x46);
-        floppy_write_cmd((h << 2) | 0); // Head + drive
-        floppy_write_cmd(c);           // Cylinder
-        floppy_write_cmd(h);           // Head
-        floppy_write_cmd(s);           // Sector (1-based)
-        floppy_write_cmd(2);           // 512 bytes/sector → 2^2 = 2
-        floppy_write_cmd(18);          // Sectors/track
-        floppy_write_cmd(0x1B);        // GAP3 length
-        floppy_write_cmd(0xFF);        // DTL (not used with 512-byte sectors)
-
-        // Poll until transfer completes
-        wait_for_data();
-
-        // For now: fill buffer with fake test data (real: map to DMA buffer)
-        buffer.copy_from_slice(&[0xAB; 512]);
-    }
-
-    pub fn read_sector_chs_old(cyl: u8, head: u8, sector: u8, buffer: &mut [u8; 512]) {
-        unsafe {
-            // Set up DMA (or fake it if doing PIO)
-            // Send READ DATA command (0x46 = MFM, multi-track, skip on error)
-            Self::send_byte(0x46);
-            Self::send_byte((head << 2) | 0); // Drive 0, head
-            Self::send_byte(cyl);
-            Self::send_byte(head);
-            Self::send_byte(sector);
-            Self::send_byte(2); // 512 bytes/sector -> 2^2 = 2
-            Self::send_byte(18); // end of track
-            Self::send_byte(0x1B); // GAP3 length
-            Self::send_byte(0xFF); // DTL (unused in 512 byte sectors)
-
-            //fdc_wait_irq();
-
-            // Read 512 bytes from FDC data port (PIO)
-            for i in 0..512 {
-                for _ in 0..100000 {
-                    if inb(0x3F4) & 0x80 != 0 {
-                        break;
-                    }
-                }
-                if let Some(buf) = buffer.get_mut(i) {
-                    *buf = inb(0x3F5);
-                }
-            }
-
-
-            // Read 7 result bytes
-            let mut result = [0u8; 7];
-            for i in 0..7 {
-                for _ in 0..100000 {
-                    if inb(0x3F4) & 0x80 != 0 {
-                        break;
-                    }
-                }
-                if let Some(res) = result.get_mut(i) {
-                    *res = inb(0x3F5);
-                }
-            }
-        }
-    }
-
-    }
+}
 
     impl BlockDevice for Floppy {
         fn read_sector(&self, lba: u64, buffer: &mut [u8; 512], vga_index: &mut isize) {
-            //let (cyl, head, sector) = lba_to_chs(lba);
-            //Self::read_sector_chs(cyl, head, sector, buffer);
-            crate::vga::write::string(vga_index, b"LBA: ", crate::vga::buffer::Color::Cyan);
-            crate::vga::write::number(vga_index, lba);
-            //crate::vga::write::newline(vga_index);
-
             Self::read_sector_dma(lba, buffer, vga_index);
         }
 

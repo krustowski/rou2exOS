@@ -15,14 +15,16 @@ impl<'a, D: BlockDevice> Fs<'a, D> {
         let mut sector = [0u8; 512];
         device.read_sector(0, &mut sector, vga_index);
 
-        /*for i in 0..512 {
-            /*if &sector[i..i+5] == b"FAT12" {
+        for i in 0..512 - 5 {
+            if &sector[i..i+5] == b"FAT12" {
                 crate::vga::write::string(vga_index, b"Found FAT12", crate::vga::buffer::Color::Green);
-            }*/
-            if let Some(b) = sector.get(i) {
-                crate::vga::write::number(vga_index, *b as u64);
+                crate::vga::write::newline(vga_index);
+                break;
             }
-        }*/
+            /*if let Some(b) = sector.get(i) {
+                crate::vga::write::number(vga_index, *b as u64);
+            }*/
+        }
 
         //crate::vga::write::newline(vga_index);
 
@@ -34,9 +36,9 @@ impl<'a, D: BlockDevice> Fs<'a, D> {
         }
         crate::vga::write::newline(vga_index);
 
-        crate::vga::write::string(vga_index, b"Bytes/Sector: ", crate::vga::buffer::Color::White);
+        /*crate::vga::write::string(vga_index, b"Bytes/Sector: ", crate::vga::buffer::Color::White);
         crate::vga::write::number(vga_index, boot_sector.bytes_per_sector as u64);
-        crate::vga::write::newline(vga_index);
+        crate::vga::write::newline(vga_index);*/
 
         let fat_start = boot_sector.reserved_sectors as u64;
         let root_dir_sectors =
@@ -117,9 +119,9 @@ impl<'a, D: BlockDevice> Fs<'a, D> {
         for sector_index in 0..total_sectors {
             self.device.read_sector(self.root_dir_start_lba + sector_index as u64, &mut buf, vga_index);
 
-            crate::vga::write::string(vga_index, b"Reading sector: ", crate::vga::buffer::Color::White);
+            /*crate::vga::write::string(vga_index, b"Reading sector: ", crate::vga::buffer::Color::White);
             crate::vga::write::number(vga_index, self.root_dir_start_lba + sector_index as u64);
-            crate::vga::write::newline(vga_index);
+            crate::vga::write::newline(vga_index);*/
 
             let entries_ptr = buf.as_ptr() as *const Entry;
 
@@ -147,7 +149,7 @@ impl<'a, D: BlockDevice> Fs<'a, D> {
                 }
 
                 self.print_name(entry, vga_index);
-                self.read_file(entry.start_cluster, vga_index);
+                //self.read_file(entry.start_cluster, vga_index);
 
                 /*self.read_file(entry.start_cluster, |data| {
                     for i in 0..data.len() - 1 {

@@ -3,3 +3,4 @@
 /iso/boot/*.o
 /kernel.*
 /r2.iso
+/fat.img

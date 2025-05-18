@@ -62,6 +62,7 @@ pub fn keyboard_loop(vga_index: &mut isize) {
     let mut input_buffer = [0u8; INPUT_BUFFER_SIZE];
     let mut input_len = 0;
 
+    vga::write::newline(vga_index);
     vga::write::string(vga_index, b"Starting prompt...", vga::buffer::Color::White);
     vga::write::newline(vga_index);
     vga::write::newline(vga_index);

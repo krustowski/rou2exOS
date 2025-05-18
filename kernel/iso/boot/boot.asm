@@ -86,6 +86,9 @@ extern pd_table
 extern pt_table
 
 global _start
+global debug_flag
+debug_flag:
+    db 0    ; 1 = enabled
 
 _start:
     mov [multiboot_ptr], ebx

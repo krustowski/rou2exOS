@@ -1,6 +1,6 @@
 use crate::fs::block::BlockDevice;
 use crate::fs::entry::{BootSector, Entry};
-use crate::init::config::DEBUG;
+use crate::init::config::debug_enabled;
 
 pub struct Fs<'a, D: BlockDevice> {
     pub device: &'a D,
@@ -20,7 +20,7 @@ impl<'a, D: BlockDevice> Fs<'a, D> {
 
         for i in 0..512 - 5 {
             if &sector[i..i+5] == b"FAT12" {
-                if DEBUG {
+                if debug_enabled() {
                     crate::vga::write::string(vga_index, b"Found FAT12", crate::vga::buffer::Color::Green);
                     crate::vga::write::newline(vga_index);
                 }
@@ -39,7 +39,7 @@ impl<'a, D: BlockDevice> Fs<'a, D> {
 
         let boot_sector = unsafe { (*(sector.as_ptr() as *const BootSector)).clone() };
 
-        if DEBUG {
+        if debug_enabled() {
             crate::vga::write::string(vga_index, b"OEM: ", crate::vga::buffer::Color::White);
             for b in &boot_sector.oem {
                 crate::vga::write::byte(vga_index, *b, crate::vga::buffer::Color::Green);
@@ -47,7 +47,7 @@ impl<'a, D: BlockDevice> Fs<'a, D> {
             crate::vga::write::newline(vga_index);
         }
 
-        if DEBUG {
+        if debug_enabled() {
             crate::vga::write::string(vga_index, b"Bytes/Sector: ", crate::vga::buffer::Color::White);
             crate::vga::write::number(vga_index, boot_sector.bytes_per_sector as u64);
             crate::vga::write::newline(vga_index);
@@ -82,7 +82,7 @@ impl<'a, D: BlockDevice> Fs<'a, D> {
             let lba = self.cluster_to_lba(current_cluster);
             self.device.read_sector(lba, &mut sector_buf, vga_index);
 
-            if DEBUG {
+            if debug_enabled() {
                 crate::vga::write::string(vga_index, &sector_buf, crate::vga::buffer::Color::Yellow);
             }
 
@@ -134,7 +134,7 @@ impl<'a, D: BlockDevice> Fs<'a, D> {
         for sector_index in 0..total_sectors {
             self.device.read_sector(self.root_dir_start_lba + sector_index as u64, &mut buf, vga_index);
 
-            if DEBUG {
+            if debug_enabled() {
                 crate::vga::write::string(vga_index, b"Reading sector: ", crate::vga::buffer::Color::White);
                 crate::vga::write::number(vga_index, self.root_dir_start_lba + sector_index as u64);
                 crate::vga::write::newline(vga_index);
@@ -167,7 +167,7 @@ impl<'a, D: BlockDevice> Fs<'a, D> {
 
                 self.print_name(entry, vga_index);
 
-                if DEBUG {
+                if debug_enabled() {
                     self.read_file(entry.start_cluster, vga_index);
                 }
 

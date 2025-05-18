@@ -2,6 +2,8 @@ use crate::fs::block::Floppy;
 use crate::fs::fs::Fs;
 use crate::init::result;
 
+use super::config;
+
 pub fn check_floppy(vga_index: &mut isize) -> result::InitResult {
     let floppy = Floppy;
     Floppy::init();
@@ -16,6 +18,8 @@ pub fn check_floppy(vga_index: &mut isize) -> result::InitResult {
             res = result::InitResult::Skipped
         }
     }
+
+    crate::init::config::set_path(b"/");
 
     res
 } 

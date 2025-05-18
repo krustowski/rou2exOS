@@ -22,6 +22,11 @@ static COMMANDS: &[Command] = &[
         function: cmd_beep,
     },
     Command {
+        name: b"cd",
+        description: b"changes the current directory",
+        function: cmd_cd,
+    },
+    Command {
         name: b"cls",
         description: b"clears the screen",
         function: cmd_clear,
@@ -140,6 +145,14 @@ fn split_cmd(input: &[u8]) -> (&[u8], &[u8]) {
     }
 }
 
+fn to_uppercase_ascii(input: &mut [u8]) {
+    for byte in input.iter_mut() {
+        if *byte >= b'a' && *byte <= b'z' {
+            *byte -= 32;
+        }
+    }
+}
+
 //
 //  COMMAND FUNCTIONS
 //
@@ -154,6 +167,35 @@ fn cmd_beep(_args: &[u8], _vga_index: &mut isize) {
     sound::beep::stop_beep();
 }
 
+fn cmd_cd(args: &[u8], vga_index: &mut isize) {
+    let floppy = fs::block::Floppy;
+
+    if args.len() == 0 {
+        unsafe {
+            config::PATH_CLUSTER = 0;
+            config::set_path(b"/");
+        }
+        return;
+    }
+
+    match fs::fs::Fs::new(&floppy, vga_index) {
+        Ok(fs) => {
+            unsafe {
+                let cluster = fs.list_dir(config::PATH_CLUSTER, args, vga_index);
+
+                if cluster > 0 {
+                    config::PATH_CLUSTER = cluster as u16;
+                    config::set_path(args);
+                }
+            }
+        }
+        Err(e) => {
+            crate::vga::write::string(vga_index, e.as_bytes(), crate::vga::buffer::Color::Red);
+            crate::vga::write::newline(vga_index);
+        }
+    }
+}
+
 fn cmd_clear(_args: &[u8], vga_index: &mut isize) {
     vga::screen::clear(vga_index);
 }
@@ -164,7 +206,7 @@ fn cmd_dir(_args: &[u8], vga_index: &mut isize) {
     match fs::fs::Fs::new(&floppy, vga_index) {
         Ok(fs) => {
             unsafe {
-                fs.list_dir(config::PATH_CLUSTER, vga_index);
+                fs.list_dir(config::PATH_CLUSTER, &[], vga_index);
             }
         }
         Err(e) => {

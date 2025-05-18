@@ -123,7 +123,7 @@ impl<'a, D: BlockDevice> Fs<'a, D> {
         entry & 0x0FFF
     }
 
-    pub fn list_dir(&self, start_cluster: u16, vga_index: &mut isize) {
+    pub fn list_dir(&self, start_cluster: u16, entry_name: &[u8], vga_index: &mut isize) -> isize {
         let entry_size = core::mem::size_of::<Entry>();
         let entries_per_sector = 512 / entry_size;
         let mut buf = [0u8; 512];
@@ -140,20 +140,41 @@ impl<'a, D: BlockDevice> Fs<'a, D> {
                 let entries_ptr = buf.as_ptr() as *const Entry;
                 for entry_index in 0..entries_per_sector {
                     if sector_index * entries_per_sector + entry_index >= total_entries {
-                        return;
+                        return -1;
                     }
 
                     let entry = unsafe { &*entries_ptr.add(entry_index) };
 
                     if entry.name[0] == 0x00 {
-                        return;
+                        return -1;
                     }
 
                     if entry.name[0] == 0xE5 || entry.attr & 0x08 != 0 {
                         continue;
                     }
 
-                    self.print_name(entry, vga_index);
+                    let entry_len = entry_name.len();
+
+                    if entry_len <= 11 && entry_len > 0 {
+                    //if entry_len > 0 && entry_len < 12 {
+                        let mut equal = true;
+                        for i in 0..entry_len {
+                            if let Some(c) = entry_name.get(i) {
+                                if let Some(cc) = entry.name.get(i) {
+                                    if *c - 32 != *cc {
+                                        equal = false;
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+
+                        if equal && entry.attr & 0x10 != 0 {
+                            return entry.start_cluster as isize;
+                        }
+                    } else {
+                        self.print_name(entry, vga_index);
+                    }
                 }
             }
         } else {
@@ -168,7 +189,7 @@ impl<'a, D: BlockDevice> Fs<'a, D> {
                         let entry = unsafe { &*entries_ptr.add(entry_index) };
 
                         if entry.name[0] == 0x00 {
-                            return;
+                            return -1;
                         }
 
                         if entry.name[0] == 0xE5 || entry.attr & 0x08 != 0 {
@@ -185,6 +206,7 @@ impl<'a, D: BlockDevice> Fs<'a, D> {
                 }
             }
         }
+        0
     }
 
     pub fn list_root_dir(&self, vga_index: &mut isize) {

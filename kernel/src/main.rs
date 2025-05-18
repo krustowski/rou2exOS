@@ -13,6 +13,7 @@ mod multiboot2;
 
 mod acpi;
 mod app;
+mod fs;
 mod init;
 mod input;
 mod mem;

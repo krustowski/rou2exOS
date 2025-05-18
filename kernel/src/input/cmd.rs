@@ -161,7 +161,7 @@ fn cmd_help(_args: &[u8], vga_index: &mut isize) {
     vga::write::newline(vga_index);
 
     for cmd in COMMANDS {
-        vga::write::string(vga_index, b" - ", vga::buffer::Color::Blue);
+        vga::write::string(vga_index, b" ", vga::buffer::Color::Blue);
         vga::write::string(vga_index, cmd.name, vga::buffer::Color::Blue);
         vga::write::string(vga_index, b": ", vga::buffer::Color::Blue);
         vga::write::string(vga_index, cmd.description, vga::buffer::Color::White);

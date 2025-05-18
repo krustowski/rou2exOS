@@ -44,6 +44,15 @@ run_iso:
 		-cdrom r2.iso \
 		-serial pty
 
+run_iso_floppy: 
+	@qemu-system-x86_64 \
+		-boot d \
+		-m 2G \
+		-vga std \
+		-cdrom r2.iso \
+		-fda fat.img \
+		-serial pty
+
 run_iso_debug: 
 	@qemu-system-x86_64 \
 		-boot d \

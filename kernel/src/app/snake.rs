@@ -124,7 +124,7 @@ impl Snake {
 
 fn draw_food(x: usize, y: usize, vga_index: &mut isize) {
     *vga_index = 2 * (y as isize * WIDTH + x as isize);
-    crate::vga::write::string(vga_index, b"*", crate::vga::buffer::Color::Pink);
+    crate::vga::write::string(vga_index, b"*", crate::vga::buffer::Color::Green);
 }
 
 fn delay() {
@@ -192,6 +192,8 @@ fn draw_char(x: usize, y: usize, ch: u8, color: crate::vga::buffer::Color, vga_i
 pub fn run(vga_index: &mut isize) {
     let mut snake = Snake::new();
 
+    let mut move_count = 0;
+
     let mut food_x = 20;
     let mut food_y = 10;
 
@@ -212,6 +214,8 @@ pub fn run(vga_index: &mut isize) {
                 _ => {}
             }
         }
+
+        move_count += 1;
 
         snake.clear(vga_index);
         snake.step();
@@ -234,6 +238,8 @@ pub fn run(vga_index: &mut isize) {
 
         draw_string(0, 0, b"Score: ", crate::vga::buffer::Color::White, vga_index);
         write_number(7, 0, snake.len - 3, vga_index);
+        draw_string(0, 1, b"Moves: ", crate::vga::buffer::Color::White, vga_index);
+        write_number(7, 1, move_count, vga_index);
 
         delay();
     }

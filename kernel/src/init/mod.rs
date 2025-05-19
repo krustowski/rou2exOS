@@ -8,6 +8,12 @@ pub mod result;
 
 pub fn init(vga_index: &mut isize, multiboot_ptr: u64) {
     result::print_result(
+        "Load kernel", 
+        result::InitResult::Passed,
+        vga_index
+    );
+
+    result::print_result(
         "Check 64-bit Long Mode", 
         cpu::check_mode(),
         vga_index

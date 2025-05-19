@@ -18,6 +18,7 @@ SECTIONS {
 
     .data : {
         *(.data*)
+	*(.dma)
     }
 
     .bss : {

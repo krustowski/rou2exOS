@@ -20,8 +20,10 @@ compile_kernel:
 nasm:
 	@nasm -f elf64 -o iso/boot/boot.o iso/boot/boot.asm
 
+KERNEL_OBJ := $(shell ls -t target/x86_64-r2/release/deps/kernel-*.o | head -1)
+
 link:
-	@ld.lld --verbose -T linker.ld -n --gc-sections -o iso/boot/kernel.elf target/x86_64-r2/release/deps/kernel-*.o iso/boot/boot.o
+	@ld.lld --verbose -T linker.ld -n --gc-sections -o iso/boot/kernel.elf ${KERNEL_OBJ} iso/boot/boot.o
 
 build_iso:
 	@grub2-mkrescue -o r2.iso iso/ \
@@ -65,6 +67,7 @@ run_iso_debug:
 		-m 2G \
 		-vga std \
 		-cdrom r2.iso \
+		-fda fat.img \
 		-d int,cpu_reset \
 		-no-reboot \
 		-no-shutdown \

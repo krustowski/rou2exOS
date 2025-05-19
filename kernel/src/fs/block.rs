@@ -139,6 +139,11 @@ pub unsafe fn dma_set_read_mode() {
     outb(0x0B, 0x56);
 }
 
+pub unsafe fn dma_set_write_mode() {
+    // Mode: single transfer, address increment, write, channel 2
+    outb(0x0B, 0x52); // 0101_0010
+}
+
 
 //
 //
@@ -359,6 +364,9 @@ impl Floppy {
         // Wait until FDC is ready
         fdc_wait_ready();
 
+        crate::vga::write::string(vga_index, b"Skip", crate::vga::buffer::Color::Yellow);
+        crate::vga::write::newline(vga_index);
+
         // Send SEEK command
         unsafe {
             fdc_send_byte(FDC_CMD_SEEK);
@@ -367,10 +375,10 @@ impl Floppy {
         }
 
         // Wait for IRQ6 (simplified — use a real IRQ handler ideally)
-        //fdc_wait_irq();
+        fdc_wait_irq();
 
         unsafe {
-            Self::fdc_wait_irq(vga_index); // wait for IRQ 6 (must be handled)
+            //Self::fdc_wait_irq(vga_index); // wait for IRQ 6 (must be handled)
         }
 
         crate::vga::write::string(vga_index, b"Kriste", crate::vga::buffer::Color::Yellow);
@@ -386,6 +394,10 @@ impl Floppy {
         unsafe {
             //core::arch::asm!("sti");
             dma_init(DMA_BUFFER.as_ptr() as u32, 512);
+            //dma_set_write_mode();
+
+        crate::vga::write::string(vga_index, b"Stop", crate::vga::buffer::Color::Yellow);
+        crate::vga::write::newline(vga_index);
 
             self.fdc_seek(1, cylinder, head, vga_index);
 
@@ -406,10 +418,11 @@ impl Floppy {
             Self::send_byte(0xFF);           // Data length (0xFF for default)
 
             //self.fdc_wait_irq(vga_index);
+            Self::fdc_wait_irq(vga_index); // wait for IRQ 6 (must be handled)
 
             //let status = fdc_read_result();
 
-            core::arch::asm!("cli");
+            //core::arch::asm!("cli");
 
             // Check status for errors
             //status.iter().all(|&s| s & 0xC0 == 0)

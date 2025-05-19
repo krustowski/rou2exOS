@@ -169,44 +169,31 @@ impl<'a, D: BlockDevice> Fs<'a, D> {
 
             let mut chunk: [u8; 512] = [0u8; 512];
 
-            let sectors = self.boot_sector.sectors_per_cluster as usize;
-            let mut cluster_data = [0u8; 4096];
-
-
-            // Manually calculate how much we can safely copy
-            /*if offset >= data.len() {
-                crate::vga::write::string(vga_index, b"Offset past end of data\n", crate::vga::buffer::Color::Red);
-                crate::vga::write::newline(vga_index);
+            if data.len() > 512 {
                 return;
-            }*/
+            }
 
-            /*let max_copy = core::cmp::min(to_write, data.len() - offset);
+            if let Some(slice) = chunk.get_mut(..) {
+                slice[..data.len()].copy_from_slice(data);
+            }
 
-            for i in 0..max_copy {
-                chunk[i] = data[offset + i];
-            }*/
+            let sectors = self.boot_sector.sectors_per_cluster as usize;
 
-            /*if let Some(slice) = data.get(offset..offset + to_write) {
-              chunk[..slice.len()].copy_from_slice(slice);
-              } else {
-              crate::vga::write::string(vga_index, b"Slice out of bounds!", crate::vga::buffer::Color::Red);
-              crate::vga::write::newline(vga_index);
-              return;
-              }*/
+            // sectors
+            for i in 0..sectors {
+                /*let sector_offset = i * 512;
+                let slice = &cluster_data[sector_offset..sector_offset + 512];
+                let sector_data: &[u8; 512] = slice.try_into().expect("Sector conversion error");*/
 
             crate::vga::write::string(vga_index, b"Writing data...", crate::vga::buffer::Color::Yellow);
             crate::vga::write::newline(vga_index);
 
-            for i in 0..0 {
-                let sector_offset = i * 512;
-                let slice = &cluster_data[sector_offset..sector_offset + 512];
-                let sector_data: &[u8; 512] = slice.try_into().expect("Sector conversion error");
-
                 self.device.write_sector(
                     cluster_lba + i as u64, 
-                    sector_data, 
+                    &chunk, 
                     vga_index,
                 );
+
             }
 
             crate::vga::write::string(vga_index, b"Boha pica uz", crate::vga::buffer::Color::Yellow);
@@ -303,29 +290,22 @@ impl<'a, D: BlockDevice> Fs<'a, D> {
 
                 if entry.name[0] == 0x00 || entry.name[0] == 0xE5 {
                     // free entry
-
-
-
-
                     crate::vga::write::string(vga_index, b"Vypadni", crate::vga::buffer::Color::Yellow);
                     crate::vga::write::newline(vga_index);
 
-
-
-
-                    /*let mut name: [u8; 8] = [0u8; 8];
+                    let mut name: [u8; 8] = [0u8; 8];
                       let mut ext: [u8; 3] = [0u8; 3];
 
                       if let Some(name_slice) = filename.get(0..8) {
                       name[..name_slice.len()].copy_from_slice(name_slice);
                       }
-                      if let Some(ext_slice) = filename.get(9..11) {
+                      if let Some(ext_slice) = filename.get(8..11) {
                       ext[..ext_slice.len()].copy_from_slice(ext_slice);
-                      }*/
+                      }
 
                     return Some(Entry {
-                        name: *b"TESTIKLY",
-                        ext: *b"TXT",
+                        name: name,
+                        ext: ext,
                         attr: 0x20,
                         start_cluster: 0,
                         file_size: 0,
@@ -333,9 +313,9 @@ impl<'a, D: BlockDevice> Fs<'a, D> {
                     });
                 }
 
-                if self.check_filename(entry, filename) {
+                /*if self.check_filename(entry, filename) {
                     return Some(*entry);
-                }
+                }*/
             }
         }
 

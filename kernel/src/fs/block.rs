@@ -33,8 +33,8 @@ impl BlockDevice for MemDisk {
     }
 
     fn write_sector(&self, lba: u64, buffer: &[u8; 512], _vga_index: &mut isize) {
-        let offset = self.sector_offset(lba);
-        let slice = &self.data[offset..offset + 512];
+        //let offset = self.sector_offset(lba);
+        //let slice = &self.data[offset..offset + 512];
         //slice.copy_from_slice(buffer);
     }
 }
@@ -348,7 +348,7 @@ impl Floppy {
     /// - `drive`: 0 (A:) or 1 (B:)
     /// - `cylinder`: track number (0..79)
     /// - `head`: 0 or 1
-    pub fn fdc_seek(&self, drive: u8, cylinder: u8, head: u8) {
+    pub fn fdc_seek(&self, drive: u8, cylinder: u8, head: u8, vga_index: &mut isize) {
         // Select drive in DOR
         let motor_bit = 1 << (4 + drive); // bit 4 = motor for drive 0
         let dor_value = (drive & 0x03) | 0x0C | motor_bit;
@@ -367,18 +367,27 @@ impl Floppy {
         }
 
         // Wait for IRQ6 (simplified — use a real IRQ handler ideally)
-        fdc_wait_irq();
+        //fdc_wait_irq();
+
+        unsafe {
+            Self::fdc_wait_irq(vga_index); // wait for IRQ 6 (must be handled)
+        }
+
+        crate::vga::write::string(vga_index, b"Kriste", crate::vga::buffer::Color::Yellow);
+        crate::vga::write::newline(vga_index);
+
 
         // Optional: Sense interrupt to verify seek
-        let (_st0, _cyl) = fdc_sense_interrupt();
+        //let (_st0, _cyl) = fdc_sense_interrupt();
     }
 
 
     pub fn fdc_write_sector(&self, cylinder: u8, head: u8, sector: u8, data: &[u8; 512], vga_index: &mut isize) {
         unsafe {
-            core::arch::asm!("sti");
+            //core::arch::asm!("sti");
+            dma_init(DMA_BUFFER.as_ptr() as u32, 512);
 
-            self.fdc_seek(1, cylinder, head);
+            self.fdc_seek(1, cylinder, head, vga_index);
 
             fdc_wait_ready(); // Wait until FDC is ready for commands
 

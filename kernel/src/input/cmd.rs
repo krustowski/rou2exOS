@@ -57,6 +57,11 @@ static COMMANDS: &[Command] = &[
         function: cmd_ping,
     },
     Command {
+        name: b"read",
+        description: b"prints the output of a file",
+        function: cmd_read,
+    },
+    Command {
         name: b"response",
         description: b"waits for ICMP/SLIP request to come, then sends a response back",
         function: cmd_response,
@@ -90,6 +95,11 @@ static COMMANDS: &[Command] = &[
         name: b"version",
         description: b"prints the kernel version",
         function: cmd_version,
+    },
+    Command {
+        name: b"write",
+        description: b"writes arguments to a sample file on floppy",
+        function: cmd_write,
     }
 ];
 
@@ -296,6 +306,34 @@ fn cmd_ping(_args: &[u8], vga_index: &mut isize) {
     net::ipv4::send_packet(ipv4_slice);
 }
 
+fn cmd_read(args: &[u8], vga_index: &mut isize) {
+    let floppy = fs::block::Floppy;
+
+    if args.len() == 0 {
+        return;
+    }
+
+    match fs::fat12::Fs::new(&floppy, vga_index) {
+        Ok(fs) => {
+            unsafe {
+                let cluster = fs.list_dir(config::PATH_CLUSTER, args, vga_index);
+
+                if cluster > 0 {
+                    fs.read_file(cluster as u16, vga_index);
+                } else {
+                    crate::vga::write::string(vga_index, b"No such file", crate::vga::buffer::Color::Red);
+                    crate::vga::write::newline(vga_index);
+                }
+            }
+        }
+        Err(e) => {
+            crate::vga::write::string(vga_index, e.as_bytes(), crate::vga::buffer::Color::Red);
+            crate::vga::write::newline(vga_index);
+        }
+    }
+}
+
+
 fn cmd_response(_args: &[u8], vga_index: &mut isize) {
     fn callback(packet: &[u8]) -> u8 {
         if let Some((ipv4_header, ipv4_payload)) = net::ipv4::parse_packet(packet) {
@@ -442,3 +480,20 @@ fn cmd_version(_args: &[u8], vga_index: &mut isize) {
     vga::write::string(vga_index, KERNEL_VERSION, vga::buffer::Color::White);
     vga::write::newline(vga_index);
 }
+
+fn cmd_write(args: &[u8], vga_index: &mut isize) {
+    let floppy = fs::block::Floppy;
+
+    match fs::fat12::Fs::new(&floppy, vga_index) {
+        Ok(fs) => {
+            unsafe {
+                fs.write_file(b"TESTIKLYTXT", args, vga_index);
+            }
+        }
+        Err(e) => {
+            crate::vga::write::string(vga_index, e.as_bytes(), crate::vga::buffer::Color::Red);
+            crate::vga::write::newline(vga_index);
+        }
+    }
+}
+

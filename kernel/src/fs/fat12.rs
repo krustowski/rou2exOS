@@ -1,3 +1,5 @@
+use core::ptr::eq;
+
 use crate::fs::block::BlockDevice;
 use crate::fs::entry::{BootSector, Entry};
 use crate::init::config::debug_enabled;
@@ -123,6 +125,189 @@ impl<'a, D: BlockDevice> Fs<'a, D> {
         entry & 0x0FFF
     }
 
+    pub fn write_fat12_entry(&self, cluster: u16, value: u16, vga_index: &mut isize) {
+        let fat_offset = (cluster as usize * 3) / 2;
+        let fat_sector = self.fat_start_lba + (fat_offset / 512) as u64;
+
+        let mut buf = [0u8; 512];
+        self.device.read_sector(fat_sector, &mut buf, vga_index);
+
+        if cluster & 1 == 0 {
+            buf[fat_offset % 512] = (value & 0xFF) as u8;
+            buf[(fat_offset + 1) % 512] = ((buf[(fat_offset + 1) % 512] & 0xF0) | ((value >> 8) as u8 & 0x0F));
+        } else {
+            buf[fat_offset % 512] = ((buf[fat_offset % 512] & 0x0F) | ((value << 4) as u8 & 0xF0));
+            buf[(fat_offset + 1) % 512] = ((value >> 4) & 0xFF) as u8;
+        }
+
+        self.device.write_sector(fat_sector, &buf, vga_index);
+    }
+
+    pub fn write_file(&mut self, filename: &[u8; 11], data: &[u8], vga_index: &mut isize) {
+        let entry = self.find_or_create_entry(filename, vga_index);
+        if entry.is_none() {
+            crate::vga::write::string(vga_index, b"Error: no free directory entry\n", crate::vga::buffer::Color::Red);
+            return;
+        }
+
+        let mut entry = entry.unwrap();
+
+        // Allocate clusters and write data
+        let mut cluster = self.allocate_cluster(vga_index);
+        let mut remaining = data.len();
+        let mut offset = 0;
+
+        entry.start_cluster = cluster;
+        let mut current_cluster = cluster;
+
+        while remaining > 0 {
+            let cluster_lba = self.cluster_to_lba(current_cluster);
+            let to_write = core::cmp::min(512 * self.boot_sector.sectors_per_cluster as usize, remaining);
+            let chunk = &data[offset..offset + to_write];
+
+            let mut buf = [0u8; 512];
+            buf[..chunk.len()].copy_from_slice(chunk);
+
+            for i in 0..self.boot_sector.sectors_per_cluster {
+                self.device.write_sector(cluster_lba + i as u64, &buf, vga_index);
+            }
+
+            remaining -= to_write;
+            offset += to_write;
+
+            if remaining > 0 {
+                let next_cluster = self.allocate_cluster(vga_index);
+                self.write_fat12_entry(current_cluster, next_cluster, vga_index);
+                current_cluster = next_cluster;
+            } else {
+                self.write_fat12_entry(current_cluster, 0xFFF, vga_index); // end-of-chain
+            }
+        }
+
+        // Update directory entry (e.g., size, start_cluster, etc.)
+        entry.file_size = data.len() as u32;
+        self.update_dir_entry(filename, &entry, vga_index);
+    }
+
+    fn allocate_cluster(&self, vga_index: &mut isize) -> u16 {
+        let mut buf = [0u8; 512];
+
+        for fat_index in 0..(self.boot_sector.sectors_per_cluster as u64) {
+            self.device.read_sector(self.fat_start_lba + fat_index, &mut buf, vga_index);
+
+            for cluster in 2..(self.boot_sector.total_sectors_16) {
+                let value = self.read_fat12_entry(cluster, vga_index);
+                if value == 0x000 {
+                    self.write_fat12_entry(cluster, 0xFFF, vga_index);
+                    return cluster;
+                }
+            }
+        }
+
+        panic!("FAT is full");
+    }
+
+    fn update_dir_entry(&self, filename: &[u8; 11], updated: &Entry, vga_index: &mut isize) {
+        let entry_size = core::mem::size_of::<Entry>();
+        let entries_per_sector = 512 / entry_size;
+        let total_entries = self.boot_sector.root_entry_count as usize;
+        let total_sectors = (total_entries * entry_size + 511) / 512;
+
+        let mut buf = [0u8; 512];
+
+        for sector_index in 0..total_sectors {
+            self.device.read_sector(self.root_dir_start_lba + sector_index as u64, &mut buf, vga_index);
+            let entries_ptr = buf.as_mut_ptr() as *mut Entry;
+
+            for entry_index in 0..entries_per_sector {
+                let entry = unsafe { &mut *entries_ptr.add(entry_index) };
+
+                if self.check_filename(entry, filename) {
+                    *entry = *updated;
+                    self.device.write_sector(self.root_dir_start_lba + sector_index as u64, &buf, vga_index);
+                    return;
+                }
+            }
+        }
+    }
+
+
+    fn find_or_create_entry(&self, filename: &[u8; 11], vga_index: &mut isize) -> Option<Entry> {
+        let entry_size = core::mem::size_of::<Entry>();
+        let entries_per_sector = 512 / entry_size;
+        let total_entries = self.boot_sector.root_entry_count as usize;
+        let total_sectors = (total_entries * entry_size + 511) / 512;
+
+        let mut buf = [0u8; 512];
+
+        for sector_index in 0..total_sectors {
+            self.device.read_sector(self.root_dir_start_lba + sector_index as u64, &mut buf, vga_index);
+            let entries_ptr = buf.as_ptr() as *const Entry;
+
+            for entry_index in 0..entries_per_sector {
+                let entry = unsafe { &*entries_ptr.add(entry_index) };
+
+                if entry.name[0] == 0x00 || entry.name[0] == 0xE5 {
+                    // free entry
+                    
+                    let mut name: [u8; 8] = [0u8; 8];
+                    let mut ext: [u8; 3] = [0u8; 3];
+                    name.copy_from_slice(&filename[0..8]);
+                    ext.copy_from_slice(&filename[9..1]);
+                    
+                    return Some(Entry {
+                        name: name,
+                        ext: ext,
+                        attr: 0x20,
+                        start_cluster: 0,
+                        file_size: 0,
+                        ..Default::default()
+                    });
+                }
+
+                if self.check_filename(entry, filename) {
+                    return Some(*entry);
+                }
+            }
+        }
+
+        None
+    }
+
+    fn check_filename(&self, entry: &Entry, entry_name: &[u8]) -> bool {
+        let entry_len = entry_name.len();
+        let mut equal = true;
+
+        if entry_len <= 11 && entry_len > 0 {
+            for i in 0..entry.name.len() {
+                if let Some(org) = entry.name.get(i) {
+                    if let Some(query) = entry_name.get(i) {
+
+                        // Filename end
+                        if *org == 0 {
+                            break;
+                        }
+
+                        if *query - 32 != *org {
+                            equal = false;
+                            break;
+                        }
+
+                        if i == entry_len - 1 {
+                            if let Some(org_nxt) = entry.name.get(i + 1) {
+                                if *org_nxt != b' ' {
+                                    equal = false;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        equal
+    }
+
     pub fn list_dir(&self, start_cluster: u16, entry_name: &[u8], vga_index: &mut isize) -> isize {
         let entry_size = core::mem::size_of::<Entry>();
         let entries_per_sector = 512 / entry_size;
@@ -153,23 +338,8 @@ impl<'a, D: BlockDevice> Fs<'a, D> {
                         continue;
                     }
 
-                    let entry_len = entry_name.len();
-
-                    if entry_len <= 11 && entry_len > 0 {
-                    //if entry_len > 0 && entry_len < 12 {
-                        let mut equal = true;
-                        for i in 0..entry_len {
-                            if let Some(c) = entry_name.get(i) {
-                                if let Some(cc) = entry.name.get(i) {
-                                    if *c - 32 != *cc {
-                                        equal = false;
-                                        break;
-                                    }
-                                }
-                            }
-                        }
-
-                        if equal && entry.attr & 0x10 != 0 {
+                    if entry_name.len() > 0 {
+                        if self.check_filename(entry, entry_name) && entry.attr & 0x10 != 0 {
                             return entry.start_cluster as isize;
                         }
                     } else {

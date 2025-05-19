@@ -178,7 +178,7 @@ fn cmd_cd(args: &[u8], vga_index: &mut isize) {
         return;
     }
 
-    match fs::fs::Fs::new(&floppy, vga_index) {
+    match fs::fat12::Fs::new(&floppy, vga_index) {
         Ok(fs) => {
             unsafe {
                 let cluster = fs.list_dir(config::PATH_CLUSTER, args, vga_index);
@@ -186,6 +186,9 @@ fn cmd_cd(args: &[u8], vga_index: &mut isize) {
                 if cluster > 0 {
                     config::PATH_CLUSTER = cluster as u16;
                     config::set_path(args);
+                } else {
+                    crate::vga::write::string(vga_index, b"No such directory", crate::vga::buffer::Color::Red);
+                    crate::vga::write::newline(vga_index);
                 }
             }
         }
@@ -203,7 +206,7 @@ fn cmd_clear(_args: &[u8], vga_index: &mut isize) {
 fn cmd_dir(_args: &[u8], vga_index: &mut isize) {
     let floppy = fs::block::Floppy;
 
-    match fs::fs::Fs::new(&floppy, vga_index) {
+    match fs::fat12::Fs::new(&floppy, vga_index) {
         Ok(fs) => {
             unsafe {
                 fs.list_dir(config::PATH_CLUSTER, &[], vga_index);

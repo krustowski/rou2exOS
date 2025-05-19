@@ -1,5 +1,5 @@
 use crate::fs::block::Floppy;
-use crate::fs::fs::Fs;
+use crate::fs::fat12::Fs;
 use crate::init::result;
 
 use super::config;

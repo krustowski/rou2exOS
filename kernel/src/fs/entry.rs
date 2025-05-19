@@ -19,6 +19,7 @@ pub struct BootSector {
 }
 
 #[repr(C, packed)]
+#[derive(Default,Copy,Clone)]
 pub struct Entry {
     pub name: [u8; 8],         // "FILE    "
     pub ext: [u8; 3],          // "TXT"

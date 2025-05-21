@@ -2,6 +2,7 @@ use crate::acpi;
 use crate::app;
 use crate::init::config;
 use crate::fs;
+use crate::init::config::PATH_CLUSTER;
 use crate::net;
 use crate::sound;
 use crate::time;
@@ -55,6 +56,11 @@ static COMMANDS: &[Command] = &[
         name: b"http",
         description: b"runs a simple HTTP/UDP handler",
         function: cmd_http,
+    },
+    Command {
+        name: b"mkdir",
+        description: b"creates a subdirectory",
+        function: cmd_mkdir,
     },
     Command {
         name: b"mv",
@@ -195,7 +201,7 @@ fn cmd_beep(_args: &[u8], _vga_index: &mut isize) {
 fn cmd_cd(args: &[u8], vga_index: &mut isize) {
     let floppy = fs::block::Floppy;
 
-    if args.len() == 0 {
+    if args.len() == 0 || args.len() > 11 {
         unsafe {
             config::PATH_CLUSTER = 0;
             config::set_path(b"/");
@@ -206,7 +212,12 @@ fn cmd_cd(args: &[u8], vga_index: &mut isize) {
     match fs::fat12::Fs::new(&floppy, vga_index) {
         Ok(fs) => {
             unsafe {
-                let cluster = fs.list_dir(config::PATH_CLUSTER, args, vga_index);
+                let mut name = [b' '; 11];
+                name[..args.len()].copy_from_slice(args);
+
+                to_uppercase_ascii(&mut name);
+
+                let cluster = fs.list_dir(config::PATH_CLUSTER, &name, vga_index);
 
                 if cluster > 0 {
                     config::PATH_CLUSTER = cluster as u16;
@@ -301,6 +312,36 @@ fn cmd_http(_args: &[u8], vga_index: &mut isize) {
         }
     }
 }
+
+fn cmd_mkdir(args: &[u8], vga_index: &mut isize) {
+    let floppy = fs::block::Floppy;
+
+    if args.len() == 0 || args.len() > 11 {
+        crate::vga::write::string(vga_index, b"Usage: mkdir <dirname>", crate::vga::buffer::Color::Yellow);
+        crate::vga::write::newline(vga_index);
+        return;
+    }
+
+    match fs::fat12::Fs::new(&floppy, vga_index) {
+        Ok(fs) => {
+            let mut filename: [u8; 11] = [b' '; 11];
+
+            if let Some(slice) = filename.get_mut(..) {
+                slice[..args.len()].copy_from_slice(args);
+            }
+
+            to_uppercase_ascii(&mut filename);
+            unsafe {
+                fs.create_subdirectory(&filename, PATH_CLUSTER, vga_index);
+            }
+        }
+        Err(e) => {
+            crate::vga::write::string(vga_index, e.as_bytes(), crate::vga::buffer::Color::Red);
+            crate::vga::write::newline(vga_index);
+        }
+    }
+}
+
 
 fn cmd_mv(args: &[u8], vga_index: &mut isize) {
     let floppy = fs::block::Floppy;

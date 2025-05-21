@@ -58,7 +58,7 @@ static COMMANDS: &[Command] = &[
     },
     Command {
         name: b"mv",
-        description: b"renames the file",
+        description: b"renames a file",
         function: cmd_mv,
     },
     Command {
@@ -75,6 +75,11 @@ static COMMANDS: &[Command] = &[
         name: b"response",
         description: b"waits for ICMP/SLIP request to come, then sends a response back",
         function: cmd_response,
+    },
+    Command {
+        name: b"rm",
+        description: b"removes a file",
+        function: cmd_rm,
     },
     Command {
         name: b"shutdown",
@@ -308,12 +313,12 @@ fn cmd_mv(args: &[u8], vga_index: &mut isize) {
 
     match fs::fat12::Fs::new(&floppy, vga_index) {
         Ok(fs) => {
-            let (old, mut new) = split_cmd(args);
+            let (old, new) = split_cmd(args);
 
-            let mut old_filename: [u8; 11] = [0u8; 11];
-            let mut new_filename: [u8; 11] = [0u8; 11];
+            let mut old_filename: [u8; 11] = [b' '; 11];
+            let mut new_filename: [u8; 11] = [b' '; 11];
 
-            if new.len() == 0 || old.len() > 11 || new.len() > 11 {
+            if new.len() == 0 || old.len() == 0 || old.len() > 11 || new.len() > 11 {
                 crate::vga::write::string(vga_index, b"Usage: mv <old> <new>", crate::vga::buffer::Color::Yellow);
                 crate::vga::write::newline(vga_index);
                 return;
@@ -321,12 +326,15 @@ fn cmd_mv(args: &[u8], vga_index: &mut isize) {
 
             if let Some(slice) = old_filename.get_mut(..) {
                 slice[..old.len()].copy_from_slice(old);
+                slice[8..11].copy_from_slice(b"TXT");
             }
 
             if let Some(slice) = new_filename.get_mut(..) {
                 slice[..new.len()].copy_from_slice(new);
+                slice[8..11].copy_from_slice(b"TXT");
             }
 
+            to_uppercase_ascii(&mut old_filename);
             to_uppercase_ascii(&mut new_filename);
 
             fs.rename_file(&old_filename, &new_filename, vga_index);
@@ -443,6 +451,35 @@ fn cmd_response(_args: &[u8], vga_index: &mut isize) {
     }
 }
 
+fn cmd_rm(args: &[u8], vga_index: &mut isize) {
+    let floppy = fs::block::Floppy;
+
+    if args.len() == 0 || args.len() > 11 {
+        crate::vga::write::string(vga_index, b"Usage: rm <filename>", crate::vga::buffer::Color::Yellow);
+        crate::vga::write::newline(vga_index);
+        return;
+    }
+
+    match fs::fat12::Fs::new(&floppy, vga_index) {
+        Ok(fs) => {
+            let mut filename: [u8; 11] = [b' '; 11];
+
+            if let Some(slice) = filename.get_mut(..) {
+                slice[..args.len()].copy_from_slice(args);
+                slice[8..11].copy_from_slice(b"TXT");
+            }
+
+            to_uppercase_ascii(&mut filename);
+            fs.delete_file(&filename, vga_index);
+        }
+        Err(e) => {
+            crate::vga::write::string(vga_index, e.as_bytes(), crate::vga::buffer::Color::Red);
+            crate::vga::write::newline(vga_index);
+        }
+    }
+}
+
+
 fn cmd_shutdown(_args: &[u8], vga_index: &mut isize) {
     vga::write::newline(vga_index);
     vga::write::string(vga_index, b" --- Shutting down", vga::buffer::Color::Cyan);
@@ -543,8 +580,31 @@ fn cmd_write(args: &[u8], vga_index: &mut isize) {
 
     match fs::fat12::Fs::new(&floppy, vga_index) {
         Ok(fs) => {
+            let (filename, content) = split_cmd(args);
+
+            if filename.len() == 0 || content.len() == 0 {
+                vga::write::string(vga_index, b"Usage <filename> <content>", vga::buffer::Color::Yellow);
+                vga::write::newline(vga_index);
+                return;
+            }
+
+            if filename.len() > 8 {
+                vga::write::string(vga_index, b"Filename too long (>8)", vga::buffer::Color::Red);
+                vga::write::newline(vga_index);
+                return;
+            }
+
+            let mut name = [b' '; 11];
+
+            if let Some(slice) = name.get_mut(..) {
+                slice[..filename.len()].copy_from_slice(filename);
+                slice[8..11].copy_from_slice(b"TXT");
+            }
+
+            to_uppercase_ascii(&mut name);
+
             unsafe {
-                fs.write_file(b"TESTIKLYTXT", args, vga_index);
+                fs.write_file(&name, content, vga_index);
             }
         }
         Err(e) => {

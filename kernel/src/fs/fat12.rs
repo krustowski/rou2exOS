@@ -350,13 +350,21 @@ impl<'a, D: BlockDevice> Fs<'a, D> {
 
                 if entry.name[0] == 0x00 {
                     // No more files
-                    return;
+                    continue;
                 }
 
                 if entry.name[0] == 0xE5 {
                     // Deleted file
                     continue;
                 }
+                    
+                crate::vga::write::string(vga_index, b"Current: ", crate::vga::buffer::Color::Yellow);
+                crate::vga::write::string(vga_index, &entry.name, crate::vga::buffer::Color::Yellow);
+                crate::vga::write::string(vga_index, b", Old: ", crate::vga::buffer::Color::Yellow);
+                crate::vga::write::string(vga_index, old_filename, crate::vga::buffer::Color::Yellow);
+                crate::vga::write::string(vga_index, b", New: ", crate::vga::buffer::Color::Yellow);
+                crate::vga::write::string(vga_index, new_filename, crate::vga::buffer::Color::Yellow);
+                crate::vga::write::newline(vga_index);
 
                 if self.check_filename(entry, old_filename) {
                     // Found the file — rename it
@@ -385,7 +393,55 @@ impl<'a, D: BlockDevice> Fs<'a, D> {
         crate::vga::write::newline(vga_index);
     }
 
-    fn check_filename(&self, entry: &Entry, entry_name: &[u8]) -> bool {
+    pub fn delete_file(&self, filename: &[u8; 11], vga_index: &mut isize) {
+        let root_dir_sector = self.boot_sector.reserved_sectors as u64 + (2 * 9); // 2 FATs × 9 sectors per FAT
+        let root_dir_entries = (self.boot_sector.root_entry_count as usize * 32) / 512;
+
+        for i in 0..root_dir_entries {
+            let mut sector: [u8; 512] = [0; 512];
+            self.device.read_sector(root_dir_sector + i as u64, &mut sector, vga_index);
+
+            for entry_index in 0..(512 / 32) {
+                let offset = entry_index * 32;
+                let entry_bytes = &sector[offset..offset + 32];
+
+                let entry = unsafe {
+                    &*(entry_bytes.as_ptr() as *const Entry)
+                };
+
+                if !self.check_filename(entry, filename) {
+                    continue;
+                }
+
+                // Found the file. Mark it as deleted by setting first byte to 0xE5
+                sector[offset] = 0xE5;
+
+                self.device.write_sector(root_dir_sector + i as u64, &sector, vga_index);
+
+                crate::vga::write::string(vga_index, b"File deleted", crate::vga::buffer::Color::Green);
+                crate::vga::write::newline(vga_index);
+                return;
+            }
+        }
+
+        crate::vga::write::string(vga_index, b"File not found", crate::vga::buffer::Color::Red);
+        crate::vga::write::newline(vga_index);
+    }
+
+    fn check_filename(&self, entry: &Entry, entry_name: &[u8; 11]) -> bool {
+        if entry.name.len() != 8 {
+            return false;
+        }
+
+        for i in 0..8 {
+            if entry.name[i] != entry_name[i] {
+                return false;
+            }
+        }
+        true
+    }
+
+    fn _check_filename(&self, entry: &Entry, entry_name: &[u8]) -> bool {
         let entry_len = entry_name.len();
         let mut equal = true;
 
@@ -395,9 +451,9 @@ impl<'a, D: BlockDevice> Fs<'a, D> {
                     if let Some(query) = entry_name.get(i) {
 
                         // Filename end
-                        if *org == 0 {
-                            break;
-                        }
+                        /*if *org == 0 {
+                          break;
+                          }*/
 
                         if *query - 32 != *org {
                             equal = false;
@@ -449,10 +505,18 @@ impl<'a, D: BlockDevice> Fs<'a, D> {
                         continue;
                     }
 
+                    if entry_name.len() > 11 {
+                        continue;
+                    }
+
+                    let mut name: [u8; 11] = [b' '; 11];
+                    name[..entry_name.len()].copy_from_slice(entry_name);
+                    name[8..11].copy_from_slice(b"TXT");
+
                     if entry_name.len() > 0 {
                         // TODO this is not safe as this allows to CD into file sectors!
                         //if self.check_filename(entry, entry_name) && entry.attr & 0x10 != 0 {
-                        if self.check_filename(entry, entry_name) {
+                        if self.check_filename(entry, &name) {
                             return entry.start_cluster as isize;
                         }
                     } else {
@@ -479,10 +543,18 @@ impl<'a, D: BlockDevice> Fs<'a, D> {
                                 continue;
                             }
 
+                            if entry_name.len() > 11 {
+                                continue;
+                            }
+
+                            let mut name: [u8; 11] = [b' '; 11];
+                            name[..entry_name.len()].copy_from_slice(entry_name);
+                            name[8..11].copy_from_slice(b"TXT");
+
                             if entry_name.len() > 0 {
                                 // TODO this is not safe as this allows to CD into file sectors!
                                 //if self.check_filename(entry, entry_name) && entry.attr & 0x10 != 0 {
-                                if self.check_filename(entry, entry_name) {
+                                if self.check_filename(entry, &name) {
                                     return entry.start_cluster as isize;
                                 }
                             } else {

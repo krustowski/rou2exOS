@@ -36,6 +36,28 @@ pub struct Entry {
     pub file_size: u32,
 }
 
+impl Entry {
+    pub fn to_bytes(e: &Entry) -> [u8; 32] {
+        let mut b = [0u8; 32];
+
+        b[0..8].copy_from_slice(&e.name);
+        b[8..11].copy_from_slice(&e.ext);
+        b[11] = e.attr;
+        b[12] = e.reserved;
+        b[13] = e.create_time_tenths;
+        b[14..16].copy_from_slice(&e.create_time.to_le_bytes());
+        b[16..18].copy_from_slice(&e.create_date.to_le_bytes());
+        b[18..20].copy_from_slice(&e.last_access_date.to_le_bytes());
+        b[20..22].copy_from_slice(&e.high_cluster.to_le_bytes()); // FAT32 only
+        b[22..24].copy_from_slice(&e.write_time.to_le_bytes());
+        b[24..26].copy_from_slice(&e.write_date.to_le_bytes());
+        b[26..28].copy_from_slice(&e.start_cluster.to_le_bytes());
+        b[28..32].copy_from_slice(&e.file_size.to_le_bytes());
+
+        b
+    }
+}
+
 #[repr(C, packed)]
 pub struct DirEntry {
     pub name: [u8; 8],         // "FILE    "

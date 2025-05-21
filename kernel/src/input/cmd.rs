@@ -374,17 +374,31 @@ fn cmd_ping(_args: &[u8], vga_index: &mut isize) {
 fn cmd_read(args: &[u8], vga_index: &mut isize) {
     let floppy = fs::block::Floppy;
 
-    if args.len() == 0 {
+    if args.len() == 0 || args.len() > 11 {
+        crate::vga::write::string(vga_index, b"Usage: read <filename>", crate::vga::buffer::Color::Red);
+        crate::vga::write::newline(vga_index);
         return;
     }
 
     match fs::fat12::Fs::new(&floppy, vga_index) {
         Ok(fs) => {
+            let mut filename = [b' '; 11];
+
+            filename[..args.len()].copy_from_slice(args);
+            filename[8..11].copy_from_slice(b"TXT");
+
+            to_uppercase_ascii(&mut filename);
+
             unsafe {
-                let cluster = fs.list_dir(config::PATH_CLUSTER, args, vga_index);
+                let cluster = fs.list_dir(config::PATH_CLUSTER, &filename, vga_index);
 
                 if cluster > 0 {
-                    fs.read_file(cluster as u16, vga_index);
+                    let mut buf = [0u8; 512];
+
+                    fs.read_file(cluster as u16, &mut buf, vga_index);
+
+                    crate::vga::write::string(vga_index, &buf, crate::vga::buffer::Color::Yellow);
+                    crate::vga::write::newline(vga_index);
                 } else {
                     crate::vga::write::string(vga_index, b"No such file", crate::vga::buffer::Color::Red);
                     crate::vga::write::newline(vga_index);

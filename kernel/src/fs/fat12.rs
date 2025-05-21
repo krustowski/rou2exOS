@@ -1,5 +1,3 @@
-use core::ptr::eq;
-
 use crate::fs::block::BlockDevice;
 use crate::fs::entry::{BootSector, Entry};
 use crate::init::config::debug_enabled;
@@ -77,17 +75,13 @@ impl<'a, D: BlockDevice> Fs<'a, D> {
     }
 
     //fn read_file(&self, start_cluster: u16, mut callback: impl FnMut(&[u8]), vga_index: &mut isize) {
-    pub fn read_file(&self, start_cluster: u16, vga_index: &mut isize) {
+    pub fn read_file(&self, start_cluster: u16, sector_buf: &mut [u8; 512], vga_index: &mut isize) {
         let mut current_cluster = start_cluster;
-        let mut sector_buf = [0u8; 512];
+        //let mut sector_buf = [0u8; 512];
 
         loop {
             let lba = self.cluster_to_lba(current_cluster);
-            self.device.read_sector(lba, &mut sector_buf, vga_index);
-
-            //if debug_enabled() {
-            crate::vga::write::string(vga_index, &sector_buf, crate::vga::buffer::Color::Yellow);
-            //}
+            self.device.read_sector(lba, sector_buf, vga_index);
 
             current_cluster = self.read_fat12_entry(current_cluster, vga_index);
             if current_cluster >= 0xFF8 {
@@ -358,14 +352,6 @@ impl<'a, D: BlockDevice> Fs<'a, D> {
                     continue;
                 }
                     
-                crate::vga::write::string(vga_index, b"Current: ", crate::vga::buffer::Color::Yellow);
-                crate::vga::write::string(vga_index, &entry.name, crate::vga::buffer::Color::Yellow);
-                crate::vga::write::string(vga_index, b", Old: ", crate::vga::buffer::Color::Yellow);
-                crate::vga::write::string(vga_index, old_filename, crate::vga::buffer::Color::Yellow);
-                crate::vga::write::string(vga_index, b", New: ", crate::vga::buffer::Color::Yellow);
-                crate::vga::write::string(vga_index, new_filename, crate::vga::buffer::Color::Yellow);
-                crate::vga::write::newline(vga_index);
-
                 if self.check_filename(entry, old_filename) {
                     // Found the file — rename it
                     let mut new_entry = [0u8; 32];
@@ -439,40 +425,6 @@ impl<'a, D: BlockDevice> Fs<'a, D> {
             }
         }
         true
-    }
-
-    fn _check_filename(&self, entry: &Entry, entry_name: &[u8]) -> bool {
-        let entry_len = entry_name.len();
-        let mut equal = true;
-
-        if entry_len <= 11 && entry_len > 0 {
-            for i in 0..entry.name.len() {
-                if let Some(org) = entry.name.get(i) {
-                    if let Some(query) = entry_name.get(i) {
-
-                        // Filename end
-                        /*if *org == 0 {
-                          break;
-                          }*/
-
-                        if *query - 32 != *org {
-                            equal = false;
-                            break;
-                        }
-
-                        if i == entry_len - 1 {
-                            if let Some(org_nxt) = entry.name.get(i + 1) {
-                                if *org_nxt != b' ' {
-                                    equal = false;
-                                    break;
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-        equal
     }
 
     pub fn list_dir(&self, start_cluster: u16, entry_name: &[u8], vga_index: &mut isize) -> isize {

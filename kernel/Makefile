@@ -61,6 +61,16 @@ run_iso_floppy: build_floppy
 		-fda fat.img \
 		-serial pty
 
+run_iso_floppy_drive: 
+	@sudo qemu-system-x86_64 \
+		-boot d \
+		-m 2G \
+		-vga std \
+		-cdrom r2.iso \
+		-serial pty \
+		-blockdev host_device,node-name=floppy1,filename=/dev/sda \
+		-device floppy,drive=floppy1
+
 run_iso_debug: 
 	@qemu-system-x86_64 \
 		-boot d \

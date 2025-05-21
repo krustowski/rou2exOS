@@ -48,11 +48,11 @@ pub fn move_cursor(row: u16, col: u16) {
 //  KEYBOARD HANDLING
 //
 
-fn keyboard_wait_read() {
+pub fn keyboard_wait_read() {
     while port::read(0x64) & 1 == 0 {}
 }
 
-fn keyboard_read_scancode() -> u8 {
+pub fn keyboard_read_scancode() -> u8 {
     keyboard_wait_read();
     port::read(0x60)
 }

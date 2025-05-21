@@ -42,6 +42,11 @@ static COMMANDS: &[Command] = &[
         function: cmd_echo,
     },
     Command {
+        name: b"ed",
+        description: b"runs a minimalistic text editor",
+        function: cmd_ed,
+    },
+    Command {
         name: b"help",
         description: b"shows this output",
         function: cmd_help,
@@ -50,6 +55,11 @@ static COMMANDS: &[Command] = &[
         name: b"http",
         description: b"runs a simple HTTP/UDP handler",
         function: cmd_http,
+    },
+    Command {
+        name: b"mv",
+        description: b"renames the file",
+        function: cmd_mv,
     },
     Command {
         name: b"ping",
@@ -155,7 +165,7 @@ fn split_cmd(input: &[u8]) -> (&[u8], &[u8]) {
     }
 }
 
-fn to_uppercase_ascii(input: &mut [u8]) {
+fn to_uppercase_ascii(input: &mut [u8; 11]) {
     for byte in input.iter_mut() {
         if *byte >= b'a' && *byte <= b'z' {
             *byte -= 32;
@@ -234,6 +244,11 @@ fn cmd_echo(args: &[u8], vga_index: &mut isize) {
     vga::write::newline(vga_index);
 }
 
+fn cmd_ed(args: &[u8], vga_index: &mut isize) {
+    app::editor::run(args);
+    vga::screen::clear(vga_index);
+}
+
 fn cmd_help(_args: &[u8], vga_index: &mut isize) {
     vga::write::string(vga_index, b"List of commands:", vga::buffer::Color::White);
     vga::write::newline(vga_index);
@@ -281,6 +296,48 @@ fn cmd_http(_args: &[u8], vga_index: &mut isize) {
         }
     }
 }
+
+fn cmd_mv(args: &[u8], vga_index: &mut isize) {
+    let floppy = fs::block::Floppy;
+
+    if args.len() == 0 {
+        crate::vga::write::string(vga_index, b"Usage: mv <old> <new>", crate::vga::buffer::Color::Yellow);
+        crate::vga::write::newline(vga_index);
+        return;
+    }
+
+    match fs::fat12::Fs::new(&floppy, vga_index) {
+        Ok(fs) => {
+            let (old, mut new) = split_cmd(args);
+
+            let mut old_filename: [u8; 11] = [0u8; 11];
+            let mut new_filename: [u8; 11] = [0u8; 11];
+
+            if new.len() == 0 || old.len() > 11 || new.len() > 11 {
+                crate::vga::write::string(vga_index, b"Usage: mv <old> <new>", crate::vga::buffer::Color::Yellow);
+                crate::vga::write::newline(vga_index);
+                return;
+            }
+
+            if let Some(slice) = old_filename.get_mut(..) {
+                slice[..old.len()].copy_from_slice(old);
+            }
+
+            if let Some(slice) = new_filename.get_mut(..) {
+                slice[..new.len()].copy_from_slice(new);
+            }
+
+            to_uppercase_ascii(&mut new_filename);
+
+            fs.rename_file(&old_filename, &new_filename, vga_index);
+        }
+        Err(e) => {
+            crate::vga::write::string(vga_index, e.as_bytes(), crate::vga::buffer::Color::Red);
+            crate::vga::write::newline(vga_index);
+        }
+    }
+}
+
 
 fn cmd_ping(_args: &[u8], vga_index: &mut isize) {
     let src_ip = [192, 168, 3, 2];

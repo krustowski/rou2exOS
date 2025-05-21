@@ -3,6 +3,7 @@ use core::ptr::eq;
 use crate::fs::block::BlockDevice;
 use crate::fs::entry::{BootSector, Entry};
 use crate::init::config::debug_enabled;
+use crate::init::config::get_path;
 
 pub struct Fs<'a, D: BlockDevice> {
     pub device: &'a D,
@@ -313,13 +314,75 @@ impl<'a, D: BlockDevice> Fs<'a, D> {
                     });
                 }
 
-                /*if self.check_filename(entry, filename) {
+                if self.check_filename(entry, filename) {
                     return Some(*entry);
-                }*/
+                }
             }
         }
 
         None
+    }
+
+    pub fn rename_file(&self, old_filename: &[u8; 11], new_filename: &[u8; 11], vga_index: &mut isize) {
+        let root_dir_sector = self.boot_sector.reserved_sectors as u64
+            + (2 as u64 * 9 as u64);
+        let root_dir_entries = (self.boot_sector.root_entry_count as usize * 32) / 512;
+
+        for i in 0..root_dir_entries {
+            let mut sector: [u8; 512] = [0; 512];
+            self.device.read_sector(root_dir_sector + i as u64, &mut sector, vga_index);
+
+            let entries_bytes = &sector[..];
+
+            for entry_index in 0..(512 / 32) {
+                let offset = entry_index * 32;
+
+                let start = entry_index * 32;
+                let end = start + 32;
+                let entry_bytes = &entries_bytes[start..end];
+
+                let entry = unsafe {
+                    &*(entry_bytes.as_ptr() as *const Entry)
+                };
+
+                //let offset = entry_index * 32;
+                //let entry = sector[offset..offset + 32].as_ptr() as *const Entry;
+
+                if entry.name[0] == 0x00 {
+                    // No more files
+                    return;
+                }
+
+                if entry.name[0] == 0xE5 {
+                    // Deleted file
+                    continue;
+                }
+
+                if self.check_filename(entry, old_filename) {
+                    // Found the file — rename it
+                    let mut new_entry = [0u8; 32];
+                    new_entry.copy_from_slice(entry_bytes);
+
+                    // Set new name
+                    new_entry[0..8].copy_from_slice(&new_filename[0..8]);
+                    new_entry[8..11].copy_from_slice(b"TXT");
+
+                    // Write back into the sector
+                    for j in 0..32 {
+                        sector[offset + j] = new_entry[j];
+                    }
+
+                    self.device.write_sector(root_dir_sector + i as u64, &sector, vga_index);
+
+                    crate::vga::write::string(vga_index, b"File renamed", crate::vga::buffer::Color::Green);
+                    crate::vga::write::newline(vga_index);
+                    return;
+                }
+            }
+        }
+
+        crate::vga::write::string(vga_index, b"File not found", crate::vga::buffer::Color::Red);
+        crate::vga::write::newline(vga_index);
     }
 
     fn check_filename(&self, entry: &Entry, entry_name: &[u8]) -> bool {

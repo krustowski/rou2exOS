@@ -92,6 +92,7 @@ pub fn keyboard_loop(vga_index: &mut isize) {
             if released == 0x1D {
                 ctrl_down = false;
             }
+            scancode_to_ascii(key);
             continue;
         }
 

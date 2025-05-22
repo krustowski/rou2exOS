@@ -744,6 +744,7 @@ impl<'a, D: BlockDevice> Fs<'a, D> {
 
             fn print_name(&self, entry: &Entry, vga_index: &mut isize) {
                 let mut printed_dot = false;
+                let mut file_len: usize = 0;
 
                 crate::vga::write::string(vga_index, b" ", crate::vga::buffer::Color::White);
 
@@ -752,12 +753,14 @@ impl<'a, D: BlockDevice> Fs<'a, D> {
                         break;
                     }
                     crate::vga::write::byte(vga_index, b, crate::vga::buffer::Color::Yellow);
+                    file_len += 1;
                 }
 
                 for &b in &entry.ext {
                     if b != b' ' && !printed_dot {
                         crate::vga::write::byte(vga_index, b'.', crate::vga::buffer::Color::White);
                         printed_dot = true;
+                        file_len += 1;
                     }
                 }
 
@@ -766,15 +769,21 @@ impl<'a, D: BlockDevice> Fs<'a, D> {
                         break;
                     }
                     crate::vga::write::byte(vga_index, b, crate::vga::buffer::Color::Pink);
+                    file_len += 1;
+                }
+
+                // Fill the space
+                while file_len < 15 {
+                    crate::vga::write::byte(vga_index, b' ', crate::vga::buffer::Color::Black);
+                    file_len += 1;
                 }
 
                 if entry.attr & 0x10 != 0 {
-                    crate::vga::write::string(vga_index, b" => DIR => ", crate::vga::buffer::Color::White);
+                    crate::vga::write::string(vga_index, b"[ DIR ] => ", crate::vga::buffer::Color::Cyan);
                     crate::vga::write::number(vga_index, entry.start_cluster as u64);
                 } else {
-                    crate::vga::write::string(vga_index, b" (", crate::vga::buffer::Color::White);
                     crate::vga::write::number(vga_index, entry.file_size as u64);
-                    crate::vga::write::string(vga_index, b" bytes)", crate::vga::buffer::Color::White);
+                    crate::vga::write::string(vga_index, b" bytes", crate::vga::buffer::Color::White);
                 }
 
                 crate::vga::write::newline(vga_index);

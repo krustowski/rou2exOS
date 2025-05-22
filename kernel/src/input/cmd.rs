@@ -393,7 +393,9 @@ fn cmd_mv(args: &[u8], vga_index: &mut isize) {
             to_uppercase_ascii(&mut old_filename);
             to_uppercase_ascii(&mut new_filename);
 
-            fs.rename_file(&old_filename, &new_filename, vga_index);
+            unsafe {
+                fs.rename_file(PATH_CLUSTER, &old_filename, &new_filename, vga_index);
+            }
         }
         Err(e) => {
             crate::vga::write::string(vga_index, e.as_bytes(), crate::vga::buffer::Color::Red);

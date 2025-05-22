@@ -213,6 +213,7 @@ pub fn keyboard_loop(vga_index: &mut isize) {
                                             return;
                                         }
                                         vga::write::string(vga_index, &input_buffer[..input_len], vga::buffer::Color::Red);
+                                        vga::write::byte(vga_index, b'"', vga::buffer::Color::Red);
                                         newline(vga_index);
                                         return;
                                     }
@@ -351,7 +352,7 @@ fn pad_prefix(mut prefix: &[u8]) -> [u8; 11] {
 
 /// Splits a buffer into two parts at the first space (`b' '`),
 /// while skipping trailing zeros and handling missing space correctly.
-pub fn split_cmd(input: &[u8]) -> (&[u8], &[u8]) {
+pub fn _split_cmd(input: &[u8]) -> (&[u8], &[u8]) {
     // Find the actual length before the first null byte
     let len = input.iter().position(|&c| c == 0).unwrap_or(input.len());
     let trimmed = &input[..len];
@@ -366,6 +367,22 @@ pub fn split_cmd(input: &[u8]) -> (&[u8], &[u8]) {
         (first, second)
     } else {
         (&[], trimmed)
+    }
+}
+
+pub fn split_cmd(input: &[u8]) -> (&[u8], &[u8]) {
+    let len = input.iter().position(|&c| c == 0).unwrap_or(input.len());
+    let trimmed = &input[..len];
+
+    if let Some(pos) = trimmed.iter().position(|&c| c == b' ') {
+        let cmd = &trimmed[..pos];
+        let mut rest = &trimmed[pos + 1..];
+        while rest.first() == Some(&b' ') {
+            rest = &rest[1..];
+        }
+        (cmd, rest)
+    } else {
+        (&trimmed[..], &[])
     }
 }
 

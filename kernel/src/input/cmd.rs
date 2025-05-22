@@ -659,7 +659,7 @@ fn cmd_write(args: &[u8], vga_index: &mut isize) {
             to_uppercase_ascii(&mut name);
 
             unsafe {
-                fs.write_file(&name, content, vga_index);
+                fs.write_file(PATH_CLUSTER, &name, content, vga_index);
             }
         }
         Err(e) => {

@@ -138,70 +138,123 @@ impl<'a, D: BlockDevice> Fs<'a, D> {
         self.device.write_sector(fat_sector, &buf, vga_index);
     }
 
-    pub fn write_file(&self, parent_cluster: u16, filename: &[u8; 11], data: &[u8], vga_index: &mut isize) {
-        let entry_opt = self.find_or_create_entry(parent_cluster, filename, vga_index);
-        if entry_opt.is_none() {
-            crate::vga::write::string(vga_index, b"Error: no free directory entry", crate::vga::buffer::Color::Red);
-            crate::vga::write::newline(vga_index);
-            return;
-        }
+    pub fn write_file(
+        &self,
+        dir_cluster: u16,
+        filename: &[u8; 11],
+        data: &[u8],
+        vga_index: &mut isize,
+    ) {
+        let mut clusters_needed = (data.len() + 511) / 512;
+        let mut first_cluster = self.allocate_cluster(vga_index);
 
-        let mut entry = entry_opt.unwrap();
-
-        // Allocate first cluster for the file
-        let first_cluster = self.allocate_cluster(vga_index);
         if first_cluster == 0 {
-            crate::vga::write::string(vga_index, b"Error: no free cluster", crate::vga::buffer::Color::Red);
-            crate::vga::write::newline(vga_index);
+            crate::vga::write::string(vga_index, b"Disk full", crate::vga::buffer::Color::Red);
             return;
         }
 
-        entry.start_cluster = first_cluster;
         let mut current_cluster = first_cluster;
+        let mut data_offset = 0;
 
-        let mut remaining = data.len();
-        let mut offset = 0;
+        while clusters_needed > 0 {
+            // Write all sectors in this cluster
+            let lba = self.cluster_to_lba(current_cluster);
 
-        while remaining > 0 {
-            let cluster_lba = self.cluster_to_lba(current_cluster);
-            let cluster_size = 512 * self.boot_sector.sectors_per_cluster as usize;
-            let to_write = core::cmp::min(cluster_size, remaining);
+            for sector_in_cluster in 0..self.boot_sector.sectors_per_cluster {
+                let mut sector_data = [0u8; 512];
 
-            if data.len() > 512 {
-                return;
+                let copy_len = core::cmp::min(512, data.len() - data_offset);
+                if copy_len == 0 {
+                    break;
+                }
+
+                if let Some(slice) = data.get(data_offset..data_offset + copy_len) {
+                    sector_data[..copy_len].copy_from_slice(slice);
+                }
+
+                self.device
+                    .write_sector(lba + sector_in_cluster as u64, &sector_data, vga_index);
+
+                data_offset += copy_len;
             }
 
-            let mut chunk = [0u8; 512];
+            clusters_needed -= 1;
 
-            if let Some(slice) = chunk.get_mut(..) {
-                slice[..data.len()].copy_from_slice(data);
-            }
-
-            // Write all sectors in the cluster
-            for sector in 0..self.boot_sector.sectors_per_cluster {
-                self.device.write_sector(cluster_lba + sector as u64, &chunk, vga_index);
-            }
-
-            offset += to_write;
-            remaining -= to_write;
-
-            if remaining > 0 {
-                let next = self.allocate_cluster(vga_index);
-                if next == 0 {
-                    crate::vga::write::string(vga_index, b"Error: ran out of clusters", crate::vga::buffer::Color::Red);
-                    crate::vga::write::newline(vga_index);
+            if clusters_needed > 0 {
+                let next_cluster = self.allocate_cluster(vga_index);
+                if next_cluster == 0 {
+                    crate::vga::write::string(vga_index, b"Disk full mid-write", crate::vga::buffer::Color::Red);
                     return;
                 }
-                self.write_fat12_entry(current_cluster, next, vga_index);
-                current_cluster = next;
+
+                self.write_fat12_entry(current_cluster, next_cluster, vga_index);
+                current_cluster = next_cluster;
             } else {
-                self.write_fat12_entry(current_cluster, 0xFFF, vga_index); // end-of-chain
+                self.write_fat12_entry(current_cluster, 0xFFF, vga_index); // EOF marker
             }
         }
 
-        entry.file_size = data.len() as u32;
+        // Write directory entry with filename, attributes, first_cluster, and size
+        self.write_dir_entry(
+            dir_cluster,
+            filename,
+            first_cluster,
+            data.len() as u32,
+            vga_index,
+        );
 
-        self.update_dir_entry(parent_cluster, filename, &entry, vga_index);
+        crate::vga::write::string(vga_index, b"File written", crate::vga::buffer::Color::Green);
+        crate::vga::write::newline(vga_index);
+    }
+
+
+    fn write_dir_entry(
+        &self,
+        dir_cluster: u16,
+        filename: &[u8; 11],
+        first_cluster: u16,
+        file_size: u32,
+        vga_index: &mut isize,
+    ) {
+        let entry_size = core::mem::size_of::<Entry>();
+        let entries_per_sector = 512 / entry_size;
+        let mut sector = [0u8; 512];
+
+        let (start_lba, sector_count) = if dir_cluster == 0 {
+            (
+                self.root_dir_start_lba,
+                self.boot_sector.sectors_per_cluster as usize,
+            )
+        } else {
+            (
+                self.cluster_to_lba(dir_cluster),
+                self.boot_sector.sectors_per_cluster as usize,
+            )
+        };
+
+        for sector_index in 0..sector_count {
+            self.device.read_sector(start_lba + sector_index as u64, &mut sector, vga_index);
+
+            for i in 0..entries_per_sector {
+                let offset = i * entry_size;
+                let entry = &sector[offset..offset + entry_size];
+
+                if entry[0] == 0x00 || entry[0] == 0xE5 {
+                    // Free entry — write here
+                    sector[offset..offset + 11].copy_from_slice(filename);
+                    sector[offset + 11] = 0x20; // file attribute: normal file
+                    sector[offset + 26..offset + 28].copy_from_slice(&first_cluster.to_le_bytes());
+                    sector[offset + 28..offset + 32].copy_from_slice(&file_size.to_le_bytes());
+
+                    self.device
+                        .write_sector(start_lba + sector_index as u64, &sector, vga_index);
+                    return;
+                }
+            }
+        }
+
+        crate::vga::write::string(vga_index, b"No dir entry slot", crate::vga::buffer::Color::Red);
+        crate::vga::write::newline(vga_index);
     }
 
 

@@ -5,7 +5,7 @@ use crate::init::config::{HOST, PATH, USER, get_path};
 
 const INPUT_BUFFER_SIZE: usize = 128;
 
-fn prompt(vga_index: &mut isize) {
+fn render_prompt(vga_index: &mut isize) {
     let path = get_path() as &[u8];
 
     vga::write::string(vga_index, b"[", vga::buffer::Color::Green);
@@ -67,7 +67,7 @@ pub fn keyboard_loop(vga_index: &mut isize) {
     vga::write::newline(vga_index);
 
     // Write prompt
-    prompt(vga_index);
+    render_prompt(vga_index);
     move_cursor_index(vga_index);
     vga::screen::scroll(vga_index);
 
@@ -119,7 +119,7 @@ pub fn keyboard_loop(vga_index: &mut isize) {
                 input_len = 0;
 
                 // Show new prompt
-                prompt(vga_index);
+                render_prompt(vga_index);
                 move_cursor_index(vga_index);
 
                 continue;

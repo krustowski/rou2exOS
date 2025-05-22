@@ -7,6 +7,7 @@ use crate::net;
 use crate::sound;
 use crate::time;
 use crate::vga;
+use crate::vga::write::newline;
 
 const KERNEL_VERSION: &[u8] = b"0.6.0";
 
@@ -176,7 +177,7 @@ fn split_cmd(input: &[u8]) -> (&[u8], &[u8]) {
     }
 }
 
-fn to_uppercase_ascii(input: &mut [u8; 11]) {
+pub fn to_uppercase_ascii(input: &mut [u8; 11]) {
     for byte in input.iter_mut() {
         if *byte >= b'a' && *byte <= b'z' {
             *byte -= 32;
@@ -261,7 +262,21 @@ fn cmd_echo(args: &[u8], vga_index: &mut isize) {
 }
 
 fn cmd_ed(args: &[u8], vga_index: &mut isize) {
-    app::editor::run(args);
+    if args.len() == 0 || args.len() > 11 {
+        vga::write::string(vga_index, b"Usage: ed <filename>", vga::buffer::Color::Yellow);
+        newline(vga_index);
+        return;
+    }
+
+    let mut filename = [b' '; 11];
+    if let Some(slice) = filename.get_mut(..args.len()) {
+        slice.copy_from_slice(args);
+    }
+
+    to_uppercase_ascii(&mut filename);
+
+    vga::screen::clear(vga_index);
+    app::editor::edit_file(&filename, vga_index);
     vga::screen::clear(vga_index);
 }
 

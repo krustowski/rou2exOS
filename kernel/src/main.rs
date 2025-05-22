@@ -6,9 +6,12 @@
 #![no_std] // don't link the Rust standard library
 #![no_main] // disable all Rust-level entry points
 #![feature(abi_x86_interrupt)]
-//#![feature(lang_items)]
+#![feature(lang_items)]
 #![feature(alloc_error_handler)]
+#![feature(ptr_internals)]
+#![feature(panic_info_message)]
 
+mod macros;
 mod multiboot2;
 
 mod acpi;
@@ -59,6 +62,8 @@ pub extern "C" fn rust_main() {
 //
 //
 
+#[lang = "eh_personality"] extern fn eh_personality() {}
+
 /// This function is called on panic.
 #[panic_handler]
 fn panic(info: &PanicInfo) -> ! {
@@ -78,6 +83,23 @@ fn panic(info: &PanicInfo) -> ! {
 
     loop {}
 }
+
+#[no_mangle]
+pub extern "C" fn panic_bounds_check() -> ! {
+    //panic("bounds check failed");
+    loop {}
+}
+
+#[no_mangle]
+pub extern "C" fn slice_end_index_len_fail() -> ! {
+    loop {}
+}
+
+#[no_mangle]
+pub extern "C" fn core_fmt_write() {
+    // Implement or stub if needed, but usually core should provide this.
+}
+
 
 /*#![alloc_error_handler]
   fn alloc_error_handler(_layout: Layout) {

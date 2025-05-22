@@ -479,40 +479,86 @@ impl<'a, D: BlockDevice> Fs<'a, D> {
         }
     }
 
-    pub fn delete_file(&self, filename: &[u8; 11], vga_index: &mut isize) {
-        let root_dir_sector = self.boot_sector.reserved_sectors as u64 + (2 * 9); // 2 FATs × 9 sectors per FAT
-        let root_dir_entries = (self.boot_sector.root_entry_count as usize * 32) / 512;
+    pub fn delete_file(&self, dir_cluster: u16, filename: &[u8; 11], vga_index: &mut isize) {
+        let entry_size = core::mem::size_of::<Entry>();
+        let entries_per_sector = 512 / entry_size;
 
-        for i in 0..root_dir_entries {
-            let mut sector: [u8; 512] = [0; 512];
-            self.device.read_sector(root_dir_sector + i as u64, &mut sector, vga_index);
+        let mut sector_buf = [0u8; 512];
 
-            for entry_index in 0..(512 / 32) {
-                let offset = entry_index * 32;
-                let entry_bytes = &sector[offset..offset + 32];
+        // Root directory case (cluster == 0)
+        if dir_cluster == 0 {
+            let root_dir_sector = self.root_dir_start_lba;
+            let root_dir_entries = self.boot_sector.root_entry_count as usize;
+            let total_sectors = (root_dir_entries * entry_size + 511) / 512;
 
-                let entry = unsafe {
-                    &*(entry_bytes.as_ptr() as *const Entry)
-                };
+            for i in 0..total_sectors {
+                self.device.read_sector(root_dir_sector + i as u64, &mut sector_buf, vga_index);
 
-                if !self.check_filename(entry, filename) {
-                    continue;
+                for entry_index in 0..entries_per_sector {
+                    let offset = entry_index * entry_size;
+                    if offset + entry_size > 512 {
+                        break;
+                    }
+
+                    let entry = unsafe { &*(sector_buf[offset..].as_ptr() as *const Entry) };
+
+                    if self.check_filename(entry, filename) {
+                        sector_buf[offset] = 0xE5;
+                        self.device.write_sector(root_dir_sector + i as u64, &sector_buf, vga_index);
+
+                        crate::vga::write::string(vga_index, b"File deleted", crate::vga::buffer::Color::Green);
+                        crate::vga::write::newline(vga_index);
+                        return;
+                    }
                 }
-
-                // Found the file. Mark it as deleted by setting first byte to 0xE5
-                sector[offset] = 0xE5;
-
-                self.device.write_sector(root_dir_sector + i as u64, &sector, vga_index);
-
-                crate::vga::write::string(vga_index, b"File deleted", crate::vga::buffer::Color::Green);
-                crate::vga::write::newline(vga_index);
-                return;
             }
+
+            crate::vga::write::string(vga_index, b"File not found", crate::vga::buffer::Color::Red);
+            crate::vga::write::newline(vga_index);
+            return;
+        }
+
+        // Subdirectory case: iterate through the directory cluster chain
+        let mut current_cluster = dir_cluster;
+
+        loop {
+            let sector_lba = self.cluster_to_lba(current_cluster);
+
+            for sector_offset in 0..self.boot_sector.sectors_per_cluster as u64 {
+                self.device.read_sector(sector_lba + sector_offset, &mut sector_buf, vga_index);
+
+                for entry_index in 0..entries_per_sector {
+                    let offset = entry_index * entry_size;
+                    if offset + entry_size > 512 {
+                        break;
+                    }
+
+                    let entry = unsafe { &*(sector_buf[offset..].as_ptr() as *const Entry) };
+
+                    if self.check_filename(entry, filename) {
+                        sector_buf[offset] = 0xE5;
+                        self.device.write_sector(sector_lba + sector_offset, &sector_buf, vga_index);
+
+                        crate::vga::write::string(vga_index, b"File deleted", crate::vga::buffer::Color::Green);
+                        crate::vga::write::newline(vga_index);
+                        return;
+                    }
+                }
+            }
+
+            // Follow FAT chain
+            let next_cluster = self.read_fat12_entry(current_cluster, vga_index);
+            if next_cluster >= 0xFF8 {
+                break;
+            }
+
+            current_cluster = next_cluster;
         }
 
         crate::vga::write::string(vga_index, b"File not found", crate::vga::buffer::Color::Red);
         crate::vga::write::newline(vga_index);
     }
+
 
     fn check_filename(&self, entry: &Entry, entry_name: &[u8; 11]) -> bool {
         if entry.name.len() != 8 {

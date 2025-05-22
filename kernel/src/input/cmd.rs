@@ -540,7 +540,10 @@ fn cmd_rm(args: &[u8], vga_index: &mut isize) {
             }
 
             to_uppercase_ascii(&mut filename);
-            fs.delete_file(&filename, vga_index);
+
+            unsafe {
+                fs.delete_file(PATH_CLUSTER, &filename, vga_index);
+            }
         }
         Err(e) => {
             crate::vga::write::string(vga_index, e.as_bytes(), crate::vga::buffer::Color::Red);

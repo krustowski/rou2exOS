@@ -68,7 +68,7 @@ pub fn create_packet(
     }
 
     // Copy payload
-    
+
     if let Some(slice) = out_buffer.get_mut(header_len..header_len + payload.len()) {
         slice.copy_from_slice(payload);
     }
@@ -149,8 +149,8 @@ pub fn receive_loop(callback: fn(packet: &[u8]) -> u8) -> u8 {
 
     loop {
         // While the keyboard is idle...
-        while port::read(0x64) & 1 == 0 && serial::ready() {
-            if temp_len <= temp_buf.len() {
+        while port::read(0x64) & 1 == 0 {
+            if serial::ready() && temp_len <= temp_buf.len() {
 
                 if let Some(p) = temp_buf.get_mut(temp_len) {
                     *p = serial::read();
@@ -185,9 +185,8 @@ pub fn receive_loop_tcp(conns: &mut [Option<tcp::TcpConnection>; MAX_CONNS], cal
 
     loop {
         // While the keyboard is idle...
-        while port::read(0x64) & 1 == 0 && serial::ready() {
-            if temp_len <= temp_buf.len() {
-
+        while port::read(0x64) & 1 == 0 {
+            if serial::ready() &&  temp_len <= temp_buf.len() {
                 if let Some(p) = temp_buf.get_mut(temp_len) {
                     *p = serial::read();
                 }

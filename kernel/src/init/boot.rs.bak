@@ -1,0 +1,265 @@
+use crate::{vga, video};
+
+use x86_64::{
+    VirtAddr,
+    structures::paging::{OffsetPageTable, PageTable},
+    registers::control::Cr3,
+};
+
+/// SAFETY: must be called only once, and only after paging is active
+pub unsafe fn init_offset_page_table(phys_mem_offset: VirtAddr) -> OffsetPageTable<'static> {
+    let (level_4_table_frame, _) = Cr3::read(); // read active top-level frame
+    let phys = level_4_table_frame.start_address();
+    let virt = phys_mem_offset + phys.as_u64();
+    let page_table_ptr: *mut PageTable = virt.as_mut_ptr();
+    OffsetPageTable::new(&mut *page_table_ptr, phys_mem_offset)
+}
+
+
+pub fn print_info(vga_index: &mut isize, multiboot_ptr: u64) {
+    //vga::write::string(vga_index, b"Multiboot2 pointer: ", vga::buffer::Color::White);
+    //vga::write::number(vga_index, (multiboot_ptr as u32) as u64);
+
+    unsafe {
+        /*parse_multiboot2_info(multiboot_ptr as usize, |msg| {
+            for b in msg.as_bytes() {
+                vga::write::byte(vga_index, *b, vga::buffer::Color::Yellow);
+            }
+        });*/
+        parse_multiboot2_info(vga_index, (multiboot_ptr as u32) as usize);
+    }
+
+    vga::write::newline(vga_index);
+}
+
+#[repr(C)]
+#[derive(Debug)]
+struct TagHeader {
+    typ: u32,
+    size: u32,
+}
+
+#[repr(C)]
+#[derive(Debug)]
+struct MemoryMapTag {
+    typ: u32,           // = 6
+    size: u32,          // size of this tag including entries
+    entry_size: u32,    // size of each entry (usually 24 bytes)
+    entry_version: u32, // usually 0
+    // followed by [MemoryMapEntry]...
+}
+
+#[repr(C, packed)]
+#[derive(Debug)]
+struct MemoryMapEntry {
+    base_addr: u64,
+    length: u64,
+    typ: u32,       // 1 = usable RAM
+    reserved: u32,  // must be 0
+}
+
+#[repr(C, packed)]
+pub struct FramebufferTag {
+    typ: u32,
+    pub size: u32,
+    pub addr: u64,
+    pub pitch: u32,
+    pub width: u32,
+    pub height: u32,
+    pub bpp: u8,
+    fb_type: u8,
+    reserved: u16,
+    // followed by palette or color info
+}
+
+//pub unsafe fn parse_multiboot2_info(base_addr: usize, mut log_fn: impl FnMut(&str)) {
+pub unsafe fn parse_multiboot2_info(vga_index: &mut isize, base_addr: usize) {
+    // Ensure alignment (Multiboot2 requires 8-byte aligned structure)
+    let addr = align_up(base_addr, 8);
+
+    // First 4 bytes: total size of the multiboot info
+    let total_size = *(addr as *const u32) as usize;
+
+    let mut ptr = addr + 8;
+    let end = addr + total_size;
+
+    let mut tag_count = 0;
+
+    while ptr < end {
+        let tag = &*(ptr as *const TagHeader);
+        if tag.size < 8 || tag.size > 4096 {
+            //log_fn("  Invalid tag size, breaking");
+            break;
+        }
+
+        match tag.typ {
+            0 => {
+                //log_fn("  End tag found.");
+                break;
+            }
+            1 => {
+                //log_fn("  Boot command line tag");
+                let str_ptr = ptr + 8;
+                let str_len = tag.size as usize - 8;
+                let raw_bytes = core::slice::from_raw_parts(str_ptr as *const u8, str_len);
+
+                let cmdline = core::str::from_utf8_unchecked(raw_bytes);
+                //log_fn(cmdline);
+            }
+            3 => {
+                //log_fn("  Module tag");
+                let start = *((ptr + 8) as *const u32);
+                let end = *((ptr + 12) as *const u32);
+                let str_ptr = ptr + 16;
+                let str_len = tag.size as usize - 16;
+                let raw_bytes = core::slice::from_raw_parts(str_ptr as *const u8, str_len);
+
+                let cmdline = core::str::from_utf8_unchecked(raw_bytes);
+                //log_fn(cmdline);
+            }
+            6 => {
+                //log_fn("  Memory map");
+                let mmap_tag = &*(ptr as *const MemoryMapTag);
+                let entries_start = (ptr + core::mem::size_of::<MemoryMapTag>()) as *const u8;
+                let entry_size = mmap_tag.entry_size as usize;
+
+                if entry_size > 0 {
+                    let entries_count = (mmap_tag.size as usize - core::mem::size_of::<MemoryMapTag>()) / entry_size;
+
+                    for i in 0..entries_count {
+                        let entry_ptr = entries_start.add(i * entry_size) as *const MemoryMapEntry;
+                        let entry = &*entry_ptr;
+
+                        if entry.typ == 1 {
+                            continue;
+                            vga::write::newline(vga_index);
+                            vga::write::string(vga_index, b"Usable mem region: ", vga::buffer::Color::White);
+                            vga::write::number(vga_index, entry.base_addr as u64);
+                            vga::write::string(vga_index, b" - ", vga::buffer::Color::White);
+                            vga::write::number(vga_index, entry.length as u64);
+                            /*vga_println!(
+                              "Usable region: base = {:#x}, length = {:#x}",
+                              entry.base_addr,
+                              entry.length
+                              );*/
+                        }
+                    }
+                }
+            }
+            8 => {
+                let fb_tag = &*(ptr as *const FramebufferTag);
+
+                /*for x in 0..100 {
+                    for y in 0..100 {
+                        video::mode::put_pixel(x, y, 255, 255, 255); // Red pixel
+                    }
+                }*/
+
+                //video::mode::init_video(fb_tag);
+                continue;
+
+                vga::write::newline(vga_index);
+                vga::write::string(vga_index, b"Frambuffer bpp: ", vga::buffer::Color::White);
+                vga::write::number(vga_index, fb_tag.bpp as u64);
+                vga::write::newline(vga_index);
+                vga::write::string(vga_index, b"Frambuffer resolution: ", vga::buffer::Color::White);
+                vga::write::number(vga_index, fb_tag.width as u64);
+                vga::write::string(vga_index, b"x", vga::buffer::Color::White);
+                vga::write::number(vga_index, fb_tag.height as u64);
+
+
+                //clear_screen(fb_tag, 0x00FF00);
+                //draw_rect(fb_tag, 50, 50, 10, 10, 0x00FF00);
+
+                //let fb_tag = &*(ptr as *const FramebufferTag);
+
+                /*if fb_tag.bpp == 32 {
+                  let framebuffer = fb_tag.addr as *mut u32;
+
+                // Draw a white pixel at (100, 100)
+                let x = 100;
+                let y = 100;
+                let color = 0xFFFFFF;
+
+                let offset = y as usize * fb_tag.pitch as usize / 4 + x as usize;
+                 *framebuffer.add(offset) = color;
+                 }
+
+                 if fb_tag.bpp == 16 {
+                 let framebuffer = fb_tag.addr as *mut u16;
+
+                 let x = 250;
+                 let y = 250;
+                 let color = rgb_to_565(25, 2, 55); // White in RGB565
+
+                 for x0 in 0..25 {
+                 for y0 in 0..25 {
+                 let pitch_pixels = fb_tag.pitch as usize / 2;
+                 let offset = y + y0 as usize * pitch_pixels + x + x0 as usize;
+
+                 *framebuffer.add(offset) = color;
+                 }
+                 }
+                 }*/
+
+            }
+            _ => {
+                //log_fn("  Unknown tag")
+                //log_fn(&format!("  Unknown tag: type={}, size={}", tag.typ, tag.size));
+            }
+        }
+
+        ptr += align_up(tag.size as usize, 8);
+        tag_count += 1;
+        if tag_count > 64 {
+            //log_fn("  Too many tags, stopping");
+            break;
+        }
+    }
+}
+
+fn align_up(x: usize, align: usize) -> usize {
+    (x + align - 1) & !(align - 1)
+}
+
+pub unsafe fn clear_screen(fb: &FramebufferTag, color: u32) {
+    let ptr = fb.addr as *mut u8;
+    let width = fb.width;
+    let height = fb.height;
+    let pitch = fb.pitch as usize;
+    let bpp = fb.bpp;
+
+    if bpp != 32 {
+        //panic!("Only 32bpp framebuffer supported");
+        return;
+    }
+
+    for y in 0..height {
+        for x in 0..width {
+            let offset = y as usize * pitch + x as usize * 4;
+            let pixel_ptr = ptr.add(offset) as *mut u32;
+            pixel_ptr.write_volatile(color);
+        }
+    }
+}
+
+pub unsafe fn draw_rect(fb: &FramebufferTag, x0: usize, y0: usize, w: usize, h: usize, color: u32) {
+    let ptr = fb.addr as *mut u8;
+    let pitch = fb.pitch as usize;
+
+    for y in y0..(y0 + h) {
+        for x in x0..(x0 + w) {
+            let offset = y * pitch + x * 4;
+            let pixel_ptr = ptr.add(offset) as *mut u32;
+            pixel_ptr.write_volatile(color);
+        }
+    }
+}
+
+fn rgb_to_565(r: u8, g: u8, b: u8) -> u16 {
+    let r5 = (r as u16 >> 3) & 0x1F;
+    let g6 = (g as u16 >> 2) & 0x3F;
+    let b5 = (b as u16 >> 3) & 0x1F;
+    (r5 << 11) | (g6 << 5) | b5
+}
+

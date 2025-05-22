@@ -1,14 +1,20 @@
 [package]
 name = "kernel"
 description = ""
-version = "0.4.0"
-edition = "2024"
+version = "0.5.0"
+edition = "2021"
 authors = ["krusty <krusty@vxn.dev>"]
 
+[build-dependencies]
+nasm = "0.0.1"
+
 [dependencies]
-#bootloader = "0.9"
-#bootloader_api = "*"
-x86_64 = { version = "0.14", default-features = false }
+#compiler_builtins = { version = "0.1", features = ["mem"] }
+x86_64 = { version = "0.15.2", default-features = false, features = ["instructions", "abi_x86_interrupt"] }
+
+[dependencies.lazy_static]
+version = "1.0"
+features = ["spin_no_std"]
 
 [profile.dev]
 panic = "abort"

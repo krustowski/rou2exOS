@@ -1,11 +1,16 @@
 use crate::acpi;
 use crate::app;
+use crate::init::config;
+use crate::fs;
+use crate::init::config::PATH_CLUSTER;
 use crate::net;
 use crate::sound;
 use crate::time;
 use crate::vga;
+use crate::vga::write::newline;
+use crate::input::keyboard;
 
-const KERNEL_VERSION: &[u8] = b"0.4.0";
+const KERNEL_VERSION: &[u8] = b"0.7.0";
 
 struct Command {
     name: &'static [u8],
@@ -20,14 +25,29 @@ static COMMANDS: &[Command] = &[
         function: cmd_beep,
     },
     Command {
+        name: b"cd",
+        description: b"changes the current directory",
+        function: cmd_cd,
+    },
+    Command {
         name: b"cls",
         description: b"clears the screen",
         function: cmd_clear,
     },
     Command {
+        name: b"dir",
+        description: b"lists the current directory",
+        function: cmd_dir,
+    },
+    Command {
         name: b"echo",
         description: b"echos the arguments",
         function: cmd_echo,
+    },
+    Command {
+        name: b"ed",
+        description: b"runs a minimalistic text editor",
+        function: cmd_ed,
     },
     Command {
         name: b"help",
@@ -40,9 +60,24 @@ static COMMANDS: &[Command] = &[
         function: cmd_http,
     },
     Command {
+        name: b"mkdir",
+        description: b"creates a subdirectory",
+        function: cmd_mkdir,
+    },
+    Command {
+        name: b"mv",
+        description: b"renames a file",
+        function: cmd_mv,
+    },
+    Command {
         name: b"ping",
         description: b"pings the host over the serial line (ICMP/SLIP)",
         function: cmd_ping,
+    },
+    Command {
+        name: b"read",
+        description: b"prints the output of a file",
+        function: cmd_read,
     },
     Command {
         name: b"response",
@@ -50,9 +85,19 @@ static COMMANDS: &[Command] = &[
         function: cmd_response,
     },
     Command {
+        name: b"rm",
+        description: b"removes a file",
+        function: cmd_rm,
+    },
+    Command {
         name: b"shutdown",
         description: b"shuts down the system",
         function: cmd_shutdown,
+    },
+    Command {
+        name: b"snake",
+        description: b"runs a simple VGA text mode snake-like game",
+        function: cmd_snake,
     },
     Command {
         name: b"tcp",
@@ -73,6 +118,11 @@ static COMMANDS: &[Command] = &[
         name: b"version",
         description: b"prints the kernel version",
         function: cmd_version,
+    },
+    Command {
+        name: b"write",
+        description: b"writes arguments to a sample file on floppy",
+        function: cmd_write,
     }
 ];
 
@@ -94,8 +144,8 @@ pub fn handle(input: &[u8], vga_index: &mut isize) {
             }
 
             // Echo back the input
-            vga::write::string(vga_index, b"unknown command: ", 0xc);
-            vga::write::string(vga_index, cmd_name, 0x0f);
+            vga::write::string(vga_index, b"unknown command: ", vga::buffer::Color::Red);
+            vga::write::string(vga_index, cmd_name, vga::buffer::Color::White);
             vga::write::newline(vga_index);
         }
     }
@@ -115,7 +165,7 @@ fn find_cmd(name: &[u8]) -> Option<&'static Command> {
     None
 }
 
-fn split_cmd(input: &[u8]) -> (&[u8], &[u8]) {
+pub fn split_cmd(input: &[u8]) -> (&[u8], &[u8]) {
     // Find the first space
     if let Some(pos) = input.iter().position(|&c| c == b' ') {
         let (cmd, args) = input.split_at(pos);
@@ -125,6 +175,14 @@ fn split_cmd(input: &[u8]) -> (&[u8], &[u8]) {
     } else {
         // No space found, entire input is the command
         (input, &[])
+    }
+}
+
+pub fn to_uppercase_ascii(input: &mut [u8; 11]) {
+    for byte in input.iter_mut() {
+        if *byte >= b'a' && *byte <= b'z' {
+            *byte -= 32;
+        }
     }
 }
 
@@ -142,26 +200,105 @@ fn cmd_beep(_args: &[u8], _vga_index: &mut isize) {
     sound::beep::stop_beep();
 }
 
+fn cmd_cd(args: &[u8], vga_index: &mut isize) {
+    let floppy = fs::block::Floppy;
+
+    if args.len() == 0 || args.len() > 11 {
+        unsafe {
+            config::PATH_CLUSTER = 0;
+            config::set_path(b"/");
+        }
+        return;
+    }
+
+    match fs::fat12::Fs::new(&floppy, vga_index) {
+        Ok(fs) => {
+            unsafe {
+                let mut name = [b' '; 11];
+                name[..args.len()].copy_from_slice(args);
+
+                to_uppercase_ascii(&mut name);
+
+                let cluster = fs.list_dir(config::PATH_CLUSTER, &name, vga_index);
+
+                if cluster > 0 {
+                    config::PATH_CLUSTER = cluster as u16;
+                    config::set_path(args);
+                } else {
+                    crate::vga::write::string(vga_index, b"No such directory", crate::vga::buffer::Color::Red);
+                    crate::vga::write::newline(vga_index);
+                }
+            }
+        }
+        Err(e) => {
+            crate::vga::write::string(vga_index, e.as_bytes(), crate::vga::buffer::Color::Red);
+            crate::vga::write::newline(vga_index);
+        }
+    }
+}
+
 fn cmd_clear(_args: &[u8], vga_index: &mut isize) {
     vga::screen::clear(vga_index);
 }
 
+fn cmd_dir(_args: &[u8], vga_index: &mut isize) {
+    let floppy = fs::block::Floppy;
+
+    match fs::fat12::Fs::new(&floppy, vga_index) {
+        Ok(fs) => {
+            unsafe {
+                fs.list_dir(config::PATH_CLUSTER, &[], vga_index);
+            }
+        }
+        Err(e) => {
+            crate::vga::write::string(vga_index, e.as_bytes(), crate::vga::buffer::Color::Red);
+            crate::vga::write::newline(vga_index);
+        }
+    }
+}
+
 fn cmd_echo(args: &[u8], vga_index: &mut isize) {
-    vga::write::string(vga_index, args, 0x0f);
+    vga::write::string(vga_index, args, vga::buffer::Color::White);
     vga::write::newline(vga_index);
 }
 
+fn cmd_ed(args: &[u8], vga_index: &mut isize) {
+    let (filename_input, _) = keyboard::split_cmd(args);
+
+    if filename_input.len() == 0 || filename_input.len() > 12 {
+        vga::write::string(vga_index, b"Usage: ed <filename>", vga::buffer::Color::Yellow);
+        newline(vga_index);
+        return;
+    }
+
+    let mut filename = [b' '; 12];
+    if let Some(slice) = filename.get_mut(..filename_input.len()) {
+        slice.copy_from_slice(filename_input);
+    }
+
+    //to_uppercase_ascii(&mut filename);
+
+    vga::screen::clear(vga_index);
+    app::editor::edit_file(&filename, vga_index);
+    vga::screen::clear(vga_index);
+}
+
 fn cmd_help(_args: &[u8], vga_index: &mut isize) {
-    vga::write::string(vga_index, b"List of commands:", 0x0f);
+    vga::write::string(vga_index, b"List of commands:", vga::buffer::Color::White);
     vga::write::newline(vga_index);
 
     for cmd in COMMANDS {
-        vga::write::string(vga_index, b" - ", 0x09);
-        vga::write::string(vga_index, cmd.name, 0x09);
-        vga::write::string(vga_index, b": ", 0x09);
-        vga::write::string(vga_index, cmd.description, 0x0f);
+        vga::write::string(vga_index, b" ", vga::buffer::Color::Blue);
+        vga::write::string(vga_index, cmd.name, vga::buffer::Color::Blue);
+        vga::write::string(vga_index, b": ", vga::buffer::Color::Blue);
+        vga::write::string(vga_index, cmd.description, vga::buffer::Color::White);
         vga::write::newline(vga_index);
     }
+}
+
+fn cmd_snake(_args: &[u8], vga_index: &mut isize) {
+    vga::screen::clear(vga_index);
+    app::snake::run(vga_index);
 }
 
 fn cmd_http(_args: &[u8], vga_index: &mut isize) {
@@ -177,22 +314,99 @@ fn cmd_http(_args: &[u8], vga_index: &mut isize) {
     }
 
     vga::write::newline(vga_index);
-    vga::write::string(vga_index, b"Starting a simple HTTP/UDP handler (hit any key to interrupt)...", 0x0f);
+    vga::write::string(vga_index, b"Starting a simple HTTP/UDP handler (hit any key to interrupt)...", vga::buffer::Color::White);
     vga::write::newline(vga_index);
 
     loop {
         let ret = net::ipv4::receive_loop(callback);
 
         if ret == 0 {
-            vga::write::string(vga_index, b"Received a HTTP request, sending response", 0x0f);
+            vga::write::string(vga_index, b"Received a HTTP request, sending response", vga::buffer::Color::White);
             vga::write::newline(vga_index);
         } else if ret == 3 {
-            vga::write::string(vga_index, b"Keyboard interrupt", 0x0f);
+            vga::write::string(vga_index, b"Keyboard interrupt", vga::buffer::Color::White);
             vga::write::newline(vga_index);
             break;
         }
     }
 }
+
+fn cmd_mkdir(args: &[u8], vga_index: &mut isize) {
+    let floppy = fs::block::Floppy;
+
+    if args.len() == 0 || args.len() > 11 {
+        crate::vga::write::string(vga_index, b"Usage: mkdir <dirname>", crate::vga::buffer::Color::Yellow);
+        crate::vga::write::newline(vga_index);
+        return;
+    }
+
+    match fs::fat12::Fs::new(&floppy, vga_index) {
+        Ok(fs) => {
+            let mut filename: [u8; 11] = [b' '; 11];
+
+            if let Some(slice) = filename.get_mut(..) {
+                slice[..args.len()].copy_from_slice(args);
+            }
+
+            to_uppercase_ascii(&mut filename);
+            unsafe {
+                fs.create_subdirectory(&filename, PATH_CLUSTER, vga_index);
+            }
+        }
+        Err(e) => {
+            crate::vga::write::string(vga_index, e.as_bytes(), crate::vga::buffer::Color::Red);
+            crate::vga::write::newline(vga_index);
+        }
+    }
+}
+
+
+fn cmd_mv(args: &[u8], vga_index: &mut isize) {
+    let floppy = fs::block::Floppy;
+
+    if args.len() == 0 {
+        crate::vga::write::string(vga_index, b"Usage: mv <old> <new>", crate::vga::buffer::Color::Yellow);
+        crate::vga::write::newline(vga_index);
+        return;
+    }
+
+    match fs::fat12::Fs::new(&floppy, vga_index) {
+        Ok(fs) => {
+            let (old, new) = split_cmd(args);
+
+            let mut old_filename: [u8; 11] = [b' '; 11];
+            let mut new_filename: [u8; 11] = [b' '; 11];
+
+            if new.len() == 0 || old.len() == 0 || old.len() > 11 || new.len() > 11 {
+                crate::vga::write::string(vga_index, b"Usage: mv <old> <new>", crate::vga::buffer::Color::Yellow);
+                crate::vga::write::newline(vga_index);
+                return;
+            }
+
+            if let Some(slice) = old_filename.get_mut(..) {
+                slice[..old.len()].copy_from_slice(old);
+                slice[8..11].copy_from_slice(b"TXT");
+            }
+
+            if let Some(slice) = new_filename.get_mut(..) {
+                slice[..new.len()].copy_from_slice(new);
+                slice[8..11].copy_from_slice(b"TXT");
+            }
+
+            to_uppercase_ascii(&mut old_filename);
+            to_uppercase_ascii(&mut new_filename);
+
+            unsafe {
+                fs.rename_file(PATH_CLUSTER, &old_filename, &new_filename, vga_index);
+            }
+        }
+        Err(e) => {
+            crate::vga::write::string(vga_index, e.as_bytes(), crate::vga::buffer::Color::Red);
+            crate::vga::write::newline(vga_index);
+        }
+    }
+}
+
 
 fn cmd_ping(_args: &[u8], vga_index: &mut isize) {
     let src_ip = [192, 168, 3, 2];
@@ -212,11 +426,53 @@ fn cmd_ping(_args: &[u8], vga_index: &mut isize) {
     let ipv4_len = net::ipv4::create_packet(src_ip, dst_ip, protocol, icmp_slice, &mut ipv4_buf);
     let ipv4_slice = ipv4_buf.get(..ipv4_len).unwrap_or(&[]);
 
-    vga::write::string(vga_index, b"Sending a ping packet...", 0x0f);
+    vga::write::string(vga_index, b"Sending a ping packet...", vga::buffer::Color::White);
     vga::write::newline(vga_index);
 
     net::ipv4::send_packet(ipv4_slice);
 }
+
+fn cmd_read(args: &[u8], vga_index: &mut isize) {
+    let floppy = fs::block::Floppy;
+
+    if args.len() == 0 || args.len() > 11 {
+        crate::vga::write::string(vga_index, b"Usage: read <filename>", crate::vga::buffer::Color::Red);
+        crate::vga::write::newline(vga_index);
+        return;
+    }
+
+    match fs::fat12::Fs::new(&floppy, vga_index) {
+        Ok(fs) => {
+            let mut filename = [b' '; 11];
+
+            filename[..args.len()].copy_from_slice(args);
+            filename[8..11].copy_from_slice(b"TXT");
+
+            to_uppercase_ascii(&mut filename);
+
+            unsafe {
+                let cluster = fs.list_dir(config::PATH_CLUSTER, &filename, vga_index);
+
+                if cluster > 0 {
+                    let mut buf = [0u8; 512];
+
+                    fs.read_file(cluster as u16, &mut buf, vga_index);
+
+                    crate::vga::write::string(vga_index, &buf, crate::vga::buffer::Color::Yellow);
+                    crate::vga::write::newline(vga_index);
+                } else {
+                    crate::vga::write::string(vga_index, b"No such file", crate::vga::buffer::Color::Red);
+                    crate::vga::write::newline(vga_index);
+                }
+            }
+        }
+        Err(e) => {
+            crate::vga::write::string(vga_index, e.as_bytes(), crate::vga::buffer::Color::Red);
+            crate::vga::write::newline(vga_index);
+        }
+    }
+}
+
 
 fn cmd_response(_args: &[u8], vga_index: &mut isize) {
     fn callback(packet: &[u8]) -> u8 {
@@ -236,6 +492,7 @@ fn cmd_response(_args: &[u8], vga_index: &mut isize) {
                 let icmp_len = net::icmp::create_packet(0, icmp_header.identifier, icmp_header.sequence_number, icmp_payload, &mut icmp_buf);
                 let icmp_slice = icmp_buf.get(..icmp_len).unwrap_or(&[]);
 
+                //let ipv4_len = net::ipv4::create_packet(ipv4_header.dest_ip, ipv4_header.source_ip, ipv4_header.protocol, &icmp_buf[..icmp_len], &mut ipv4_buf);
                 let ipv4_len = net::ipv4::create_packet([192, 168, 3, 2], ipv4_header.source_ip, ipv4_header.protocol, icmp_slice, &mut ipv4_buf);
                 let ipv4_slice = ipv4_buf.get(..ipv4_len).unwrap_or(&[]);
 
@@ -246,32 +503,64 @@ fn cmd_response(_args: &[u8], vga_index: &mut isize) {
     }
 
     vga::write::newline(vga_index);
-    vga::write::string(vga_index, b"Waiting for an ICMP echo request (hit any key to interrupt)...", 0x0f);
+    vga::write::string(vga_index, b"Waiting for an ICMP echo request (hit any key to interrupt)...", vga::buffer::Color::White);
     vga::write::newline(vga_index);
 
     loop {
         let ret = net::ipv4::receive_loop(callback);
 
         if ret == 0 {
-            vga::write::string(vga_index, b"Received a ping request, sending a response", 0x0f);
+            vga::write::string(vga_index, b"Received a ping request, sending a response", vga::buffer::Color::White);
             vga::write::newline(vga_index);
             /*} else if ret == 1 {
-              vga::write::string(vga_index, b"Wrong IPv4 protocol (not ICMP) received", 0xc);
+              vga::write::string(vga_index, b"Wrong IPv4 protocol (not ICMP) received", vga::buffer::Color::Green);
               vga::write::newline(vga_index);*/
     } else if ret == 2 {
-        vga::write::string(vga_index, b"Received a non-request ICMP packet", 0xc);
+        vga::write::string(vga_index, b"Received a non-request ICMP packet", vga::buffer::Color::Green);
         vga::write::newline(vga_index);
     } else if ret == 3 {
-        vga::write::string(vga_index, b"Keyboard interrupt", 0x0f);
+        vga::write::string(vga_index, b"Keyboard interrupt", vga::buffer::Color::White);
         vga::write::newline(vga_index);
         break;
     }
     }
 }
 
+fn cmd_rm(args: &[u8], vga_index: &mut isize) {
+    let floppy = fs::block::Floppy;
+
+    if args.len() == 0 || args.len() > 11 {
+        crate::vga::write::string(vga_index, b"Usage: rm <filename>", crate::vga::buffer::Color::Yellow);
+        crate::vga::write::newline(vga_index);
+        return;
+    }
+
+    match fs::fat12::Fs::new(&floppy, vga_index) {
+        Ok(fs) => {
+            let mut filename: [u8; 11] = [b' '; 11];
+
+            if let Some(slice) = filename.get_mut(..) {
+                slice[..args.len()].copy_from_slice(args);
+                slice[8..11].copy_from_slice(b"TXT");
+            }
+
+            to_uppercase_ascii(&mut filename);
+
+            unsafe {
+                fs.delete_file(PATH_CLUSTER, &filename, vga_index);
+            }
+        }
+        Err(e) => {
+            crate::vga::write::string(vga_index, e.as_bytes(), crate::vga::buffer::Color::Red);
+            crate::vga::write::newline(vga_index);
+        }
+    }
+}
+
+
 fn cmd_shutdown(_args: &[u8], vga_index: &mut isize) {
     vga::write::newline(vga_index);
-    vga::write::string(vga_index, b" --- Shutting down", 0xb);
+    vga::write::string(vga_index, b" --- Shutting down", vga::buffer::Color::Cyan);
 
     for _ in 0..3 {
         for _ in 0..3_500_000 {
@@ -279,7 +568,7 @@ fn cmd_shutdown(_args: &[u8], vga_index: &mut isize) {
                 core::arch::asm!("nop");
             }
         }
-        vga::write::string(vga_index, b". ", 0xb);
+        vga::write::string(vga_index, b". ", vga::buffer::Color::Cyan);
     }
 
     acpi::shutdown::shutdown();
@@ -292,40 +581,40 @@ fn cmd_tcp(_args: &[u8], vga_index: &mut isize) {
 fn cmd_time(_args: &[u8], vga_index: &mut isize) {
     let (y, mo, d, h, m, s) = time::rtc::read_rtc_full();
 
-    vga::write::string(vga_index, b"RTC Time: ", 0x0f);
-    vga::write::number(vga_index, &mut (h as u64));
+    vga::write::string(vga_index, b"RTC Time: ", vga::buffer::Color::White);
+    vga::write::number(vga_index, h as u64);
 
-    vga::write::string(vga_index, b":", 0x0f);
+    vga::write::string(vga_index, b":", vga::buffer::Color::White);
 
     if m < 10 { 
-        vga::write::string(vga_index, b"0", 0x0f); 
+        vga::write::string(vga_index, b"0", vga::buffer::Color::White); 
     }
-    vga::write::number(vga_index, &mut (m as u64));
+    vga::write::number(vga_index, m as u64);
 
-    vga::write::string(vga_index, b":", 0x0f);
+    vga::write::string(vga_index, b":", vga::buffer::Color::White);
 
     if s < 10 { 
-        vga::write::string(vga_index, b"0", 0x0f); 
+        vga::write::string(vga_index, b"0", vga::buffer::Color::White); 
     }
-    vga::write::number(vga_index, &mut (s as u64));
+    vga::write::number(vga_index, s as u64);
 
     vga::write::newline(vga_index);
 
-    vga::write::string(vga_index, b"RTC Date: ", 0x0f);
+    vga::write::string(vga_index, b"RTC Date: ", vga::buffer::Color::White);
 
     if d < 10 {
-        vga::write::string(vga_index, b"0", 0x0f); 
+        vga::write::string(vga_index, b"0", vga::buffer::Color::White); 
     }
-    vga::write::number(vga_index, &mut (d as u64));
-    vga::write::string(vga_index, b"-", 0x0f);
+    vga::write::number(vga_index, d as u64);
+    vga::write::string(vga_index, b"-", vga::buffer::Color::White);
 
     if mo < 10 {
-        vga::write::string(vga_index, b"0", 0x0f); 
+        vga::write::string(vga_index, b"0", vga::buffer::Color::White); 
     }
-    vga::write::number(vga_index, &mut (mo as u64));
-    vga::write::string(vga_index, b"-", 0x0f);
+    vga::write::number(vga_index, mo as u64);
+    vga::write::string(vga_index, b"-", vga::buffer::Color::White);
 
-    vga::write::number(vga_index, &mut (y as u64));
+    vga::write::number(vga_index, y as u64);
 
     vga::write::newline(vga_index);
 }
@@ -333,33 +622,73 @@ fn cmd_time(_args: &[u8], vga_index: &mut isize) {
 fn cmd_uptime(_args: &[u8], vga_index: &mut isize) {
     let total_seconds = time::acpi::get_uptime_seconds();
 
-    let mut hours = total_seconds / 3600;
-    let mut minutes = (total_seconds % 3600) / 60;
-    let mut seconds = total_seconds % 60;
+    let hours = total_seconds / 3600;
+    let minutes = (total_seconds % 3600) / 60;
+    let seconds = total_seconds % 60;
 
     // Print formatted
-    vga::write::string(vga_index, b"Uptime: ", 0x0f);
-    vga::write::number(vga_index, &mut hours);
-    vga::write::string(vga_index, b":", 0x0f);
+    vga::write::string(vga_index, b"Uptime: ", vga::buffer::Color::White);
+    vga::write::number(vga_index, hours);
+    vga::write::string(vga_index, b":", vga::buffer::Color::White);
 
     if minutes < 10 {
-        vga::write::string(vga_index, b"0", 0x0f);
+        vga::write::string(vga_index, b"0", vga::buffer::Color::White);
     }
 
-    vga::write::number(vga_index, &mut minutes);
-    vga::write::string(vga_index, b":", 0x0f);
+    vga::write::number(vga_index, minutes);
+    vga::write::string(vga_index, b":", vga::buffer::Color::White);
 
     if seconds < 10 {
-        vga::write::string(vga_index, b"0", 0x0f);
+        vga::write::string(vga_index, b"0", vga::buffer::Color::White);
     }
 
-    vga::write::number(vga_index, &mut seconds);
+    vga::write::number(vga_index, seconds);
 
     vga::write::newline(vga_index);
 }
 
 fn cmd_version(_args: &[u8], vga_index: &mut isize) {
-    vga::write::string(vga_index, b"Version: ", 0x0f);
-    vga::write::string(vga_index, KERNEL_VERSION, 0x0f);
+    vga::write::string(vga_index, b"Version: ", vga::buffer::Color::White);
+    vga::write::string(vga_index, KERNEL_VERSION, vga::buffer::Color::White);
     vga::write::newline(vga_index);
 }
+
+fn cmd_write(args: &[u8], vga_index: &mut isize) {
+    let floppy = fs::block::Floppy;
+
+    match fs::fat12::Fs::new(&floppy, vga_index) {
+        Ok(fs) => {
+            let (filename, content) = split_cmd(args);
+
+            if filename.len() == 0 || content.len() == 0 {
+                vga::write::string(vga_index, b"Usage <filename> <content>", vga::buffer::Color::Yellow);
+                vga::write::newline(vga_index);
+                return;
+            }
+
+            if filename.len() > 8 {
+                vga::write::string(vga_index, b"Filename too long (>8)", vga::buffer::Color::Red);
+                vga::write::newline(vga_index);
+                return;
+            }
+
+            let mut name = [b' '; 11];
+
+            if let Some(slice) = name.get_mut(..) {
+                slice[..filename.len()].copy_from_slice(filename);
+                slice[8..11].copy_from_slice(b"TXT");
+            }
+
+            to_uppercase_ascii(&mut name);
+
+            unsafe {
+                fs.write_file(PATH_CLUSTER, &name, content, vga_index);
+            }
+        }
+        Err(e) => {
+            crate::vga::write::string(vga_index, e.as_bytes(), crate::vga::buffer::Color::Red);
+            crate::vga::write::newline(vga_index);
+        }
+    }
+}
+

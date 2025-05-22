@@ -1,3 +1,6 @@
 /target
 /iso/boot/kernel.*
+/iso/boot/*.o
 /kernel.*
+/r2.iso
+/fat.img

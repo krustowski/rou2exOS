@@ -1,38 +1,43 @@
 use crate::vga::buffer;
 use crate::vga::screen;
 
-pub fn number(vga_index: &mut isize, num: &mut u64) {
+pub fn number(vga_index: &mut isize, num: u64) {
     // Dumb print without heap, just very basic
     let mut buf = [0u8; 20];
     let mut i = buf.len();
 
-    if *num == 0 {
-        string(vga_index, b"0", 0x0f);
+    if num == 0 {
+        string(vga_index, b"0", buffer::Color::White);
         return;
     }
 
-    while *num > 0 {
+    let mut n = num;
+
+    while n > 0 {
         i -= 1;
         if let Some(b) = buf.get_mut(i) {
-            *b = b'0' + (*num % 10) as u8;
+            *b = b'0' + (n % 10) as u8;
         }
-        *num /= 10;
+        n /= 10;
     }
 
-    let buf_slice = buf.get(i..).unwrap_or(&[]);
-    string(vga_index, buf_slice as &[u8], 0x0f);
+    string(vga_index, buf.get(i..).unwrap_or(&[]) as &[u8], buffer::Color::White);
 }
 
 /// Write a whole string to screen
-pub fn string(vga_index: &mut isize, string: &[u8], color: u8) {
+pub fn string(vga_index: &mut isize, string: &[u8], color: buffer::Color) {
     screen::scroll(vga_index);
 
-    for &byte in string {
-        unsafe {
-            *buffer::VGA_BUFFER.offset(*vga_index) = byte;
-            *buffer::VGA_BUFFER.offset(*vga_index + 1) = color;
-            *vga_index += 2;
-        }
+    for &b in string {
+        byte(vga_index, b, color);
+    }
+}
+
+pub fn byte(vga_index: &mut isize, b: u8, color: buffer::Color) {
+    unsafe {
+        *buffer::VGA_BUFFER.offset(*vga_index) = b;
+        *buffer::VGA_BUFFER.offset(*vga_index + 1) = color as u8;
+        *vga_index += 2;
     }
 }
 

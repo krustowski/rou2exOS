@@ -8,7 +8,7 @@ pub fn color_demo(vga_index: &mut isize) {
         0xC, 0xD, 0xE, 0xF,
     ];
 
-    vga::write::string(vga_index, b"Color test:", 0x0f);
+    vga::write::string(vga_index, b"Color test:", vga::buffer::Color::White);
     vga::write::newline(vga_index);
 
     let mut col = 0;

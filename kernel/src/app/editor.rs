@@ -86,7 +86,7 @@ impl Editor {
         idx
     }
 
-    pub fn render(&self, writer: &mut Writer, filename: &[u8; 11]) {
+    pub fn render(&self, writer: &mut Writer, filename: &[u8; 12]) {
         for y in 0..self.line_count {
             for x in 0..MAX_LINE_LEN {
                 if let Some(rw) = self.buffer.get(y) {
@@ -190,7 +190,7 @@ impl Editor {
     }
 }
 
-pub fn edit_file(file_name: &[u8; 11], vga_index: &mut isize) {
+pub fn edit_file(file_name: &[u8; 12], vga_index: &mut isize) {
     let floppy = Floppy;
 
     match Fs::new(&floppy, vga_index) {
@@ -202,12 +202,30 @@ pub fn edit_file(file_name: &[u8; 11], vga_index: &mut isize) {
         Ok(fs) => {
             let mut file_buf = [0u8; 512];
 
+            let (name, ext) = split_filename(file_name);
+
+            let mut filename = [0u8; 11];
+            if let Some(slice) = filename.get_mut(..name.len()) {
+                slice.copy_from_slice(name);
+            }
+
+            let mut cluster: u16 = 0;
+
             unsafe {
-                let cluster = fs.list_dir(PATH_CLUSTER, file_name, vga_index);
+                fs.for_each_entry(PATH_CLUSTER, |entry| {
+                    if entry.name[0] != 0x00 && entry.name[0] != 0xE5 && entry.attr & 0x10 == 0 {
+
+                        if entry.name.starts_with(name) {
+                            cluster = entry.start_cluster;
+                            return;
+                        }
+                    }
+                }, &mut 0);
+
                 if cluster <= 0 {
                     return;
                 }
-                fs.read_file(cluster as u16, &mut file_buf, vga_index);
+                fs.read_file(cluster, &mut file_buf, vga_index);
             }
 
             let mut editor = Editor::new();
@@ -249,7 +267,13 @@ pub fn edit_file(file_name: &[u8; 11], vga_index: &mut isize) {
 
                             unsafe {
                                 if let Some(slice) = save_buf.get(..len) { 
-                                    fs.write_file(PATH_CLUSTER, file_name, slice, vga_index);
+                                    let mut filename = [b' '; 11];
+                                    if name.len() <= 8 && ext.len() <= 3 {
+                                        filename[..name.len()].copy_from_slice(name);
+                                        filename[8..8 + ext.len()].copy_from_slice(ext);
+
+                                        fs.write_file(PATH_CLUSTER, &filename, slice, vga_index);
+                                    }
                                 }
                             }
                         } else {
@@ -364,6 +388,22 @@ pub fn scancode_to_ascii(sc: u8) -> Option<u8> {
         };
 
         Some(ch)
+    }
+}
+
+pub fn split_filename(input: &[u8]) -> (&[u8], &[u8]) {
+    let len = input.iter().position(|&c| c == 0).unwrap_or(input.len());
+    let trimmed = &input[..len];
+
+    if let Some(pos) = trimmed.iter().position(|&c| c == b'.') {
+        let cmd = &trimmed[..pos];
+        let mut rest = &trimmed[pos + 1..];
+        while rest.first() == Some(&b' ') {
+            rest = &rest[1..];
+        }
+        (cmd, rest)
+    } else {
+        (&trimmed[..], &[])
     }
 }
 

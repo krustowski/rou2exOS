@@ -200,14 +200,20 @@ pub fn keyboard_loop(vga_index: &mut isize) {
                                             slice.copy_from_slice(&cmd[..cmd.len()]);
                                         }
 
-                                        if let Some(slice) = input_buffer.get_mut(cmd.len() + 1..cmd.len() + 1 + clean_name.len()) {
+                                        let clean_name_len = if ext_end > 0 {
+                                            name_end + 1 + ext_end // include dot
+                                        } else {
+                                            name_end
+                                        }; 
+
+                                        if let Some(slice) = input_buffer.get_mut(cmd.len() + 1..cmd.len() + 1 + clean_name_len) {
                                             if name_end + ext_end + 1 > 12 {
                                                 return;
                                             }
-                                            slice.copy_from_slice(&clean_name[..]);
+                                            slice.copy_from_slice(&clean_name[..clean_name_len]);
                                         }
 
-                                        input_len += cmd.len() + 1 + clean_name.len(); // adjust if necessary
+                                        input_len += cmd.len() + 1 + clean_name_len; // adjust if necessary
 
                                         if input_len > 128 {
                                             return;

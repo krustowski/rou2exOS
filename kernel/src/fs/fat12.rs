@@ -642,6 +642,52 @@ impl<'a, D: BlockDevice> Fs<'a, D> {
         true
     }
 
+    pub fn for_each_entry<F: FnMut(&Entry)>(&self, dir_cluster: u16, mut f: F, vga_index: &mut isize) {
+        let entry_size = core::mem::size_of::<Entry>();
+        let entries_per_sector = 512 / entry_size;
+        let mut buf = [0u8; 512];
+
+        let mut current_cluster = dir_cluster;
+
+        if dir_cluster == 0 {
+            let total_entries = self.boot_sector.root_entry_count as usize;
+            let total_sectors = (total_entries * entry_size + 511) / 512;
+
+            for sector_index in 0..total_sectors {
+                self.device.read_sector(self.root_dir_start_lba + sector_index as u64, &mut buf, vga_index);
+
+                let entries_ptr = buf.as_ptr() as *const Entry;
+                for entry_index in 0..entries_per_sector {
+                    if sector_index * entries_per_sector + entry_index >= total_entries {
+                        return;
+                    }
+
+                    let entry = unsafe { &*entries_ptr.add(entry_index) };
+                    f(entry);
+                }
+            }
+        } else {
+
+            let sector_start = self.cluster_to_lba(current_cluster);
+
+            for i in 0..self.boot_sector.sectors_per_cluster {
+                self.device.read_sector(sector_start as u64 + i as u64, &mut buf, vga_index);
+
+                let entries_ptr = buf.as_ptr() as *const Entry;
+
+                for entry_index in 0..entries_per_sector {
+                    let entry = unsafe { &*entries_ptr.add(entry_index) };
+                    f(entry);
+                }
+
+                current_cluster = self.read_fat12_entry(current_cluster, vga_index);
+                if current_cluster >= 0xFF8 {
+                    break;
+                }
+            }
+        }
+    }
+
     pub fn create_subdirectory(&self, name: &[u8; 11], parent_cluster: u16, vga_index: &mut isize) {
         let cluster = self.allocate_cluster(vga_index);
         if cluster == 0 {

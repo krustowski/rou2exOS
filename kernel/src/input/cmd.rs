@@ -164,7 +164,7 @@ fn find_cmd(name: &[u8]) -> Option<&'static Command> {
     None
 }
 
-fn split_cmd(input: &[u8]) -> (&[u8], &[u8]) {
+pub fn split_cmd(input: &[u8]) -> (&[u8], &[u8]) {
     // Find the first space
     if let Some(pos) = input.iter().position(|&c| c == b' ') {
         let (cmd, args) = input.split_at(pos);

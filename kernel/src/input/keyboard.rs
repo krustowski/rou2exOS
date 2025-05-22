@@ -1,9 +1,18 @@
+use crate::fs::{block::Floppy, fat12::Fs, entry::Entry};
+use crate::init::config::PATH_CLUSTER;
+use crate::net::serial::ready;
 use crate::vga;
 use crate::input::cmd;
 use crate::input::port;
 use crate::init::config::{HOST, PATH, USER, get_path};
+use crate::vga::write::newline;
+
+use super::cmd::to_uppercase_ascii;
 
 const INPUT_BUFFER_SIZE: usize = 128;
+
+static mut SHIFT_PRESSED: bool = false;
+static mut CAPS_LOCK_ON: bool = false;
 
 fn render_prompt(vga_index: &mut isize) {
     let path = get_path() as &[u8];
@@ -72,42 +81,30 @@ pub fn keyboard_loop(vga_index: &mut isize) {
     vga::screen::scroll(vga_index);
 
     loop {
-        // Wait for a keypress
-        let scancode = keyboard_read_scancode();
+        let key = keyboard_read_scancode();
 
-        if scancode & 0x80 != 0 {
+        if key & 0x80 != 0 {
+            // Key released
+            let released = key & 0x7F;
+            if released == 0x1D {
+                //ctrl_down = false;
+            }
             continue;
         }
 
-        // VERY basic scancode to ASCII mapping (only letters a-z)
-        let c = match scancode {
-            0x1E => b'a',
-            0x30 => b'b',
-            0x2E => b'c',
-            0x20 => b'd',
-            0x12 => b'e',
-            0x21 => b'f',
-            0x22 => b'g',
-            0x23 => b'h',
-            0x17 => b'i',
-            0x24 => b'j',
-            0x25 => b'k',
-            0x26 => b'l',
-            0x32 => b'm',
-            0x31 => b'n',
-            0x18 => b'o',
-            0x19 => b'p',
-            0x10 => b'q',
-            0x13 => b'r',
-            0x1F => b's',
-            0x14 => b't',
-            0x16 => b'u',
-            0x2F => b'v',
-            0x11 => b'w',
-            0x2D => b'x',
-            0x15 => b'y',
-            0x2C => b'z',
-            0x39 => b' ', // spacebar
+        match key {
+            0x0E => { // backspace
+                if input_len > 0 {
+                    input_len -= 1;
+                    unsafe {
+                        *vga_index -= 2; // move cursor back one character
+                        *vga::buffer::VGA_BUFFER.offset(*vga_index) = b' ';
+                        *vga::buffer::VGA_BUFFER.offset(*vga_index + 1) = vga::buffer::Color::White as u8;
+                    }
+                    move_cursor_index(vga_index);
+                }
+                continue;
+            }
             0x1C => {
                 // ENTER key pressed
                 vga::write::newline(vga_index);
@@ -124,37 +121,214 @@ pub fn keyboard_loop(vga_index: &mut isize) {
 
                 continue;
             }
-            0x0E => { // backspace
-                if input_len > 0 {
-                    input_len -= 1;
-                    unsafe {
-                        *vga_index -= 2; // move cursor back one character
-                        *vga::buffer::VGA_BUFFER.offset(*vga_index) = b' ';
-                        *vga::buffer::VGA_BUFFER.offset(*vga_index + 1) = vga::buffer::Color::White as u8;
+            0x0F => {
+                // TAB
+                let mut input_cpy = [0u8; 128];
+                input_cpy.copy_from_slice(&input_buffer);
+
+                let (cmd, pre_prefix) = cmd::split_cmd(&input_cpy);
+                let (prefix, _rubbish) = cmd::split_cmd(pre_prefix);
+
+                let floppy = Floppy;
+                let mut found = false;
+
+                match Fs::new(&floppy, vga_index) {
+                    Ok(fs) => {
+                        unsafe {
+                            if prefix.len() > 8 {
+                                return;
+                            }
+
+                            let padded_prefix = pad_prefix(prefix);
+                            fs.for_each_entry(PATH_CLUSTER, |entry| {
+                                if entry.name[0] != 0x00 && entry.name[0] != 0xE5 && entry.attr & 0x10 == 0 {
+
+                                    let mut clean_name = [0u8; 12];
+
+                                    let name_end = entry.name[..8].iter().position(|&c| c == b' ').unwrap_or(8);
+                                    let ext_end = entry.ext[..3].iter().position(|&c| c == b' ').unwrap_or(3);
+
+                                    if name_end > 8 || ext_end > 3 || ext_end == 0 || name_end == 0 {
+                                        return;
+                                    }
+
+                                    if let Some(slice) = clean_name.get_mut(..name_end) {
+                                        if let Some(sl) = entry.name.get(..name_end) {
+                                            slice.copy_from_slice(sl);
+                                        }
+                                    }
+
+                                    if ext_end > 0 && ext_end <= 3 && name_end > 0 && name_end <= 8 && ext_end + name_end <= 12 {
+                                        clean_name[name_end] = b'.';
+
+                                        if let Some(slice) = clean_name.get_mut(name_end..name_end + ext_end) {
+                                            if let Some(sl) = entry.ext.get(..ext_end) {
+                                                slice.copy_from_slice(sl);
+                                            }
+                                        }
+                                    }
+
+                                    if prefix.len() > 8 {
+                                        return;
+                                    }
+
+                                    //vga::write::number(vga_index, prefix.len() as u64);
+
+                                    //vga::write::string(vga_index, &padded_prefix[..prefix.len()], vga::buffer::Color::Yellow);
+                                    //vga::write::string(vga_index, &clean_name, vga::buffer::Color::Cyan);
+                                    //newline(vga_index);
+
+                                    // MATCH
+                                    if entry.name.starts_with(&padded_prefix[..prefix.len()]) {
+                                        vga::write::string(vga_index, &clean_name, vga::buffer::Color::Pink);
+                                        newline(vga_index);
+                                        found = true;
+
+                                        if cmd.len() > 10 || cmd.len() + 1 > 11 {
+                                            return;
+                                        }
+
+                                        if let Some(slice) = input_buffer.get_mut(..cmd.len()) {
+                                            slice.copy_from_slice(&cmd[..cmd.len()]);
+                                        }
+
+                                        if let Some(slice) = input_buffer.get_mut(cmd.len() + 1..cmd.len() + 1 + clean_name.len()) {
+                                            slice.copy_from_slice(&clean_name[..]);
+                                        }
+
+                                        input_len += cmd.len() + 1 + clean_name.len(); // adjust if necessary
+                                        return;
+                                    }
+
+                                }
+                            }, &mut 0);
+                        }
                     }
-                    move_cursor_index(vga_index);
+                    Err(e) => {
+                        vga::write::string(vga_index, e.as_bytes(), vga::buffer::Color::Red);
+                        newline(vga_index);
+                    }
+                }
+
+                continue;
+            }
+            byte => {
+                if let Some(ascii) = scancode_to_ascii(byte) {
+                    // If we have room, add to buffer
+                    if input_len < INPUT_BUFFER_SIZE {
+                        if let Some(w) = input_buffer.get_mut(input_len) {
+                            *w = ascii
+                        }
+
+                        input_len += 1;
+
+                        // Draw it on screen
+                        unsafe {
+                            *vga::buffer::VGA_BUFFER.offset(*vga_index) = ascii;
+                            *vga::buffer::VGA_BUFFER.offset(*vga_index + 1) = vga::buffer::Color::White as u8;
+                            *vga_index += 2;
+                        }
+                        move_cursor_index(vga_index);
+                    }
                 }
                 continue;
             }
-            _ => continue, // ignore unknown keys
+        };
+    }
+}
+
+pub fn scancode_to_ascii(sc: u8) -> Option<u8> {
+    unsafe {
+        match sc {
+            // Modifier keys
+            0x2A | 0x36 => {
+                SHIFT_PRESSED = true;
+                return None;
+            }
+            0xAA | 0xB6 => {
+                SHIFT_PRESSED = false;
+                return None;
+            }
+            0x3A => {
+                CAPS_LOCK_ON = !CAPS_LOCK_ON;
+                return None;
+            }
+
+            // Printable keys
+            _ => {}
+        }
+
+        let shifted = SHIFT_PRESSED;
+        let caps = CAPS_LOCK_ON;
+
+        let ch = match sc {
+            // Number row (with Shift symbols)
+            0x02 => if shifted { b'!' } else { b'1' },
+            0x03 => if shifted { b'@' } else { b'2' },
+            0x04 => if shifted { b'#' } else { b'3' },
+            0x05 => if shifted { b'$' } else { b'4' },
+            0x06 => if shifted { b'%' } else { b'5' },
+            0x07 => if shifted { b'^' } else { b'6' },
+            0x08 => if shifted { b'&' } else { b'7' },
+            0x09 => if shifted { b'*' } else { b'8' },
+            0x0A => if shifted { b'(' } else { b'9' },
+            0x0B => if shifted { b')' } else { b'0' },
+            0x0C => if shifted { b'_' } else { b'-' },
+            0x0D => if shifted { b'+' } else { b'=' },
+
+            // Letters (Caps Lock + Shift logic)
+            0x10..=0x19 | 0x1E..=0x26 | 0x2C..=0x32 => {
+                let lower = match sc {
+                    0x10 => b'q', 0x11 => b'w', 0x12 => b'e', 0x13 => b'r', 0x14 => b't',
+                    0x15 => b'y', 0x16 => b'u', 0x17 => b'i', 0x18 => b'o', 0x19 => b'p',
+                    0x1E => b'a', 0x1F => b's', 0x20 => b'd', 0x21 => b'f', 0x22 => b'g',
+                    0x23 => b'h', 0x24 => b'j', 0x25 => b'k', 0x26 => b'l',
+                    0x2C => b'z', 0x2D => b'x', 0x2E => b'c', 0x2F => b'v',
+                    0x30 => b'b', 0x31 => b'n', 0x32 => b'm',
+                    _ => return None,
+                };
+                let upper = lower.to_ascii_uppercase();
+                if caps ^ shifted { upper } else { lower }
+            }
+
+            // Punctuation
+            0x1A => if shifted { b'{' } else { b'[' },
+            0x1B => if shifted { b'}' } else { b']' },
+            0x27 => if shifted { b':' } else { b';' },
+            0x28 => if shifted { b'"' } else { b'\'' },
+            0x29 => if shifted { b'~' } else { b'`' },
+            0x2B => if shifted { b'|' } else { b'\\' },
+            0x33 => if shifted { b'<' } else { b',' },
+            0x34 => if shifted { b'>' } else { b'.' },
+            0x35 => if shifted { b'?' } else { b'/' },
+
+            // Control keys
+            0x0E => 8,         // Backspace
+            0x1C => b'\n',     // Enter
+            0x39 => b' ',      // Space
+
+            _ => return None,
         };
 
-        // If we have room, add to buffer
-        if input_len < INPUT_BUFFER_SIZE {
-            if let Some(w) = input_buffer.get_mut(input_len) {
-                *w = c
-            }
-
-            input_len += 1;
-
-            // Draw it on screen
-            unsafe {
-                *vga::buffer::VGA_BUFFER.offset(*vga_index) = c;
-                *vga::buffer::VGA_BUFFER.offset(*vga_index + 1) = vga::buffer::Color::White as u8;
-                *vga_index += 2;
-            }
-            move_cursor_index(vga_index);
-        }
+        Some(ch)
     }
+}
+
+fn pad_prefix(mut prefix: &[u8]) -> [u8; 11] {
+    let mut padded = [b' '; 11];
+
+    let mut i = 0;
+    let mut j = 0;
+    while i < prefix.len() && j < 11 {
+        if prefix[i] == b'.' {
+            j = 8; // jump to extension part
+        } else {
+            padded[j] = prefix[i].to_ascii_uppercase(); // FAT stores names uppercase
+            j += 1;
+        }
+        i += 1;
+    }
+
+    padded
 }
 

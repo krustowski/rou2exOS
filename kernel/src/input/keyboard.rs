@@ -5,6 +5,7 @@ use crate::vga;
 use crate::input::cmd;
 use crate::input::port;
 use crate::init::config::{HOST, PATH, USER, get_path};
+use crate::vga::screen::clear;
 use crate::vga::write::newline;
 
 use super::cmd::to_uppercase_ascii;
@@ -70,6 +71,8 @@ pub fn keyboard_loop(vga_index: &mut isize) {
     let mut input_buffer = [0u8; INPUT_BUFFER_SIZE];
     let mut input_len = 0;
 
+    let mut ctrl_down = false;
+
     vga::write::newline(vga_index);
     vga::write::string(vga_index, b"Starting prompt...", vga::buffer::Color::White);
     vga::write::newline(vga_index);
@@ -87,12 +90,29 @@ pub fn keyboard_loop(vga_index: &mut isize) {
             // Key released
             let released = key & 0x7F;
             if released == 0x1D {
-                //ctrl_down = false;
+                ctrl_down = false;
             }
             continue;
         }
 
         match key {
+            0x1D => {
+                ctrl_down = true;
+                continue;
+            }
+            0x26 => {
+                if ctrl_down {
+                    clear(vga_index);
+
+                    // Clear input buffer
+                    input_buffer = [0u8; 128];
+                    input_len = 0;
+
+                    render_prompt(vga_index);
+                    move_cursor_index(vga_index);
+                    continue;
+                }
+            }
             0x0E => { // backspace
                 if input_len > 0 {
                     input_len -= 1;
@@ -124,140 +144,135 @@ pub fn keyboard_loop(vga_index: &mut isize) {
             }
             0x0F => {
                 // TAB
-                let mut input_cpy = [0u8; 128];
-                input_cpy.copy_from_slice(&input_buffer);
+                handle_tab_completion(&mut input_buffer, &mut input_len, vga_index);
+                continue;
+            }
+            _ => {}
+        }
 
-                let (cmd, prefix) = split_cmd(&input_cpy);
-
-                if prefix.len() == 0 {
-                    cmd::handle(b"help", vga_index);
-                    continue;
+        if let Some(ascii) = scancode_to_ascii(key) {
+            // If we have room, add to buffer
+            if input_len < INPUT_BUFFER_SIZE {
+                if let Some(w) = input_buffer.get_mut(input_len) {
+                    *w = ascii
                 }
 
-                vga::write::string(vga_index, prefix, vga::buffer::Color::Yellow);
-                newline(vga_index);
+                input_len += 1;
 
-                let floppy = Floppy;
-                let mut found = false;
+                // Draw it on screen
+                unsafe {
+                    *vga::buffer::VGA_BUFFER.offset(*vga_index) = ascii;
+                    *vga::buffer::VGA_BUFFER.offset(*vga_index + 1) = vga::buffer::Color::White as u8;
+                    *vga_index += 2;
+                }
+                move_cursor_index(vga_index);
+            }
+        }
+    };
+}
 
-                match Fs::new(&floppy, vga_index) {
-                    Ok(fs) => {
-                        unsafe {
-                            if prefix.len() > 8 {
+fn handle_tab_completion(input_buffer: &mut [u8; INPUT_BUFFER_SIZE], input_len: &mut usize, vga_index: &mut isize) {
+    let mut input_cpy = [0u8; 128];
+    input_cpy.copy_from_slice(input_buffer);
+
+    let (cmd, prefix) = split_cmd(&input_cpy);
+
+    if prefix.len() == 0 {
+        cmd::handle(b"help", vga_index);
+        return;
+    }
+
+    vga::write::string(vga_index, prefix, vga::buffer::Color::Yellow);
+    newline(vga_index);
+
+    let floppy = Floppy;
+    let mut found = false;
+
+    match Fs::new(&floppy, vga_index) {
+        Ok(fs) => {
+            unsafe {
+                if prefix.len() > 8 {
+                    return;
+                }
+
+                let padded_prefix = pad_prefix(prefix);
+                fs.for_each_entry(PATH_CLUSTER, |entry| {
+                    if entry.name[0] != 0x00 && entry.name[0] != 0xE5 && entry.attr & 0x10 == 0 {
+
+                        let mut clean_name = [0u8; 12];
+
+                        let name_end = entry.name[..8].iter().position(|&c| c == b' ').unwrap_or(8);
+                        let ext_end = entry.ext[..3].iter().position(|&c| c == b' ').unwrap_or(3);
+
+                        if name_end > 8 || ext_end > 3 || ext_end == 0 || name_end == 0 {
+                            return;
+                        }
+
+                        if let Some(slice) = clean_name.get_mut(..name_end) {
+                            if let Some(sl) = entry.name.get(..name_end) {
+                                slice.copy_from_slice(sl);
+                            }
+                        }
+
+                        if ext_end > 0 && ext_end <= 3 && name_end > 0 && name_end <= 8 && ext_end + name_end <= 12 {
+                            clean_name[name_end] = b'.';
+
+                            if let Some(slice) = clean_name.get_mut(name_end + 1..name_end + ext_end + 1) {
+                                if let Some(sl) = entry.ext.get(..ext_end) {
+                                    slice.copy_from_slice(sl);
+                                }
+                            }
+                        }
+
+                        if prefix.len() > 8 {
+                            return;
+                        }
+
+                        // MATCH
+                        if entry.name.starts_with(&padded_prefix[..prefix.len()]) {
+                            vga::write::string(vga_index, &clean_name, vga::buffer::Color::Pink);
+                            newline(vga_index);
+                            found = true;
+
+                            if cmd.len() > 10 || cmd.len() + 1 > 11 {
                                 return;
                             }
 
-                            let padded_prefix = pad_prefix(prefix);
-                            fs.for_each_entry(PATH_CLUSTER, |entry| {
-                                if entry.name[0] != 0x00 && entry.name[0] != 0xE5 && entry.attr & 0x10 == 0 {
+                            if let Some(slice) = input_buffer.get_mut(..cmd.len()) {
+                                slice.copy_from_slice(&cmd[..cmd.len()]);
+                            }
 
-                                    let mut clean_name = [0u8; 12];
+                            let clean_name_len = if ext_end > 0 {
+                                name_end + 1 + ext_end // include dot
+                            } else {
+                                name_end
+                            }; 
 
-                                    let name_end = entry.name[..8].iter().position(|&c| c == b' ').unwrap_or(8);
-                                    let ext_end = entry.ext[..3].iter().position(|&c| c == b' ').unwrap_or(3);
-
-                                    if name_end > 8 || ext_end > 3 || ext_end == 0 || name_end == 0 {
-                                        return;
-                                    }
-
-                                    if let Some(slice) = clean_name.get_mut(..name_end) {
-                                        if let Some(sl) = entry.name.get(..name_end) {
-                                            slice.copy_from_slice(sl);
-                                        }
-                                    }
-
-                                    if ext_end > 0 && ext_end <= 3 && name_end > 0 && name_end <= 8 && ext_end + name_end <= 12 {
-                                        clean_name[name_end] = b'.';
-
-                                        if let Some(slice) = clean_name.get_mut(name_end + 1..name_end + ext_end + 1) {
-                                            if let Some(sl) = entry.ext.get(..ext_end) {
-                                                slice.copy_from_slice(sl);
-                                            }
-                                        }
-                                    }
-
-                                    if prefix.len() > 8 {
-                                        return;
-                                    }
-
-                                    //vga::write::number(vga_index, prefix.len() as u64);
-
-                                    //vga::write::string(vga_index, &padded_prefix[..prefix.len()], vga::buffer::Color::Yellow);
-                                    //vga::write::string(vga_index, &clean_name, vga::buffer::Color::Cyan);
-                                    //newline(vga_index);
-
-                                    // MATCH
-                                    if entry.name.starts_with(&padded_prefix[..prefix.len()]) {
-                                        vga::write::string(vga_index, &clean_name, vga::buffer::Color::Pink);
-                                        newline(vga_index);
-                                        found = true;
-
-                                        if cmd.len() > 10 || cmd.len() + 1 > 11 {
-                                            return;
-                                        }
-
-                                        if let Some(slice) = input_buffer.get_mut(..cmd.len()) {
-                                            slice.copy_from_slice(&cmd[..cmd.len()]);
-                                        }
-
-                                        let clean_name_len = if ext_end > 0 {
-                                            name_end + 1 + ext_end // include dot
-                                        } else {
-                                            name_end
-                                        }; 
-
-                                        if let Some(slice) = input_buffer.get_mut(cmd.len() + 1..cmd.len() + 1 + clean_name_len) {
-                                            if name_end + ext_end + 1 > 12 {
-                                                return;
-                                            }
-                                            slice.copy_from_slice(&clean_name[..clean_name_len]);
-                                        }
-
-                                        input_len += cmd.len() + 1 + clean_name_len; // adjust if necessary
-
-                                        if input_len > 128 {
-                                            return;
-                                        }
-                                        vga::write::string(vga_index, &input_buffer[..input_len], vga::buffer::Color::Red);
-                                        vga::write::byte(vga_index, b'"', vga::buffer::Color::Red);
-                                        newline(vga_index);
-                                        return;
-                                    }
-
+                            if let Some(slice) = input_buffer.get_mut(cmd.len() + 1..cmd.len() + 1 + clean_name_len) {
+                                if name_end + ext_end + 1 > 12 {
+                                    return;
                                 }
-                            }, &mut 0);
+                                slice.copy_from_slice(&clean_name[..clean_name_len]);
+                            }
+
+                            *input_len += cmd.len() + 1 + clean_name_len; // adjust if necessary
+
+                            if *input_len > 128 {
+                                return;
+                            }
+                            vga::write::string(vga_index, &input_buffer[..*input_len], vga::buffer::Color::Red);
+                            vga::write::byte(vga_index, b'"', vga::buffer::Color::Red);
+                            newline(vga_index);
+                            return;
                         }
                     }
-                    Err(e) => {
-                        vga::write::string(vga_index, e.as_bytes(), vga::buffer::Color::Red);
-                        newline(vga_index);
-                    }
-                }
-
-                continue;
+                }, &mut 0);
             }
-            byte => {
-                if let Some(ascii) = scancode_to_ascii(byte) {
-                    // If we have room, add to buffer
-                    if input_len < INPUT_BUFFER_SIZE {
-                        if let Some(w) = input_buffer.get_mut(input_len) {
-                            *w = ascii
-                        }
-
-                        input_len += 1;
-
-                        // Draw it on screen
-                        unsafe {
-                            *vga::buffer::VGA_BUFFER.offset(*vga_index) = ascii;
-                            *vga::buffer::VGA_BUFFER.offset(*vga_index + 1) = vga::buffer::Color::White as u8;
-                            *vga_index += 2;
-                        }
-                        move_cursor_index(vga_index);
-                    }
-                }
-                continue;
-            }
-        };
+        }
+        Err(e) => {
+            vga::write::string(vga_index, e.as_bytes(), vga::buffer::Color::Red);
+            newline(vga_index);
+        }
     }
 }
 

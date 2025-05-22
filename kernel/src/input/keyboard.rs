@@ -113,6 +113,7 @@ pub fn keyboard_loop(vga_index: &mut isize) {
                 cmd::handle(input_slice, vga_index);
 
                 // Clear input buffer
+                input_buffer = [0u8; 128];
                 input_len = 0;
 
                 // Show new prompt
@@ -126,8 +127,15 @@ pub fn keyboard_loop(vga_index: &mut isize) {
                 let mut input_cpy = [0u8; 128];
                 input_cpy.copy_from_slice(&input_buffer);
 
-                let (cmd, pre_prefix) = cmd::split_cmd(&input_cpy);
-                let (prefix, _rubbish) = cmd::split_cmd(pre_prefix);
+                let (cmd, prefix) = split_cmd(&input_cpy);
+
+                if prefix.len() == 0 {
+                    cmd::handle(b"help", vga_index);
+                    continue;
+                }
+
+                vga::write::string(vga_index, prefix, vga::buffer::Color::Yellow);
+                newline(vga_index);
 
                 let floppy = Floppy;
                 let mut found = false;
@@ -161,7 +169,7 @@ pub fn keyboard_loop(vga_index: &mut isize) {
                                     if ext_end > 0 && ext_end <= 3 && name_end > 0 && name_end <= 8 && ext_end + name_end <= 12 {
                                         clean_name[name_end] = b'.';
 
-                                        if let Some(slice) = clean_name.get_mut(name_end..name_end + ext_end) {
+                                        if let Some(slice) = clean_name.get_mut(name_end + 1..name_end + ext_end + 1) {
                                             if let Some(sl) = entry.ext.get(..ext_end) {
                                                 slice.copy_from_slice(sl);
                                             }
@@ -193,10 +201,19 @@ pub fn keyboard_loop(vga_index: &mut isize) {
                                         }
 
                                         if let Some(slice) = input_buffer.get_mut(cmd.len() + 1..cmd.len() + 1 + clean_name.len()) {
+                                            if name_end + ext_end + 1 > 12 {
+                                                return;
+                                            }
                                             slice.copy_from_slice(&clean_name[..]);
                                         }
 
                                         input_len += cmd.len() + 1 + clean_name.len(); // adjust if necessary
+
+                                        if input_len > 128 {
+                                            return;
+                                        }
+                                        vga::write::string(vga_index, &input_buffer[..input_len], vga::buffer::Color::Red);
+                                        newline(vga_index);
                                         return;
                                     }
 
@@ -330,5 +347,25 @@ fn pad_prefix(mut prefix: &[u8]) -> [u8; 11] {
     }
 
     padded
+}
+
+/// Splits a buffer into two parts at the first space (`b' '`),
+/// while skipping trailing zeros and handling missing space correctly.
+pub fn split_cmd(input: &[u8]) -> (&[u8], &[u8]) {
+    // Find the actual length before the first null byte
+    let len = input.iter().position(|&c| c == 0).unwrap_or(input.len());
+    let trimmed = &input[..len];
+
+    if let Some(space_pos) = trimmed.iter().position(|&c| c == b' ') {
+        let first = &trimmed[..space_pos];
+        let second = if space_pos + 1 < trimmed.len() {
+            &trimmed[space_pos + 1..]
+        } else {
+            &[]
+        };
+        (first, second)
+    } else {
+        (&[], trimmed)
+    }
 }
 

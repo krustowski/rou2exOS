@@ -10,7 +10,7 @@ use crate::vga;
 use crate::vga::write::newline;
 use crate::input::keyboard;
 
-const KERNEL_VERSION: &[u8] = b"0.6.0";
+const KERNEL_VERSION: &[u8] = b"0.7.0";
 
 struct Command {
     name: &'static [u8],

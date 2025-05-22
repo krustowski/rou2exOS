@@ -5,9 +5,6 @@
 
 #![no_std] // don't link the Rust standard library
 #![no_main] // disable all Rust-level entry points
-#![feature(abi_x86_interrupt)]
-#![feature(lang_items)]
-#![feature(asm_const)]
 
 #[unsafe(no_mangle)]
 #[unsafe(link_section = ".multiboot2_header")]
@@ -20,8 +17,6 @@ pub static MULTIBOOT2_HEADER: [u32; 8] = [
     0, 8,       // end tag (type = 0, size = 8)
 ];
 
-//mod int;
-
 mod acpi;
 mod app;
 mod init;
@@ -32,52 +27,37 @@ mod sound;
 mod time;
 mod vga;
 
-use core::arch::asm;
-use x86_64::{
-    structures::{
-        gdt::{GlobalDescriptorTable, Descriptor, SegmentSelector},
-        idt::InterruptDescriptorTable,
-        tss::TaskStateSegment,
-    },
-    VirtAddr,
-};
-
+//use core::alloc::Layout;
 use core::panic::PanicInfo;
 use core::ptr;
-
-use no_panic::no_panic;
 
 use mem::bump::BumpAllocator;
 
 #[global_allocator]
 static mut ALLOCATOR: BumpAllocator = BumpAllocator::new();
 
-// Constants
-const DOUBLE_FAULT_IST_INDEX: usize = 0;
-const STACK_SIZE: usize = 4096 * 5;
+//#[entry]
+#[unsafe(no_mangle)]
+pub extern "C" fn _start() { 
+    let vga_index: &mut isize = &mut 0;
 
-#[repr(C, packed)]
-struct DescriptorTablePointer {
-    limit: u16,
-    base: u64,
+    vga::screen::clear(vga_index);
+
+    // Show color palette.
+    init::init(vga_index);
+
+    // Run prompt loop.
+    input::keyboard::keyboard_loop(vga_index);
+
+    loop {
+        unsafe {
+            core::arch::asm!("hlt");
+        }
+    }
 }
-
-#[unsafe(link_section = ".bss.stack")]
-static mut STACK: [u8; STACK_SIZE] = [0; STACK_SIZE];
-
-#[repr(align(16))]
-struct AlignedTss(TaskStateSegment);
-static mut TSS: AlignedTss = AlignedTss(TaskStateSegment::new());
 
 /// This function is called on panic.
 #[panic_handler]
-fn panic(info: &PanicInfo) -> ! {
-    // You could write to a serial port here
-    // or display a panic message on-screen (if you have VGA/text mode setup)
-    let _ = info; // silence unused var warning
-    loop {}
-}
-/*#[panic_handler]
 fn panic(info: &PanicInfo) -> ! {
     let vga_index: &mut isize = &mut 0;
 
@@ -100,94 +80,16 @@ fn panic(info: &PanicInfo) -> ! {
             core::arch::asm!("hlt");
         }
     }
-}*/
-
-#[lang = "eh_personality"]
-extern "C" fn eh_personality() {}
+}
 
 #[unsafe(no_mangle)]
 pub extern "C" fn rust_begin_unwind(_: &core::panic::PanicInfo) {
     //loop {}
 }
 
-//#[entry]
-#[no_panic]
-#[unsafe(no_mangle)]
-pub extern "C" fn _start() { 
-    unsafe {
-        // === STACK AND TSS ===
-        //let stack_start = VirtAddr::from_ptr(STACK.as_ptr());
-        let stack_start = VirtAddr::from_ptr(unsafe { &mut *(STACK.as_mut_ptr()) });
-        //let stack_start = VirtAddr::from_ptr(unsafe { STACK.as_mut_ptr() });
-        let stack_end = stack_start + (STACK_SIZE as u64);
-
-        //let tss_ptr: *mut TaskStateSegment = &raw mut TSS;
-        
-        let tss_ptr = &mut *(core::ptr::addr_of_mut!(TSS.0) as *mut TaskStateSegment);
-        let ist_ptr = tss_ptr.interrupt_stack_table.as_mut_ptr();
-
-        //let ist_ptr = TSS.0.interrupt_stack_table.as_mut_ptr();
-        ptr::write_unaligned(ist_ptr.add(DOUBLE_FAULT_IST_INDEX), stack_end);
-        //(*tss_ptr).interrupt_stack_table[DOUBLE_FAULT_IST_INDEX] = stack_end;
-
-        //tss.interrupt_stack_table[DOUBLE_FAULT_IST_INDEX] = stack_end;
-
-        // === GDT ===
-        let mut gdt = GlobalDescriptorTable::new();
-        gdt.append(Descriptor::kernel_code_segment());
-        //let tss_selector: SegmentSelector = gdt.append(Descriptor::tss_segment(&tss));
-        let tss_selector = gdt.append(Descriptor::tss_segment(&TSS.0));
-
-
-        let gdt_len = gdt.entries().len();
-        let gdt_ptr = DescriptorTablePointer {
-            limit: (gdt_len * core::mem::size_of::<u64>() - 1) as u16,
-            base: &gdt as *const _ as u64,
-        };
-
-        asm!("lgdt [{}]", in(reg) &gdt_ptr, options(readonly, nostack, preserves_flags));
-        asm!("ltr ax", in("ax") tss_selector.0, options(nostack, preserves_flags));
-
-        // === IDT ===
-        let mut idt = InterruptDescriptorTable::new();
-        // idt.double_fault.set_handler_fn(...).set_stack_index(DOUBLE_FAULT_IST_INDEX);
-
-        let idt_ptr = DescriptorTablePointer {
-            limit: (core::mem::size_of::<InterruptDescriptorTable>() - 1) as u16,
-            base: &idt as *const _ as u64,
-        };
-
-        asm!("lidt [{}]", in(reg) &idt_ptr, options(readonly, nostack, preserves_flags));
-    }
-
-    /*loop {
-      unsafe {
-      x86_64::instructions::interrupts::disable();
-      core::arch::asm!("hlt");
-      }
-      }*/
-
-    // VGA buffer position
-    let vga_index: &mut isize = &mut 0;
-
-    vga::screen::clear(vga_index);
-
-    // Show color palette.
-    init::init(vga_index);
-
-    // Run prompt loop.
-    input::keyboard::keyboard_loop(vga_index);
-
-    loop {
-        unsafe {
-            core::arch::asm!("hlt");
-        }
-    }
-}
-
 /*#![alloc_error_handler]
-  fn alloc_error_handler(_layout: Layout) {
-//loop {}
+fn alloc_error_handler(_layout: Layout) {
+    //loop {}
 }*/
 
 fn print_string(vga_index: &mut isize, s: &str) {

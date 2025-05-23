@@ -211,19 +211,33 @@ fn cmd_cd(args: &[u8], vga_index: &mut isize) {
         return;
     }
 
+    let (filename_input, _) = keyboard::split_cmd(args);
+
+    if filename_input.len() == 0 || filename_input.len() > 12 {
+        vga::write::string(vga_index, b"Usage: ed <filename>", vga::buffer::Color::Yellow);
+        newline(vga_index);
+        return;
+    }
+
+    let mut filename = [b' '; 12];
+    if let Some(slice) = filename.get_mut(..filename_input.len()) {
+        slice.copy_from_slice(filename_input);
+    }
+
     match fs::fat12::Fs::new(&floppy, vga_index) {
         Ok(fs) => {
+            let mut cluster: u16 = 0;
+
             unsafe {
-                let mut name = [b' '; 11];
-                name[..args.len()].copy_from_slice(args);
-
-                to_uppercase_ascii(&mut name);
-
-                let cluster = fs.list_dir(config::PATH_CLUSTER, &name, vga_index);
+                fs.for_each_entry(config::PATH_CLUSTER, |entry| {
+                    if entry.name.starts_with(&filename_input) {
+                        cluster = entry.start_cluster;
+                    }
+                }, vga_index);
 
                 if cluster > 0 {
                     config::PATH_CLUSTER = cluster as u16;
-                    config::set_path(args);
+                    config::set_path(&filename_input);
                 } else {
                     crate::vga::write::string(vga_index, b"No such directory", crate::vga::buffer::Color::Red);
                     crate::vga::write::newline(vga_index);

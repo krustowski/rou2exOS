@@ -14,6 +14,8 @@ static mut SELECTED: usize = 0;
 pub fn menu_loop(vga_index: &mut isize) {
     let menu = ["First", "Second", "Third"];
 
+    draw_window(30, 5, 25, 10, Some("Menu"));
+
     loop {
         unsafe {
             let scancode = keyboard_read_scancode();
@@ -30,7 +32,6 @@ pub fn menu_loop(vga_index: &mut isize) {
             }
         }
 
-        draw_window(30, 5, 25, 10, Some("Menu"));
         draw_menu(34, 7, &menu, vga_index);
     }
 }
@@ -89,10 +90,6 @@ fn draw_menu(x: usize, y: usize, items: &[&str], vga_index: &mut isize) {
         for (j, byte) in item.bytes().enumerate() {
 
             unsafe {
-                /*if i == SELECTED {
-                //write_char(x - 2, y + i, b'\x1A', 0xE0); // 0x1A is "→"
-                byte_raw(vga_index, b'\x1A', 0xE0);
-                }*/
                 // Write selector arrow
                 if i == SELECTED {
                     write_char(x - 2, y + i, b'\x1A', 0x0E); // arrow

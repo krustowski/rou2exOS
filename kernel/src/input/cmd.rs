@@ -65,6 +65,11 @@ static COMMANDS: &[Command] = &[
         function: cmd_http,
     },
     Command {
+        name: b"menu",
+        description: b"renders a sample menu",
+        function: cmd_menu,
+    },
+    Command {
         name: b"mkdir",
         description: b"creates a subdirectory",
         function: cmd_mkdir,
@@ -353,6 +358,10 @@ fn cmd_http(_args: &[u8], vga_index: &mut isize) {
             break;
         }
     }
+}
+
+fn cmd_menu(_args: &[u8], vga_index: &mut isize) {
+    app::menu::menu_loop(vga_index);
 }
 
 fn cmd_mkdir(args: &[u8], vga_index: &mut isize) {

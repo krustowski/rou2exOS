@@ -198,14 +198,14 @@ fn handle_tab_completion(input_buffer: &mut [u8; INPUT_BUFFER_SIZE], input_len: 
 
                 let padded_prefix = pad_prefix(prefix);
                 fs.for_each_entry(PATH_CLUSTER, |entry| {
-                    if entry.name[0] != 0x00 && entry.name[0] != 0xE5 && entry.attr & 0x10 == 0 {
+                    if entry.name[0] != 0x00 && entry.name[0] != 0xE5 {
 
                         let mut clean_name = [0u8; 12];
 
                         let name_end = entry.name[..8].iter().position(|&c| c == b' ').unwrap_or(8);
                         let ext_end = entry.ext[..3].iter().position(|&c| c == b' ').unwrap_or(3);
 
-                        if name_end > 8 || ext_end > 3 || ext_end == 0 || name_end == 0 {
+                        if name_end > 8 || ext_end > 3 || name_end == 0 {
                             return;
                         }
 
@@ -215,7 +215,7 @@ fn handle_tab_completion(input_buffer: &mut [u8; INPUT_BUFFER_SIZE], input_len: 
                             }
                         }
 
-                        if ext_end > 0 && ext_end <= 3 && name_end > 0 && name_end <= 8 && ext_end + name_end <= 12 {
+                        if ext_end <= 3 && name_end > 0 && name_end <= 8 && ext_end + name_end <= 12 {
                             clean_name[name_end] = b'.';
 
                             if let Some(slice) = clean_name.get_mut(name_end + 1..name_end + ext_end + 1) {
@@ -231,6 +231,10 @@ fn handle_tab_completion(input_buffer: &mut [u8; INPUT_BUFFER_SIZE], input_len: 
 
                         // MATCH
                         if entry.name.starts_with(&padded_prefix[..prefix.len()]) {
+                            if cmd == b"cd" && entry.attr & 0x10 == 0 {
+                                return;
+                            }
+
                             vga::write::string(vga_index, &clean_name, vga::buffer::Color::Pink);
                             newline(vga_index);
                             found = true;

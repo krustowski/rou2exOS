@@ -70,7 +70,23 @@ fn scan_directory(
         Ok(fs) => {
             fs.for_each_entry(start_cluster, |entry| {
                 if entry.name[0] == 0x00 || entry.name[0] == 0xE5 {
+                    //string(vga_index, b" -> Invalid entry: ", Color::Red);
+                    //number(vga_index, entry.start_cluster as u64);
+                    //newline(vga_index);
+                    report.invalid_entries += 1;
                     return;
+                }
+
+                if entry.attr & 0x08 != 0 {
+                    // Volume label
+                    return;
+                }
+
+                if entry.attr & 0x10 != 0 && entry.file_size != 0 {
+                    string(vga_index, b" -> Directory has non-zero value: ", Color::Red);
+                    number(vga_index, entry.start_cluster as u64);
+                    newline(vga_index);
+                    report.errors += 1;
                 }
 
                 if entry.start_cluster < 2 {
@@ -91,9 +107,9 @@ fn scan_directory(
                     return;
                 }
 
-                let chain = fat.follow_chain_array(entry.start_cluster);
+                //let chain = fat.follow_chain_array(entry.start_cluster);
 
-                if chain.0 > chain.1.len() {
+                /*if chain.0 > chain.1.len() {
                     return;
                 }
 
@@ -114,14 +130,65 @@ fn scan_directory(
                     } else {
                         used[cl as usize] = true;
                     }
-                }
+                }*/
 
                 if entry.attr & 0x10 != 0 {
                     scan_directory(entry.start_cluster, fat, used, report, vga_index, depth + 1);
+                } else {
+                    validate_chain(entry.start_cluster, fat, used, report, vga_index);
                 }
             }, &mut 0);
         }
         Err(e) => {}
+    }
+}
+
+fn is_valid_name(name: &[u8; 11]) -> bool {
+    name.iter().all(|&c| {
+        (b'A'..=b'Z').contains(&c) ||
+        (b'0'..=b'9').contains(&c) ||
+        c == b' ' || b"!#$%&'()-@^_`{}~".contains(&c)
+    })
+}
+
+pub fn validate_chain(
+    start: u16,
+    fat: &FatTable,
+    used: &mut [bool; 4096],
+    report: &mut CheckReport,
+    vga_index: &mut isize,
+) {
+    let mut cluster = start;
+
+    while fat.is_valid_cluster(cluster) && !fat.is_end_of_chain(cluster) {
+        if cluster as usize >= used.len() {
+            string(vga_index, b" -> Cluster out of bounds: ", Color::Red);
+            number(vga_index, cluster as u64);
+            newline(vga_index);
+            report.errors += 1;
+            return;
+        }
+
+        if used[cluster as usize] {
+            string(vga_index, b" -> Cross-linked cluster: ", Color::Red);
+            number(vga_index, cluster as u64);
+            newline(vga_index);
+            report.cross_linked += 1;
+            return;
+        }
+
+        used[cluster as usize] = true;
+
+        match fat.next_cluster(cluster) {
+            Some(next) if next >= 0xFF8 => break,
+            Some(next) => cluster = next,
+            None => {
+                string(vga_index, b" -> Invalid chain entry", Color::Red);
+                newline(vga_index);
+                report.errors += 1;
+                break;
+            }
+        }
     }
 }
 

@@ -108,5 +108,34 @@ impl FatTable {
     pub fn total_clusters(&self) -> usize {
         MAX_CLUSTERS
     }
+
+    pub fn next_cluster(&self, cluster: u16) -> Option<u16> {
+        if cluster < 2 || cluster >= 0xFF8 {
+            return None;
+        }
+
+        let offset = (cluster as usize * 3) / 2;
+        if offset + 1 >= self.data.len() {
+            return None;
+        }
+
+        let val = if cluster & 1 == 0 {
+            // Even cluster
+            ((self.data[offset] as u16) | ((self.data[offset + 1] as u16) << 8)) & 0x0FFF
+        } else {
+            // Odd cluster
+            ((self.data[offset] as u16) >> 4 | ((self.data[offset + 1] as u16) << 4)) & 0x0FFF
+        };
+
+        Some(val)
+    }
+
+    pub fn is_valid_cluster(&self, cluster: u16) -> bool {
+        (2..=0xFEF).contains(&cluster)
+    }
+
+    pub fn is_end_of_chain(&self, cluster: u16) -> bool {
+        (0xFF8..=0xFFF).contains(&cluster)
+    }
 }
 

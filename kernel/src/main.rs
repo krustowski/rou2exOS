@@ -23,6 +23,7 @@ mod mem;
 mod net;
 mod sound;
 mod time;
+mod tui;
 mod vga;
 //mod video;
 

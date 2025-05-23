@@ -9,6 +9,7 @@ use crate::time;
 use crate::vga;
 use crate::vga::write::newline;
 use crate::input::keyboard;
+use crate::tui::{widget::{Container, Window, Label}, app::TuiApp};
 
 const KERNEL_VERSION: &[u8] = b"0.7.0";
 
@@ -361,7 +362,31 @@ fn cmd_http(_args: &[u8], vga_index: &mut isize) {
 }
 
 fn cmd_menu(_args: &[u8], vga_index: &mut isize) {
-    app::menu::menu_loop(vga_index);
+    // Working sample, but loop without exit
+    //app::menu::menu_loop(vga_index);
+
+    let mut label1 = Label { x: 0, y: 0, text: "Play", attr: 0x0F };
+    let mut label2 = Label { x: 0, y: 2, text: "Scores", attr: 0x0F };
+    let mut label3 = Label { x: 0, y: 4, text: "Quit", attr: 0x0F };
+
+    let mut menu = Container {
+        x: 30,
+        y: 10,
+        children: [&mut label1, &mut label2, &mut label3],
+    };
+
+    let mut window = Window {
+        x: 20,
+        y: 5,
+        w: 40,
+        h: 15,
+        title: Some("Snake Menu"),
+        child: Some(&mut menu),
+    };
+
+    let mut app = TuiApp::new();
+    app.set_root(&mut window);
+    app.run();
 }
 
 fn cmd_mkdir(args: &[u8], vga_index: &mut isize) {

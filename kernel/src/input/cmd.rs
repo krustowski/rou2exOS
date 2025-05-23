@@ -1,7 +1,7 @@
 use crate::acpi;
 use crate::app;
 use crate::init::config;
-use crate::fs::fat12::{block::Floppy, fs::Fs};
+use crate::fs::fat12::{block::Floppy, fs::Fs, check::run_check};
 use crate::init::config::PATH_CLUSTER;
 use crate::net;
 use crate::sound;
@@ -48,6 +48,11 @@ static COMMANDS: &[Command] = &[
         name: b"ed",
         description: b"runs a minimalistic text editor",
         function: cmd_ed,
+    },
+    Command {
+        name: b"fsck",
+        description: b"runs the filesystem check",
+        function: cmd_fsck,
     },
     Command {
         name: b"help",
@@ -296,6 +301,11 @@ fn cmd_ed(args: &[u8], vga_index: &mut isize) {
     app::editor::edit_file(&filename, vga_index);
     vga::screen::clear(vga_index);
 }
+
+fn cmd_fsck(_args: &[u8], vga_index: &mut isize) {
+    run_check(vga_index);
+}
+
 
 fn cmd_help(_args: &[u8], vga_index: &mut isize) {
     vga::write::string(vga_index, b"List of commands:", vga::buffer::Color::White);

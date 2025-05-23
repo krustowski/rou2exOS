@@ -151,3 +151,18 @@ fn init_heap_allocator() {
     }
 }
 
+extern "C" {
+    static __stack_start: u8;
+    static __stack_end: u8;
+}
+
+fn print_stack_info() {
+    let sp: usize;
+    unsafe {
+        core::arch::asm!("mov {}, rsp", out(reg) sp);
+        //string(vga_index, b"Stack pointer: ", Color::Yellow);
+        //number(vga_index, sp as u64);
+        //newline(vga_index);
+    }
+}
+

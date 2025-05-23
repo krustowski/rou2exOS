@@ -1,4 +1,6 @@
-use crate::fs::fat12::fs::Fs;
+use crate::fs::fat12::{block::Floppy, fs::Fs};
+
+use super::block::BlockDevice;
 
 /// The number of bytes in a sector.
 const BYTES_PER_SECTOR: usize = 512;
@@ -21,12 +23,27 @@ pub struct FatTable {
 }
 
 impl FatTable {
-    pub fn load() -> Self {
+    pub fn load(vga_index: &mut isize) -> Self {
         let mut data = [0u8; FAT_SECTORS * BYTES_PER_SECTOR];
+
+        let floppy = Floppy;
+        let mut buf: [u8; 512] = [0u8; BYTES_PER_SECTOR];
+
+        match Fs::new(&floppy, vga_index) {
+            Ok(fs) => {
         for i in 0..FAT_SECTORS {
-            read_sector(FAT_START_SECTOR + i as u16, &mut data[i * BYTES_PER_SECTOR..][..BYTES_PER_SECTOR]);
+
+            //fs.device.read_sector(FAT_START_SECTOR + i as u16, &mut data[i * BYTES_PER_SECTOR..][..BYTES_PER_SECTOR], vga_index);
+            fs.device.read_sector((FAT_START_SECTOR + i as u16) as u64, &mut buf, vga_index);
+            data[i * BYTES_PER_SECTOR..(i + 1) * BYTES_PER_SECTOR].copy_from_slice(&buf);
         }
         Self { data }
+            }
+            Err(e) => {
+                Self { data: [0u8; FAT_SECTORS * BYTES_PER_SECTOR] }
+            }
+        }
+
     }
 
     /// Get the next cluster in the chain.
@@ -53,25 +70,39 @@ impl FatTable {
     }
 
     /// Follow a cluster chain until end-of-chain or loop.
-    pub fn follow_chain(&self, start: u16) -> heapless::Vec<u16, MAX_CLUSTERS> {
-        let mut out = heapless::Vec::<u16, MAX_CLUSTERS>::new();
+    pub fn follow_chain_array(&self, start: u16) -> (usize, [u16; MAX_CLUSTERS]) {
+        let mut result = [0u16; MAX_CLUSTERS];
+        let mut len = 0;
         let mut current = start;
 
         while let Some(next) = self.get(current) {
-            if out.contains(&current) {
-                break; // loop
+            // skip cluster 0 and 1 which are reserved in FAT12
+            if current < 2 || current >= MAX_CLUSTERS as u16 {
+                break;
             }
 
-            out.push(current).ok();
+            // loop protection
+            if result[..len].contains(&current) {
+                break;
+            }
+
+            result[len] = current;
+            len += 1;
+
+            if len >= MAX_CLUSTERS {
+                break;
+            }
+
             current = next;
         }
 
-        // Push final if it's not EOC and not a loop
-        if !out.contains(&current) {
-            out.push(current).ok();
+        // include last if valid and not already included
+        if current >= 2 && !result[..len].contains(&current) && len < MAX_CLUSTERS {
+            result[len] = current;
+            len += 1;
         }
 
-        out
+        (len, result)
     }
 
     pub fn total_clusters(&self) -> usize {

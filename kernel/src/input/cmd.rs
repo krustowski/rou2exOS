@@ -327,8 +327,7 @@ fn cmd_help(_args: &[u8], vga_index: &mut isize) {
 }
 
 fn cmd_snake(_args: &[u8], vga_index: &mut isize) {
-    vga::screen::clear(vga_index);
-    app::snake::run(vga_index);
+    app::snake::menu::menu_loop(vga_index);
 }
 
 fn cmd_http(_args: &[u8], vga_index: &mut isize) {

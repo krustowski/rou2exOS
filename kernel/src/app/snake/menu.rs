@@ -1,5 +1,6 @@
-use crate::vga::{write::{byte_raw}, buffer::VGA_BUFFER};
+use crate::vga::{write::{byte_raw}, buffer::VGA_BUFFER, screen::clear};
 use crate::input::keyboard::{keyboard_read_scancode};
+use crate::app::snake::engine::run;
 
 const WIDTH: isize = 80;
 const HEIGHT: isize = 25;
@@ -9,36 +10,73 @@ const KEY_DOWN: u8 = 0x50;
 const KEY_LEFT: u8 = 0x4B;
 const KEY_RIGHT: u8 = 0x4D;
 
+const KEY_ESC: u8 = 0x01;
+const KEY_ENTER: u8 = 0x1C;
+
 static mut SELECTED: usize = 0;
 
 pub fn menu_loop(vga_index: &mut isize) {
-    let menu = ["First", "Second", "Third"];
+    clear(vga_index);
+    let menu = ["New game", "High scores", "Exit to prompt"];
 
-    draw_window(30, 5, 25, 10, Some("Menu"));
+    draw_window(28, 7, 25, 10, Some("Snake"));
 
     loop {
         unsafe {
             let scancode = keyboard_read_scancode();
 
-            if scancode == KEY_DOWN {
-                SELECTED = (SELECTED + 1) % menu.len();
-            }
-            if scancode == KEY_UP {
-                if SELECTED == 0 {
-                    SELECTED = menu.len() - 1;
-                } else {
-                    SELECTED -= 1;
+            match scancode {
+                KEY_DOWN => {
+                    SELECTED = (SELECTED + 1) % menu.len();
                 }
+                KEY_UP => {
+                    if SELECTED == 0 {
+                        SELECTED = menu.len() - 1;
+                    } else {
+                        SELECTED -= 1;
+                    }
+                }
+                KEY_ENTER => {
+                    if SELECTED == 2 {
+                        clear(vga_index);
+                        return;
+                    }
+
+                    handle_enter(vga_index);
+                }
+                KEY_ESC => {
+                    clear(vga_index);
+                    return;
+                }
+                _ => {}
             }
         }
 
-        draw_menu(34, 7, &menu, vga_index);
+        draw_menu(32, 9, &menu);
+    }
+}
+
+fn handle_enter(vga_index: &mut isize) {
+    unsafe {
+        match SELECTED {
+            0 => {
+                clear(vga_index);
+                run(vga_index);
+
+                clear(vga_index);
+                draw_window(28, 7, 25, 10, Some("Snake"));
+            }
+            1 => {
+                //
+            }
+            _ => {}
+        }
     }
 }
 
 // Draw the window frame with a title
 fn draw_window(x: usize, y: usize, width: usize, height: usize, title: Option<&str>) {
-    let attr = 0x0F; // white on black
+    let attr = 0x0E; // white on black
 
     // Corners
     write_char(x, y, 0xC9, attr);                                  // ╔
@@ -70,7 +108,7 @@ fn draw_window(x: usize, y: usize, width: usize, height: usize, title: Option<&s
             write_char(start + i, y, byte, 0x0E); // yellow on blue
             j += 1;
         }
-        
+
         write_char(start + j + 0, y, b' ', 0x0E);
         write_char(start + j + 1, y, b']', 0x0E);
     }
@@ -85,21 +123,20 @@ fn write_char(x: usize, y: usize, chr: u8, attr: u8) {
     }
 }
 
-fn draw_menu(x: usize, y: usize, items: &[&str], vga_index: &mut isize) {
+fn draw_menu(x: usize, y: usize, items: &[&str]) {
     for (i, &item) in items.iter().enumerate() {
         for (j, byte) in item.bytes().enumerate() {
 
             unsafe {
                 // Write selector arrow
                 if i == SELECTED {
-                    write_char(x - 2, y + i, b'\x1A', 0x0E); // arrow
+                    write_char(x - 2, y + i * 2, b'\x1A', 0x0E); // arrow
                 } else {
-                    write_char(x - 2, y + i, b' ', 0x07);
+                    write_char(x - 2, y + i * 2, b' ', 0x07);
                 }
             }
 
-
-            let offset = 2 * ((y + i) * WIDTH as usize + x + j);
+            let offset = 2 * ((y + i * 2) * WIDTH as usize + x + j);
             unsafe {
                 core::ptr::write_volatile(
                     VGA_BUFFER.add(offset),

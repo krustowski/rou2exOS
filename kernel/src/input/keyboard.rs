@@ -1,4 +1,4 @@
-use crate::fs::{block::Floppy, fat12::Fs, entry::Entry};
+use crate::fs::fat12::{block::Floppy, fs::Fs, entry::Entry};
 use crate::init::config::PATH_CLUSTER;
 use crate::net::serial::ready;
 use crate::vga;

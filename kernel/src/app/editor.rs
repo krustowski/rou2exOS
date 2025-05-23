@@ -1,4 +1,4 @@
-use crate::fs::{fat12::Fs, block::Floppy};
+use crate::fs::fat12::{fs::Fs, block::Floppy};
 use crate::init::config::PATH_CLUSTER;
 use crate::input::keyboard::{self, keyboard_read_scancode};
 use crate::vga::{buffer::Color, screen::clear, write::{string, newline}, writer::Writer};

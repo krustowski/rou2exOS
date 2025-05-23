@@ -1,5 +1,4 @@
-use crate::fs::block::Floppy;
-use crate::fs::fat12::Fs;
+use crate::fs::fat12::{block::Floppy, fs::Fs};
 use crate::init::result;
 
 use super::config::{self, PATH_CLUSTER};

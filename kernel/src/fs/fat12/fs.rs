@@ -1,5 +1,4 @@
-use crate::fs::block::BlockDevice;
-use crate::fs::entry::{BootSector, Entry};
+use crate::fs::fat12::{block::BlockDevice, entry::{BootSector, Entry}};
 use crate::init::config::{debug_enabled, PATH, PATH_CLUSTER};
 use crate::init::config::get_path;
 

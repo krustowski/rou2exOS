@@ -1,7 +1,7 @@
 use crate::acpi;
 use crate::app;
 use crate::init::config;
-use crate::fs;
+use crate::fs::fat12::{block::Floppy, fs::Fs};
 use crate::init::config::PATH_CLUSTER;
 use crate::net;
 use crate::sound;
@@ -201,7 +201,7 @@ fn cmd_beep(_args: &[u8], _vga_index: &mut isize) {
 }
 
 fn cmd_cd(args: &[u8], vga_index: &mut isize) {
-    let floppy = fs::block::Floppy;
+    let floppy = Floppy;
 
     if args.len() == 0 || args.len() > 11 {
         unsafe {
@@ -224,7 +224,7 @@ fn cmd_cd(args: &[u8], vga_index: &mut isize) {
         slice.copy_from_slice(filename_input);
     }
 
-    match fs::fat12::Fs::new(&floppy, vga_index) {
+    match Fs::new(&floppy, vga_index) {
         Ok(fs) => {
             let mut cluster: u16 = 0;
 
@@ -256,9 +256,9 @@ fn cmd_clear(_args: &[u8], vga_index: &mut isize) {
 }
 
 fn cmd_dir(_args: &[u8], vga_index: &mut isize) {
-    let floppy = fs::block::Floppy;
+    let floppy = Floppy;
 
-    match fs::fat12::Fs::new(&floppy, vga_index) {
+    match Fs::new(&floppy, vga_index) {
         Ok(fs) => {
             unsafe {
                 fs.list_dir(config::PATH_CLUSTER, &[], vga_index);
@@ -346,7 +346,7 @@ fn cmd_http(_args: &[u8], vga_index: &mut isize) {
 }
 
 fn cmd_mkdir(args: &[u8], vga_index: &mut isize) {
-    let floppy = fs::block::Floppy;
+    let floppy = Floppy;
 
     if args.len() == 0 || args.len() > 11 {
         crate::vga::write::string(vga_index, b"Usage: mkdir <dirname>", crate::vga::buffer::Color::Yellow);
@@ -354,7 +354,7 @@ fn cmd_mkdir(args: &[u8], vga_index: &mut isize) {
         return;
     }
 
-    match fs::fat12::Fs::new(&floppy, vga_index) {
+    match Fs::new(&floppy, vga_index) {
         Ok(fs) => {
             let mut filename: [u8; 11] = [b' '; 11];
 
@@ -376,7 +376,7 @@ fn cmd_mkdir(args: &[u8], vga_index: &mut isize) {
 
 
 fn cmd_mv(args: &[u8], vga_index: &mut isize) {
-    let floppy = fs::block::Floppy;
+    let floppy = Floppy;
 
     if args.len() == 0 {
         crate::vga::write::string(vga_index, b"Usage: mv <old> <new>", crate::vga::buffer::Color::Yellow);
@@ -384,7 +384,7 @@ fn cmd_mv(args: &[u8], vga_index: &mut isize) {
         return;
     }
 
-    match fs::fat12::Fs::new(&floppy, vga_index) {
+    match Fs::new(&floppy, vga_index) {
         Ok(fs) => {
             let (old, new) = split_cmd(args);
 
@@ -447,7 +447,7 @@ fn cmd_ping(_args: &[u8], vga_index: &mut isize) {
 }
 
 fn cmd_read(args: &[u8], vga_index: &mut isize) {
-    let floppy = fs::block::Floppy;
+    let floppy = Floppy;
 
     if args.len() == 0 || args.len() > 11 {
         crate::vga::write::string(vga_index, b"Usage: read <filename>", crate::vga::buffer::Color::Red);
@@ -455,7 +455,7 @@ fn cmd_read(args: &[u8], vga_index: &mut isize) {
         return;
     }
 
-    match fs::fat12::Fs::new(&floppy, vga_index) {
+    match Fs::new(&floppy, vga_index) {
         Ok(fs) => {
             let mut filename = [b' '; 11];
 
@@ -541,7 +541,7 @@ fn cmd_response(_args: &[u8], vga_index: &mut isize) {
 }
 
 fn cmd_rm(args: &[u8], vga_index: &mut isize) {
-    let floppy = fs::block::Floppy;
+    let floppy = Floppy;
 
     if args.len() == 0 || args.len() > 11 {
         crate::vga::write::string(vga_index, b"Usage: rm <filename>", crate::vga::buffer::Color::Yellow);
@@ -549,7 +549,7 @@ fn cmd_rm(args: &[u8], vga_index: &mut isize) {
         return;
     }
 
-    match fs::fat12::Fs::new(&floppy, vga_index) {
+    match Fs::new(&floppy, vga_index) {
         Ok(fs) => {
             let mut filename: [u8; 11] = [b' '; 11];
 
@@ -668,9 +668,9 @@ fn cmd_version(_args: &[u8], vga_index: &mut isize) {
 }
 
 fn cmd_write(args: &[u8], vga_index: &mut isize) {
-    let floppy = fs::block::Floppy;
+    let floppy = Floppy;
 
-    match fs::fat12::Fs::new(&floppy, vga_index) {
+    match Fs::new(&floppy, vga_index) {
         Ok(fs) => {
             let (filename, content) = split_cmd(args);
 

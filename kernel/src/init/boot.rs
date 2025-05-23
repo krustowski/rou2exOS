@@ -119,6 +119,7 @@ pub unsafe fn parse_multiboot2_info(vga_index: &mut isize, base_addr: usize) -> 
                         let entry = &*entry_ptr;
 
                         if entry.typ == 1 {
+                            continue;
                             /*vga::write::string(vga_index, b"Usable mem region: ", vga::buffer::Color::White);
                             vga::write::number(vga_index, entry.base_addr as u64);
                             vga::write::string(vga_index, b" - ", vga::buffer::Color::White);
@@ -129,7 +130,7 @@ pub unsafe fn parse_multiboot2_info(vga_index: &mut isize, base_addr: usize) -> 
                 }
             }
             8 => {
-                let fb_tag = &*(ptr as *const FramebufferTag);
+                //let fb_tag = &*(ptr as *const FramebufferTag);
 
                 /*vga::write::string(vga_index, b"Frame buf (bpp + res): ", vga::buffer::Color::White);
                 vga::write::number(vga_index, fb_tag.bpp as u64);

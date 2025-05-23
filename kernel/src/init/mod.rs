@@ -19,11 +19,11 @@ pub fn init(vga_index: &mut isize, multiboot_ptr: u64) {
         vga_index
     );
 
-    result::print_result(
+    /*result::print_result(
         "Check multiboot2 tag count", 
         boot::print_info(vga_index, multiboot_ptr),
         vga_index
-    );
+    );*/
 
     result::print_result(
         "Check floppy drive", 

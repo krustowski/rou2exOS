@@ -115,15 +115,7 @@ pub fn keyboard_loop(vga_index: &mut isize) {
                 }
             }
             0x0E => { // backspace
-                if input_len > 0 {
-                    input_len -= 1;
-                    unsafe {
-                        *vga_index -= 2; // move cursor back one character
-                        *vga::buffer::VGA_BUFFER.offset(*vga_index) = b' ';
-                        *vga::buffer::VGA_BUFFER.offset(*vga_index + 1) = vga::buffer::Color::White as u8;
-                    }
-                    move_cursor_index(vga_index);
-                }
+                handle_backspace(&mut input_len, vga_index);
                 continue;
             }
             0x1C => {
@@ -172,6 +164,18 @@ pub fn keyboard_loop(vga_index: &mut isize) {
     };
 }
 
+fn handle_backspace(input_len: &mut usize, vga_index: &mut isize) {
+    if *input_len > 0 {
+        *input_len -= 1;
+        unsafe {
+            *vga_index -= 2; // move cursor back one character
+            *vga::buffer::VGA_BUFFER.offset(*vga_index) = b' ';
+            *vga::buffer::VGA_BUFFER.offset(*vga_index + 1) = vga::buffer::Color::White as u8;
+        }
+        move_cursor_index(vga_index);
+    }
+}
+
 fn handle_tab_completion(input_buffer: &mut [u8; INPUT_BUFFER_SIZE], input_len: &mut usize, vga_index: &mut isize) {
     let mut input_cpy = [0u8; 128];
     input_cpy.copy_from_slice(input_buffer);
@@ -183,8 +187,9 @@ fn handle_tab_completion(input_buffer: &mut [u8; INPUT_BUFFER_SIZE], input_len: 
         return;
     }
 
-    vga::write::string(vga_index, prefix, vga::buffer::Color::Yellow);
-    newline(vga_index);
+    // Print passed prefix
+    //vga::write::string(vga_index, prefix, vga::buffer::Color::Yellow);
+    //newline(vga_index);
 
     let floppy = Floppy;
     let mut found = false;
@@ -216,7 +221,10 @@ fn handle_tab_completion(input_buffer: &mut [u8; INPUT_BUFFER_SIZE], input_len: 
                         }
 
                         if ext_end <= 3 && name_end > 0 && name_end <= 8 && ext_end + name_end <= 12 {
-                            clean_name[name_end] = b'.';
+
+                            if cmd != b"cd" || ext_end != 0 {
+                                clean_name[name_end] = b'.';
+                            }
 
                             if let Some(slice) = clean_name.get_mut(name_end + 1..name_end + ext_end + 1) {
                                 if let Some(sl) = entry.ext.get(..ext_end) {
@@ -235,8 +243,12 @@ fn handle_tab_completion(input_buffer: &mut [u8; INPUT_BUFFER_SIZE], input_len: 
                                 return;
                             }
 
+                            for i in 0..prefix.len() {
+                                handle_backspace(input_len, vga_index);
+                            }
+
                             vga::write::string(vga_index, &clean_name, vga::buffer::Color::Pink);
-                            newline(vga_index);
+                            move_cursor_index(vga_index);
                             found = true;
 
                             if cmd.len() > 10 || cmd.len() + 1 > 11 {
@@ -265,9 +277,11 @@ fn handle_tab_completion(input_buffer: &mut [u8; INPUT_BUFFER_SIZE], input_len: 
                             if *input_len > 128 {
                                 return;
                             }
-                            vga::write::string(vga_index, &input_buffer[..*input_len], vga::buffer::Color::Red);
-                            vga::write::byte(vga_index, b'"', vga::buffer::Color::Red);
-                            newline(vga_index);
+
+                            // Debug: print full input buffer
+                            //vga::write::string(vga_index, &input_buffer[..*input_len], vga::buffer::Color::Red);
+                            //vga::write::byte(vga_index, b'"', vga::buffer::Color::Red);
+                            //newline(vga_index);
                             return;
                         }
                     }

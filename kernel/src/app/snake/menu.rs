@@ -1,6 +1,6 @@
-use crate::vga::{write::{byte_raw}, buffer::VGA_BUFFER, screen::clear};
+use crate::vga::{buffer::VGA_BUFFER, screen::clear, write::{byte_raw, string}};
 use crate::input::keyboard::{keyboard_read_scancode};
-use crate::app::snake::engine::run;
+use crate::app::snake::{engine::run, score::{load_high_scores_fat12, save_high_scores_fat12}};
 
 const WIDTH: isize = 80;
 const HEIGHT: isize = 25;
@@ -19,7 +19,7 @@ pub fn menu_loop(vga_index: &mut isize) {
     clear(vga_index);
     let menu = ["New game", "High scores", "Exit to prompt"];
 
-    draw_window(28, 7, 25, 10, Some("Snake"));
+    draw_window(26, 6, 27, 12, Some("Snake"));
 
     loop {
         unsafe {
@@ -37,12 +37,9 @@ pub fn menu_loop(vga_index: &mut isize) {
                     }
                 }
                 KEY_ENTER => {
-                    if SELECTED == 2 {
-                        clear(vga_index);
+                    if handle_enter(vga_index) {
                         return;
                     }
-
-                    handle_enter(vga_index);
                 }
                 KEY_ESC => {
                     clear(vga_index);
@@ -56,7 +53,7 @@ pub fn menu_loop(vga_index: &mut isize) {
     }
 }
 
-fn handle_enter(vga_index: &mut isize) {
+fn handle_enter(vga_index: &mut isize) -> bool {
     unsafe {
         match SELECTED {
             0 => {
@@ -64,14 +61,24 @@ fn handle_enter(vga_index: &mut isize) {
                 run(vga_index);
 
                 clear(vga_index);
-                draw_window(28, 7, 25, 10, Some("Snake"));
+                draw_window(26, 6, 27, 12, Some("Snake"));
             }
             1 => {
+                match load_high_scores_fat12(vga_index) {
+                    Ok(scores) => {}
+                    Err(e) => {
+                        string(vga_index, e.as_bytes(), crate::vga::buffer::Color::Red);
+                    }
+                }
                 //
             }
-            _ => {}
+            _ => {
+                clear(vga_index);
+                return true;
+            }
         }
     }
+    false
 }
 
 // Draw the window frame with a title

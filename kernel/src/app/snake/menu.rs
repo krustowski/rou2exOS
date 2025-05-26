@@ -1,6 +1,6 @@
-use crate::vga::{buffer::VGA_BUFFER, screen::clear, write::{byte_raw, string}};
+use crate::{input::keyboard::{move_cursor, move_cursor_index}, vga::{self, buffer::VGA_BUFFER, screen::clear, write::{byte_raw, string}}};
 use crate::input::keyboard::{keyboard_read_scancode};
-use crate::app::snake::{engine::run, score::{load_high_scores_fat12, save_high_scores_fat12}};
+use crate::app::snake::{engine::run, score::{load_high_scores_fat12, save_high_scores_fat12, render_scores_window}};
 
 const WIDTH: isize = 80;
 const HEIGHT: isize = 25;
@@ -13,13 +13,19 @@ const KEY_RIGHT: u8 = 0x4D;
 const KEY_ESC: u8 = 0x01;
 const KEY_ENTER: u8 = 0x1C;
 
+const MENU_WINDOW_X: usize = 26;
+const MENU_WINDOW_Y: usize = 6;
+const MENU_WINDOW_WIDTH: usize = 27;
+const MENU_WINDOW_HEIGHT: usize = 12;
+
 static mut SELECTED: usize = 0;
 
 pub fn menu_loop(vga_index: &mut isize) {
+    move_cursor(30, 0);
     clear(vga_index);
-    let menu = ["New game", "High scores", "Exit to prompt"];
+    let menu = ["New game", "High scores", "Exit to shell"];
 
-    draw_window(26, 6, 27, 12, Some("Snake"));
+    draw_window(MENU_WINDOW_X, MENU_WINDOW_Y, MENU_WINDOW_WIDTH, MENU_WINDOW_HEIGHT, Some("Snake"));
 
     loop {
         unsafe {
@@ -61,11 +67,18 @@ fn handle_enter(vga_index: &mut isize) -> bool {
                 run(vga_index);
 
                 clear(vga_index);
-                draw_window(26, 6, 27, 12, Some("Snake"));
+                draw_window(MENU_WINDOW_X, MENU_WINDOW_Y, MENU_WINDOW_WIDTH, MENU_WINDOW_HEIGHT, Some("Snake"));
             }
             1 => {
                 match load_high_scores_fat12(vga_index) {
-                    Ok(scores) => {}
+                    Ok(scores) => {
+                        clear(vga_index);
+                        SELECTED = 0;
+                        render_scores_window(&scores, vga_index);
+
+                        clear(vga_index);
+                        draw_window(MENU_WINDOW_X, MENU_WINDOW_Y, MENU_WINDOW_WIDTH, MENU_WINDOW_HEIGHT, Some("Snake"));
+                    }
                     Err(e) => {
                         string(vga_index, e.as_bytes(), crate::vga::buffer::Color::Red);
                     }
@@ -74,6 +87,7 @@ fn handle_enter(vga_index: &mut isize) -> bool {
             }
             _ => {
                 clear(vga_index);
+                move_cursor_index(vga_index);
                 return true;
             }
         }
@@ -82,7 +96,7 @@ fn handle_enter(vga_index: &mut isize) -> bool {
 }
 
 // Draw the window frame with a title
-fn draw_window(x: usize, y: usize, width: usize, height: usize, title: Option<&str>) {
+pub fn draw_window(x: usize, y: usize, width: usize, height: usize, title: Option<&str>) {
     let attr = 0x0E; // white on black
 
     // Corners
@@ -130,7 +144,7 @@ fn write_char(x: usize, y: usize, chr: u8, attr: u8) {
     }
 }
 
-fn draw_menu(x: usize, y: usize, items: &[&str]) {
+pub fn draw_menu(x: usize, y: usize, items: &[&str]) {
     for (i, &item) in items.iter().enumerate() {
         for (j, byte) in item.bytes().enumerate() {
 

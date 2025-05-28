@@ -43,7 +43,13 @@ pub fn save_high_scores_fat12(scores: &[u32; SCORE_LEN], vga_index: &mut isize) 
 
     // Serialize scores as little endian u32
     let mut buf = [0u8; 4 * SCORE_LEN];
+
     for (i, &score) in scores.iter().enumerate() {
+
+        if i >= buf.len() {
+            break;
+        }
+
         buf[i * 4..i * 4 + 4].copy_from_slice(&score.to_le_bytes());
     }
 
@@ -71,7 +77,7 @@ pub fn save_high_scores_fat12(scores: &[u32; SCORE_LEN], vga_index: &mut isize) 
     Ok(())
 }
 
-pub fn load_high_scores_fat12(vga_index: &mut isize) -> Result<[u32; SCORE_LEN], Error> {
+pub fn load_high_scores_fat12(vga_index: &mut isize) -> Option<[u32; SCORE_LEN]> {
     let floppy = Floppy;
     let mut sector_buf = [0u8; 512];
 
@@ -89,72 +95,63 @@ pub fn load_high_scores_fat12(vga_index: &mut isize) -> Result<[u32; SCORE_LEN],
                         cluster = entry.start_cluster;
                     }
                 }, vga_index);
+            }
 
-                if cluster == 0 {
-                    return Ok([0; SCORE_LEN]); // no file yet — return default scores
-                }
+            if cluster == 0 {
+                return None;
             }
 
             fs.read_file(cluster, &mut sector_buf, vga_index);
         }
-        Err(_) => return Err("filesystem init failed"),
+        Err(_) => return None
     }
 
-    let mut scores: [u32; SCORE_LEN] = [0; SCORE_LEN];
+    let scores = parse_scores_from_sector(&sector_buf);
+    scores
+}
 
-    if let Some(slice) = sector_buf.get(..20) {
-        let mut i = 0;
-        let mut score = [0u8; 4];
+pub fn parse_scores_from_sector(sector_buf: &[u8; 512]) -> Option<[u32; 5]> {
+    let mut scores = [0u32; SCORE_LEN];
 
-        for b in slice.iter() {
-            if let Some(byte) = score.get_mut(i % 4) {
-                *byte = *b;
-            }
+    // Manually extract 5 * 4 = 20 bytes without causing bounds checks
+    for i in 0..SCORE_LEN - 1 {
+        let offset = i * 4;
 
-            if (i / 4) - 1 >= SCORE_LEN {
-                break;
-            }
+        // Bounds check manually before copying
+        if offset + 4 > sector_buf.len() {
+            return None;
+        }
 
-            if i != 0 && i % 4 == 0 {
-                if let Some(sc) = scores.get_mut((i / 4) - 1) {
-                    *sc = u32::from_le_bytes(score);
+        // Copy the 4 bytes manually without panic
+        let mut b = [0u8; 4];
+        for j in 0..3 {
+            if let Some(byte) = sector_buf.get(offset + j) {
+                if let Some(sl) = b.get_mut(j) {
+                    *sl = *byte;
                 }
             }
+        }
 
-            //byte(vga_index, *b, crate::vga::buffer::Color::Yellow);
-            i += 1;
+        if i >= scores.len() {
+            break;
+        }
+
+        if let Some(sc) = scores.get_mut(i) {
+            *sc = u32::from_le_bytes(b);
         }
     }
 
-    //let mut buf = [0u8; 512];
-    
-    //let scores = parse_scores_from_sector(&buf).unwrap_or([0; SCORE_LEN]);
-
-    Ok(scores)
+    Some(scores)
 }
-
-pub fn parse_scores_from_sector(sector_buf: &[u8]) -> Option<[u32; 5]> {
-    sector_buf.get(..20).map(|slice| {
-        let mut scores = [0u32; 5];
-        for i in 0..5 {
-            scores[i] = u32::from_le_bytes([
-                slice[i * 4],
-                slice[i * 4 + 1],
-                slice[i * 4 + 2],
-                slice[i * 4 + 3],
-            ]);
-        }
-        scores
-    })
-}
-
 
 pub fn sprintf_score<'a>(prefix: &'static [u8], buf: &'a mut [u8], score: u32) -> &'a str {
     let mut i = 0;
 
     for &b in prefix {
         if i < buf.len() {
-            buf[i] = b;
+            if let Some(bf) = buf.get_mut(i) {
+                *bf = b;
+            }
             i += 1;
         }
     }
@@ -162,23 +159,35 @@ pub fn sprintf_score<'a>(prefix: &'static [u8], buf: &'a mut [u8], score: u32) -
     let mut num = score;
     if num == 0 {
         if i < buf.len() {
-            buf[i] = b'0';
+            if let Some(bf) = buf.get_mut(i) {
+                *bf = b'0'
+            }
             i += 1;
         }
     } else {
         let mut temp = [0u8; 10];
         let mut j = 0;
         while num > 0 && j < temp.len() {
-            temp[j] = b'0' + (num % 10) as u8;
+            if let Some(tmp) = temp.get_mut(j) {
+                *tmp = b'0' + (num % 10) as u8;
+            }
             num /= 10;
             j += 1;
         }
         for k in (0..j).rev() {
             if i < buf.len() {
-                buf[i] = temp[k];
+                if let Some(bf) = buf.get_mut(i) {
+                    if let Some(tmp) = temp.get(k) {
+                        *bf = *tmp
+                    }
+                }
                 i += 1;
             }
         }
+    }
+
+    if i >= buf.len() {
+        return "";
     }
 
     // Safety: we only use ASCII bytes, so this is always valid UTF-8.

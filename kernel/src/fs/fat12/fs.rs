@@ -76,7 +76,6 @@ impl<'a, D: BlockDevice> Fs<'a, D> {
     //fn read_file(&self, start_cluster: u16, mut callback: impl FnMut(&[u8]), vga_index: &mut isize) {
     pub fn read_file(&self, start_cluster: u16, sector_buf: &mut [u8; 512], vga_index: &mut isize) {
         let mut current_cluster = start_cluster;
-        //let mut sector_buf = [0u8; 512];
 
         loop {
             let lba = self.cluster_to_lba(current_cluster);

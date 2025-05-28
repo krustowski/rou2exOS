@@ -70,23 +70,19 @@ fn handle_enter(vga_index: &mut isize) -> bool {
                 draw_window(MENU_WINDOW_X, MENU_WINDOW_Y, MENU_WINDOW_WIDTH, MENU_WINDOW_HEIGHT, Some("Snake"));
             }
             1 => {
-                match load_high_scores_fat12(vga_index) {
-                    Ok(scores) => {
-                        clear(vga_index);
-                        SELECTED = 0;
-                        render_scores_window(&scores, vga_index);
+                if let Some(scores) = load_high_scores_fat12(vga_index) {
+                    clear(vga_index);
+                    SELECTED = 0;
+                    render_scores_window(&scores, vga_index);
 
-                        clear(vga_index);
-                        draw_window(MENU_WINDOW_X, MENU_WINDOW_Y, MENU_WINDOW_WIDTH, MENU_WINDOW_HEIGHT, Some("Snake"));
-                    }
-                    Err(e) => {
-                        string(vga_index, e.as_bytes(), crate::vga::buffer::Color::Red);
-                    }
+                    clear(vga_index);
+                    draw_window(MENU_WINDOW_X, MENU_WINDOW_Y, MENU_WINDOW_WIDTH, MENU_WINDOW_HEIGHT, Some("Snake"));
                 }
                 //
             }
             _ => {
                 clear(vga_index);
+                SELECTED = 0;
                 move_cursor_index(vga_index);
                 return true;
             }

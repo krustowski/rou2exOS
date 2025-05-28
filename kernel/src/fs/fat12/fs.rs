@@ -143,6 +143,21 @@ impl<'a, D: BlockDevice> Fs<'a, D> {
         data: &[u8],
         vga_index: &mut isize,
     ) {
+        // If file exists, free its clusters
+        if let Some((entry_lba, entry_offset, dir_entry)) =
+            self.find_dir_entry_mut(dir_cluster, filename, vga_index)
+        {
+            let first_cluster = u16::from_le_bytes([dir_entry[26], dir_entry[27]]);
+            self.free_cluster_chain(first_cluster, vga_index);
+
+            // Mark directory entry as deleted
+            let mut sector = [0u8; 512];
+            self.device.read_sector(entry_lba, &mut sector, vga_index);
+            sector[entry_offset] = 0xE5; // Mark as deleted
+            self.device.write_sector(entry_lba, &sector, vga_index);
+        }
+
+        // Write new file
         let mut clusters_needed = (data.len() + 511) / 512;
         let mut first_cluster = self.allocate_cluster(vga_index);
 
@@ -155,12 +170,10 @@ impl<'a, D: BlockDevice> Fs<'a, D> {
         let mut data_offset = 0;
 
         while clusters_needed > 0 {
-            // Write all sectors in this cluster
             let lba = self.cluster_to_lba(current_cluster);
 
             for sector_in_cluster in 0..self.boot_sector.sectors_per_cluster {
                 let mut sector_data = [0u8; 512];
-
                 let copy_len = core::cmp::min(512, data.len() - data_offset);
                 if copy_len == 0 {
                     break;
@@ -172,7 +185,6 @@ impl<'a, D: BlockDevice> Fs<'a, D> {
 
                 self.device
                     .write_sector(lba + sector_in_cluster as u64, &sector_data, vga_index);
-
                 data_offset += copy_len;
             }
 
@@ -188,11 +200,11 @@ impl<'a, D: BlockDevice> Fs<'a, D> {
                 self.write_fat12_entry(current_cluster, next_cluster, vga_index);
                 current_cluster = next_cluster;
             } else {
-                self.write_fat12_entry(current_cluster, 0xFFF, vga_index); // EOF marker
+                self.write_fat12_entry(current_cluster, 0xFFF, vga_index); // EOF
             }
         }
 
-        // Write directory entry with filename, attributes, first_cluster, and size
+        // Write new directory entry
         self.write_dir_entry(
             dir_cluster,
             filename,
@@ -204,6 +216,7 @@ impl<'a, D: BlockDevice> Fs<'a, D> {
         crate::vga::write::string(vga_index, b"File written", crate::vga::buffer::Color::Green);
         crate::vga::write::newline(vga_index);
     }
+
 
 
     fn write_dir_entry(
@@ -253,6 +266,46 @@ impl<'a, D: BlockDevice> Fs<'a, D> {
 
         crate::vga::write::string(vga_index, b"No dir entry slot", crate::vga::buffer::Color::Red);
         crate::vga::write::newline(vga_index);
+    }
+
+    fn find_dir_entry_mut(
+        &self,
+        dir_cluster: u16,
+        filename: &[u8; 11],
+        vga_index: &mut isize,
+    ) -> Option<(u64, usize, [u8; 32])> {
+        let entry_size = 32;
+        let entries_per_sector = 512 / entry_size;
+        let mut sector = [0u8; 512];
+
+        let (start_lba, sector_count) = if dir_cluster == 0 {
+            (
+                self.root_dir_start_lba,
+                self.boot_sector.sectors_per_cluster as usize,
+            )
+        } else {
+            (
+                self.cluster_to_lba(dir_cluster),
+                self.boot_sector.sectors_per_cluster as usize,
+            )
+        };
+
+        for sector_index in 0..sector_count {
+            self.device.read_sector(start_lba + sector_index as u64, &mut sector, vga_index);
+
+            for i in 0..entries_per_sector {
+                let offset = i * entry_size;
+                let entry = &sector[offset..offset + 11];
+
+                if entry == filename {
+                    let mut entry_buf = [0u8; 32];
+                    entry_buf.copy_from_slice(&sector[offset..offset + 32]);
+                    return Some((start_lba + sector_index as u64, offset, entry_buf));
+                }
+            }
+        }
+
+        None
     }
 
 
@@ -393,6 +446,14 @@ impl<'a, D: BlockDevice> Fs<'a, D> {
             }
 
             cluster = self.read_fat12_entry(cluster, vga_index);
+        }
+    }
+
+    fn free_cluster_chain(&self, mut cluster: u16, vga_index: &mut isize) {
+        while cluster < 0xFF8 {
+            let next = self.read_fat12_entry(cluster, vga_index);
+            self.write_fat12_entry(cluster, 0x000, vga_index);
+            cluster = next;
         }
     }
 

@@ -1,5 +1,6 @@
 use crate::vga::screen::clear;
 
+use super::level::load_level_by_number;
 use super::score::{self, load_high_scores_fat12, save_high_scores_fat12, update_high_scores};
 use super::menu::{draw_menu, draw_window};
 
@@ -33,6 +34,7 @@ fn inb(port: u16) -> u8 {
     ret
 }
 
+#[derive(Clone,Copy)]
 pub struct Point {
     pub x: usize,
     pub y: usize,
@@ -54,7 +56,6 @@ pub const WALLS: &[Point] = &[
     Point { x: 32, y: 12 },
     Point { x: 33, y: 12 },
 ];
-
 
 const MAX_LEN: usize = 64;
 
@@ -160,8 +161,8 @@ impl Snake {
 
 fn draw_food(x: usize, y: usize, vga_index: &mut isize) {
     let crt: usize = {
-        if y == 0 {
-            1;
+        if y == 0 || y == 1 {
+            2;
         }
         0
     };
@@ -170,8 +171,8 @@ fn draw_food(x: usize, y: usize, vga_index: &mut isize) {
     crate::vga::write::string(vga_index, b"*", crate::vga::buffer::Color::Green);
 }
 
-fn draw_walls(vga_index: &mut isize) {
-    for wall in WALLS {
+fn draw_walls(walls: &[Point], vga_index: &mut isize) {
+    for wall in walls {
         draw_char(wall.x, wall.y, b'#', crate::vga::buffer::Color::Red, vga_index);
     }
 }
@@ -277,7 +278,11 @@ pub fn run(vga_index: &mut isize) {
     let mut food_x = 20;
     let mut food_y = 10;
 
-    let mut field = [[CellType::Empty; WIDTH as usize]; HEIGHT as usize];
+    //let mut field = [[CellType::Empty; WIDTH as usize]; HEIGHT as usize];
+
+    let level = 1;
+
+    let (walls, wall_count) = load_level_by_number::<{ super::level::MAX_WALLS }>(level, vga_index);
 
     loop {
         let code = read_scancode();
@@ -285,7 +290,7 @@ pub fn run(vga_index: &mut isize) {
         if code == 0x01 {
             save_score_window(vga_index);
             update_high_scores(move_count, vga_index);
-            crate::vga::screen::clear(vga_index);
+            clear(vga_index);
             break;
         }
 
@@ -311,12 +316,22 @@ pub fn run(vga_index: &mut isize) {
                     snake.len += 1;
                 }
 
-                let seed = x * 13 + y * 31;
-                food_x = simple_hash(seed) % WIDTH as usize;
-                food_y = simple_hash(seed.wrapping_add(1)) % HEIGHT as usize;
+                loop {
+                    let seed = x * 13 + y * 31;
+                    food_x = simple_hash(seed) % WIDTH as usize;
+                    food_y = simple_hash(seed.wrapping_add(1)) % HEIGHT as usize;
+
+                    for wall in walls {
+                        if food_x == wall.x && food_y == wall.y {
+                            continue;
+                        }
+                    }
+
+                    break;
+                }
             }
 
-            for wall in WALLS {
+            for wall in walls {
                 if wall.x == *x && wall.y == *y {
                     game_over(vga_index);
                     return;
@@ -325,8 +340,9 @@ pub fn run(vga_index: &mut isize) {
         }
 
         snake.draw(vga_index);
+
+        draw_walls(&walls, vga_index);
         draw_food(food_x, food_y, vga_index);
-        draw_walls(vga_index);
 
         draw_string(0, 0, b"Level: ", crate::vga::buffer::Color::White, vga_index);
         write_number(7, 0, 1, vga_index);

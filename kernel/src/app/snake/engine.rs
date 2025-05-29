@@ -1,4 +1,4 @@
-use super::score::{self, load_high_scores_fat12, save_high_scores_fat12};
+use super::score::{self, load_high_scores_fat12, save_high_scores_fat12, update_high_scores};
 
 const WIDTH: isize = 80;
 const HEIGHT: isize = 25;
@@ -203,13 +203,7 @@ pub fn run(vga_index: &mut isize) {
         let code = read_scancode();
 
         if code == 0x01 {
-            /*if let Some(scores) = load_high_scores_fat12(vga_index) {
-                    //save_high_scores_fat12(&scores, vga_index);
-                    }*/
-            let mut scores = [0u32; 5];
-            scores[0] = move_count;
-            save_high_scores_fat12(&scores, vga_index);
-
+            update_high_scores(move_count, vga_index);
             crate::vga::screen::clear(vga_index);
             break;
         }

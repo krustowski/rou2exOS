@@ -77,6 +77,22 @@ pub fn save_high_scores_fat12(scores: &[u32; SCORE_LEN], vga_index: &mut isize) 
     Ok(())
 }
 
+pub fn update_high_scores(score: u32, vga_index: &mut isize) {
+    if let Some(mut scores) = load_high_scores_fat12(vga_index) {
+        scores.sort_unstable_by(|a, b| b.cmp(a));
+
+        if score > scores[SCORE_LEN - 1] {
+            scores[SCORE_LEN - 1] = score;
+            scores.sort_unstable_by(|a, b| b.cmp(a));
+            save_high_scores_fat12(&scores, vga_index);
+        }
+    } else {
+        let mut scores = [0u32; SCORE_LEN];
+        scores[0] = score;
+        save_high_scores_fat12(&scores, vga_index);
+    }
+}
+
 pub fn load_high_scores_fat12(vga_index: &mut isize) -> Option<[u32; SCORE_LEN]> {
     let floppy = Floppy;
     let mut sector_buf = [0u8; 512];

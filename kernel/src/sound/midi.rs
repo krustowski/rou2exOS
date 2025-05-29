@@ -3,7 +3,7 @@ use super::beep::{beep, stop_beep};
 pub static mut MIDI_FREQ_TABLE: [u16; 128] = [0; 128];
 
 pub fn wait_millis(ms: u16) {
-    for _ in 0..(ms as u32 * 1_000_000) {
+    for _ in 0..(ms as u32 * 1_000) {
         unsafe { core::arch::asm!("nop") };
     }
 }

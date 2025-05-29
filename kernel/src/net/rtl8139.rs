@@ -24,23 +24,36 @@ pub fn receive_frame(buf: &mut [u8]) -> Option<usize> {
         port::write_u8(RTL8139_IO_BASE + 0x3E, 0x01); // Acknowledge RX interrupt
 
         let offset = RX_OFFSET & 0x1FFF;
-        let rx_buf = &RX_BUFFER[offset..];
+        //let rx_buf = &RX_BUFFER[offset..];
 
-        let rx_status = u16::from_le_bytes([rx_buf[0], rx_buf[1]]);
-        let len = u16::from_le_bytes([rx_buf[2], rx_buf[3]]) as usize;
+        if let Some(rx_buf) = RX_BUFFER.get(offset..) {
+            if rx_buf.len() < 4 {
+                return None;
+            }
 
-        if len == 0 || len > buf.len() {
-            return None;
+            let rx_status = u16::from_le_bytes([rx_buf[0], rx_buf[1]]);
+            let len = u16::from_le_bytes([rx_buf[2], rx_buf[3]]) as usize;
+
+            if len == 0 || len > buf.len() {
+                return None;
+            }
+
+            if let Some(bf) = buf.get_mut(..len) {
+                if let Some(rx) = rx_buf.get(4..4 + len) {
+                    bf.copy_from_slice(rx);
+                }
+            }
+            //buf[..len].copy_from_slice(&rx_buf[4..4 + len]);
+
+            RX_OFFSET = (RX_OFFSET + len + 4 + 3) & !3; // Align to 4 bytes
+
+            // Tell the card we've read this packet
+            port::write_u16(RTL8139_IO_BASE + 0x38, RX_OFFSET as u16);
+
+            Some(len)
+        } else {
+            None
         }
-
-        buf[..len].copy_from_slice(&rx_buf[4..4 + len]);
-
-        RX_OFFSET = (RX_OFFSET + len + 4 + 3) & !3; // Align to 4 bytes
-
-        // Tell the card we've read this packet
-        port::write_u16(RTL8139_IO_BASE + 0x38, RX_OFFSET as u16);
-
-        Some(len)
     }
 }
 

@@ -51,6 +51,11 @@ static COMMANDS: &[Command] = &[
         function: cmd_ed,
     },
     Command {
+        name: b"ether",
+        description: b"runs the Ethernet frame handler",
+        function: cmd_ether,
+    },
+    Command {
         name: b"fsck",
         description: b"runs the filesystem check",
         function: cmd_fsck,
@@ -306,6 +311,10 @@ fn cmd_ed(args: &[u8], vga_index: &mut isize) {
     vga::screen::clear(vga_index);
     app::editor::edit_file(&filename, vga_index);
     vga::screen::clear(vga_index);
+}
+
+fn cmd_ether(args: &[u8], vga_index: &mut isize) {
+    app::ether::handle_packet(vga_index);
 }
 
 fn cmd_fsck(_args: &[u8], vga_index: &mut isize) {

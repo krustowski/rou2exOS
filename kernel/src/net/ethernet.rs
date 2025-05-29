@@ -115,11 +115,11 @@ fn send_arp_reply(payload: &[u8]) {
 pub fn receive_loop(callback: fn(packet: &[u8]) -> u8) -> u8 {
     let mut frame_buf: [u8; 2048] = [0; 2048];
             
-    rtl8139::rtl8139_init();
-
     loop {
         // While the keyboard is idle...
         while port::read(0x64) & 1 == 0 {
+
+            rtl8139::rtl8139_init();
 
             if let Some(frame_len) = rtl8139::receive_frame(&mut frame_buf) {
                 // Minimal length check
@@ -127,33 +127,38 @@ pub fn receive_loop(callback: fn(packet: &[u8]) -> u8) -> u8 {
                     continue;
                 }
 
-                if let Some(frame) = EthernetFrame::parse(&frame_buf[..frame_len]) {
+                if let Some(slice) = frame_buf.get(..frame_len) {
+                    return callback(slice);
+                    if let Some(frame) = EthernetFrame::parse(slice) {
 
-                    match frame.ethertype {
-                        //0x0800 => {
-                        EtherType::Ipv4 => {
-                            // IPv4 packet → pass to callback
-                            return callback(frame.payload);
-                        }
-                        //0x0806 => {
-                        EtherType::Arp => {
-                            // ARP → handle separately
-                            if let Some(arp) = ArpPacket::parse(frame.payload) {
-                                // handle_arp(arp);
+                        match frame.ethertype {
+                            //0x0800 => {
+                            EtherType::Ipv4 => {
+                                // IPv4 packet → pass to callback
+                                return callback(frame.payload);
+                            }
+                            //0x0806 => {
+                            EtherType::Arp => {
+                                // ARP → handle separately
+                                if let Some(arp) = ArpPacket::parse(frame.payload) {
+                                    // handle_arp(arp);
+                                }
+                            }
+                            _ => {
+                                return callback(frame.payload);
                             }
                         }
-                        _ => {}
+                        }
+                        }
                     }
                 }
+
+                // If any key is pressed, break the loop and return.
+                if port::read(0x60) & 0x80 == 0 {
+                    break;
+                }
             }
-        }
 
-        // If any key is pressed, break the loop and return.
-        if port::read(0x60) & 0x80 == 0 {
-            break;
+            3
         }
-    }
-
-    3
-}
 

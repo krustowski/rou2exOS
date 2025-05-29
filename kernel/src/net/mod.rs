@@ -1,6 +1,9 @@
-//pub mod ethernet;
+pub mod arp;
+pub mod ethernet;
 pub mod icmp;
 pub mod ipv4;
+pub mod pci;
+pub mod rtl8139;
 pub mod serial;
 pub mod slip;
 pub mod tcp;

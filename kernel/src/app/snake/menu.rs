@@ -18,7 +18,7 @@ const MENU_WINDOW_Y: usize = 6;
 const MENU_WINDOW_WIDTH: usize = 27;
 const MENU_WINDOW_HEIGHT: usize = 12;
 
-static mut SELECTED: usize = 0;
+pub static mut SELECTED: usize = 0;
 
 pub fn menu_loop(vga_index: &mut isize) {
     move_cursor(30, 0);

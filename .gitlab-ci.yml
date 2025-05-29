@@ -1,0 +1,24 @@
+workflow:
+  rules:
+    - when: always
+
+stages:
+  - test
+
+combined-coverage-sonarqube-check:
+  stage: test
+  when: manual
+  rules:
+    - when: always
+  allow_failure: true
+  script:
+    - go clean -testcache
+    - go test -v -coverprofile ./coverage.profile ./... && go tool cover -func ./coverage.profile
+    - make sonar_check
+
+vet-analysis:
+  stage: test
+  script:
+    - go vet ./...
+
+

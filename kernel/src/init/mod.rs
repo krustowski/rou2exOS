@@ -33,4 +33,6 @@ pub fn init(vga_index: &mut isize, multiboot_ptr: u64) {
 
     color::color_demo(vga_index);
     ascii::ascii_art(vga_index);
+
+    crate::sound::midi::play_melody();
 }

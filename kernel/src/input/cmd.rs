@@ -207,7 +207,8 @@ pub fn to_uppercase_ascii(input: &mut [u8; 11]) {
 //
 
 fn cmd_beep(_args: &[u8], _vga_index: &mut isize) {
-    sound::beep::beep(5000);
+    //sound::beep::beep(5000);
+    sound::midi::play_melody();
 
     for _ in 0..3_000_000 {
         unsafe { core::arch::asm!("nop"); }

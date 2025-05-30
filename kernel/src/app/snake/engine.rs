@@ -40,22 +40,6 @@ pub struct Point {
     pub y: usize,
 }
 
-// Hardcoded wall layout
-pub const WALLS: &[Point] = &[
-    Point { x: 10, y: 5 },
-    Point { x: 11, y: 5 },
-    Point { x: 12, y: 5 },
-    Point { x: 13, y: 5 },
-    Point { x: 14, y: 5 },
-    Point { x: 15, y: 5 },
-    Point { x: 30, y: 9 },
-    Point { x: 30, y: 10 },
-    Point { x: 30, y: 11 },
-    Point { x: 30, y: 12 },
-    Point { x: 31, y: 12 },
-    Point { x: 32, y: 12 },
-    Point { x: 33, y: 12 },
-];
 
 const MAX_LEN: usize = 64;
 
@@ -160,20 +144,17 @@ impl Snake {
 }
 
 fn draw_food(x: usize, y: usize, vga_index: &mut isize) {
-    let crt: usize = {
-        if y == 0 || y == 1 {
-            2;
-        }
-        0
-    };
-
-    *vga_index = 2 * ((crt + y) as isize * WIDTH + x as isize);
+    *vga_index = 2 * (y as isize * WIDTH + x as isize);
     crate::vga::write::string(vga_index, b"*", crate::vga::buffer::Color::Green);
 }
 
-fn draw_walls(walls: &[Point], vga_index: &mut isize) {
+fn draw_walls(walls: &[Point], vga_index: &mut isize, ch: u8) {
     for wall in walls {
-        draw_char(wall.x, wall.y, b'#', crate::vga::buffer::Color::Red, vga_index);
+        if wall.x == 0 && wall.y == 0 {
+            continue;
+        }
+
+        draw_char(wall.x, wall.y, ch, crate::vga::buffer::Color::Red, vga_index);
     }
 }
 
@@ -274,23 +255,26 @@ pub fn run(vga_index: &mut isize) {
     let mut snake = Snake::new();
 
     let mut move_count = 0;
+    let mut score = 0;
 
     let mut food_x = 20;
     let mut food_y = 10;
 
     //let mut field = [[CellType::Empty; WIDTH as usize]; HEIGHT as usize];
 
-    let level = 1;
+    let mut level = 1;
 
-    let (walls, wall_count) = load_level_by_number::<{ super::level::MAX_WALLS }>(level, vga_index);
+    let (mut walls, mut wall_count) = load_level_by_number::<{ super::level::MAX_WALLS }>(level as u8, vga_index);
+
 
     loop {
         let code = read_scancode();
 
         if code == 0x01 {
             save_score_window(vga_index);
-            update_high_scores(move_count, vga_index);
+            update_high_scores(score, vga_index);
             clear(vga_index);
+            game_over(vga_index);
             break;
         }
 
@@ -304,6 +288,16 @@ pub fn run(vga_index: &mut isize) {
             }
         }
 
+        if score % 30 == 0 && snake.len - 3 != 0 {
+            level = (score / 30) + 1;
+
+            draw_walls(&walls, vga_index, b' ');
+            (walls, wall_count) = load_level_by_number::<{ super::level::MAX_WALLS }>(level as u8, vga_index);
+
+            snake.clear(vga_index);
+            snake = Snake::new();
+        }
+
         move_count += 1;
 
         snake.clear(vga_index);
@@ -314,15 +308,24 @@ pub fn run(vga_index: &mut isize) {
             if *x == food_x && *y == food_y {
                 if snake.len < MAX_LEN {
                     snake.len += 1;
+                    score += 1;
                 }
 
+                let mut crt = 0;
+
                 loop {
-                    let seed = x * 13 + y * 31;
+                    let seed = x * 13 + y * 31 + crt;
                     food_x = simple_hash(seed) % WIDTH as usize;
                     food_y = simple_hash(seed.wrapping_add(1)) % HEIGHT as usize;
 
+                    if food_x == 0 || food_y == 0 {
+                        crt += 1;
+                        continue;
+                    }
+
                     for wall in walls {
                         if food_x == wall.x && food_y == wall.y {
+                            crt += 1;
                             continue;
                         }
                     }
@@ -333,6 +336,7 @@ pub fn run(vga_index: &mut isize) {
 
             for wall in walls {
                 if wall.x == *x && wall.y == *y {
+                    update_high_scores(score, vga_index);
                     game_over(vga_index);
                     return;
                 }
@@ -341,15 +345,15 @@ pub fn run(vga_index: &mut isize) {
 
         snake.draw(vga_index);
 
-        draw_walls(&walls, vga_index);
+        draw_walls(&walls, vga_index, b'#');
         draw_food(food_x, food_y, vga_index);
 
         draw_string(0, 0, b"Level: ", crate::vga::buffer::Color::White, vga_index);
-        write_number(7, 0, 1, vga_index);
+        write_number(7, 0, level as usize, vga_index);
         draw_string(10, 0, b"Score: ", crate::vga::buffer::Color::White, vga_index);
-        write_number(17, 0, snake.len - 3, vga_index);
-        draw_string(20, 0, b"Moves: ", crate::vga::buffer::Color::White, vga_index);
-        write_number(27, 0, move_count as usize, vga_index);
+        write_number(17, 0, score as usize, vga_index);
+        draw_string(21, 0, b"Moves: ", crate::vga::buffer::Color::White, vga_index);
+        write_number(28, 0, move_count as usize, vga_index);
 
         delay();
     }

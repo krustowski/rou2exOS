@@ -81,11 +81,21 @@ pub fn update_high_scores(score: u32, vga_index: &mut isize) {
     if let Some(mut scores) = load_high_scores_fat12(vga_index) {
         scores.sort_unstable_by(|a, b| b.cmp(a));
 
-        if score > scores[SCORE_LEN - 1] {
-            scores[SCORE_LEN - 1] = score;
-            scores.sort_unstable_by(|a, b| b.cmp(a));
-            save_high_scores_fat12(&scores, vga_index);
+        let mut scores_new = [0u32; 6];
+
+        for i in 0..scores.len() {
+            scores_new[i] = scores[i];
         }
+
+        scores_new[SCORE_LEN] = score;
+
+        scores_new.sort_unstable_by(|a, b| b.cmp(a));
+
+        for i in 0..scores.len() {
+            scores[i] = scores_new[i];
+        }
+
+        save_high_scores_fat12(&scores, vga_index);
     } else {
         let mut scores = [0u32; SCORE_LEN];
         scores[0] = score;

@@ -24,5 +24,9 @@ make build
 # run the QEMU emulation with ISO image (respectively with additional floppy image attached as well)
 make run_iso
 make run_iso_floppy
+
+# (alternative) run the kernel exclusively only (needs the `bootloader` dependency in Cargo.toml to be added)
+cargo bootimage
+make run
 ```
 

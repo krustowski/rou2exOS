@@ -2,9 +2,8 @@
 
 A second iteration of the RoureXOS operating system, rewritten in Rust.
 
-[Original RoureXOS (a blog post)](https://krusty.space/projects/rourexos/).
-
-[rou2exOS Rusted Edition (a blog post)](https://blog.vxn.dev/rou2exos-rusted-edition)
++ [Original RoureXOS (a blog post)](https://krusty.space/projects/rourexos/)
++ [rou2exOS Rusted Edition (a blog post)](https://blog.vxn.dev/rou2exos-rusted-edition)
 
 ## How to use (kernel)
 

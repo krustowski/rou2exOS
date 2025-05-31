@@ -17,7 +17,7 @@ pub fn shutdown() {
         );
     }
 
-    // Freeze in case of the shutdown failure (no ACPI).
+    // Freeze in case of the shutdown failure (no ACPI)
     loop {
         unsafe {
             core::arch::asm!("hlt");

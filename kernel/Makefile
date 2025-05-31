@@ -52,6 +52,23 @@ run_iso:
 		-cdrom r2.iso \
 		-serial pty
 
+run_iso_usb: 
+	@qemu-system-x86_64 \
+		-m 2G \
+		-vga std \
+		-hdb /dev/sdb \
+		-serial pty
+
+run_iso_net: 
+	@qemu-system-x86_64 \
+		-boot d \
+		-m 2G \
+		-vga std \
+		-cdrom r2.iso \
+		-netdev tap,id=net0,ifname=tap0,script=no,downscript=no \
+		-device rtl8139,netdev=net0 \
+		-serial pty
+
 run_iso_floppy: build_floppy
 	@qemu-system-x86_64 \
 		-boot d \

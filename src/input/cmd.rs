@@ -31,6 +31,11 @@ static COMMANDS: &[Command] = &[
         function: cmd_cd,
     },
     Command {
+        name: b"chat",
+        description: b"starts a chat",
+        function: cmd_chat,
+    },
+    Command {
         name: b"cls",
         description: b"clears the screen",
         function: cmd_clear,
@@ -266,6 +271,11 @@ fn cmd_cd(args: &[u8], vga_index: &mut isize) {
             crate::vga::write::newline(vga_index);
         }
     }
+}
+
+fn cmd_chat(_args: &[u8], vga_index: &mut isize) {
+    crate::vga::screen::clear(vga_index);
+    app::chat::tcp::handle_conns(vga_index);
 }
 
 fn cmd_clear(_args: &[u8], vga_index: &mut isize) {

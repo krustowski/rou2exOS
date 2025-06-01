@@ -11,7 +11,7 @@ use crate::{
     },
     vga::{
         buffer::Color, 
-        screen::{clear, scroll}, 
+        screen::{clear, scroll_at}, 
         write::{
             byte,
             newline,
@@ -75,7 +75,6 @@ pub fn receive_loop_tcp(
             }
         }
 
-        // If any key is pressed, break the loop and return.
         let key = port::read(0x60);
         if key & 0x80 == 0 {
             match key {
@@ -120,7 +119,7 @@ pub fn receive_loop_tcp(
 
                                     byte(&mut VGA_INDEX_WRITE, ascii, Color::Yellow);
                                     move_cursor_index(&mut VGA_INDEX_WRITE);
-                                    scroll(&mut VGA_INDEX);
+                                    //scroll(&mut VGA_INDEX);
                                 }
                             }
                         }
@@ -220,6 +219,10 @@ pub fn handle_conns(vga_index: &mut isize) {
 
     let mut conns: [Option<tcp::TcpConnection>; ipv4::MAX_CONNS] = Default::default();
 
+    unsafe {
+        VGA_INDEX = 0;
+    }
+
     move_cursor_index(&mut END_LINE);
 
     loop {
@@ -306,7 +309,7 @@ pub fn handle_conns(vga_index: &mut isize) {
                         }
 
                         send_response(conn, tcp::ACK | tcp::PSH, response);
-                        conn.seq_num += RESPONSE_LENGTH as u32;
+                        conn.seq_num += (RESPONSE_LENGTH + 1) as u32;
 
                         if let Some(b) = response.get_mut(response.len() - 1) {
                             *b = b' ';
@@ -315,6 +318,7 @@ pub fn handle_conns(vga_index: &mut isize) {
                         string(&mut VGA_INDEX, b"[you]: ", Color::Yellow);
                         string(&mut VGA_INDEX, &response, Color::White);
                         newline(&mut VGA_INDEX);
+                        scroll_at(&mut VGA_INDEX, &mut 24);
                     }
 
                     RESPONSE_BUFFER = [0u8; 256];
@@ -384,7 +388,7 @@ fn handle_tcp_packet(conn: &mut tcp::TcpConnection, tcp_header: &tcp::TcpHeader,
                     string(&mut VGA_INDEX, b"[peer]: ", Color::Green);
                     string(&mut VGA_INDEX, msg, Color::White);
                     newline(&mut VGA_INDEX);
-                    scroll(&mut VGA_INDEX);
+                    scroll_at(&mut VGA_INDEX, &mut 24);
                 }
             }
         } else {

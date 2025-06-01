@@ -40,7 +40,6 @@ pub struct Point {
     pub y: usize,
 }
 
-
 const MAX_LEN: usize = 64;
 
 #[derive(Copy, Clone, PartialEq)]

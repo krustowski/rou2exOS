@@ -1,4 +1,4 @@
-# rou2rexOS Rusted Edition
+# rou2exOS Rusted Edition
 
 A second iteration of the RoureXOS operating system, rewritten in Rust.
 

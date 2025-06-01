@@ -15,26 +15,46 @@ build: compile_kernel nasm link build_iso
 
 #@cargo rustc --release --target x86_64-r2.json -- -C relocation-model=static --emit=obj
 compile_kernel:
-	@cargo rustc --release -Z build-std=core,compiler_builtins --target x86_64-r2.json -- --emit=obj
+	@cargo rustc \
+		--release \
+		-Z build-std=core,compiler_builtins \
+		--target x86_64-r2.json \
+		-- --emit=obj
 
 nasm:
-	@nasm -f elf64 -o iso/boot/boot.o iso/boot/boot.asm
+	@nasm \
+		-f elf64 \
+		-o iso/boot/boot.o \
+		iso/boot/boot.asm
 
 KERNEL_OBJ := $(shell ls -t target/x86_64-r2/release/deps/kernel-*.o | head -1)
 
 link:
-	@ld.lld --verbose -T linker.ld -n --gc-sections -o iso/boot/kernel.elf ${KERNEL_OBJ} iso/boot/boot.o
+	@ld.lld \
+		--verbose \
+		-T linker.ld \
+		-n \
+		--gc-sections \
+		-o iso/boot/kernel.elf \
+		${KERNEL_OBJ} iso/boot/boot.o
 
 build_iso:
-	@grub2-mkrescue -o r2.iso iso/ \
+	@grub2-mkrescue \
+		-o r2.iso iso/ \
 		--modules="multiboot2 vbe video video_bochs video_cirrus gfxterm all_video"
 
 build_floppy:
-	@dd if=/dev/zero of=fat.img bs=512 count=2880
-	@mkfs.fat -F 12 fat.img
+	@dd \
+		if=/dev/zero \
+		of=fat.img \
+		bs=512 \
+		count=2880
+	@mkfs.fat \
+		-F 12 \
+		fat.img
 	@echo "Hello from floppy!" > /tmp/hello.txt
-	@mcopy -i fat.img /tmp/hello.txt ::HELLO.TXT
-	@mcopy -i fat.img -s -m -v -n fappe/ ::
+	@mcopy \
+		-i fat.img /tmp/hello.txt ::HELLO.TXT
 
 #
 #  RUN
@@ -109,7 +129,11 @@ clean:
 	@cargo clean
 
 clippy:
-	@cargo clippy --release --target x86_64-r2.json --no-default-features -- -D warnings
+	@cargo clippy \
+		--release \
+		--target x86_64-r2.json \
+		--no-default-features \
+		-- -D warnings
 
 
 ifeq (${SONAR_HOST_URL}${SONAR_TOKEN},)

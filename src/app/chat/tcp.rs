@@ -265,7 +265,7 @@ pub fn handle_conns(vga_index: &mut isize) {
                         continue; 
                     };
 
-                    send_response(conn, tcp::ACK | tcp::PSH | tcp::FIN, b"BYE\n");
+                    send_response(conn, tcp::ACK | tcp::PSH | tcp::FIN, b"DISCONNECT\n");
                     conn.state = tcp::TcpState::Closed;
                     break;
                 }
@@ -279,46 +279,32 @@ pub fn handle_conns(vga_index: &mut isize) {
                     //string(vga_index, b"No free slots", Color::White);
                 }
                 HandleState::SendResponse => {
-                    let found_conn = conns.iter_mut().find(|entry| {
-                        if let Some(conn) = entry {
-                            conn.src_port == 12345
+                    let found_conn = for_each_conn(&mut conns, |conn| {
+                        if conn.src_port == 12345 {
+                            Some(conn)
                         } else {
-                            false
+                            None
                         }
                     });
 
-                    let conn = if let Some(slot) = found_conn {
-                        match slot.as_mut() {
-                            Some(c) => c,
-                            // Unexpected: maybe_existing was Some, but inner value was None
-                            None => {
-                                RESPONSE_BUFFER = [0u8; 256];
-                                RESPONSE_LENGTH = 0;
-                                continue;
+                    if let Some(conn) = found_conn {
+                        if let Some(response) = RESPONSE_BUFFER.get_mut(..RESPONSE_LENGTH + 1) {
+                            if let Some(b) = response.get_mut(response.len() - 1) {
+                                *b = b'\n';
                             }
+
+                            send_response(conn, tcp::ACK | tcp::PSH, response);
+                            conn.seq_num += (RESPONSE_LENGTH + 1) as u32;
+
+                            if let Some(b) = response.get_mut(response.len() - 1) {
+                                *b = b' ';
+                            }
+
+                            string(&mut VGA_INDEX, b"[you]: ", Color::Yellow);
+                            string(&mut VGA_INDEX, &response, Color::White);
+                            newline(&mut VGA_INDEX);
+                            scroll_at(&mut VGA_INDEX, &mut 24);
                         }
-                    } else { 
-                        RESPONSE_BUFFER = [0u8; 256];
-                        RESPONSE_LENGTH = 0;
-                        continue; 
-                    };
-
-                    if let Some(response) = RESPONSE_BUFFER.get_mut(..RESPONSE_LENGTH + 1) {
-                        if let Some(b) = response.get_mut(response.len() - 1) {
-                            *b = b'\n';
-                        }
-
-                        send_response(conn, tcp::ACK | tcp::PSH, response);
-                        conn.seq_num += (RESPONSE_LENGTH + 1) as u32;
-
-                        if let Some(b) = response.get_mut(response.len() - 1) {
-                            *b = b' ';
-                        }
-
-                        string(&mut VGA_INDEX, b"[you]: ", Color::Yellow);
-                        string(&mut VGA_INDEX, &response, Color::White);
-                        newline(&mut VGA_INDEX);
-                        scroll_at(&mut VGA_INDEX, &mut 24);
                     }
 
                     RESPONSE_BUFFER = [0u8; 256];
@@ -331,7 +317,16 @@ pub fn handle_conns(vga_index: &mut isize) {
     clear(vga_index);
 }
 
-fn find_conn(conns: &mut [Option<tcp::TcpConnection>; ipv4::MAX_CONNS]) {}
+fn for_each_conn<'a, F, R>(conns: &'a mut [Option<TcpConnection>], mut f: F) -> Option<R> where F: FnMut(&'a mut TcpConnection) -> Option<R> {
+    for conn in conns.iter_mut() {
+        if let Some(ref mut c) = conn {
+            if let Some(result) = f(c) {
+                return Some(result);
+            }
+        }
+    }
+    None
+}
 
 fn handle_tcp_packet(conn: &mut tcp::TcpConnection, tcp_header: &tcp::TcpHeader, payload: &[u8]) -> HandleState {
     let (syn, ack, fin, _rst) = tcp::parse_flags(tcp_header);
@@ -384,7 +379,15 @@ fn handle_tcp_packet(conn: &mut tcp::TcpConnection, tcp_header: &tcp::TcpHeader,
 
             // Write the message out
             unsafe {
-                if let Some(msg) = payload.get(..payload.len() - 2) {
+                let mut crt = 0;
+
+                if let Some(end) = payload.get(payload.len() - 1) {
+                    if *end == b'\n' {
+                        crt = 1;
+                    }
+                }
+
+                if let Some(msg) = payload.get(..payload.len() - 1 - crt) {
                     string(&mut VGA_INDEX, b"[peer]: ", Color::Green);
                     string(&mut VGA_INDEX, msg, Color::White);
                     newline(&mut VGA_INDEX);
@@ -406,7 +409,6 @@ fn handle_tcp_packet(conn: &mut tcp::TcpConnection, tcp_header: &tcp::TcpHeader,
             send_response(conn, tcp::ACK, &[]);
         }
     }
-
     HandleState::GotACK
 }
 

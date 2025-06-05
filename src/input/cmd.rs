@@ -199,6 +199,62 @@ pub fn split_cmd(input: &[u8]) -> (&[u8], &[u8]) {
     }
 }
 
+const MAX_IPS: usize = 4;
+
+pub fn parse_ip_args(input: &[u8], out: &mut [[u8; 4]; MAX_IPS]) -> usize {
+    let mut ip_count = 0;
+    let mut i = 0;
+    let len = input.len();
+
+    while i < len && ip_count < MAX_IPS {
+        let mut ip = [0u8; 4];
+        let mut octet = 0;
+        let mut val = 0u16;
+        let mut digit_seen = false;
+
+        while i < len {
+            match input[i] {
+                b'0'..=b'9' => {
+                    val = val * 10 + (input[i] - b'0') as u16;
+                    if val > 255 {
+                        break;
+                    }
+                    digit_seen = true;
+                }
+                b'.' => {
+                    if !digit_seen || octet >= 3 {
+                        break;
+                    }
+                    ip[octet] = val as u8;
+                    octet += 1;
+                    val = 0;
+                    digit_seen = false;
+                }
+                b' ' => {
+                    i += 1;
+                    break;
+                }
+                _ => {
+                    break;
+                }
+            }
+            i += 1;
+        }
+
+        if digit_seen && octet == 3 {
+            ip[3] = val as u8;
+            out[ip_count] = ip;
+            ip_count += 1;
+        }
+
+        while i < len && input[i] == b' ' {
+            i += 1;
+        }
+    }
+
+    ip_count
+}
+
 pub fn to_uppercase_ascii(input: &mut [u8; 11]) {
     for byte in input.iter_mut() {
         if *byte >= b'a' && *byte <= b'z' {
@@ -273,9 +329,17 @@ fn cmd_cd(args: &[u8], vga_index: &mut isize) {
     }
 }
 
-fn cmd_chat(_args: &[u8], vga_index: &mut isize) {
+fn cmd_chat(args: &[u8], vga_index: &mut isize) {
     crate::vga::screen::clear(vga_index);
-    app::chat::tcp::handle_conns(vga_index);
+
+    let mut ips = [[0u8; 4]; MAX_IPS];
+    let count = parse_ip_args(args, &mut ips);
+
+    if count > 0 {
+        app::chat::tcp::handle_conns(vga_index, &ips);
+    } else {
+        app::chat::tcp::handle_conns(vga_index, &[[0u8; 4]; 4]);
+    }
 }
 
 fn cmd_clear(_args: &[u8], vga_index: &mut isize) {
@@ -485,9 +549,10 @@ fn cmd_mv(args: &[u8], vga_index: &mut isize) {
 }
 
 
-fn cmd_ping(_args: &[u8], vga_index: &mut isize) {
-    let src_ip = [192, 168, 3, 2];
-    let dst_ip = [192, 168, 3, 1];
+fn cmd_ping(args: &[u8], vga_index: &mut isize) {
+    let mut ips = [[0u8; 4]; MAX_IPS];
+    let count = parse_ip_args(args, &mut ips);
+
     let protocol = 1;
     let identifier = 1342;
     let sequence_no = 1;
@@ -500,7 +565,7 @@ fn cmd_ping(_args: &[u8], vga_index: &mut isize) {
     let icmp_len = net::icmp::create_packet(8, identifier, sequence_no, payload, &mut icmp_buf);
     let icmp_slice = icmp_buf.get(..icmp_len).unwrap_or(&[]);
 
-    let ipv4_len = net::ipv4::create_packet(src_ip, dst_ip, protocol, icmp_slice, &mut ipv4_buf);
+    let ipv4_len = net::ipv4::create_packet(ips[0], ips[1], protocol, icmp_slice, &mut ipv4_buf);
     let ipv4_slice = ipv4_buf.get(..ipv4_len).unwrap_or(&[]);
 
     vga::write::string(vga_index, b"Sending a ping packet...", vga::buffer::Color::White);
@@ -570,7 +635,7 @@ fn cmd_response(_args: &[u8], vga_index: &mut isize) {
                 let icmp_slice = icmp_buf.get(..icmp_len).unwrap_or(&[]);
 
                 //let ipv4_len = net::ipv4::create_packet(ipv4_header.dest_ip, ipv4_header.source_ip, ipv4_header.protocol, &icmp_buf[..icmp_len], &mut ipv4_buf);
-                let ipv4_len = net::ipv4::create_packet([192, 168, 3, 2], ipv4_header.source_ip, ipv4_header.protocol, icmp_slice, &mut ipv4_buf);
+                let ipv4_len = net::ipv4::create_packet(ipv4_header.dest_ip, ipv4_header.source_ip, ipv4_header.protocol, icmp_slice, &mut ipv4_buf);
                 let ipv4_slice = ipv4_buf.get(..ipv4_len).unwrap_or(&[]);
 
                 net::ipv4::send_packet(ipv4_slice);

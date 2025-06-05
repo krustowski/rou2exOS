@@ -149,7 +149,7 @@ fn filter_and_close_conns(conns: &mut [Option<tcp::TcpConnection>; ipv4::MAX_CON
     HandleState::ConnOK
 }
 
-pub fn handle_conns(vga_index: &mut isize) {
+pub fn handle_conns(vga_index: &mut isize, ips: &[[u8; 4]; 4]) {
     fn callback(conns: &mut [Option<tcp::TcpConnection>; ipv4::MAX_CONNS], packet: &[u8]) -> HandleState {
         if let Some((ipv4_header, ipv4_payload)) = ipv4::parse_packet(packet) {
             if let Some((tcp_header, payload)) = tcp::parse_packet(ipv4_payload) {
@@ -219,6 +219,27 @@ pub fn handle_conns(vga_index: &mut isize) {
 
     let mut conns: [Option<tcp::TcpConnection>; ipv4::MAX_CONNS] = Default::default();
 
+    if ips.len() > 1 && ips[0][0] != 0 {
+        let mut new_conn = tcp::TcpConnection {
+            state: tcp::TcpState::Listen,
+            src_ip: ips[0],
+            dst_ip: ips[1],
+            src_port: 33333,
+            dst_port: 12345,
+            seq_num: 0x1000,
+            ack_num: 0,
+        };
+
+        send_response(&mut new_conn, tcp::SYN, &[]);
+        
+        unsafe {
+            string(&mut VGA_INDEX, b"[NEW] Dialing....", Color::Cyan);
+            newline(&mut VGA_INDEX);
+        }
+
+        conns[0] = Some(new_conn);
+    }
+
     unsafe {
         VGA_INDEX = 0;
     }
@@ -247,7 +268,7 @@ pub fn handle_conns(vga_index: &mut isize) {
 
                     let found_conn = conns.iter_mut().find(|entry| {
                         if let Some(conn) = entry {
-                            conn.src_port == 12345
+                            conn.src_port == 12345 || conn.dst_port == 12345
                         } else {
                             false
                         }
@@ -280,7 +301,7 @@ pub fn handle_conns(vga_index: &mut isize) {
                 }
                 HandleState::SendResponse => {
                     let found_conn = for_each_conn(&mut conns, |conn| {
-                        if conn.src_port == 12345 {
+                        if conn.src_port == 12345 || conn.dst_port == 12345 {
                             Some(conn)
                         } else {
                             None
@@ -361,7 +382,7 @@ fn handle_tcp_packet(conn: &mut tcp::TcpConnection, tcp_header: &tcp::TcpHeader,
         send_response(conn, tcp::ACK, &[]);
         return HandleState::GotACK;
 
-    } else if conn.state == tcp::TcpState::Established && conn.src_port == 12345 {
+    } else if conn.state == tcp::TcpState::Established && (conn.src_port == 12345 || conn.dst_port == 12345) {
         if !payload.is_empty() {
 
             // Send ACK to received message

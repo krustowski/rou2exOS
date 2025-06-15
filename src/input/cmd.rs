@@ -1,10 +1,10 @@
 use crate::acpi;
 use crate::app;
+use crate::audio;
 use crate::init::config;
 use crate::fs::fat12::{block::Floppy, fs::Fs, check::run_check};
 use crate::init::config::PATH_CLUSTER;
 use crate::net;
-use crate::sound;
 use crate::time;
 use crate::vga;
 use crate::vga::write::newline;
@@ -269,13 +269,13 @@ pub fn to_uppercase_ascii(input: &mut [u8; 11]) {
 
 fn cmd_beep(_args: &[u8], _vga_index: &mut isize) {
     //sound::beep::beep(5000);
-    sound::midi::play_melody();
+    audio::midi::play_melody();
 
     for _ in 0..3_000_000 {
         unsafe { core::arch::asm!("nop"); }
     }
 
-    sound::beep::stop_beep();
+    audio::beep::stop_beep();
 }
 
 fn cmd_cd(args: &[u8], vga_index: &mut isize) {

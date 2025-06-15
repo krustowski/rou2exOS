@@ -16,12 +16,12 @@ mod multiboot2;
 
 mod acpi;
 mod app;
+mod audio;
 mod fs;
 mod init;
 mod input;
 mod mem;
 mod net;
-mod sound;
 mod time;
 mod tui;
 mod vga;
@@ -34,14 +34,6 @@ use mem::bump::BumpAllocator;
 
 #[global_allocator]
 static mut ALLOCATOR: BumpAllocator = BumpAllocator::new();
-
-//#[lang = "eh_personality"]
-//extern "C" fn eh_personality() {}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn rust_begin_unwind(_: &core::panic::PanicInfo) {
-    //loop {}
-}
 
 #[unsafe(no_mangle)]
 pub extern "C" fn rust_main() { 
@@ -83,6 +75,11 @@ fn panic(info: &PanicInfo) -> ! {
     }
 
     loop {}
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn rust_begin_unwind(_: &core::panic::PanicInfo) {
+    //loop {}
 }
 
 #[no_mangle]

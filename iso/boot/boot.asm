@@ -78,7 +78,7 @@ multiboot_ptr:
 section .text
 align 4
 
-extern rust_main
+extern kernel_main
 
 extern pml4_table
 extern pdpt_table

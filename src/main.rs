@@ -155,11 +155,6 @@ fn init_heap_allocator() {
     }
 }
 
-extern "C" {
-    static __stack_start: u8;
-    static __stack_end: u8;
-}
-
 fn print_stack_info() {
     let sp: usize;
     unsafe {

@@ -1,6 +1,5 @@
 use crate::fs::fat12::{block::Floppy, fs::Fs};
-use crate::init::result;
-
+use super::result;
 use super::config::{self, PATH_CLUSTER};
 
 pub fn check_floppy(vga_index: &mut isize) -> result::InitResult {
@@ -37,7 +36,7 @@ pub fn print_info(vga_index: &mut isize) {
     match Fs::new(&floppy, vga_index) {
         Ok(fs) => {
             unsafe {
-                fs.list_dir(PATH_CLUSTER, &[], vga_index);
+                fs.list_dir(PATH_CLUSTER, &[b' '; 11], vga_index);
             }
         }
         Err(e) => {

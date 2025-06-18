@@ -352,7 +352,7 @@ fn cmd_dir(_args: &[u8], vga_index: &mut isize) {
     match Fs::new(&floppy, vga_index) {
         Ok(fs) => {
             unsafe {
-                fs.list_dir(config::PATH_CLUSTER, &[], vga_index);
+                fs.list_dir(config::PATH_CLUSTER, &[b' '; 11], vga_index);
             }
         }
         Err(e) => {

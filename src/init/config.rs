@@ -21,8 +21,6 @@ pub fn get_path() -> &'static [u8] {
     }
 }
 
-
-
 //
 //
 //
@@ -39,5 +37,10 @@ pub fn debug_enabled() -> bool {
     unsafe { 
         debug_flag != 0 
     }
+}
+
+extern "C" {
+    static __stack_start: u8;
+    static __stack_end: u8;
 }
 

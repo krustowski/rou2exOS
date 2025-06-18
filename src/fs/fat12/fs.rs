@@ -1,7 +1,10 @@
-use crate::fs::fat12::{block::BlockDevice, entry::{BootSector, Entry}};
-use crate::init::config::{debug_enabled, PATH, PATH_CLUSTER};
-use crate::init::config::get_path;
+use crate::init::config::{
+    debug_enabled, 
+};
+use crate::vga::{write::{string, number, newline, byte}, buffer::Color};
+use super::{block::BlockDevice, entry::{BootSector, Entry}};
 
+/// Fs is the filesystem abstraction for FAT12 devices.
 pub struct Fs<'a, D: BlockDevice> {
     pub device: &'a D,
     pub boot_sector: BootSector,
@@ -12,51 +15,54 @@ pub struct Fs<'a, D: BlockDevice> {
 }
 
 impl<'a, D: BlockDevice> Fs<'a, D> {
+    /// new method ensures the filesystem <Fs> abstraction is initilized and ready to read and
+    /// write data.
     pub fn new(device: &'a D, vga_index: &mut isize) -> Result<Self, &'static str> {
+        // Prepare buffer for the boot sector to load into
         let mut sector = [0u8; 512];
         device.read_sector(0, &mut sector, vga_index);
 
         let mut found_fat = false;
 
+        // Search for the FAT12 label in the boot sector
         for i in 0..512 - 5 {
             if &sector[i..i+5] == b"FAT12" {
-                if debug_enabled() {
-                    crate::vga::write::string(vga_index, b"Found FAT12", crate::vga::buffer::Color::Green);
-                    crate::vga::write::newline(vga_index);
-                }
+                debug!("Found FAT12!");
 
                 found_fat = true;
                 break;
             }
-            /*if let Some(b) = sector.get(i) {
-              crate::vga::write::number(vga_index, *b as u64);
-              }*/
         }
 
         if !found_fat {
             return Err("Could not find the FAT12 label, floppy may not be present");
         }
 
+        // Cast the sector as BootSector
         let boot_sector = unsafe { (*(sector.as_ptr() as *const BootSector)).clone() };
 
         if debug_enabled() {
-            crate::vga::write::string(vga_index, b"OEM: ", crate::vga::buffer::Color::White);
+            string(vga_index, b"OEM: ", crate::vga::buffer::Color::White);
             for b in &boot_sector.oem {
-                crate::vga::write::byte(vga_index, *b, crate::vga::buffer::Color::Green);
+                byte(vga_index, *b, crate::vga::buffer::Color::Green);
             }
-            crate::vga::write::newline(vga_index);
+            newline(vga_index);
+
+            string(vga_index, b"Bytes/Sector: ", crate::vga::buffer::Color::White);
+            number(vga_index, boot_sector.bytes_per_sector as u64);
+            newline(vga_index);
         }
 
-        if debug_enabled() {
-            crate::vga::write::string(vga_index, b"Bytes/Sector: ", crate::vga::buffer::Color::White);
-            crate::vga::write::number(vga_index, boot_sector.bytes_per_sector as u64);
-            crate::vga::write::newline(vga_index);
-        }
-
+        // Start of the FAT tables
         let fat_start = boot_sector.reserved_sectors as u64;
-        let root_dir_sectors =
-            ((boot_sector.root_entry_count as u32 * 32) + 511) / 512;
+
+        // Count of sectors used for root directory
+        let root_dir_sectors = ((boot_sector.root_entry_count as u32 * 32) + 511) / 512;
+
+        // LBA address of the root directory
         let root_dir_start = fat_start + (boot_sector.fat_count as u64 * boot_sector.fat_size_16 as u64);
+
+        // LBA address of the starting point for data
         let data_start = root_dir_start + root_dir_sectors as u64;
 
         Ok(Self {
@@ -69,11 +75,12 @@ impl<'a, D: BlockDevice> Fs<'a, D> {
         })
     }
 
+    /// cluster_to_lba method takes in a cluster number and returns its LBA address
     fn cluster_to_lba(&self, cluster: u16) -> u64 {
         self.data_start_lba + ((cluster as u64 - 2) * self.sectors_per_cluster as u64)
     }
 
-    //fn read_file(&self, start_cluster: u16, mut callback: impl FnMut(&[u8]), vga_index: &mut isize) {
+    /// read_file loads the seector data into the buffer provided
     pub fn read_file(&self, start_cluster: u16, sector_buf: &mut [u8; 512], vga_index: &mut isize) {
         let mut current_cluster = start_cluster;
 
@@ -82,12 +89,15 @@ impl<'a, D: BlockDevice> Fs<'a, D> {
             self.device.read_sector(lba, sector_buf, vga_index);
 
             current_cluster = self.read_fat12_entry(current_cluster, vga_index);
+            // Chain end
             if current_cluster >= 0xFF8 {
-                break; // End of chain
+                break;
             }
         }
     }
 
+    /// read_fat12_entry method reads through the FAT table to find chains of sectors used by such
+    /// cluster provided
     pub fn read_fat12_entry(&self, cluster: u16, vga_index: &mut isize) -> u16 {
         let fat_offset = (cluster as usize * 3) / 2;
         let sector = (fat_offset / 512) as u64;
@@ -118,6 +128,7 @@ impl<'a, D: BlockDevice> Fs<'a, D> {
         entry & 0x0FFF
     }
 
+    /// write_fat12_entry writes into the FAT table according to the provided cluster number
     pub fn write_fat12_entry(&self, cluster: u16, value: u16, vga_index: &mut isize) {
         let fat_offset = (cluster as usize * 3) / 2;
         let fat_sector = self.fat_start_lba + (fat_offset / 512) as u64;
@@ -136,6 +147,7 @@ impl<'a, D: BlockDevice> Fs<'a, D> {
         self.device.write_sector(fat_sector, &buf, vga_index);
     }
 
+    /// write_file method is a directory-agnostic function to write files into the filesystem
     pub fn write_file(
         &self,
         dir_cluster: u16,
@@ -162,7 +174,7 @@ impl<'a, D: BlockDevice> Fs<'a, D> {
         let mut first_cluster = self.allocate_cluster(vga_index);
 
         if first_cluster == 0 {
-            crate::vga::write::string(vga_index, b"Disk full", crate::vga::buffer::Color::Red);
+            string(vga_index, b"Disk is full", Color::Red);
             return;
         }
 
@@ -193,14 +205,16 @@ impl<'a, D: BlockDevice> Fs<'a, D> {
             if clusters_needed > 0 {
                 let next_cluster = self.allocate_cluster(vga_index);
                 if next_cluster == 0 {
-                    crate::vga::write::string(vga_index, b"Disk full mid-write", crate::vga::buffer::Color::Red);
+                    string(vga_index, b"Disk full mid-write, aborting", Color::Red);
                     return;
                 }
 
+                // Write new cluster to the FAT table
                 self.write_fat12_entry(current_cluster, next_cluster, vga_index);
                 current_cluster = next_cluster;
             } else {
-                self.write_fat12_entry(current_cluster, 0xFFF, vga_index); // EOF
+                // End of file mark
+                self.write_fat12_entry(current_cluster, 0xFFF, vga_index);
             }
         }
 
@@ -213,12 +227,11 @@ impl<'a, D: BlockDevice> Fs<'a, D> {
             vga_index,
         );
 
-        crate::vga::write::string(vga_index, b"File written", crate::vga::buffer::Color::Green);
-        crate::vga::write::newline(vga_index);
+        string(vga_index, b"File written", Color::Green);
+        newline(vga_index);
     }
 
-
-
+    /// write_dir_entry method ensures a new directory entry is written into the directory file list
     fn write_dir_entry(
         &self,
         dir_cluster: u16,
@@ -257,15 +270,14 @@ impl<'a, D: BlockDevice> Fs<'a, D> {
                     sector[offset + 26..offset + 28].copy_from_slice(&first_cluster.to_le_bytes());
                     sector[offset + 28..offset + 32].copy_from_slice(&file_size.to_le_bytes());
 
-                    self.device
-                        .write_sector(start_lba + sector_index as u64, &sector, vga_index);
+                    self.device.write_sector(start_lba + sector_index as u64, &sector, vga_index);
                     return;
                 }
             }
         }
 
-        crate::vga::write::string(vga_index, b"No dir entry slot", crate::vga::buffer::Color::Red);
-        crate::vga::write::newline(vga_index);
+        string(vga_index, b"No dir entry slot", Color::Red);
+        newline(vga_index);
     }
 
     fn find_dir_entry_mut(
@@ -308,8 +320,7 @@ impl<'a, D: BlockDevice> Fs<'a, D> {
         None
     }
 
-
-    /// Inserts a directory entry into a directory cluster (including root).
+    /// Inserts a directory entry into a directory cluster (including root)
     /// `dir_cluster == 0` means root directory.
     /// `entry_name` must be 11 bytes: 8 for name + 3 for extension.
     pub fn insert_directory_entry(&self, dir_cluster: u16, new_entry: &Entry, vga_index: &mut isize) {
@@ -396,14 +407,12 @@ impl<'a, D: BlockDevice> Fs<'a, D> {
         }
     }
 
+    /// Looks for an empty sector to write new data to
     fn allocate_cluster(&self, vga_index: &mut isize) -> u16 {
         let mut buf = [0u8; 512];
 
         for fat_index in 0..(self.boot_sector.sectors_per_cluster as u64) {
             self.device.read_sector(self.fat_start_lba + fat_index, &mut buf, vga_index);
-
-            crate::vga::write::string(vga_index, b"Jezisi", crate::vga::buffer::Color::Yellow);
-            crate::vga::write::newline(vga_index);
 
             for cluster in 2..(self.boot_sector.total_sectors_16) {
                 let value = self.read_fat12_entry(cluster, vga_index);
@@ -418,6 +427,16 @@ impl<'a, D: BlockDevice> Fs<'a, D> {
         0
     }
 
+    /// Ensures that previously used sectors in FAT table are freed
+    fn free_cluster_chain(&self, mut cluster: u16, vga_index: &mut isize) {
+        while cluster < 0xFF8 {
+            let next = self.read_fat12_entry(cluster, vga_index);
+            self.write_fat12_entry(cluster, 0x000, vga_index);
+            cluster = next;
+        }
+    }
+
+    /// Overwrites the directory entry with new data referenced by filename
     fn update_dir_entry(&self, dir_cluster: u16, filename: &[u8; 11], updated: &Entry, vga_index: &mut isize) {
         let entry_size = core::mem::size_of::<Entry>();
         let entries_per_sector = 512 / entry_size;
@@ -449,86 +468,7 @@ impl<'a, D: BlockDevice> Fs<'a, D> {
         }
     }
 
-    fn free_cluster_chain(&self, mut cluster: u16, vga_index: &mut isize) {
-        while cluster < 0xFF8 {
-            let next = self.read_fat12_entry(cluster, vga_index);
-            self.write_fat12_entry(cluster, 0x000, vga_index);
-            cluster = next;
-        }
-    }
-
-    fn find_or_create_entry(&self, dir_cluster: u16, filename: &[u8; 11], vga_index: &mut isize) -> Option<Entry> {
-        let entry_size = core::mem::size_of::<Entry>();
-        let entries_per_sector = 512 / entry_size;
-        let mut cluster = dir_cluster;
-
-        while cluster < 0xFF8 {
-            let cluster_lba = self.cluster_to_lba(cluster);
-            let sectors = self.boot_sector.sectors_per_cluster as usize;
-
-            for i in 0..sectors {
-                let lba = cluster_lba + i as u64;
-                let mut buf = [0u8; 512];
-                self.device.read_sector(lba, &mut buf, vga_index);
-
-                let entries_bytes = &mut buf[..];
-
-                for entry_index in 0..entries_per_sector {
-                    let start = entry_index * entry_size;
-                    let end = start + entry_size;
-                    let entry_bytes = &mut entries_bytes[start..end];
-
-                    let entry = unsafe {
-                        &*(entry_bytes.as_ptr() as *const Entry)
-                    };
-
-                    if entry.name[0] == 0x00 || entry.name[0] == 0xE5 {
-                        // Free entry slot
-                        let mut name: [u8; 8] = [0u8; 8];
-                        let mut ext: [u8; 3] = [0u8; 3];
-
-                        if let Some(name_slice) = filename.get(0..8) {
-                            name[..name_slice.len()].copy_from_slice(name_slice);
-                        }
-                        if let Some(ext_slice) = filename.get(8..11) {
-                            ext[..ext_slice.len()].copy_from_slice(ext_slice);
-                        }
-
-                        let new_entry = Entry {
-                            name,
-                            ext,
-                            attr: 0x20,
-                            start_cluster: 0,
-                            file_size: 0,
-                            ..Default::default()
-                        };
-
-                        // Write the new entry directly into the sector buffer
-                        let entry_bytes = unsafe {
-                            core::slice::from_raw_parts(
-                                &new_entry as *const _ as *const u8,
-                                entry_size
-                            )
-                        };
-
-                        entries_bytes[start..end].copy_from_slice(entry_bytes);
-                        self.device.write_sector(lba, &buf, vga_index);
-
-                        return Some(new_entry);
-                    }
-
-                    if self.check_filename(entry, filename) {
-                        return Some(*entry);
-                    }
-                }
-            }
-
-            cluster = self.read_fat12_entry(cluster, vga_index);
-        }
-
-        None
-    }
-
+    /// Takes in an old filename to be replaced with the new filename in the current directory
     pub fn rename_file(&self, dir_cluster: u16, old_filename: &[u8; 11], new_filename: &[u8; 11], vga_index: &mut isize) {
         let entry_size = core::mem::size_of::<Entry>();
         let entries_per_sector = 512 / entry_size;
@@ -557,8 +497,8 @@ impl<'a, D: BlockDevice> Fs<'a, D> {
                         sector_buf[offset + 8..offset + 11].copy_from_slice(&new_filename[8..11]);
 
                         self.device.write_sector(root_dir_sector + i as u64, &sector_buf, vga_index);
-                        crate::vga::write::string(vga_index, b"File renamed", crate::vga::buffer::Color::Green);
-                        crate::vga::write::newline(vga_index);
+                        string(vga_index, b"File renamed", Color::Green);
+                        newline(vga_index);
                         return;
                     }
                 }
@@ -587,8 +527,8 @@ impl<'a, D: BlockDevice> Fs<'a, D> {
                             sector_buf[offset + 8..offset + 11].copy_from_slice(&new_filename[8..11]);
 
                             self.device.write_sector(sector_lba + sector_offset, &sector_buf, vga_index);
-                            crate::vga::write::string(vga_index, b"File renamed", crate::vga::buffer::Color::Green);
-                            crate::vga::write::newline(vga_index);
+                            string(vga_index, b"File renamed", Color::Green);
+                            newline(vga_index);
                             return;
                         }
                     }
@@ -603,10 +543,11 @@ impl<'a, D: BlockDevice> Fs<'a, D> {
             }
         }
 
-        crate::vga::write::string(vga_index, b"File not found", crate::vga::buffer::Color::Red);
-        crate::vga::write::newline(vga_index);
+        string(vga_index, b"File not found", Color::Red);
+        newline(vga_index);
     }
 
+    /// Deletes a file referenced by filename in the current directory
     pub fn delete_file(&self, dir_cluster: u16, filename: &[u8; 11], vga_index: &mut isize) {
         let entry_size = core::mem::size_of::<Entry>();
         let entries_per_sector = 512 / entry_size;
@@ -628,21 +569,23 @@ impl<'a, D: BlockDevice> Fs<'a, D> {
                         break;
                     }
 
+                    // Cast the read sector as an Entry
                     let entry = unsafe { &*(sector_buf[offset..].as_ptr() as *const Entry) };
 
+                    // Check the filename
                     if self.check_filename(entry, filename) {
                         sector_buf[offset] = 0xE5;
                         self.device.write_sector(root_dir_sector + i as u64, &sector_buf, vga_index);
 
-                        crate::vga::write::string(vga_index, b"File deleted", crate::vga::buffer::Color::Green);
-                        crate::vga::write::newline(vga_index);
+                        string(vga_index, b"File deleted", Color::Green);
+                        newline(vga_index);
                         return;
                     }
                 }
             }
 
-            crate::vga::write::string(vga_index, b"File not found", crate::vga::buffer::Color::Red);
-            crate::vga::write::newline(vga_index);
+            string(vga_index, b"File not found", Color::Red);
+            newline(vga_index);
             return;
         }
 
@@ -667,8 +610,8 @@ impl<'a, D: BlockDevice> Fs<'a, D> {
                         sector_buf[offset] = 0xE5;
                         self.device.write_sector(sector_lba + sector_offset, &sector_buf, vga_index);
 
-                        crate::vga::write::string(vga_index, b"File deleted", crate::vga::buffer::Color::Green);
-                        crate::vga::write::newline(vga_index);
+                        string(vga_index, b"File deleted", Color::Green);
+                        newline(vga_index);
                         return;
                     }
                 }
@@ -683,11 +626,11 @@ impl<'a, D: BlockDevice> Fs<'a, D> {
             current_cluster = next_cluster;
         }
 
-        crate::vga::write::string(vga_index, b"File not found", crate::vga::buffer::Color::Red);
-        crate::vga::write::newline(vga_index);
+        string(vga_index, b"File not found", Color::Red);
+        newline(vga_index);
     }
 
-
+    /// Compares given entry_name with entry name 
     fn check_filename(&self, entry: &Entry, entry_name: &[u8; 11]) -> bool {
         if entry.name.len() != 8 {
             return false;
@@ -701,6 +644,7 @@ impl<'a, D: BlockDevice> Fs<'a, D> {
         true
     }
 
+    /// Iterates over the given directory entries and provides a closure
     pub fn for_each_entry<F: FnMut(&Entry)>(&self, dir_cluster: u16, mut f: F, vga_index: &mut isize) {
         let entry_size = core::mem::size_of::<Entry>();
         let entries_per_sector = 512 / entry_size;
@@ -708,23 +652,30 @@ impl<'a, D: BlockDevice> Fs<'a, D> {
 
         let mut current_cluster = dir_cluster;
 
+        // Root directory
         if dir_cluster == 0 {
             let total_entries = self.boot_sector.root_entry_count as usize;
             let total_sectors = (total_entries * entry_size + 511) / 512;
 
+            // Loop over all sectors of the root directory
             for sector_index in 0..total_sectors {
                 self.device.read_sector(self.root_dir_start_lba + sector_index as u64, &mut buf, vga_index);
 
                 let entries_ptr = buf.as_ptr() as *const Entry;
+
                 for entry_index in 0..entries_per_sector {
                     if sector_index * entries_per_sector + entry_index >= total_entries {
                         return;
                     }
 
+                    // Cast the entry_index as an Entry
                     let entry = unsafe { &*entries_ptr.add(entry_index) };
+
+                    // Propagate the entry into the closure
                     f(entry);
                 }
             }
+            // Generic subdirectory
         } else {
 
             let sector_start = self.cluster_to_lba(current_cluster);
@@ -735,10 +686,14 @@ impl<'a, D: BlockDevice> Fs<'a, D> {
                 let entries_ptr = buf.as_ptr() as *const Entry;
 
                 for entry_index in 0..entries_per_sector {
+                    // Cast the entry_index as an Entry
                     let entry = unsafe { &*entries_ptr.add(entry_index) };
+
+                    // Propagate the entry into the closure
                     f(entry);
                 }
 
+                // Read next cluster number
                 current_cluster = self.read_fat12_entry(current_cluster, vga_index);
                 if current_cluster >= 0xFF8 {
                     break;
@@ -747,14 +702,15 @@ impl<'a, D: BlockDevice> Fs<'a, D> {
         }
     }
 
+    /// Creates a new directory (folder) in the given scope/directory
     pub fn create_subdirectory(&self, name: &[u8; 11], parent_cluster: u16, vga_index: &mut isize) {
         let cluster = self.allocate_cluster(vga_index);
         if cluster == 0 {
-            // handle full FAT
+            // Handle full FAT
             return;
         }
 
-        // 1. Insert entry into current directory (e.g., root)
+        // Prepare the Entry to be inserted into the current directory
         let entry = Entry {
             name: name[..8].try_into().unwrap(),
             ext: name[8..].try_into().unwrap(),
@@ -764,10 +720,9 @@ impl<'a, D: BlockDevice> Fs<'a, D> {
             ..Default::default()
         };
 
-        // Write this entry into root dir (similar to your write_file)
         self.insert_directory_entry(parent_cluster, &entry, vga_index);
 
-        // 2. Initialize cluster with "." and ".."
+        // Initialize cluster with "." and ".." entries
         let mut buf = [0u8; 512];
 
         let dot = Entry {
@@ -786,6 +741,7 @@ impl<'a, D: BlockDevice> Fs<'a, D> {
             ..Default::default()
         };
 
+        // Serialize the entry into the byte slice
         let dot_bytes = unsafe {
             core::slice::from_raw_parts(&dot as *const _ as *const u8, 32)
         };
@@ -796,156 +752,86 @@ impl<'a, D: BlockDevice> Fs<'a, D> {
         };
         buf[32..64].copy_from_slice(dotdot_bytes);
 
+        // Write dot and dotdot entries to a new directory
         self.device.write_sector(self.cluster_to_lba(cluster), &buf, vga_index);
 
-        // 3. Update FAT
+        // Update the FAT table
         self.write_fat12_entry(cluster, 0xFFF, vga_index);
     }
 
+    /// Lists all entries of a given directory
+    pub fn list_dir(&self, start_cluster: u16, entry_name: &[u8; 11], vga_index: &mut isize) -> isize {
+        let mut status: isize = 0;
 
-    pub fn list_dir(&self, start_cluster: u16, entry_name: &[u8], vga_index: &mut isize) -> isize {
-        let entry_size = core::mem::size_of::<Entry>();
-        let entries_per_sector = 512 / entry_size;
-        let mut buf = [0u8; 512];
-
-        let mut current_cluster = start_cluster;
-
-        if start_cluster == 0 {
-            let total_entries = self.boot_sector.root_entry_count as usize;
-            let total_sectors = (total_entries * entry_size + 511) / 512;
-
-            for sector_index in 0..total_sectors {
-                self.device.read_sector(self.root_dir_start_lba + sector_index as u64, &mut buf, vga_index);
-
-                let entries_ptr = buf.as_ptr() as *const Entry;
-                for entry_index in 0..entries_per_sector {
-                    if sector_index * entries_per_sector + entry_index >= total_entries {
-                        return -1;
-                    }
-
-                    let entry = unsafe { &*entries_ptr.add(entry_index) };
-
-                    if entry.name[0] == 0x00 {
-                        return -1;
-                    }
-
-                    if entry.name[0] == 0xE5 || entry.attr & 0x08 != 0 {
-                        continue;
-                    }
-
-                    if entry_name.len() > 11 {
-                        continue;
-                    }
-
-                    let mut name: [u8; 11] = [b' '; 11];
-                    name[..entry_name.len()].copy_from_slice(entry_name);
-                    name[8..11].copy_from_slice(b"TXT");
-
-                    if entry_name.len() > 0 {
-                        // TODO this is not safe as this allows to CD into file sectors!
-                        //if self.check_filename(entry, entry_name) && entry.attr & 0x10 != 0 {
-                        if self.check_filename(entry, &name) {
-                            return entry.start_cluster as isize;
-                        }
-                    } else {
-                        self.print_name(entry, vga_index);
-                    }
-                    }
-                }
-            } else {
-                loop {
-                    let sector_start = self.cluster_to_lba(current_cluster);
-
-                    for i in 0..self.boot_sector.sectors_per_cluster {
-                        self.device.read_sector(sector_start as u64 + i as u64, &mut buf, vga_index);
-
-                        let entries_ptr = buf.as_ptr() as *const Entry;
-                        for entry_index in 0..entries_per_sector {
-                            let entry = unsafe { &*entries_ptr.add(entry_index) };
-
-                            if entry.name[0] == 0x00 {
-                                return -1;
-                            }
-
-                            if entry.name[0] == 0xE5 || entry.attr & 0x08 != 0 {
-                                continue;
-                            }
-
-                            if entry_name.len() > 11 {
-                                continue;
-                            }
-
-                            let mut name: [u8; 11] = [b' '; 11];
-                            name[..entry_name.len()].copy_from_slice(entry_name);
-                            name[8..11].copy_from_slice(b"TXT");
-
-                            if entry_name.len() > 0 {
-                                // TODO this is not safe as this allows to CD into file sectors!
-                                //if self.check_filename(entry, entry_name) && entry.attr & 0x10 != 0 {
-                                if self.check_filename(entry, &name) {
-                                    return entry.start_cluster as isize;
-                                }
-                            } else {
-                                self.print_name(entry, vga_index);
-                            }
-                            }
-                        }
-
-                        current_cluster = self.read_fat12_entry(current_cluster, vga_index);
-                        if current_cluster >= 0xFF8 {
-                            break;
-                        }
-                    }
-                }
-                0
+        self.for_each_entry(start_cluster, | entry | {
+            if entry.name[0] == 0x00 {
+                status = -1;
+                return;
             }
 
-            fn print_name(&self, entry: &Entry, vga_index: &mut isize) {
-                let mut printed_dot = false;
-                let mut file_len: usize = 0;
-
-                crate::vga::write::string(vga_index, b" ", crate::vga::buffer::Color::White);
-
-                for &b in &entry.name {
-                    if b == b' ' {
-                        break;
-                    }
-                    crate::vga::write::byte(vga_index, b, crate::vga::buffer::Color::Yellow);
-                    file_len += 1;
-                }
-
-                for &b in &entry.ext {
-                    if b != b' ' && !printed_dot {
-                        crate::vga::write::byte(vga_index, b'.', crate::vga::buffer::Color::White);
-                        printed_dot = true;
-                        file_len += 1;
-                    }
-                }
-
-                for &b in &entry.ext {
-                    if b == b' ' {
-                        break;
-                    }
-                    crate::vga::write::byte(vga_index, b, crate::vga::buffer::Color::Pink);
-                    file_len += 1;
-                }
-
-                // Fill the space
-                while file_len < 15 {
-                    crate::vga::write::byte(vga_index, b' ', crate::vga::buffer::Color::Black);
-                    file_len += 1;
-                }
-
-                if entry.attr & 0x10 != 0 {
-                    crate::vga::write::string(vga_index, b"[ DIR ] => ", crate::vga::buffer::Color::Cyan);
-                    crate::vga::write::number(vga_index, entry.start_cluster as u64);
-                } else {
-                    crate::vga::write::number(vga_index, entry.file_size as u64);
-                    crate::vga::write::string(vga_index, b" bytes", crate::vga::buffer::Color::White);
-                }
-
-                crate::vga::write::newline(vga_index);
+            if entry.name[0] == 0xE5 || entry.attr & 0x08 != 0 {
+                return;
             }
 
+            if self.check_filename(entry, entry_name) {
+                status = entry.start_cluster as isize;
+                return;
+            }
+
+            if entry_name[0] == b' ' {
+                self.print_name(entry, vga_index);
+            }
+        }, &mut 0);
+
+        status
+    }
+
+    fn print_name(&self, entry: &Entry, vga_index: &mut isize) {
+        let mut printed_dot = false;
+        let mut file_len: usize = 0;
+
+        string(vga_index, b" ", Color::White);
+
+        for &b in &entry.name {
+            if b == b' ' {
+                break;
+            }
+            byte(vga_index, b, Color::Yellow);
+            file_len += 1;
         }
+
+        for &b in &entry.ext {
+            if b != b' ' && !printed_dot {
+                byte(vga_index, b'.', Color::White);
+                printed_dot = true;
+                file_len += 1;
+            }
+        }
+
+        for &b in &entry.ext {
+            if b == b' ' {
+                break;
+            }
+            byte(vga_index, b, Color::Pink);
+            file_len += 1;
+        }
+
+        // Fill the space
+        while file_len < 15 {
+            byte(vga_index, b' ', Color::Black);
+            file_len += 1;
+        }
+
+        if entry.attr & 0x10 != 0 {
+            string(vga_index, b"[ DIR ] => ", Color::Cyan);
+            number(vga_index, entry.start_cluster as u64);
+        } else {
+            number(vga_index, entry.file_size as u64);
+            string(vga_index, b" bytes", Color::White);
+        }
+
+        newline(vga_index);
+    }
+
+}
 

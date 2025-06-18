@@ -1,3 +1,4 @@
+use core::fmt::{self, Write};
 use core::ptr::Unique;
 
 use crate::app::editor::{MAX_LINES, MAX_LINE_LEN};
@@ -44,6 +45,14 @@ pub struct Writer {
     buffer: Unique<Buffer>,
 }
 
+// Implement core::fmt::Write so we can use `write!()`
+impl Write for Writer {
+    fn write_str(&mut self, s: &str) -> fmt::Result {
+        self.write_str(s);
+        Ok(())
+    }
+}
+
 impl Writer {
     pub fn new() -> Self {
         Writer {
@@ -59,37 +68,35 @@ impl Writer {
     }
 
     pub fn write_byte(&mut self, byte: u8) {
-    match byte {
-        b'\n' => self.new_line(),
-        byte => {
-            if self.col_pos >= BUFFER_WIDTH {
-                self.new_line();
-            }
+        match byte {
+            b'\n' => self.new_line(),
+            byte => {
+                if self.col_pos >= BUFFER_WIDTH {
+                    self.new_line();
+                }
 
-            let row = self.row_pos;
-            let col = self.col_pos;
+                let row = self.row_pos;
+                let col = self.col_pos;
 
-            if row >= BUFFER_HEIGHT || col >= BUFFER_WIDTH {
-                return;
-            }
+                if row >= BUFFER_HEIGHT || col >= BUFFER_WIDTH {
+                    return;
+                }
 
-            let color_code = self.color_code;
-            let buf = self.buffer_mut();
+                let color_code = self.color_code;
+                let buf = self.buffer_mut();
 
-            if let Some(row_buf) = buf.chars.get_mut(row) {
-                if let Some(cell) = row_buf.get_mut(col) {
-                    *cell = ScreenChar {
-                        ascii_character: byte,
-                        color_code,
-                    };
-                    self.col_pos += 1;
+                if let Some(row_buf) = buf.chars.get_mut(row) {
+                    if let Some(cell) = row_buf.get_mut(col) {
+                        *cell = ScreenChar {
+                            ascii_character: byte,
+                            color_code,
+                        };
+                        self.col_pos += 1;
+                    }
                 }
             }
         }
     }
-}
-
-
 
     fn new_line(&mut self) {
         if self.row_pos < BUFFER_HEIGHT - 1 {

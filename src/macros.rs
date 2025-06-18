@@ -1,6 +1,6 @@
 use crate::vga::writer::Writer;
 
-static mut WRITER: Option<Writer> = None;
+pub static mut WRITER: Option<Writer> = None;
 
 pub fn init_writer() {
     unsafe {
@@ -13,7 +13,7 @@ macro_rules! print {
     ($($arg:tt)*) => ({
         use core::fmt::Write;
         unsafe {
-            if let Some(writer) = &mut $crate::WRITER {
+            if let Some(writer) = &mut $crate::macros::WRITER {
                 let _ = write!(writer, $($arg)*);
             }
         }
@@ -28,4 +28,12 @@ macro_rules! println {
     });
 }
 
-
+#[macro_export]
+macro_rules! debug {
+    () => {$crate::println!()};
+    ($($arg:tt)*) => ({
+        if debug_enabled() {
+            $crate::print!("{}\n", format_args!($($arg)*));
+        }
+    });
+}

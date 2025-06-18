@@ -360,7 +360,7 @@ long_mode_entry:
 
     ; Clear the stack (assume we got 1MB+ memory)
     mov rsp, 0x80000
-    call rust_main
+    call kernel_main
 
     hlt
     jmp $

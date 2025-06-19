@@ -7,7 +7,7 @@ pub mod fs;
 pub mod result;
 
 pub fn init(vga_index: &mut isize, multiboot_ptr: u64) {
-    debugf!("Kernel init start\n");
+    debugln!("Kernel init start");
 
     result::print_result(
         "Load kernel", 
@@ -21,11 +21,11 @@ pub fn init(vga_index: &mut isize, multiboot_ptr: u64) {
         vga_index
     );
 
-    /*result::print_result(
+    result::print_result(
         "Check multiboot2 tag count", 
         boot::print_info(vga_index, multiboot_ptr),
         vga_index
-    );*/
+    );
 
     result::print_result(
         "Check floppy drive", 

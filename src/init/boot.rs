@@ -1,4 +1,7 @@
-use crate::vga;
+use crate::vga::{
+    write::{string, newline, number},
+    buffer::Color,
+};
 use crate::init::result::InitResult;
 
 pub fn print_info(vga_index: &mut isize, multiboot_ptr: u64) -> InitResult {
@@ -8,16 +11,19 @@ pub fn print_info(vga_index: &mut isize, multiboot_ptr: u64) -> InitResult {
           vga::write::byte(vga_index, *b, vga::buffer::Color::Yellow);
           }
           });*/
+
+        debug!("Multiboot2 pointer: ");
+        debugn!(multiboot_ptr);
+        debugln!("");
+
         if parse_multiboot2_info(vga_index, (multiboot_ptr as u32) as usize) > 0 {
             return InitResult::Passed;
         }
     }
 
-    debugf!("Multiboot2 pointer: {}\n", multiboot_ptr);
-
-    vga::write::string(vga_index, b"Multiboot2 pointer: ", vga::buffer::Color::White);
-    vga::write::number(vga_index, (multiboot_ptr as u32) as u64);
-    vga::write::newline(vga_index);
+    debug!("Multiboot2 pointer: ");
+    debugn!(multiboot_ptr);
+    debugln!("");
 
     InitResult::Failed
 }
@@ -78,26 +84,28 @@ pub unsafe fn parse_multiboot2_info(vga_index: &mut isize, base_addr: usize) -> 
     while ptr < end {
         let tag = &*(ptr as *const TagHeader);
         if tag.size < 8 || tag.size > 4096 {
-            //log_fn("  Invalid tag size, breaking");
+            debugln!("Invalid tag size: abort");
             break;
         }
 
         match tag.typ {
             0 => {
-                //log_fn("  End tag found.");
+                debugln!("End tag found");
                 break;
             }
             1 => {
-                //log_fn("  Boot command line tag");
+                debug!("Boot command line tag: ");
+
                 let str_ptr = ptr + 8;
                 let str_len = tag.size as usize - 8;
                 let raw_bytes = core::slice::from_raw_parts(str_ptr as *const u8, str_len);
 
                 let cmdline = core::str::from_utf8_unchecked(raw_bytes);
-                //log_fn(cmdline);
+                debugln!(cmdline);
             }
             3 => {
-                //log_fn("  Module tag");
+                debug!("Module tag found: ");
+
                 let start = *((ptr + 8) as *const u32);
                 let end = *((ptr + 12) as *const u32);
                 let str_ptr = ptr + 16;
@@ -105,10 +113,11 @@ pub unsafe fn parse_multiboot2_info(vga_index: &mut isize, base_addr: usize) -> 
                 let raw_bytes = core::slice::from_raw_parts(str_ptr as *const u8, str_len);
 
                 let cmdline = core::str::from_utf8_unchecked(raw_bytes);
-                //log_fn(cmdline);
+                debugln!(cmdline);
             }
             6 => {
-                //log_fn("  Memory map");
+                //debug!("Memory map tag");
+
                 let mmap_tag = &*(ptr as *const MemoryMapTag);
                 let entries_start = (addr + core::mem::size_of::<MemoryMapTag>()) as *const u8;
                 let entry_size = mmap_tag.entry_size as usize;
@@ -121,12 +130,13 @@ pub unsafe fn parse_multiboot2_info(vga_index: &mut isize, base_addr: usize) -> 
                         let entry = &*entry_ptr;
 
                         if entry.typ == 1 {
+                            debug!("Usable memory region: ");
+                            debugn!(entry.base_addr as u64);
+                            debug!("-");
+                            debugn!(entry.length as u64);
+                            debugln!("");
+
                             continue;
-                            /*vga::write::string(vga_index, b"Usable mem region: ", vga::buffer::Color::White);
-                            vga::write::number(vga_index, entry.base_addr as u64);
-                            vga::write::string(vga_index, b" - ", vga::buffer::Color::White);
-                            vga::write::number(vga_index, entry.length as u64);
-                            vga::write::newline(vga_index);*/
                         }
                     }
                 }
@@ -135,12 +145,12 @@ pub unsafe fn parse_multiboot2_info(vga_index: &mut isize, base_addr: usize) -> 
                 //let fb_tag = &*(ptr as *const FramebufferTag);
 
                 /*vga::write::string(vga_index, b"Frame buf (bpp + res): ", vga::buffer::Color::White);
-                vga::write::number(vga_index, fb_tag.bpp as u64);
-                vga::write::string(vga_index, b" + ", vga::buffer::Color::White);
-                vga::write::number(vga_index, fb_tag.width as u64);
-                vga::write::string(vga_index, b"x", vga::buffer::Color::White);
-                vga::write::number(vga_index, fb_tag.height as u64);
-                vga::write::newline(vga_index);*/
+                  vga::write::number(vga_index, fb_tag.bpp as u64);
+                  vga::write::string(vga_index, b" + ", vga::buffer::Color::White);
+                  vga::write::number(vga_index, fb_tag.width as u64);
+                  vga::write::string(vga_index, b"x", vga::buffer::Color::White);
+                  vga::write::number(vga_index, fb_tag.height as u64);
+                  vga::write::newline(vga_index);*/
 
             }
             _ => {

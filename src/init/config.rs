@@ -26,7 +26,7 @@ pub fn get_path() -> &'static [u8] {
 //
 
 extern "C" {
-    pub static multiboot_ptr: u64;
+    pub static multiboot_ptr: u32;
 }
 
 extern "C" {

@@ -52,7 +52,7 @@ pub extern "C" fn kernel_main() {
 
     // Run init checks
     unsafe {
-        init::init(vga_index, init::config::multiboot_ptr);
+        init::init(vga_index, init::config::multiboot_ptr as u64);
     }
 
     // Run prompt loop

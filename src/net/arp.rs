@@ -11,8 +11,8 @@ pub enum ArpOp {
 }
 
 pub struct ArpPacket<'a> {
-    pub hw_type: u16,       // usually 1 for Ethernet
-    pub proto_type: u16,    // usually 0x0800 for IPv4
+    pub hw_type: u16,       // Usually 1 for Ethernet
+    pub proto_type: u16,    // Usually 0x0800 for IPv4
     pub hw_len: u8,         // 6
     pub proto_len: u8,      // 4
     pub op: ArpOp,
@@ -20,7 +20,7 @@ pub struct ArpPacket<'a> {
     pub sender_ip: Ipv4Address,
     pub target_mac: MacAddress,
     pub target_ip: Ipv4Address,
-    pub raw: &'a [u8],      // whole packet slice (optional use)
+    pub raw: &'a [u8],      // Whole packet slice
 }
 
 impl<'a> ArpPacket<'a> {
@@ -77,10 +77,10 @@ impl<'a> ArpPacket<'a> {
             return None;
         }
 
-        buf[0..2].copy_from_slice(&1u16.to_be_bytes());       // hw type: Ethernet
-        buf[2..4].copy_from_slice(&0x0800u16.to_be_bytes());  // proto type: IPv4
-        buf[4] = 6;                                            // MAC length
-        buf[5] = 4;                                            // IP length
+        buf[0..2].copy_from_slice(&1u16.to_be_bytes());        // Hw type: Ethernet
+        buf[2..4].copy_from_slice(&0x0800u16.to_be_bytes());   // Proto type: IPv4
+        buf[4] = 6;                                                 // MAC length
+        buf[5] = 4;                                                 // IP length
         buf[6..8].copy_from_slice(&(op as u16).to_be_bytes());
 
         buf[8..14].copy_from_slice(&sender_mac.0);

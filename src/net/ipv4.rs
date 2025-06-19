@@ -34,14 +34,14 @@ pub fn create_packet(
     let total_len = (header_len + payload.len()) as u16;
 
     let header = Ipv4Header {
-        version_ihl: (4 << 4) | 5, // Version 4, IHL=5 (20 bytes)
+        version_ihl: (4 << 4) | 5,                  // Version 4, IHL=5 (20 bytes)
         dscp_ecn: 0,
         total_length: total_len.to_be(),
         identification: 0x1337u16.to_be(),
         flags_fragment_offset: (0x4000u16).to_be(), // Don't Fragment flag
         ttl: 64,
         protocol,
-        header_checksum: 0, // will fix later
+        header_checksum: 0,                         // To be calculated
         source_ip: source,
         dest_ip: dest,
     };
@@ -167,7 +167,7 @@ pub fn receive_loop(callback: fn(packet: &[u8]) -> u8) -> u8 {
             }
         }
 
-        // If any key is pressed, break the loop and return.
+        // If any key is pressed, break the loop and return
         if port::read(0x60) & 0x80 == 0 {
             break;
         }
@@ -202,7 +202,7 @@ pub fn receive_loop_tcp(conns: &mut [Option<tcp::TcpConnection>; MAX_CONNS], cal
             }
         }
 
-        // If any key is pressed, break the loop and return.
+        // If any key is pressed, break the loop and return
         if port::read(0x60) & 0x80 == 0 {
             break;
         }

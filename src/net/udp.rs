@@ -20,7 +20,7 @@ pub fn create_packet(
         source_port: source_port.to_be(),
         dest_port: dest_port.to_be(),
         length: (udp_len as u16).to_be(),
-        checksum: 0, // temporary 0, we'll compute later
+        checksum: 0, // Temporary 0, we'll compute later
     };
 
     // Copy header
@@ -39,8 +39,8 @@ pub fn create_packet(
         slice.copy_from_slice(payload);
     }
 
-    // Calculate checksum (optional in UDP, but some OSes expect it!)
-    // For now: leave checksum 0.
+    // Calculate checksum
+    // TODO
 
     udp_len
 }
@@ -91,11 +91,11 @@ pub fn parse_packet(packet: &[u8]) -> Option<(u16, u16, &[u8])> {
 pub fn get_checksum(
     src_ip: [u8; 4],
     dst_ip: [u8; 4],
-    udp_packet: &[u8], // whole UDP header + data
+    udp_packet: &[u8], // Whole UDP header + data
 ) -> u16 {
     let mut sum = 0u32;
 
-    // --- Pseudo-header ---
+    // Pseudo-header
     
     if let Some(w1) = src_ip.first() {
         if let Some(w2) = src_ip.get(1) {
@@ -119,10 +119,10 @@ pub fn get_checksum(
         }
     }
 
-    sum += 0x11u8 as u32; // Protocol (UDP = 17 decimal)
+    sum += 0x11u8 as u32;           // Protocol (UDP = 17 decimal)
     sum += udp_packet.len() as u32; // UDP length
 
-    // --- UDP header + payload ---
+    // UDP header + payload
     let mut i = 0;
     while i + 1 < udp_packet.len() {
         if let Some(w1) = udp_packet.get(i) {

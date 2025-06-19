@@ -3,8 +3,8 @@ const SLIP_ESC: u8 = 0xDB;
 const SLIP_ESC_END: u8 = 0xDC;
 const SLIP_ESC_ESC: u8 = 0xDD;
 
-/// Encodes a raw packet into a SLIP frame.
-/// Returns how many bytes were written to `output`.
+/// Encodes a raw packet into a SLIP frame
+/// Returns how many bytes were written to `output`
 pub fn encode(input: &[u8], output: &mut [u8]) -> Option<usize> {
     let mut out_pos = 0;
 
@@ -77,8 +77,8 @@ pub fn encode(input: &[u8], output: &mut [u8]) -> Option<usize> {
     Some(out_pos)
 }
 
-/// Decodes a SLIP frame into a raw packet.
-/// Returns how many bytes were written to `output`.
+/// Decodes a SLIP frame into a raw packet
+/// Returns how many bytes were written to `output`
 pub fn decode(input: &[u8], output: &mut [u8]) -> Option<usize> {
     let mut out_pos = 0;
     let mut escape = false;
@@ -110,6 +110,6 @@ pub fn decode(input: &[u8], output: &mut [u8]) -> Option<usize> {
         }
     }
 
-    None // Not finished
+    None // Not finished yet
 }
 

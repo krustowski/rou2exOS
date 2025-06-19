@@ -4,7 +4,7 @@ use crate::net::pci;
 pub const PCI_VENDOR_ID_REALTEK: u16 = 0x10EC;
 pub const PCI_DEVICE_ID_RTL8139: u16 = 0x8139;
 
-const RTL8139_IO_BASE: u16 = 0xC000; // Set to your real I/O base
+const RTL8139_IO_BASE: u16 = 0xC000;
 const NUM_TX_BUFFERS: usize = 4;
 
 static mut RX_BUFFER: [u8; 8192 + 16 + 1500] = [0; 8192 + 16 + 1500];
@@ -18,7 +18,7 @@ pub fn receive_frame(buf: &mut [u8]) -> Option<usize> {
     unsafe {
         let isr = port::read(RTL8139_IO_BASE + 0x3E); // ISR (Interrupt Status Register)
         if isr & 0x01 == 0 {
-            return None; // no packet received
+            return None; // No packet received
         }
 
         port::write_u8(RTL8139_IO_BASE + 0x3E, 0x01); // Acknowledge RX interrupt
@@ -47,7 +47,7 @@ pub fn receive_frame(buf: &mut [u8]) -> Option<usize> {
 
             RX_OFFSET = (RX_OFFSET + len + 4 + 3) & !3; // Align to 4 bytes
 
-            // Tell the card we've read this packet
+            // Tell the card the packet has been read
             port::write_u16(RTL8139_IO_BASE + 0x38, RX_OFFSET as u16);
 
             Some(len)

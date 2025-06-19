@@ -83,7 +83,7 @@ pub fn receive_frame(buf: &mut [u8]) -> Option<usize> {
     // Fill `buf[..len]` with received frame
     // Return Some(len) if a frame is received
 
-    None // placeholder
+    None
 }
 
 pub fn build_ethernet_frame(

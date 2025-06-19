@@ -8,18 +8,18 @@ pub struct IcmpHeader {
 }
 
 pub fn create_packet(
-    packet_type: u8,           // 8 for Echo Request, 0 for Echo Reply
+    packet_type: u8,            // 8 for Echo Request, 0 for Echo Reply
     identifier: u16,
     sequence_number: u16,
     payload: &[u8],
     out_buffer: &mut [u8],
 ) -> usize {
-    let header_len = 8; // ICMP header is 8 bytes
+    let header_len = 8;         // ICMP header is 8 bytes
 
     let header = IcmpHeader {
         icmp_type: packet_type,
-        icmp_code: 0, // Usually 0
-        checksum: 0,  // Fill later
+        icmp_code: 0,           // Usually 0
+        checksum: 0,            // To be filled later
         identifier,
         sequence_number,
     };

@@ -14,7 +14,7 @@ pub struct TcpHeader {
     pub window_size: u16,
     pub checksum: u16,
     pub urgent_pointer: u16,
-    // Options would follow here if data_offset > 5
+    // Options skipped
 }
 
 #[derive(PartialEq, Eq)]
@@ -39,7 +39,6 @@ pub struct TcpConnection {
     pub dst_port: u16,
     pub seq_num: u32,
     pub ack_num: u32,
-    //pub peer_seq_num: u32,
 }
 
 #[allow(clippy::too_many_arguments)]

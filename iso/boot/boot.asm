@@ -63,7 +63,6 @@ multiboot_ptr:
 ;align 16
 ;tss:
     ; IST pointers (7 entries), each 8 bytes
-    ; We'll only use IST1 for example
 ;    resq 1                  ; RSP0 (not used but must exist)
 ;    resq 1                  ; RSP1
 ;    resq 1                  ; RSP2
@@ -74,6 +73,9 @@ multiboot_ptr:
 ;    resw 0
 ;tss_end:
 
+;
+;
+;
 
 section .text
 align 4
@@ -136,57 +138,61 @@ load_idt:
     lidt [idt_ptr]
     ret
 
-; === Set up page tables ===
+; Set up page tables
 setup_paging:
-    ; Clear tables (optional but recommended)
-    ; This can be done in Rust too later
+    ; Clear tables
 
-    ; --- PML4[511] → PDP @ 0x2000 ---
+    ; PML4[511] → PDP @ 0x2000
     mov eax, pdpt_table
-    or eax, 0x03        ; Present + Writable
-    mov [0x1000 + 8 * 511], eax  ; PML4 entry pointing to PDPT
+    or eax, 0x03        		; Present + Writable
+    mov [0x1000 + 8 * 511], eax  	; PML4 entry pointing to PDPT
 
-    ; --- PDP[0] → PD @ 0x3000 ---
+    ; PDP[0] → PD @ 0x3000
     mov eax, pd_table
     or eax, 0x03
     mov [0x2000 + 8 * 0], eax
 
-    ; --- PD[0] → 2 MiB large page at 0x00100000 (kernel) ---
-    mov eax, 0x00100000        ; Kernel page starting at 0x00100000
-    or eax, 0x83               ; Present + Writable + LargePage
-    mov [0x3000 + 8 * 0], eax    ; PD entry pointing to 2MB page
+    ; PD[0] → 2 MiB large page at 0x00100000 (kernel)
+    mov eax, 0x00100000        		; Kernel page starting at 0x00100000
+    or eax, 0x83               		; Present + Writable + LargePage
+    mov [0x3000 + 8 * 0], eax    	; PD entry pointing to 2MB page
 
-    ; --- (Optional) Identity map 0x00000000 for safe booting ---
-    mov eax, 0x00000000        ; Map the first 4KiB
-    or eax, 0x03               ; Present + Writable
-    mov [0x4000 + 8*0], eax    ; PT entry
+    ; Identity map 0x00000000 for safe booting
+    mov eax, 0x00000000        		; Map the first 4KiB
+    or eax, 0x03               		; Present + Writable
+    mov [0x4000 + 8*0], eax    		; PT entry
 
     ret
 
-    ; === Enable Long Mode Paging ===
+; Enable Long Mode Paging
 enable_long_mode:
     ; Load PML4 into CR3
-    mov eax, pml4_table        ; Make sure this address is correct for your PML4 table
-    ;mov eax, 0x1000        ; Make sure this address is correct for your PML4 table
+    mov eax, pml4_table        	; Must correspond to the PML4 table
+
+    ;mov eax, 0x1000        	; Must correspond to the PML4 table
     mov cr3, eax
 
     ; Enable PAE (Physical Address Extension, necessary for 64-bit)
     mov eax, cr4
-    or eax, 1 << 5         ; Set the PAE bit in CR4
+    or eax, 1 << 5         	; Set the PAE bit in CR4
     mov cr4, eax
 
     ; Enable Long Mode (EFER.LME = 1)
-    mov ecx, 0xC0000080    ; EFER MSR
-    rdmsr                   ; Read MSR
-    or eax, 1 << 8          ; Set LME bit to enable long mode
-    wrmsr                   ; Write back to EFER MSR
+    mov ecx, 0xC0000080    	; EFER MSR
+    rdmsr                   	; Read MSR
+    or eax, 1 << 8          	; Set LME bit to enable long mode
+    wrmsr                   	; Write back to EFER MSR
 
     ; Enable Paging (CR0.PG = 1)
     mov eax, cr0
-    or eax, 1 << 31        ; Set paging bit in CR0
+    or eax, 1 << 31        	; Set paging bit in CR0
     mov cr0, eax
 
     ret
+
+;
+;
+;
 
 section .rodata
 align 8
@@ -208,13 +214,13 @@ gdt_start:
 
     ; TSS descriptor (offset 0x28, needs two entries: 16 bytes total)
     ;dw tss_end - tss - 1               ; [0:15]  Limit 0:15
-    ;dw tss               ; [16:31] Base 0:15
-    ;db tss >> 16              ; [32:39] Base 16:23
-    ;db 0x89                        ; [40:47] Type=0x9 (TSS), Present=1
-    ;db 0x00              ; [48:51] Limit 16:19
-    ;db tss >> 24              ; [52:59] Base 24:31
-    ;dd tss >> 32              ; [64:95] Base 32:63
-    ;dd 0x00                         ; [96:127] Reserved
+    ;dw tss               		; [16:31] Base 0:15
+    ;db tss >> 16              		; [32:39] Base 16:23
+    ;db 0x89                        	; [40:47] Type=0x9 (TSS), Present=1
+    ;db 0x00              		; [48:51] Limit 16:19
+    ;db tss >> 24              		; [52:59] Base 24:31
+    ;dd tss >> 32              		; [64:95] Base 32:63
+    ;dd 0x00                         	; [96:127] Reserved
 gdt_tss_low: 
     dq 0
 gdt__tss_high:
@@ -266,7 +272,7 @@ idt_start:
     dd 0
     dq 0                      ; Reserved (Upper part of handler address)
 
-    times 256 dq 0               ; 256 null descriptors (each 16 bytes in 64-bit)
+    times 256 dq 0            ; 256 null descriptors (each 16 bytes in 64-bit)
 idt_end:
 
 ; Page Fault Handler (INT 0x0E)
@@ -282,10 +288,10 @@ page_fault_handler:
     ; More logic to handle fault types goes here
 
     ; For example, if the page was not present:
-    ; - You might want to load the page from swap or handle the fault
+    ; - One might want to load the page from swap or handle the fault
 
-    ; In this example, we'll just print a message (you can print via serial port or VGA)
-    ; Here you can put your error handling code or panic, depending on your requirements.
+    ; In this example, we'll just print a message (we can print via serial port or VGA)
+    ; Here goes the error handling code or panic, depending on set requirements
 
     hlt                        ; Halt the system (in case of an unhandled fault)
 
@@ -297,54 +303,58 @@ page_fault_handler:
 ;
 
 set_up_page_tables:
-    ; map first P4 entry to P3 table
+    ; Map first P4 entry to P3 table
     mov eax, p3_table
-    or eax, 0b11 ; present + writable
+    or eax, 0b11 		; Present + writable
     mov [p4_table], eax
 
-    ; map first P3 entry to P2 table
+    ; Map first P3 entry to P2 table
     mov eax, p2_table
-    or eax, 0b11 ; present + writable
+    or eax, 0b11 		; Present + writable
     mov [p3_table], eax
 
-    ; map each P2 entry to a huge 2MiB page
-    mov ecx, 0         ; counter variable
+    ; Map each P2 entry to a huge 2MiB page
+    mov ecx, 0         		; counter variable
 
 .map_p2_table:
-    ; map ecx-th P2 entry to a huge page that starts at address 2MiB*ecx
-    mov eax, 0x200000  ; 2MiB
-    mul ecx            ; start address of ecx-th page
-    or eax, 0b10000011 ; present + writable + huge
-    mov [p2_table + ecx * 8], eax ; map ecx-th entry
+    ; Map ecx-th P2 entry to a huge page that starts at address 2MiB*ecx
+    mov eax, 0x200000  			; 2MiB
+    mul ecx            			; Start address of ecx-th page
+    or eax, 0b10000011 			; Present + writable + huge
+    mov [p2_table + ecx * 8], eax 	; Map ecx-th entry
 
-    inc ecx            ; increase counter
-    cmp ecx, 512       ; if counter == 512, the whole P2 table is mapped
-    jne .map_p2_table  ; else map the next entry
+    inc ecx            ; Increase counter
+    cmp ecx, 512       ; If counter == 512, the whole P2 table is mapped
+    jne .map_p2_table  ; Else map the next entry
 
     ret
 
 enable_paging:
-    ; load P4 to cr3 register (cpu uses this to access the P4 table)
+    ; Load P4 to cr3 register (cpu uses this to access the P4 table)
     mov eax, p4_table
     mov cr3, eax
 
-    ; enable PAE-flag in cr4 (Physical Address Extension)
+    ; Enable PAE-flag in cr4 (Physical Address Extension)
     mov eax, cr4
     or eax, 1 << 5
     mov cr4, eax
 
-    ; set the long mode bit in the EFER MSR (model specific register)
+    ; Set the long mode bit in the EFER MSR (model specific register)
     mov ecx, 0xC0000080
     rdmsr
     or eax, 1 << 8
     wrmsr
 
-    ; enable paging in the cr0 register
+    ; Enable paging in the cr0 register
     mov eax, cr0
     or eax, 1 << 31
     mov cr0, eax
 
     ret
+
+;
+;
+;
 
 BITS 64
 

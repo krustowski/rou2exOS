@@ -22,10 +22,9 @@ checksum = "5c8214115b7bf84099f1309324e63141d4c5d7cc26862f97a0a857dbefe165bd"
 
 [[package]]
 name = "kernel"
-version = "0.7.5"
+version = "0.7.6"
 dependencies = [
  "lazy_static",
- "nasm",
  "spin",
  "x86_64",
 ]
@@ -48,12 +47,6 @@ dependencies = [
  "autocfg",
  "scopeguard",
 ]
-
-[[package]]
-name = "nasm"
-version = "0.0.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e94c0a4df47a3bb6ed27c447abdeadb2c72e179a727bbf3be9d692a235788536"
 
 [[package]]
 name = "rustversion"

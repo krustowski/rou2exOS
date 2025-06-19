@@ -1,12 +1,9 @@
 [package]
 name = "kernel"
 description = ""
-version = "0.7.5"
+version = "0.7.6"
 edition = "2021"
 authors = ["krusty <krusty@vxn.dev>"]
-
-[build-dependencies]
-nasm = "0.0.1"
 
 [dependencies]
 #compiler_builtins = { version = "0.1", features = ["mem"] }

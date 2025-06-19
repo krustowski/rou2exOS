@@ -5,6 +5,8 @@ A second iteration of the RoureXOS operating system, rewritten in Rust.
 + [Original RoureXOS (a blog post)](https://krusty.space/projects/rourexos/)
 + [rou2exOS Rusted Edition (a blog post)](https://blog.vxn.dev/rou2exos-rusted-edition)
 
+![rou2exOS startup](https://blog.vxn.dev/images/posts/rou2exos/cover.webp)
+
 To run the OS, you can use the attached ISO image from any Release, and run it in QEMU emulator. The system was also tested on x86_64 baremetal (booted from the USB flash disk).
 
 ## How to build and run
@@ -13,10 +15,11 @@ To run the OS, you can use the attached ISO image from any Release, and run it i
 # install Rust and its dependencies
 make init
 
-# make sure you have `xorriso`, `net-tools` and `grub2-tools` installed (Linux)
+# make sure you have `xorriso`, `net-tools` and `grub2-tools` (or just grub-tools) installed (Linux)
 dnf install xorriso net-tools grub2-tools qemu qemu-common qemu-system-x86
 
-# compile the kernel and stage2 bootloader, link it into an ELF binary and bake into an ISO image with GRUB stage1 bootloader
+# compile the kernel and stage2 bootloader, link it into an ELF binary and bake into an ISO
+# image with GRUB stage1 bootloader
 make build
 
 # run the QEMU emulation with ISO image (respectively with additional floppy image attached as well)

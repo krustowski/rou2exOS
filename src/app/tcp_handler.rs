@@ -61,7 +61,7 @@ pub fn handle(vga_index: &mut isize) {
 
                             match empty_slot.as_mut() {
                                 Some(c) => c,
-                                None => return 252, // This shouldn't happen, just inserted Some
+                                None => return 252, // This shouldn't happen???
                             }
                         }
                         None => return 255, // No free slot — drop the packet
@@ -246,31 +246,6 @@ fn u32_to_ascii(mut num: u32, buf: &mut [u8]) -> usize {
     }
     i
 }
-
-/*fn write_u32(buf: &mut [u8], mut idx: usize, mut num: u32) -> usize {
-//let start = idx;
-let mut rev = [0u8; 10]; // max digits in u32
-let mut i = 0;
-
-if num == 0 {
-buf[idx] = b'0';
-return idx + 1;
-}
-
-while num > 0 {
-rev[i] = b'0' + (num % 10) as u8;
-num /= 10;
-i += 1;
-}
-
-while i > 0 {
-i -= 1;
-buf[idx] = rev[i];
-idx += 1;
-}
-
-idx
-}*/
 
 fn match_path(payload: &[u8], path: &[u8]) -> bool {
     if payload.starts_with(b"GET ") {

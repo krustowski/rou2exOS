@@ -58,7 +58,7 @@ impl Editor {
 
         for y in 0..self.line_count {
             if let Some(row) = self.buffer.get(y) {
-            let mut last_non_space = row.iter().rposition(|&c| c != b' ');
+            let last_non_space = row.iter().rposition(|&c| c != b' ');
 
             if let Some(last) = last_non_space {
                 for &c in &row[..=last] {
@@ -98,7 +98,7 @@ impl Editor {
             writer.write_byte(b'\n');
         }
 
-        // --- Status bar ---
+        // Status bar
         writer.write_byte(b'\n');
 
         writer.write_str_raw("MODE: ");
@@ -238,7 +238,7 @@ pub fn edit_file(file_name: &[u8; 12], vga_index: &mut isize) {
                 let mut wr = Writer::new(); // RECREATE each frame
                 editor.render(&mut wr, file_name);
 
-                // Optional: set cursor position on screen
+                // Set cursor position on screen
                 keyboard::move_cursor(editor.cursor_y as u16, editor.cursor_x as u16);
 
                 let key = keyboard_read_scancode();

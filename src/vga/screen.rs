@@ -38,13 +38,12 @@ pub fn scroll_at(vga_index: &mut isize, height: &mut isize) {
             row_size * (buffer::HEIGHT - 1),  // total bytes of 24 rows
         );
 
-        // Corrected: Clear the last line (row 24)
         let last_line_offset = row_size * (buffer::HEIGHT - 1);
         let last_line_ptr = buffer::VGA_BUFFER.add(last_line_offset);
 
         for i in 0..buffer::WIDTH {
             *last_line_ptr.add(i * 2) = b' ';
-            *last_line_ptr.add(i * 2 + 1) = 0x07; // Light gray on black
+            *last_line_ptr.add(i * 2 + 1) = 0x07; 
         }
     }
 
@@ -67,7 +66,6 @@ pub fn scroll(vga_index: &mut isize) {
             row_size * (buffer::HEIGHT - 1),  // total bytes of 24 rows
         );
 
-        // Corrected: Clear the last line (row 24)
         let last_line_offset = row_size * (buffer::HEIGHT - 1);
         let last_line_ptr = buffer::VGA_BUFFER.add(last_line_offset);
 

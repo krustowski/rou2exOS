@@ -133,4 +133,14 @@ pub fn dump_debug_log_to_file(vga_index: &mut isize) {
     }
 }
 
+fn print_stack_info() {
+    let sp: usize;
+    unsafe {
+        core::arch::asm!("mov {}, rsp", out(reg) sp);
+
+        debug!("Stack pointer: ");
+        debugn!(sp as u64);
+        debugln!("");
+    }
+}
 

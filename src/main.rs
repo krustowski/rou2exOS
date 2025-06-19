@@ -33,7 +33,6 @@ mod vga;
 //mod video;
 
 use core::panic::PanicInfo;
-use core::ptr;
 
 /// Kernel entrypoint
 #[unsafe(no_mangle)]
@@ -63,18 +62,21 @@ pub extern "C" fn kernel_main() {
 /// Panic handler for panic fucntion invocations
 #[panic_handler]
 fn panic(info: &PanicInfo) -> ! {
+    use vga::write::{string, number, newline};
+    use vga::buffer::Color;
+
     let vga_index: &mut isize = &mut 0;
 
     vga::screen::clear(vga_index);
 
     if let Some(location) = info.location() {
-        print_string(vga_index, location.file());
-        print_string(vga_index, ":");
-        print_num(vga_index, location.line());
-        vga::write::newline(vga_index);
+        string(vga_index, location.file().as_bytes(), Color::Red);
+        string(vga_index, b":", Color::Red);
+        number(vga_index, location.line() as u64);
+        newline(vga_index);
     } else {
-        vga::write::string(vga_index, b"No location", vga::buffer::Color::Red);
-        vga::write::newline(vga_index);
+        string(vga_index, b"No location", Color::Red);
+        newline(vga_index);
     }
 
     loop {}
@@ -98,51 +100,6 @@ pub extern "C" fn slice_end_index_len_fail() -> ! {
 
 #[no_mangle]
 pub extern "C" fn core_fmt_write() {
-    // Implement or stub if needed, but usually core should provide this.
-}
-
-
-/*#![alloc_error_handler]
-  fn alloc_error_handler(_layout: Layout) {
-  loop {}
-  }*/
-
-fn print_string(vga_index: &mut isize, s: &str) {
-    for byte in s.bytes() {
-        vga::write::string(vga_index, &[byte], vga::buffer::Color::Red);
-    }
-}
-
-fn print_num(vga_index: &mut isize, mut num: u32) {
-    let mut buf = [0u8; 10]; // Max u32 = 10 digits
-    let mut i = buf.len();
-
-    if num == 0 {
-        vga::write::string(vga_index, b"0", vga::buffer::Color::Red);
-        return;
-    }
-
-    while num > 0 {
-        i -= 1;
-        if let Some(b) = buf.get_mut(i) {
-            *b = b'0' + (num % 10) as u8;
-        }
-        num /= 10;
-    }
-
-    for b in buf.get(i..).unwrap_or(&[]) {
-        vga::write::string(vga_index, &[*b], vga::buffer::Color::Red);
-    }
-}
-
-fn print_stack_info() {
-    let sp: usize;
-    unsafe {
-        core::arch::asm!("mov {}, rsp", out(reg) sp);
-
-        debug!("Stack pointer: ");
-        debugn!(sp as u64);
-        debugln!("");
-    }
+    loop {}
 }
 

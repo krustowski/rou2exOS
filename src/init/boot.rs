@@ -2,7 +2,7 @@ use crate::vga::{
     write::{string, newline, number},
     buffer::Color,
 };
-use crate::init::result::InitResult;
+use super::result::InitResult;
 
 pub fn print_info(vga_index: &mut isize, multiboot_ptr: u64) -> InitResult {
     unsafe {
@@ -142,19 +142,20 @@ pub unsafe fn parse_multiboot2_info(vga_index: &mut isize, base_addr: usize) -> 
                 }
             }
             8 => {
-                //let fb_tag = &*(ptr as *const FramebufferTag);
+                debug!("Framebuffer tag: ");
 
-                /*vga::write::string(vga_index, b"Frame buf (bpp + res): ", vga::buffer::Color::White);
-                  vga::write::number(vga_index, fb_tag.bpp as u64);
-                  vga::write::string(vga_index, b" + ", vga::buffer::Color::White);
-                  vga::write::number(vga_index, fb_tag.width as u64);
-                  vga::write::string(vga_index, b"x", vga::buffer::Color::White);
-                  vga::write::number(vga_index, fb_tag.height as u64);
-                  vga::write::newline(vga_index);*/
+                let fb_tag = &*(ptr as *const FramebufferTag);
 
+                debug!("(bpp + res): ");
+                debugn!(fb_tag.bpp as u64);
+                debug!(" + ");
+                debugn!(fb_tag.width as u64);
+                debug!("x");
+                debugn!(fb_tag.height as u64);
+                debugln!("");
             }
             _ => {
-                //log_fn("  Unknown tag")
+                debugln!("Unknown tag");
                 //log_fn(&format!("  Unknown tag: type={}, size={}", tag.typ, tag.size));
             }
         }
@@ -162,7 +163,7 @@ pub unsafe fn parse_multiboot2_info(vga_index: &mut isize, base_addr: usize) -> 
         ptr += align_up(tag.size as usize, 8);
         tag_count += 1;
         if tag_count > 64 {
-            //log_fn("  Too many tags, stopping");
+            debugln!("Too many tags, aborting");
             break;
         }
     }

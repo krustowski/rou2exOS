@@ -2,6 +2,7 @@ use crate::acpi;
 use crate::app;
 use crate::audio;
 use crate::init::config;
+use crate::debug;
 use crate::fs::fat12::{block::Floppy, fs::Fs, check::run_check};
 use crate::init::config::PATH_CLUSTER;
 use crate::net;
@@ -39,6 +40,11 @@ static COMMANDS: &[Command] = &[
         name: b"cls",
         description: b"clears the screen",
         function: cmd_clear,
+    },
+    Command {
+        name: b"debug",
+        description: b"dumps the debug log into a file",
+        function: cmd_debug,
     },
     Command {
         name: b"dir",
@@ -344,6 +350,10 @@ fn cmd_chat(args: &[u8], vga_index: &mut isize) {
 
 fn cmd_clear(_args: &[u8], vga_index: &mut isize) {
     vga::screen::clear(vga_index);
+}
+
+fn cmd_debug(_args: &[u8], _vga_index: &mut isize) {
+    debug::dump_debug_log_to_file();
 }
 
 fn cmd_dir(_args: &[u8], vga_index: &mut isize) {

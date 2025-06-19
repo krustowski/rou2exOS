@@ -13,6 +13,8 @@ pub fn print_info(vga_index: &mut isize, multiboot_ptr: u64) -> InitResult {
         }
     }
 
+    debugf!("Multiboot2 pointer: {}\n", multiboot_ptr);
+
     vga::write::string(vga_index, b"Multiboot2 pointer: ", vga::buffer::Color::White);
     vga::write::number(vga_index, (multiboot_ptr as u32) as u64);
     vga::write::newline(vga_index);

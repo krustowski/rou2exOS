@@ -21,13 +21,27 @@ impl DebugLog {
     }
 
     pub fn data(&self) -> &[u8] {
-        &self.buffer[..self.len]
+        //&self.buffer[..self.len];
+        if let Some(d) = self.buffer.get(..self.len) {
+            return d;
+        }
+
+        &[]
     }
 
     pub fn append(&mut self, data: &[u8]) {
         let remaining = DEBUG_LOG_SIZE - self.len;
         let to_copy = core::cmp::min(data.len(), remaining);
-        self.buffer[self.len..self.len + to_copy].copy_from_slice(&data[..to_copy]);
+
+
+        if let Some(slice) = self.buffer.get_mut(self.len..self.len + to_copy) {
+            if let Some(data) = data.get(..to_copy) {
+                slice.copy_from_slice(data);
+            }
+        }
+
+        //self.buffer[self.len..self.len + to_copy].copy_from_slice(&data[..to_copy]);
+
         self.len += to_copy;
     }
 }
@@ -39,17 +53,13 @@ impl Write for DebugLog {
     }
 }
 
-use lazy_static::lazy_static;
-
-lazy_static! {
-    pub static ref DEBUG_LOG: Mutex<DebugLog> = Mutex::new(DebugLog::new());
-}
+pub static DEBUG_LOG: Mutex<DebugLog> = Mutex::new(DebugLog::new());
 
 #[macro_export]
 macro_rules! debugf {
     ($($arg:tt)*) => ({
         use core::fmt::Write;
-        let mut dbg = $crate::debug_log::DEBUG_LOG.lock();
+        let mut dbg = $crate::debug::DEBUG_LOG.lock();
         let _ = writeln!(dbg, $($arg)*);
     });
 }

@@ -7,6 +7,8 @@ pub mod fs;
 pub mod result;
 
 pub fn init(vga_index: &mut isize, multiboot_ptr: u64) {
+    debugf!("Kernel init start\n");
+
     result::print_result(
         "Load kernel", 
         result::InitResult::Passed,

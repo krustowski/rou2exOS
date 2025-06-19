@@ -12,7 +12,7 @@ use crate::vga::write::newline;
 use crate::input::keyboard;
 use crate::tui::{widget::{Container, Window, Label}, app::TuiApp};
 
-const KERNEL_VERSION: &[u8] = b"0.7.4";
+const KERNEL_VERSION: &[u8] = b"0.7.5";
 
 struct Command {
     name: &'static [u8],

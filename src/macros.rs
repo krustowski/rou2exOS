@@ -28,7 +28,7 @@ macro_rules! println {
     });
 }
 
-#[macro_export]
+/*#[macro_export]
 macro_rules! debug {
     () => {$crate::println!()};
     ($($arg:tt)*) => ({
@@ -36,4 +36,4 @@ macro_rules! debug {
             $crate::print!("{}\n", format_args!($($arg)*));
         }
     });
-}
+}*/

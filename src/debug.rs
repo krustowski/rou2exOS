@@ -1,5 +1,6 @@
 use core::fmt::{self, Write};
 use spin::Mutex;
+use crate::vga::{write::string, buffer::Color, screen};
 
 const DEBUG_LOG_SIZE: usize = 8192;
 
@@ -64,6 +65,25 @@ macro_rules! debugf {
     });
 }
 
+#[macro_export]
+macro_rules! debug {
+        ($s:expr) => {{
+        use $crate::debug::DEBUG_LOG;
+
+        // Only &[u8], *str and b"literal" 
+        let bytes = ($s).as_ref();
+        DEBUG_LOG.lock().append(bytes);
+    }};
+}
+
+#[macro_export]
+macro_rules! debugln {
+    ($s:expr) => {{
+        $crate::debug!($s);
+        $crate::debug!("\n");
+    }};
+}
+
 use crate::fs::fat12::{block::Floppy, fs::Fs};
 
 pub fn dump_debug_log_to_file() {
@@ -76,7 +96,11 @@ pub fn dump_debug_log_to_file() {
             // Dump debug data into the DEBUG.TXT file in root directory
             fs.write_file(0, b"DEBUG   TXT", dbg.data(), &mut 0);
         }
-        Err(e) => {}
+        Err(e) => {
+            // Dump logs right into the display
+            screen::clear(&mut 0);
+            string(&mut 0, dbg.data(), Color::Yellow);
+        }
     }
 }
 

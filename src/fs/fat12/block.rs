@@ -1,4 +1,4 @@
-use crate::vga::{self, buffer};
+use crate::vga::{write::{byte, string, newline, number}};
 
 pub trait BlockDevice {
     /// Reads 1 sector (usually 512 bytes) at the given LBA into `buffer`
@@ -14,6 +14,10 @@ const CMD_WRITE_SECTOR: u8 = 0x45; // 0x40 | 0x05 = write with MFM, multi-track
 pub struct MemDisk {
     pub data: &'static mut [u8], // must be sector-aligned
 }
+
+//
+//  MEMDISK
+//
 
 impl MemDisk {
     pub fn new(data: &'static mut [u8]) -> Self {
@@ -43,6 +47,24 @@ impl BlockDevice for MemDisk {
 //  FLOPPY
 //
 
+pub struct Floppy;
+
+impl BlockDevice for Floppy {
+    fn read_sector(&self, lba: u64, buffer: &mut [u8; 512], vga_index: &mut isize) {
+        Self::read_sector_dma(lba, buffer, vga_index);
+    }
+
+    fn write_sector(&self, lba: u64, buffer: &[u8; 512], vga_index: &mut isize) {
+        let (cylinder, head, sector) = lba_to_chs(lba);
+
+        self.fdc_write_sector(cylinder, head, sector, buffer, vga_index);
+    }
+}
+
+//
+//
+//
+
 pub unsafe fn outb(port: u16, value: u8) {
     core::arch::asm!(
         "out dx, al", 
@@ -60,7 +82,6 @@ pub unsafe fn inb(port: u16) -> u8 {
     );
     val
 }
-
 
 pub fn lba_to_chs(lba: u64) -> (u8, u8, u8) {
     let sectors_per_track = 18;
@@ -144,12 +165,9 @@ pub unsafe fn dma_set_write_mode() {
     outb(0x0B, 0x52); // 0101_0010
 }
 
-
 //
 //
 //
-
-pub struct Floppy;
 
 fn wait_msr_ready() {
     for _ in 0..100000 {
@@ -215,7 +233,6 @@ fn fdc_wait_irq() {
         // spin-loop / delay (not robust)
     }
 }
-
 
 impl Floppy {
     pub fn init() {
@@ -364,9 +381,6 @@ impl Floppy {
         // Wait until FDC is ready
         fdc_wait_ready();
 
-        crate::vga::write::string(vga_index, b"Skip", crate::vga::buffer::Color::Yellow);
-        crate::vga::write::newline(vga_index);
-
         // Send SEEK command
         unsafe {
             fdc_send_byte(FDC_CMD_SEEK);
@@ -381,10 +395,6 @@ impl Floppy {
             //Self::fdc_wait_irq(vga_index); // wait for IRQ 6 (must be handled)
         }
 
-        crate::vga::write::string(vga_index, b"Kriste", crate::vga::buffer::Color::Yellow);
-        crate::vga::write::newline(vga_index);
-
-
         // Optional: Sense interrupt to verify seek
         //let (_st0, _cyl) = fdc_sense_interrupt();
     }
@@ -395,9 +405,6 @@ impl Floppy {
             //core::arch::asm!("sti");
             dma_init(DMA_BUFFER.as_ptr() as u32, 512);
             //dma_set_write_mode();
-
-        crate::vga::write::string(vga_index, b"Stop", crate::vga::buffer::Color::Yellow);
-        crate::vga::write::newline(vga_index);
 
             self.fdc_seek(1, cylinder, head, vga_index);
 
@@ -428,20 +435,5 @@ impl Floppy {
             //status.iter().all(|&s| s & 0xC0 == 0)
         }
     }
-
-
-
-    }
-
-    impl BlockDevice for Floppy {
-        fn read_sector(&self, lba: u64, buffer: &mut [u8; 512], vga_index: &mut isize) {
-            Self::read_sector_dma(lba, buffer, vga_index);
-        }
-
-        fn write_sector(&self, lba: u64, buffer: &[u8; 512], vga_index: &mut isize) {
-            let (cylinder, head, sector) = lba_to_chs(lba);
-
-            self.fdc_write_sector(cylinder, head, sector, buffer, vga_index);
-        }
-    }
+}
 

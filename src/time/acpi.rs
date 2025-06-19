@@ -1,5 +1,5 @@
-const ACPI_PM_TIMER_PORT: u16 = 0x408; // Hardcoded for now
-const PM_TIMER_FREQUENCY_HZ: u64 = 3_579_545; // Hz
+const ACPI_PM_TIMER_PORT: u16 = 0x408;          // TODO: Hardcoded 
+const PM_TIMER_FREQUENCY_HZ: u64 = 3_579_545;   // Hz
 
 static mut LAST_TICKS: u32 = 0;
 static mut UPTIME_TICKS: u64 = 0;

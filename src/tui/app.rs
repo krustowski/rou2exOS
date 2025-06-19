@@ -26,7 +26,6 @@ impl<'a> TuiApp<'a> {
             root.render(&Screen, 0, 0);
         }
 
-        // For now, no input loop
         loop {
             let scancode = keyboard_read_scancode();
 

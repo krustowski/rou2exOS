@@ -93,7 +93,7 @@ impl<'a> Widget for Window<'a> {
 pub struct Container<'a> {
     pub x: usize,
     pub y: usize,
-    pub children: [&'a mut dyn Widget; 3], // up to 4 children
+    pub children: [&'a mut dyn Widget; 3], 
 }
 
 impl<'a> Widget for Container<'a> {
@@ -114,7 +114,6 @@ impl<'a> Widget for Container<'a> {
 
     fn handle_event(&mut self, event: TuiEvent) {
         for child in self.children.iter_mut() {
-            // optionally dispatch only to focused child
             child.handle_event(event);
         }
     }
@@ -128,8 +127,8 @@ pub struct OffsetWidget<'a> {
 
 impl<'a> Widget for OffsetWidget<'a> {
     fn render(&mut self, screen: &Screen, offset_x: usize, offset_y: usize) {
-        self.widget.render(screen, self.dx, self.dy); // ideally render with offset logic
-        // To keep it simple now, we're skipping offset math
+        self.widget.render(screen, self.dx, self.dy);
+        // TODO: Offset math amd render
     }
 
     fn handle_event(&mut self, event: TuiEvent) {

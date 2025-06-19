@@ -56,7 +56,7 @@ pub fn put_pixel(x: usize, y: usize, r: u8, g: u8, b: u8) {
                 }
             }
             Some(VideoMode::TextMode) => {
-                // no-op for pixel drawing in text mode
+                // No-op for pixel drawing in text mode
             }
             _ => {}
         }
@@ -75,7 +75,7 @@ pub fn put_char(x: usize, y: usize, ch: u8, color: u8) {
                 *VGA_BUFFER.add(offset + 1) = color;
             }
             _ => {
-                // Optional: render bitmap font to framebuffer instead
+                // TODO: Render bitmap font to framebuffer
             }
         }
     }

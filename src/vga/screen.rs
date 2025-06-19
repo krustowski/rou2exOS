@@ -28,14 +28,14 @@ pub fn scroll_at(vga_index: &mut isize, height: &mut isize) {
     }
 
     unsafe {
-        let row_size = buffer::WIDTH * 2; // bytes per row
+        let row_size = buffer::WIDTH * 2;                // Bytes per row
         let screen_size = row_size * buffer::HEIGHT;
 
         // Copy all rows up one line: from row 1 to row 0
         ptr::copy(
-            buffer::VGA_BUFFER.add(row_size), // start of row 1
-            buffer::VGA_BUFFER,               // start of row 0
-            row_size * (buffer::HEIGHT - 1),  // total bytes of 24 rows
+            buffer::VGA_BUFFER.add(row_size),       // Start of row 1
+            buffer::VGA_BUFFER,                            // Start of row 0
+            row_size * (buffer::HEIGHT - 1),             // total bytes of 24 rows
         );
 
         let last_line_offset = row_size * (buffer::HEIGHT - 1);
@@ -56,14 +56,14 @@ pub fn scroll(vga_index: &mut isize) {
     }
 
     unsafe {
-        let row_size = buffer::WIDTH * 2; // bytes per row
+        let row_size = buffer::WIDTH * 2; // Bytes per row
         let screen_size = row_size * buffer::HEIGHT;
 
         // Copy all rows up one line: from row 1 to row 0
         ptr::copy(
-            buffer::VGA_BUFFER.add(row_size), // start of row 1
-            buffer::VGA_BUFFER,               // start of row 0
-            row_size * (buffer::HEIGHT - 1),  // total bytes of 24 rows
+            buffer::VGA_BUFFER.add(row_size), // Start of row 1
+            buffer::VGA_BUFFER,               // Start of row 0
+            row_size * (buffer::HEIGHT - 1),  // Total bytes of 24 rows
         );
 
         let last_line_offset = row_size * (buffer::HEIGHT - 1);

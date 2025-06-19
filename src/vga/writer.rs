@@ -45,7 +45,7 @@ pub struct Writer {
     buffer: Unique<Buffer>,
 }
 
-// Implement core::fmt::Write so we can use `write!()`
+// Implement core::fmt::Write to use `write!()`
 impl Write for Writer {
     fn write_str(&mut self, s: &str) -> fmt::Result {
         //let _ = self.write_str(s);

@@ -2,7 +2,6 @@ use crate::vga::buffer;
 use crate::vga::screen;
 
 pub fn number(vga_index: &mut isize, num: u64) {
-    // Dumb print without heap, just very basic
     let mut buf = [0u8; 20];
     let mut i = buf.len();
 

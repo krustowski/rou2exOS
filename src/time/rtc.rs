@@ -1,6 +1,6 @@
 pub fn read_rtc_register(reg: u8) -> u8 {
     unsafe {
-        // Tell CMOS what address we want
+        // Tell CMOS what address is wanted
         core::arch::asm!(
             "out dx, al",
             in("dx") 0x70,
@@ -25,7 +25,7 @@ pub fn read_rtc_full() -> (u16, u8, u8, u8, u8, u8) {
     let mut day;
     let mut month;
     let mut year;
-    let mut century = 20; // fallback if no CMOS reg 0x32
+    let mut century = 20; // Fallback if no CMOS reg 0x32
 
     loop {
         if (read_rtc_register(0x0A) & 0x80) == 0 {

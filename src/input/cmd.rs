@@ -352,8 +352,8 @@ fn cmd_clear(_args: &[u8], vga_index: &mut isize) {
     vga::screen::clear(vga_index);
 }
 
-fn cmd_debug(_args: &[u8], _vga_index: &mut isize) {
-    debug::dump_debug_log_to_file();
+fn cmd_debug(_args: &[u8], vga_index: &mut isize) {
+    debug::dump_debug_log_to_file(vga_index);
 }
 
 fn cmd_dir(_args: &[u8], vga_index: &mut isize) {

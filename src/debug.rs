@@ -1,5 +1,6 @@
 use core::fmt::{self, Write};
 use spin::Mutex;
+use x86_64::registers::debug;
 use crate::vga::{write::string, buffer::Color, screen};
 
 const DEBUG_LOG_SIZE: usize = 8192;
@@ -72,21 +73,22 @@ pub fn u64_to_dec_str(mut n: u64, buf: &mut [u8; 20]) -> &[u8] {
 #[macro_export]
 macro_rules! debugn {
     ($n:expr) => {{
-        use $crate::debug::DEBUG_LOG;
-        let mut buf = [0u8; 20];
-        let s = $crate::debug::u64_to_dec_str($n as u64, &mut buf);
-        DEBUG_LOG.lock().append(s);
+        if let Some(mut log) = $crate::debug::DEBUG_LOG.try_lock() {
+            let mut buf = [0u8; 20];
+            let s = $crate::debug::u64_to_dec_str($n as u64, &mut buf);
+            log.append(s);
+        }
     }};
 }
 
 #[macro_export]
 macro_rules! debug {
-        ($s:expr) => {{
-        use $crate::debug::DEBUG_LOG;
-
-        // Only &[u8], *str and b"literal" 
-        let bytes = ($s).as_ref();
-        DEBUG_LOG.lock().append(bytes);
+    ($s:expr) => {{
+        if let Some(mut log) = $crate::debug::DEBUG_LOG.try_lock() {
+            // Only &[u8], *str and b"literal" 
+            let bytes = ($s).as_ref();
+            log.append(bytes);
+        }
     }};
 }
 
@@ -100,17 +102,30 @@ macro_rules! debugln {
 
 use crate::fs::fat12::{block::Floppy, fs::Fs};
 
-pub fn dump_debug_log_to_file() {
+pub fn dump_debug_log_to_file(vga_index: &mut isize) {
+    string(vga_index, b"jezisi", Color::Cyan);
+
     let dbg = DEBUG_LOG.lock();
+
+    string(vga_index, b"kriste", Color::Cyan);
 
     let floppy = Floppy;
 
-    match Fs::new(&floppy, &mut 0) {
+    /*screen::clear(&mut 0);
+      string(&mut 0, dbg.data(), Color::Yellow);
+
+      return;*/
+
+    match Fs::new(&floppy, vga_index) {
         Ok(fs) => {
+            string(vga_index, b"dost ano", Color::Cyan);
+
             // Dump debug data into the DEBUG.TXT file in root directory
-            fs.write_file(0, b"DEBUG   TXT", dbg.data(), &mut 0);
+            fs.write_file(0, b"DEBUG   TXT", dbg.data(), vga_index);
         }
-        Err(_) => {
+        Err(e) => {
+            debugln!(e);
+
             // Dump logs right into the display
             screen::clear(&mut 0);
             string(&mut 0, dbg.data(), Color::Yellow);

@@ -26,11 +26,13 @@ impl<'a, D: BlockDevice> Fs<'a, D> {
 
         // Search for the FAT12 label in the boot sector
         for i in 0..512 - 5 {
-            if &sector[i..i+5] == b"FAT12" {
-                debugln!("Found FAT12!");
+            if let Some(slice) = sector.get(i..i + 5) {
+                if slice == b"FAT12" {
+                    debugln!("Found FAT12");
 
-                found_fat = true;
-                break;
+                    found_fat = true;
+                    break;
+                }
             }
         }
 

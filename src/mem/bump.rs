@@ -2,6 +2,9 @@ use core::alloc::{GlobalAlloc, Layout};
 use core::ptr::null_mut;
 use core::sync::atomic::{AtomicUsize, Ordering};
 
+#[global_allocator]
+pub static mut ALLOCATOR: BumpAllocator = BumpAllocator::new();
+
 pub struct BumpAllocator {
     heap_start: usize,
     heap_end: usize,

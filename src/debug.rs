@@ -1,6 +1,5 @@
 use core::fmt::{self, Write};
 use spin::Mutex;
-use x86_64::registers::debug;
 use crate::vga::{write::string, buffer::Color, screen};
 
 const DEBUG_LOG_SIZE: usize = 8192;
@@ -23,7 +22,6 @@ impl DebugLog {
     }
 
     pub fn data(&self) -> &[u8] {
-        //&self.buffer[..self.len];
         if let Some(d) = self.buffer.get(..self.len) {
             return d;
         }
@@ -41,7 +39,6 @@ impl DebugLog {
                 slice.copy_from_slice(data);
             }
         }
-        //self.buffer[self.len..self.len + to_copy].copy_from_slice(&data[..to_copy]);
 
         self.len += to_copy;
     }
@@ -103,32 +100,22 @@ macro_rules! debugln {
 use crate::fs::fat12::{block::Floppy, fs::Fs};
 
 pub fn dump_debug_log_to_file(vga_index: &mut isize) {
-    string(vga_index, b"jezisi", Color::Cyan);
-
     let dbg = DEBUG_LOG.lock();
-
-    string(vga_index, b"kriste", Color::Cyan);
 
     let floppy = Floppy;
 
-    /*screen::clear(&mut 0);
-      string(&mut 0, dbg.data(), Color::Yellow);
-
-      return;*/
+    // Dump log to display
+    screen::clear(&mut 0);
+    string(&mut 0, dbg.data(), Color::Yellow);
 
     match Fs::new(&floppy, vga_index) {
         Ok(fs) => {
-            string(vga_index, b"dost ano", Color::Cyan);
-
             // Dump debug data into the DEBUG.TXT file in root directory
             fs.write_file(0, b"DEBUG   TXT", dbg.data(), vga_index);
         }
         Err(e) => {
             debugln!(e);
-
-            // Dump logs right into the display
-            screen::clear(&mut 0);
-            string(&mut 0, dbg.data(), Color::Yellow);
+            string(vga_index, e.as_bytes(), Color::Red);
         }
     }
 }

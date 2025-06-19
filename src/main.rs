@@ -1,4 +1,4 @@
-// Enable static analysis for clippy
+// Enable static analysis features for clippy
 #![deny(clippy::indexing_slicing)]
 #![deny(clippy::panic)]
 #![deny(clippy::unwrap_used)]
@@ -32,8 +32,6 @@ mod tui;
 mod vga;
 //mod video;
 
-use core::panic::PanicInfo;
-
 /// Kernel entrypoint
 #[unsafe(no_mangle)]
 pub extern "C" fn kernel_main() { 
@@ -58,6 +56,8 @@ pub extern "C" fn kernel_main() {
 //
 
 #[lang = "eh_personality"] extern fn eh_personality() {}
+
+use core::panic::PanicInfo;
 
 /// Panic handler for panic fucntion invocations
 #[panic_handler]

@@ -4,7 +4,7 @@ pub trait BlockDevice {
     /// Reads 1 sector (usually 512 bytes) at the given LBA into `buffer`
     fn read_sector(&self, lba: u64, buffer: &mut [u8; 512], vga_index: &mut isize);
 
-    /// Optional: writes 1 sector from `buffer` to `lba`
+    /// Writes 1 sector from `buffer` to `lba`
     fn write_sector(&self, lba: u64, buffer: &[u8; 512], vga_index: &mut isize);
 }
 
@@ -36,7 +36,7 @@ impl BlockDevice for MemDisk {
         buffer.copy_from_slice(slice);
     }
 
-    fn write_sector(&self, lba: u64, buffer: &[u8; 512], _vga_index: &mut isize) {
+    fn write_sector(&self, _lba: u64, _buffer: &[u8; 512], _vga_index: &mut isize) {
         //let offset = self.sector_offset(lba);
         //let slice = &self.data[offset..offset + 512];
         //slice.copy_from_slice(buffer);
@@ -51,12 +51,14 @@ pub struct Floppy;
 
 impl BlockDevice for Floppy {
     fn read_sector(&self, lba: u64, buffer: &mut [u8; 512], vga_index: &mut isize) {
+        debugln!("Floppy read_sector()");
         Self::read_sector_dma(lba, buffer, vga_index);
     }
 
     fn write_sector(&self, lba: u64, buffer: &[u8; 512], vga_index: &mut isize) {
-        let (cylinder, head, sector) = lba_to_chs(lba);
+        debugln!("Floppy write_sector()");
 
+        let (cylinder, head, sector) = lba_to_chs(lba);
         self.fdc_write_sector(cylinder, head, sector, buffer, vga_index);
     }
 }

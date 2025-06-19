@@ -1,6 +1,3 @@
-use crate::init::config::{
-    debug_enabled, 
-};
 use crate::vga::{write::{string, number, newline, byte}, buffer::Color};
 use super::{block::BlockDevice, entry::{BootSector, Entry}};
 

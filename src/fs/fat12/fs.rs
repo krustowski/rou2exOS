@@ -27,7 +27,7 @@ impl<'a, D: BlockDevice> Fs<'a, D> {
         // Search for the FAT12 label in the boot sector
         for i in 0..512 - 5 {
             if &sector[i..i+5] == b"FAT12" {
-                debug!("Found FAT12!");
+                debugln!("Found FAT12!");
 
                 found_fat = true;
                 break;
@@ -41,17 +41,12 @@ impl<'a, D: BlockDevice> Fs<'a, D> {
         // Cast the sector as BootSector
         let boot_sector = unsafe { (*(sector.as_ptr() as *const BootSector)).clone() };
 
-        if debug_enabled() {
-            string(vga_index, b"OEM: ", crate::vga::buffer::Color::White);
-            for b in &boot_sector.oem {
-                byte(vga_index, *b, crate::vga::buffer::Color::Green);
-            }
-            newline(vga_index);
+        debug!("OEM: ");
+        debugln!(boot_sector.oem);
 
-            string(vga_index, b"Bytes/Sector: ", crate::vga::buffer::Color::White);
-            number(vga_index, boot_sector.bytes_per_sector as u64);
-            newline(vga_index);
-        }
+        debug!("Bytes/Sector: ");
+        debugn!(boot_sector.bytes_per_sector);
+        debugln!("");
 
         // Start of the FAT tables
         let fat_start = boot_sector.reserved_sectors as u64;
@@ -171,9 +166,10 @@ impl<'a, D: BlockDevice> Fs<'a, D> {
 
         // Write new file
         let mut clusters_needed = (data.len() + 511) / 512;
-        let mut first_cluster = self.allocate_cluster(vga_index);
+        let first_cluster = self.allocate_cluster(vga_index);
 
         if first_cluster == 0 {
+            debugln!("Write file: disk is full");
             string(vga_index, b"Disk is full", Color::Red);
             return;
         }
@@ -205,6 +201,7 @@ impl<'a, D: BlockDevice> Fs<'a, D> {
             if clusters_needed > 0 {
                 let next_cluster = self.allocate_cluster(vga_index);
                 if next_cluster == 0 {
+                    debugln!("Disk full mif-write, aborting");
                     string(vga_index, b"Disk full mid-write, aborting", Color::Red);
                     return;
                 }
@@ -227,8 +224,7 @@ impl<'a, D: BlockDevice> Fs<'a, D> {
             vga_index,
         );
 
-        string(vga_index, b"File written", Color::Green);
-        newline(vga_index);
+        debugln!("Data written to a file successfully");
     }
 
     /// write_dir_entry method ensures a new directory entry is written into the directory file list
@@ -276,6 +272,7 @@ impl<'a, D: BlockDevice> Fs<'a, D> {
             }
         }
 
+        debugln!("No directory entry slot available");
         string(vga_index, b"No dir entry slot", Color::Red);
         newline(vga_index);
     }
@@ -497,6 +494,8 @@ impl<'a, D: BlockDevice> Fs<'a, D> {
                         sector_buf[offset + 8..offset + 11].copy_from_slice(&new_filename[8..11]);
 
                         self.device.write_sector(root_dir_sector + i as u64, &sector_buf, vga_index);
+
+                        debugln!("File renamed");
                         string(vga_index, b"File renamed", Color::Green);
                         newline(vga_index);
                         return;
@@ -527,6 +526,9 @@ impl<'a, D: BlockDevice> Fs<'a, D> {
                             sector_buf[offset + 8..offset + 11].copy_from_slice(&new_filename[8..11]);
 
                             self.device.write_sector(sector_lba + sector_offset, &sector_buf, vga_index);
+
+
+                            debugln!("File renamed");
                             string(vga_index, b"File renamed", Color::Green);
                             newline(vga_index);
                             return;
@@ -543,6 +545,7 @@ impl<'a, D: BlockDevice> Fs<'a, D> {
             }
         }
 
+        debugln!("File not found");
         string(vga_index, b"File not found", Color::Red);
         newline(vga_index);
     }
@@ -577,6 +580,8 @@ impl<'a, D: BlockDevice> Fs<'a, D> {
                         sector_buf[offset] = 0xE5;
                         self.device.write_sector(root_dir_sector + i as u64, &sector_buf, vga_index);
 
+
+                        debugln!("File renamed");
                         string(vga_index, b"File deleted", Color::Green);
                         newline(vga_index);
                         return;
@@ -584,6 +589,7 @@ impl<'a, D: BlockDevice> Fs<'a, D> {
                 }
             }
 
+            debugln!("File not found");
             string(vga_index, b"File not found", Color::Red);
             newline(vga_index);
             return;
@@ -610,6 +616,7 @@ impl<'a, D: BlockDevice> Fs<'a, D> {
                         sector_buf[offset] = 0xE5;
                         self.device.write_sector(sector_lba + sector_offset, &sector_buf, vga_index);
 
+                        debugln!("File not found");
                         string(vga_index, b"File deleted", Color::Green);
                         newline(vga_index);
                         return;
@@ -626,6 +633,7 @@ impl<'a, D: BlockDevice> Fs<'a, D> {
             current_cluster = next_cluster;
         }
 
+        debugln!("File not found");
         string(vga_index, b"File not found", Color::Red);
         newline(vga_index);
     }
@@ -757,6 +765,8 @@ impl<'a, D: BlockDevice> Fs<'a, D> {
 
         // Update the FAT table
         self.write_fat12_entry(cluster, 0xFFF, vga_index);
+
+        debugln!("Created a subdirectory");
     }
 
     /// Lists all entries of a given directory

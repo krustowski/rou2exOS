@@ -48,6 +48,7 @@ pub extern "C" fn kernel_main() {
     vga::screen::clear(vga_index);
 
     // Initialize the heap
+    debugln!("Heap allocator init start");
     init_heap_allocator();
 
     // Run init checks
@@ -56,6 +57,7 @@ pub extern "C" fn kernel_main() {
     }
 
     // Run prompt loop
+    debugln!("Starting shell...");
     input::keyboard::keyboard_loop(vga_index);
 }
 

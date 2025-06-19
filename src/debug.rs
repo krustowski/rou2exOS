@@ -40,7 +40,6 @@ impl DebugLog {
                 slice.copy_from_slice(data);
             }
         }
-
         //self.buffer[self.len..self.len + to_copy].copy_from_slice(&data[..to_copy]);
 
         self.len += to_copy;
@@ -56,13 +55,28 @@ impl Write for DebugLog {
 
 pub static DEBUG_LOG: Mutex<DebugLog> = Mutex::new(DebugLog::new());
 
+pub fn u64_to_dec_str(mut n: u64, buf: &mut [u8; 20]) -> &[u8] {
+    if n == 0 {
+        buf[0] = b'0';
+        return &buf[..1];
+    }
+    let mut i = 20;
+    while n > 0 && i > 0 {
+        i -= 1;
+        buf[i] = b'0' + (n % 10) as u8;
+        n /= 10;
+    }
+    &buf[i..]
+}
+
 #[macro_export]
-macro_rules! debugf {
-    ($($arg:tt)*) => ({
-        use core::fmt::Write;
-        let mut dbg = $crate::debug::DEBUG_LOG.lock();
-        let _ = writeln!(dbg, $($arg)*);
-    });
+macro_rules! debugn {
+    ($n:expr) => {{
+        use $crate::debug::DEBUG_LOG;
+        let mut buf = [0u8; 20];
+        let s = $crate::debug::u64_to_dec_str($n as u64, &mut buf);
+        DEBUG_LOG.lock().append(s);
+    }};
 }
 
 #[macro_export]
@@ -89,14 +103,14 @@ use crate::fs::fat12::{block::Floppy, fs::Fs};
 pub fn dump_debug_log_to_file() {
     let dbg = DEBUG_LOG.lock();
 
-    let mut floppy = Floppy;
+    let floppy = Floppy;
 
     match Fs::new(&floppy, &mut 0) {
         Ok(fs) => {
             // Dump debug data into the DEBUG.TXT file in root directory
             fs.write_file(0, b"DEBUG   TXT", dbg.data(), &mut 0);
         }
-        Err(e) => {
+        Err(_) => {
             // Dump logs right into the display
             screen::clear(&mut 0);
             string(&mut 0, dbg.data(), Color::Yellow);

@@ -4,6 +4,7 @@ pub mod color;
 pub mod config;
 pub mod cpu;
 pub mod fs;
+pub mod heap;
 pub mod result;
 
 pub fn init(vga_index: &mut isize, multiboot_ptr: u64) {
@@ -22,7 +23,13 @@ pub fn init(vga_index: &mut isize, multiboot_ptr: u64) {
     );
 
     result::print_result(
-        "Check multiboot2 tag count", 
+        "Initialize heap allocator", 
+        heap::print_result(vga_index),
+        vga_index
+    );
+
+    result::print_result(
+        "Read Multiboot2 tags", 
         boot::print_info(vga_index, multiboot_ptr),
         vga_index
     );

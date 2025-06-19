@@ -35,21 +35,14 @@ mod vga;
 use core::panic::PanicInfo;
 use core::ptr;
 
-use mem::bump::BumpAllocator;
-
-#[global_allocator]
-static mut ALLOCATOR: BumpAllocator = BumpAllocator::new();
-
 /// Kernel entrypoint
 #[unsafe(no_mangle)]
 pub extern "C" fn kernel_main() { 
+    debugln!("Kernel loaded");
+
     // VGA buffer position
     let vga_index: &mut isize = &mut 0;
     vga::screen::clear(vga_index);
-
-    // Initialize the heap
-    debugln!("Heap allocator init start");
-    init_heap_allocator();
 
     // Run init checks
     unsafe {
@@ -142,30 +135,14 @@ fn print_num(vga_index: &mut isize, mut num: u32) {
     }
 }
 
-fn init_heap_allocator() {
-    unsafe {
-        unsafe extern "C" {
-            static __heap_start: u8;
-            static __heap_end: u8;
-        }
-
-        let heap_start = &__heap_start as *const u8 as usize;
-        let heap_end = &__heap_end as *const u8 as usize;
-        let heap_size = heap_end - heap_start;
-
-        //#![allow(static_mut_refs)]
-        let allocator_ptr = ptr::addr_of_mut!(ALLOCATOR);
-        (*allocator_ptr).init(heap_start, heap_size);
-    }
-}
-
 fn print_stack_info() {
     let sp: usize;
     unsafe {
         core::arch::asm!("mov {}, rsp", out(reg) sp);
-        //string(vga_index, b"Stack pointer: ", Color::Yellow);
-        //number(vga_index, sp as u64);
-        //newline(vga_index);
+
+        debug!("Stack pointer: ");
+        debugn!(sp as u64);
+        debugln!("");
     }
 }
 

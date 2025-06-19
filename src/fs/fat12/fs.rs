@@ -112,10 +112,10 @@ impl<'a, D: BlockDevice> Fs<'a, D> {
         let entry: u16;
 
         if cluster & 1 == 0 {
-            // even cluster
+            // Even cluster
             entry = ((next_byte as u16 & 0x0F) << 8) | (fat_sector[offset_in_sector] as u16);
         } else {
-            // odd cluster
+            // Odd cluster
             entry = ((next_byte as u16) << 4) | ((fat_sector[offset_in_sector] as u16 & 0xF0) >> 4);
         }
 

@@ -9,7 +9,7 @@ pub struct CheckReport {
 }
 
 pub fn run_check(vga_index: &mut isize) -> CheckReport {
-    let fat = FatTable::load(vga_index); // You must implement this
+    let fat = FatTable::load(vga_index);
     let mut report = CheckReport {
         errors: 0,
         orphan_clusters: 0,
@@ -21,7 +21,7 @@ pub fn run_check(vga_index: &mut isize) -> CheckReport {
 
     scan_directory(0, &fat, &mut used_clusters, &mut report, vga_index, 0);
 
-    // Now check the FAT for unreferenced or multiply referenced clusters
+    // Check the FAT for unreferenced or multiply referenced clusters
     for cluster in 2..fat.total_clusters() {
         let fat_entry = fat.get(cluster as u16);
         if fat_entry.is_some() && !used_clusters[cluster as usize] {
@@ -106,31 +106,6 @@ fn scan_directory(
                 if is_dotdot {
                     return;
                 }
-
-                //let chain = fat.follow_chain_array(entry.start_cluster);
-
-                /*if chain.0 > chain.1.len() {
-                    return;
-                }
-
-                for &cl in &chain.1[..chain.0] {
-                    if cl < 2 || cl >= used.len() as u16 {
-                        string(vga_index, b" -> Cluster out of bounds: ", Color::Red);
-                        number(vga_index, cl as u64);
-                        newline(vga_index);
-                        report.errors += 1;
-                        continue;
-                    }
-
-                    if used[cl as usize] {
-                        string(vga_index, b" -> Cross-linked cluster: ", Color::Red);
-                        number(vga_index, cl as u64);
-                        newline(vga_index);
-                        report.cross_linked += 1;
-                    } else {
-                        used[cl as usize] = true;
-                    }
-                }*/
 
                 if entry.attr & 0x10 != 0 {
                     scan_directory(entry.start_cluster, fat, used, report, vga_index, depth + 1);

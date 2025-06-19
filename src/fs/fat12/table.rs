@@ -2,7 +2,7 @@ use crate::fs::fat12::{block::Floppy, fs::Fs};
 
 use super::block::BlockDevice;
 
-/// The number of bytes in a sector.
+/// The number of bytes in a sector
 const BYTES_PER_SECTOR: usize = 512;
 
 /// The size of the FAT table in sectors (for a 1.44MB floppy, usually 9)
@@ -46,8 +46,8 @@ impl FatTable {
 
     }
 
-    /// Get the next cluster in the chain.
-    /// Returns `None` for free cluster or end-of-chain.
+    /// Get the next cluster in the chain
+    /// Returns `None` for free cluster or end-of-chain
     pub fn get(&self, cluster: u16) -> Option<u16> {
         if cluster < 2 || cluster >= MAX_CLUSTERS as u16 {
             return None;
@@ -69,19 +69,19 @@ impl FatTable {
         }
     }
 
-    /// Follow a cluster chain until end-of-chain or loop.
+    /// Follow a cluster chain until end-of-chain or loop
     pub fn follow_chain_array(&self, start: u16) -> (usize, [u16; MAX_CLUSTERS]) {
         let mut result = [0u16; MAX_CLUSTERS];
         let mut len = 0;
         let mut current = start;
 
         while let Some(next) = self.get(current) {
-            // skip cluster 0 and 1 which are reserved in FAT12
+            // Skip cluster 0 and 1 which are reserved in FAT12
             if current < 2 || current >= MAX_CLUSTERS as u16 {
                 break;
             }
 
-            // loop protection
+            // Loop protection
             if result[..len].contains(&current) {
                 break;
             }
@@ -96,7 +96,7 @@ impl FatTable {
             current = next;
         }
 
-        // include last if valid and not already included
+        // Include last if valid and not already included
         if current >= 2 && !result[..len].contains(&current) && len < MAX_CLUSTERS {
             result[len] = current;
             len += 1;

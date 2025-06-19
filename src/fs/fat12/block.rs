@@ -12,7 +12,7 @@ static mut DISK_DATA: [u8; 1024 * 512] = [0u8; 1024 * 512]; // 1024 sectors
 const CMD_WRITE_SECTOR: u8 = 0x45; // 0x40 | 0x05 = write with MFM, multi-track
 
 pub struct MemDisk {
-    pub data: &'static mut [u8], // must be sector-aligned
+    pub data: &'static mut [u8], // Must be sector-aligned
 }
 
 //
@@ -227,12 +227,12 @@ fn fdc_sense_interrupt() -> (u8, u8) {
     (st0, cyl)
 }
 
-/// Dummy IRQ wait — replace with real IRQ handling
+/// Dummy IRQ wait
 fn fdc_wait_irq() {
-    // This should block until IRQ6 is received.
-    // In a real OS, this should be a semaphore or atomic flag.
+    // This should block until IRQ6 is received
+    // This should be a semaphore or atomic flag
     for _ in 0..1000000 {
-        // spin-loop / delay (not robust)
+        // spin-loop / delay
     }
 }
 
@@ -268,7 +268,6 @@ impl Floppy {
     pub unsafe fn fdc_wait_irq(vga_index: &mut isize) {
         // Wait until interrupt is fired (simulate or use actual IRQ handling)
         // For now: a naive delay loop or poll status.
-        //for _ in 0..10_000_000 {
         loop {
             let status = inb(0x3F4);
             if status & 0x80 != 0 {
@@ -285,7 +284,7 @@ impl Floppy {
         let cylinder = Floppy::read_byte();
         let head = Floppy::read_byte();
         let sector = Floppy::read_byte();
-        let bytesize = Floppy::read_byte(); // sector size as N where size = 128 << N
+        let bytesize = Floppy::read_byte(); // Sector size as N where size = 128 << N
 
         /*crate::vga::write::string(vga_index, b"ST0: ", crate::vga::buffer::Color::Pink);
           crate::vga::write::number(vga_index, st0 as u64);
@@ -313,17 +312,17 @@ impl Floppy {
             dma_init(DMA_BUFFER.as_ptr() as u32, 512);
             dma_set_read_mode();
 
-            Self::send_byte(0x46); // READ DATA
-            Self::send_byte((h << 2) | 0); // drive 0, head
-            Self::send_byte(c);    // cylinder
-            Self::send_byte(h);    // head
-            Self::send_byte(s);    // sector (1-based)
-            Self::send_byte(2);    // 512 = 2^2
-            Self::send_byte(18);   // last sector
-            Self::send_byte(0x1B); // GAP3
-            Self::send_byte(0xFF); // DTL (don't care for 512B)
+            Self::send_byte(0x46);          // Read data
+            Self::send_byte((h << 2) | 0);  // drive 0, head
+            Self::send_byte(c);             // Cylinder
+            Self::send_byte(h);             // Head
+            Self::send_byte(s);             // Sector (1-based)
+            Self::send_byte(2);             // 512 = 2^2
+            Self::send_byte(18);            // Last sector
+            Self::send_byte(0x1B);          // GAP3
+            Self::send_byte(0xFF);          // DTL (don't care for 512B)
 
-            Self::fdc_wait_irq(vga_index); // wait for IRQ 6 (must be handled)
+            Self::fdc_wait_irq(vga_index); // Wait for IRQ 6 (must be handled)
 
             // Copy from DMA buffer to output
             buffer.copy_from_slice(&DMA_BUFFER);
@@ -374,7 +373,7 @@ impl Floppy {
     /// - `head`: 0 or 1
     pub fn fdc_seek(&self, drive: u8, cylinder: u8, head: u8, vga_index: &mut isize) {
         // Select drive in DOR
-        let motor_bit = 1 << (4 + drive); // bit 4 = motor for drive 0
+        let motor_bit = 1 << (4 + drive); // Bit 4 = motor for drive 0
         let dor_value = (drive & 0x03) | 0x0C | motor_bit;
         unsafe {
             outb(FDC_DOR, dor_value);
@@ -386,19 +385,18 @@ impl Floppy {
         // Send SEEK command
         unsafe {
             fdc_send_byte(FDC_CMD_SEEK);
-            fdc_send_byte((head << 2) | (drive & 0x03)); // head & drive combined
+            fdc_send_byte((head << 2) | (drive & 0x03)); // Head & drive combined
             fdc_send_byte(cylinder);
         }
 
-        // Wait for IRQ6 (simplified — use a real IRQ handler ideally)
+        // Wait for IRQ6
         fdc_wait_irq();
 
         unsafe {
             //Self::fdc_wait_irq(vga_index); // wait for IRQ 6 (must be handled)
         }
 
-        // Optional: Sense interrupt to verify seek
-        //let (_st0, _cyl) = fdc_sense_interrupt();
+        // TODO: Verify the seek result (sense the interrupt)
     }
 
 
@@ -412,19 +410,19 @@ impl Floppy {
 
             fdc_wait_ready(); // Wait until FDC is ready for commands
 
-            outb(DOR, 0x1C); // Enable motor and controller
+            outb(DOR, 0x1C);   // Enable motor and controller
             self.fdc_dma_setup_write(data); // Setup DMA for writing
 
             // Send command packet to FDC
             Self::send_byte(CMD_WRITE_SECTOR);
-            Self::send_byte((head << 2) | 0); // Drive 0, head
-            Self::send_byte(cylinder);       // Cylinder number
-            Self::send_byte(head);           // Head
-            Self::send_byte(sector);         // Sector number (starts at 1)
-            Self::send_byte(2);              // 512 bytes/sector => 2^2 = 512
-            Self::send_byte(18);             // Sectors/track (usually 18)
-            Self::send_byte(0x1B);           // GAP3 length (standard = 0x1B)
-            Self::send_byte(0xFF);           // Data length (0xFF for default)
+            Self::send_byte((head << 2) | 0);   // Drive 0, head
+            Self::send_byte(cylinder);          // Cylinder number
+            Self::send_byte(head);              // Head
+            Self::send_byte(sector);            // Sector number (starts at 1)
+            Self::send_byte(2);                 // 512 bytes/sector => 2^2 = 512
+            Self::send_byte(18);                // Sectors/track (usually 18)
+            Self::send_byte(0x1B);              // GAP3 length (standard = 0x1B)
+            Self::send_byte(0xFF);              // Data length (0xFF for default)
 
             //self.fdc_wait_irq(vga_index);
             Self::fdc_wait_irq(vga_index); // wait for IRQ 6 (must be handled)

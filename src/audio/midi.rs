@@ -22,11 +22,11 @@ fn midi_note_to_freq(note: u8) -> u16 {
     let multiplier = pow2(n);
 
     let hz = ((BASE_FREQ as u64 * multiplier) >> 20) as u16;
-    if hz == 0 { 1 } else { hz } // ← avoid zero frequency
+    if hz == 0 { 1 } else { hz } // ← Avoid zero frequency
 }
 
 fn pow2(n: i32) -> u64 {
-    const BASE: u64 = 1 << 20; // Q12.20
+    const BASE: u64 = 1 << 20;     // Q12.20
     const SEMI_UP: u64 = 108579;   // ≈ 2^(1/12) * BASE
     const SEMI_DOWN: u64 = 94387;  // ≈ 2^(-1/12) * BASE
 

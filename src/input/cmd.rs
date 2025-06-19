@@ -431,7 +431,7 @@ fn cmd_http(_args: &[u8], vga_index: &mut isize) {
                 return 1;
             }
 
-            return app::http_server::udp_handler(&ipv4_header, ipv4_payload);
+            return app::http_udp::udp_handler(&ipv4_header, ipv4_payload);
         }
         0
     }

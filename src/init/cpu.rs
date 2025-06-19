@@ -1,23 +1,25 @@
 use core::arch::asm;
-use crate::vga;
+use crate::vga::{
+    write::{string, newline},
+    buffer::Color,
+};
+use super::result;
 
 pub fn print_mode(vga_index: &mut isize) {
-    vga::write::string(vga_index, b"CPU mode: ", vga::buffer::Color::White);
-    vga::write::string(vga_index, check_cpu_mode().as_bytes(), vga::buffer::Color::Green);
+    string(vga_index, b"CPU mode: ", Color::White);
+    string(vga_index, check_cpu_mode().as_bytes(), Color::Green);
 
-    vga::write::newline(vga_index);
+    newline(vga_index);
 }
 
 pub fn check_mode() -> crate::init::result::InitResult {
-
     let mode = check_cpu_mode();
 
     if mode.as_bytes().len() > 5 && mode.as_bytes()[0..4] == *b"Long" {
-        return crate::init::result::InitResult::Passed;
+        return result::InitResult::Passed;
     }
 
-
-    crate::init::result::InitResult::Failed
+    result::InitResult::Failed
 }
 
 /// Function to check CPU mode using CPUID instruction
@@ -45,9 +47,10 @@ fn cpuid(eax: u32) -> u32 {
     unsafe {
         asm!(
             "cpuid",
-            inout("eax") eax => result,    // Use eax for input and output (stored in `result`)
-            out("ecx") _,                  // Don't use `ecx`, just discard it
-            out("edx") _,                  // Don't use `edx`, just discard it
+            // Store eax into result
+            inout("eax") eax => result,    
+            out("ecx") _,                  
+            out("edx") _,                  
         );
     }
     result

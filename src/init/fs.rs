@@ -1,6 +1,12 @@
 use crate::fs::fat12::{block::Floppy, fs::Fs};
-use super::result;
-use super::config::{self, PATH_CLUSTER};
+use crate::vga::{
+    write::{string, newline},
+    buffer::Color,
+};
+use super::{
+    config::{PATH_CLUSTER, set_path},
+    result,
+};
 
 pub fn check_floppy(vga_index: &mut isize) -> result::InitResult {
     let floppy = Floppy;
@@ -12,15 +18,17 @@ pub fn check_floppy(vga_index: &mut isize) -> result::InitResult {
         Ok(_) => {
             res = result::InitResult::Passed
         }
-        Err(_) => {
+        Err(e) => {
+            debug!("Filesystem init (floppy) fail: ");
+            debugln!(e);
             res = result::InitResult::Skipped
         }
     }
 
-    crate::init::config::set_path(b"/");
+    set_path(b"/");
 
     unsafe {
-        crate::init::config::PATH_CLUSTER = 0;
+        PATH_CLUSTER = 0;
     }
 
     res
@@ -30,8 +38,8 @@ pub fn print_info(vga_index: &mut isize) {
     let floppy = Floppy;
     Floppy::init();
 
-    crate::vga::write::string(vga_index, b"Reading floppy...", crate::vga::buffer::Color::White);
-    crate::vga::write::newline(vga_index);
+    string(vga_index, b"Reading floppy...", Color::White);
+    newline(vga_index);
 
     match Fs::new(&floppy, vga_index) {
         Ok(fs) => {
@@ -40,8 +48,8 @@ pub fn print_info(vga_index: &mut isize) {
             }
         }
         Err(e) => {
-            crate::vga::write::string(vga_index, e.as_bytes(), crate::vga::buffer::Color::Red);
-            crate::vga::write::newline(vga_index);
+            string(vga_index, e.as_bytes(), Color::Red);
+            newline(vga_index);
         }
     }
 }

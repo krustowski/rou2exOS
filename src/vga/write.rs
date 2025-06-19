@@ -29,6 +29,11 @@ pub fn string(vga_index: &mut isize, string: &[u8], color: buffer::Color) {
     screen::scroll(vga_index);
 
     for &b in string {
+        if b == b'\n' {
+            newline(vga_index);
+            continue;
+        }
+
         byte(vga_index, b, color);
     }
 }

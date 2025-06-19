@@ -28,12 +28,3 @@ macro_rules! println {
     });
 }
 
-/*#[macro_export]
-macro_rules! debug {
-    () => {$crate::println!()};
-    ($($arg:tt)*) => ({
-        if debug_enabled() {
-            $crate::print!("{}\n", format_args!($($arg)*));
-        }
-    });
-}*/

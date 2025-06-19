@@ -196,7 +196,7 @@ pub fn split_cmd(input: &[u8]) -> (&[u8], &[u8]) {
     // Find the first space
     if let Some(pos) = input.iter().position(|&c| c == b' ') {
         let (cmd, args) = input.split_at(pos);
-        // skip the space character for args
+        // Skip the space character for args
         let args_slice = args.get(1..).unwrap_or(&[]);
         (cmd, args_slice)
     } else {
@@ -274,12 +274,13 @@ pub fn to_uppercase_ascii(input: &mut [u8; 11]) {
 //
 
 fn cmd_beep(_args: &[u8], _vga_index: &mut isize) {
-    //sound::beep::beep(5000);
     audio::midi::play_melody();
+
+    /*sound::beep::beep(5000);
 
     for _ in 0..3_000_000 {
         unsafe { core::arch::asm!("nop"); }
-    }
+    }*/
 
     audio::beep::stop_beep();
 }
@@ -398,7 +399,7 @@ fn cmd_ed(args: &[u8], vga_index: &mut isize) {
     vga::screen::clear(vga_index);
 }
 
-fn cmd_ether(args: &[u8], vga_index: &mut isize) {
+fn cmd_ether(_args: &[u8], vga_index: &mut isize) {
     app::ether::handle_packet(vga_index);
 }
 
@@ -454,7 +455,7 @@ fn cmd_http(_args: &[u8], vga_index: &mut isize) {
     }
 }
 
-fn cmd_menu(_args: &[u8], vga_index: &mut isize) {
+fn cmd_menu(_args: &[u8], _vga_index: &mut isize) {
     // Working sample, but loop without exit
     //app::menu::menu_loop(vga_index);
 
@@ -566,12 +567,12 @@ fn cmd_ping(args: &[u8], vga_index: &mut isize) {
     let protocol = 1;
     let identifier = 1342;
     let sequence_no = 1;
-    let payload = b"ping from r2"; // optional payload*/
+    let payload = b"ping from r2"; // Optional payload
 
     let mut icmp_buf = [0u8; 256];
     let mut ipv4_buf = [0u8; 1500];
 
-    // Create ICMP packet and encapsulate it in the IPv4 packet.
+    // Create ICMP packet and encapsulate it in the IPv4 packet
     let icmp_len = net::icmp::create_packet(8, identifier, sequence_no, payload, &mut icmp_buf);
     let icmp_slice = icmp_buf.get(..icmp_len).unwrap_or(&[]);
 

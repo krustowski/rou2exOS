@@ -8,8 +8,6 @@ use crate::init::config::{HOST, PATH, USER, get_path};
 use crate::vga::screen::clear;
 use crate::vga::write::newline;
 
-use super::cmd::to_uppercase_ascii;
-
 const INPUT_BUFFER_SIZE: usize = 128;
 
 static mut SHIFT_PRESSED: bool = false;
@@ -26,9 +24,6 @@ fn render_prompt(vga_index: &mut isize) {
     vga::write::string(vga_index, path, vga::buffer::Color::Blue);
     vga::write::string(vga_index, b"] > ", vga::buffer::Color::Green);
 }
-
-//use x86_64::instructions::port::Port;
-//let mut port60 = Port::new(0x60);
 
 //
 //  HARDWARE CURSOR HANDLING
@@ -114,7 +109,7 @@ pub fn keyboard_loop(vga_index: &mut isize) {
                     continue;
                 }
             }
-            0x0E => { // backspace
+            0x0E => { // Backspace
                 handle_backspace(&mut input_len, vga_index);
                 continue;
             }
@@ -144,7 +139,7 @@ pub fn keyboard_loop(vga_index: &mut isize) {
         }
 
         if let Some(ascii) = scancode_to_ascii(key) {
-            // If we have room, add to buffer
+            // If there is room, add to buffer
             if input_len < INPUT_BUFFER_SIZE {
                 if let Some(w) = input_buffer.get_mut(input_len) {
                     *w = ascii
@@ -168,7 +163,7 @@ fn handle_backspace(input_len: &mut usize, vga_index: &mut isize) {
     if *input_len > 0 {
         *input_len -= 1;
         unsafe {
-            *vga_index -= 2; // move cursor back one character
+            *vga_index -= 2; // Move cursor back one character
             *vga::buffer::VGA_BUFFER.offset(*vga_index) = b' ';
             *vga::buffer::VGA_BUFFER.offset(*vga_index + 1) = vga::buffer::Color::White as u8;
         }
@@ -379,7 +374,7 @@ fn pad_prefix(mut prefix: &[u8]) -> [u8; 11] {
     let mut j = 0;
     while i < prefix.len() && j < 11 {
         if prefix[i] == b'.' {
-            j = 8; // jump to extension part
+            j = 8; // Jump to extension part
         } else {
             padded[j] = prefix[i].to_ascii_uppercase(); // FAT stores names uppercase
             j += 1;
@@ -391,7 +386,7 @@ fn pad_prefix(mut prefix: &[u8]) -> [u8; 11] {
 }
 
 /// Splits a buffer into two parts at the first space (`b' '`),
-/// while skipping trailing zeros and handling missing space correctly.
+/// while skipping trailing zeros and handling missing space correctly
 pub fn _split_cmd(input: &[u8]) -> (&[u8], &[u8]) {
     // Find the actual length before the first null byte
     let len = input.iter().position(|&c| c == 0).unwrap_or(input.len());

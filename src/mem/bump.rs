@@ -40,7 +40,7 @@ unsafe impl GlobalAlloc for BumpAllocator {
         let new_next = aligned.checked_add(size).unwrap_or(aligned);
 
         if new_next > self.heap_end {
-            return null_mut(); // out of memory
+            return null_mut(); // Out of memory
         }
 
         self.next.store(new_next, Ordering::SeqCst);

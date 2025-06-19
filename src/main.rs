@@ -13,6 +13,8 @@
 #![feature(panic_info_message)]
 
 #[macro_use]
+mod debug;
+#[macro_use]
 mod macros;
 mod multiboot2;
 

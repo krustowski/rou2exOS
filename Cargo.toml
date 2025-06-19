@@ -11,6 +11,7 @@ nasm = "0.0.1"
 [dependencies]
 #compiler_builtins = { version = "0.1", features = ["mem"] }
 x86_64 = { version = "0.15.2", default-features = false, features = ["instructions", "abi_x86_interrupt"] }
+spin = "0.9"
 
 [dependencies.lazy_static]
 version = "1.0"

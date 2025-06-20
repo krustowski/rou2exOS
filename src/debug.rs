@@ -9,6 +9,8 @@ pub struct DebugLog {
     len: usize,
 }
 
+pub static DEBUG_LOG: Mutex<DebugLog> = Mutex::new(DebugLog::new());
+
 impl DebugLog {
     pub const fn new() -> Self {
         Self {
@@ -50,8 +52,6 @@ impl Write for DebugLog {
         Ok(())
     }
 }
-
-pub static DEBUG_LOG: Mutex<DebugLog> = Mutex::new(DebugLog::new());
 
 pub fn u64_to_dec_str(mut n: u64, buf: &mut [u8; 20]) -> &[u8] {
     if n == 0 {

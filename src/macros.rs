@@ -1,10 +1,11 @@
-use crate::vga::writer::{Color, Writer};
+use spin::Mutex;
+use crate::vga::writer::{Writer};
 
-pub static mut WRITER: Option<Writer> = None;
+pub static mut WRITER: Option<Mutex<Writer>> = None;
 
 pub fn init_writer() {
     unsafe {
-        WRITER = Some(Writer::new());
+        WRITER = Some(Mutex::new(Writer::new()));
     }
 }
 
@@ -28,7 +29,7 @@ macro_rules! warn {
     };
     ($arg:expr $(,)?) => {
         // Set yellow chars on black
-        $crate::print!($arg, Color::Yellow, Color::Black);
+        $crate::print!($arg, $crate::vga::writer::Color::Yellow, $crate::vga::writer::Color::Black);
     };
 }
 
@@ -37,8 +38,9 @@ macro_rules! print {
     ($arg:expr) => {
         unsafe {
             if let Some(writer) = &mut $crate::macros::WRITER {
-                writer.set_color(Color::White, Color::Black);
-                writer.write_str_raw($arg);
+                let mut guard = writer.lock();
+                guard.set_color(Color::White, Color::Black);
+                guard.write_str_raw($arg);
             }
         }
     };
@@ -47,16 +49,18 @@ macro_rules! print {
 
         unsafe {
             if let Some(writer) = &mut $crate::macros::WRITER {
-                writer.set_color($fg, Color::Black);
-                writer.write_str_raw($arg);
+                let mut guard = writer.lock();
+                guard.set_color($fg, Color::Black);
+                guard.write_str_raw($arg);
             }
         }
     };
     ($arg:expr, $fg:expr, $bg:expr) => ({
         unsafe {
             if let Some(writer) = &mut $crate::macros::WRITER {
-                writer.set_color($fg, $bg);
-                writer.write_str_raw($arg);
+                let mut guard = writer.lock();
+                guard.set_color($fg, $bg);
+                guard.write_str_raw($arg);
             }
         }
     });

@@ -1,11 +1,10 @@
 use core::fmt::{self, Write};
 use core::ptr::Unique;
 
-use crate::app::editor::{MAX_LINES, MAX_LINE_LEN};
-
 /// VGA text mode buffer dimensions
 const BUFFER_WIDTH: usize = 80;
 const BUFFER_HEIGHT: usize = 25;
+const BUFFER_ADDRESS: usize = 0xb8000;
 
 /// VGA color attributes
 #[allow(dead_code)]
@@ -13,6 +12,21 @@ const BUFFER_HEIGHT: usize = 25;
 #[repr(u8)]
 pub enum Color {
     Black = 0,
+    DarkBlue = 1,
+    DarkGreen = 2,
+    DarkCyan = 3,
+    DarkRed = 4,
+    DarkMagenta = 5,
+    DarkYellow = 6,
+    LightGrey = 7,
+    //
+    Grey = 8,
+    Blue = 9,
+    Green = 10,
+    Cyan = 11,
+    Red = 12,
+    Magenta = 13,
+    Yellow = 14,
     White = 15,
 }
 
@@ -48,7 +62,7 @@ pub struct Writer {
 // Implement core::fmt::Write to use `write!()`
 impl Write for Writer {
     fn write_str(&mut self, s: &str) -> fmt::Result {
-        //let _ = self.write_str(s);
+        let _ = self.write_str_raw(s);
         Ok(())
     }
 }
@@ -59,8 +73,13 @@ impl Writer {
             col_pos: 0,
             row_pos: 0,
             color_code: ColorCode::new(Color::White, Color::Black),
-            buffer: unsafe { Unique::new_unchecked(0xb8000 as *mut _) },
+            buffer: unsafe { Unique::new_unchecked(BUFFER_ADDRESS as *mut _) },
         }
+    }
+    
+    /// Sets the specified ColorCode from provided foreground and background colors.
+    pub fn set_color(&mut self, fg: Color, bg: Color) {
+        self.color_code = ColorCode::new(fg, bg)
     }
 
     fn buffer_mut(&mut self) -> &mut Buffer {

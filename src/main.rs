@@ -37,9 +37,12 @@ mod vga;
 pub extern "C" fn kernel_main() { 
     debugln!("Kernel loaded");
 
-    // VGA buffer position
+    // VGA buffer position (LEGACY)
     let vga_index: &mut isize = &mut 0;
     vga::screen::clear(vga_index);
+
+    // Instantiate new Writer
+    macros::init_writer();
 
     // Run init checks
     unsafe {

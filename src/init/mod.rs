@@ -96,7 +96,7 @@ pub fn init(vga_index: &mut isize, multiboot_ptr: u64) {
 
     let mut legacy_idx: isize = (INIT_BUFFER.lock().pos * 2) as isize;
 
-    color::color_demo(&mut legacy_idx);
+    color::color_demo();
     ascii::ascii_art(&mut legacy_idx);
 
     // Play startup melody

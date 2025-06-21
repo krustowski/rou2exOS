@@ -8,7 +8,6 @@ use crate::init::config::PATH_CLUSTER;
 use crate::net;
 use crate::time;
 use crate::vga;
-use crate::vga::write::newline;
 use crate::input::keyboard;
 use crate::tui::{widget::{Container, Window, Label}, app::TuiApp};
 
@@ -792,82 +791,87 @@ fn cmd_tcp(_args: &[u8], vga_index: &mut isize) {
     app::tcp_handler::handle(vga_index);
 }
 
-/// Prints current time and date in UTC.
-fn cmd_time(_args: &[u8], vga_index: &mut isize) {
+/// Prints current time and date in UTC as read from RTC in CMOS.
+fn cmd_time(_args: &[u8], _vga_index: &mut isize) {
     let (y, mo, d, h, m, s) = time::rtc::read_rtc_full();
 
-    vga::write::string(vga_index, b"RTC Time: ", vga::buffer::Color::White);
-    vga::write::number(vga_index, h as u64);
+    print!("RTC Time: ");
 
-    vga::write::string(vga_index, b":", vga::buffer::Color::White);
+    // Hours
+    printn!(h as u64);
+    print!(":");
 
+    // Minutes
     if m < 10 { 
-        vga::write::string(vga_index, b"0", vga::buffer::Color::White); 
+        print!("0");
     }
-    vga::write::number(vga_index, m as u64);
+    printn!(m as u64);
+    print!(":");
 
-    vga::write::string(vga_index, b":", vga::buffer::Color::White);
-
+    // Seconds
     if s < 10 { 
-        vga::write::string(vga_index, b"0", vga::buffer::Color::White); 
+        print!("0");
     }
-    vga::write::number(vga_index, s as u64);
+    printn!(s as u64);
+    println!();
 
-    vga::write::newline(vga_index);
+    print!("RTC Date: ");
 
-    vga::write::string(vga_index, b"RTC Date: ", vga::buffer::Color::White);
-
+    // Day of month
     if d < 10 {
-        vga::write::string(vga_index, b"0", vga::buffer::Color::White); 
+        print!("0");
     }
-    vga::write::number(vga_index, d as u64);
-    vga::write::string(vga_index, b"-", vga::buffer::Color::White);
+    printn!(d as u64);
+    print!("/");
 
+    // Months
     if mo < 10 {
-        vga::write::string(vga_index, b"0", vga::buffer::Color::White); 
+        print!("0");
     }
-    vga::write::number(vga_index, mo as u64);
-    vga::write::string(vga_index, b"-", vga::buffer::Color::White);
+    printn!(mo as u64);
+    print!("/");
 
-    vga::write::number(vga_index, y as u64);
-
-    vga::write::newline(vga_index);
+    printn!(y as u64);
+    println!();
 }
 
+/// Experimental command function to show the system uptime.
 fn cmd_uptime(_args: &[u8], vga_index: &mut isize) {
     let total_seconds = time::acpi::get_uptime_seconds();
 
-    let hours = total_seconds / 3600;
-    let minutes = (total_seconds % 3600) / 60;
-    let seconds = total_seconds % 60;
+    let h = total_seconds / 3600;
+    let m = (total_seconds % 3600) / 60;
+    let s = total_seconds % 60;
 
-    // Print formatted
-    vga::write::string(vga_index, b"Uptime: ", vga::buffer::Color::White);
-    vga::write::number(vga_index, hours);
-    vga::write::string(vga_index, b":", vga::buffer::Color::White);
+    print!("System uptime: ");
 
-    if minutes < 10 {
-        vga::write::string(vga_index, b"0", vga::buffer::Color::White);
+    // Hours
+    printn!(h);
+    print!(":");
+
+    // Minutes
+    if m < 10 {
+        print!("0");
     }
+    printn!(m);
+    print!(":");
 
-    vga::write::number(vga_index, minutes);
-    vga::write::string(vga_index, b":", vga::buffer::Color::White);
-
-    if seconds < 10 {
-        vga::write::string(vga_index, b"0", vga::buffer::Color::White);
+    // Seconds
+    if s < 10 {
+        print!("0");
     }
-
-    vga::write::number(vga_index, seconds);
-
-    vga::write::newline(vga_index);
+    printn!(s);
+    println!();
 }
 
+/// Prints system information set, mainly version and name.
 fn cmd_version(_args: &[u8], vga_index: &mut isize) {
-    vga::write::string(vga_index, b"Version: ", vga::buffer::Color::White);
-    vga::write::string(vga_index, KERNEL_VERSION, vga::buffer::Color::White);
-    vga::write::newline(vga_index);
+    print!("Version: ");
+    printb!(KERNEL_VERSION);
+    println!();
 }
 
+/// Experimental command function to demonstrate the possibility of writing to files in FAT12 filesystem.
 fn cmd_write(args: &[u8], vga_index: &mut isize) {
     let floppy = Floppy;
 
@@ -876,14 +880,12 @@ fn cmd_write(args: &[u8], vga_index: &mut isize) {
             let (filename, content) = split_cmd(args);
 
             if filename.len() == 0 || content.len() == 0 {
-                vga::write::string(vga_index, b"Usage <filename> <content>", vga::buffer::Color::Yellow);
-                vga::write::newline(vga_index);
+                warn!("Usage <filename> <content>\n");
                 return;
             }
 
             if filename.len() > 8 {
-                vga::write::string(vga_index, b"Filename too long (>8)", vga::buffer::Color::Red);
-                vga::write::newline(vga_index);
+                error!("Filename too long (>8)\n");
                 return;
             }
 
@@ -901,8 +903,8 @@ fn cmd_write(args: &[u8], vga_index: &mut isize) {
             }
         }
         Err(e) => {
-            crate::vga::write::string(vga_index, e.as_bytes(), crate::vga::buffer::Color::Red);
-            crate::vga::write::newline(vga_index);
+            error!(e);
+            error!();
         }
     }
 }

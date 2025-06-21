@@ -80,6 +80,33 @@ macro_rules! printb {
     };
 }
 
+/// Special macro to print u64 numbers as a slice of u8 bytes.
+#[macro_export]
+macro_rules! printn {
+    ($arg:expr) => {
+        //
+        let mut buf = [0u8; 20];
+        let mut len = buf.len();
+
+        if $arg == 0 {
+            print!("0");
+            return;
+        }
+
+        let mut num = $arg;
+
+        while num > 0 {
+            len -= 1;
+            if let Some(b) = buf.get_mut(len) {
+                *b = b'0' + (num % 10) as u8;
+            }
+            num /= 10;
+        }
+
+        printb!(buf.get(len..).unwrap_or(&[]));
+    };
+}
+
 /// Meta macro to include the newline implicitly at the end of provided string.
 #[macro_export]
 macro_rules! println {

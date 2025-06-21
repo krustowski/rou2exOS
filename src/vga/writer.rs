@@ -59,7 +59,6 @@ pub struct Writer {
     buffer: Unique<Buffer>,
 }
 
-// Implement core::fmt::Write to use `write!()`
 impl Write for Writer {
     fn write_str(&mut self, s: &str) -> fmt::Result {
         let _ = self.write_str_raw(s);
@@ -68,6 +67,7 @@ impl Write for Writer {
 }
 
 impl Writer {
+    /// Initializes a new Writer instance and returns it right away.
     pub fn new() -> Self {
         Writer {
             col_pos: 0,
@@ -76,16 +76,26 @@ impl Writer {
             buffer: unsafe { Unique::new_unchecked(BUFFER_ADDRESS as *mut _) },
         }
     }
+
+    /// Clears the screen with the current ColorCode.
+    pub fn clear_screen(&mut self) {
+        for row in 0..BUFFER_HEIGHT {
+            self.clear_row(row);
+        }
+    }
     
     /// Sets the specified ColorCode from provided foreground and background colors.
     pub fn set_color(&mut self, fg: Color, bg: Color) {
         self.color_code = ColorCode::new(fg, bg)
     }
 
-    fn buffer_mut(&mut self) -> &mut Buffer {
-        unsafe { self.buffer.as_mut() }
+    /// Meta function to support printing static strings.
+    pub fn write_str_raw(&mut self, s: &str) {
+        for &byte in s.as_bytes() {
+            self.write_byte(byte);
+        }
     }
-
+    /// Write one (1) byte to the display.
     pub fn write_byte(&mut self, byte: u8) {
         match byte {
             b'\n' => self.new_line(),
@@ -104,6 +114,7 @@ impl Writer {
                 let color_code = self.color_code;
                 let buf = self.buffer_mut();
 
+                // Write the character to screen
                 if let Some(row_buf) = buf.chars.get_mut(row) {
                     if let Some(cell) = row_buf.get_mut(col) {
                         *cell = ScreenChar {
@@ -117,6 +128,12 @@ impl Writer {
         }
     }
 
+    /// Returns a mutable reference to the video buffer.
+    fn buffer_mut(&mut self) -> &mut Buffer {
+        unsafe { self.buffer.as_mut() }
+    }
+
+    /// Does the CRLF type of magic with the positional coordinates of a Writer instance.
     fn new_line(&mut self) {
         if self.row_pos < BUFFER_HEIGHT - 1 {
             self.row_pos += 1;
@@ -133,6 +150,7 @@ impl Writer {
         self.col_pos = 0;
     }
 
+    /// Clears the whole text row with the current ColorCode.
     fn clear_row(&mut self, row: usize) {
         let blank = ScreenChar {
             ascii_character: b' ',
@@ -141,12 +159,6 @@ impl Writer {
         let buffer = self.buffer_mut();
         for col in 0..BUFFER_WIDTH {
             buffer.chars[row][col] = blank;
-        }
-    }
-
-    pub fn write_str_raw(&mut self, s: &str) {
-        for &byte in s.as_bytes() {
-            self.write_byte(byte);
         }
     }
 }

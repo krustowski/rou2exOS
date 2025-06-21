@@ -8,11 +8,14 @@ use crate::vga::screen::clear;
 use crate::vga::write::newline;
 use crate::video::{self, vga};
 
+/// The macimum size of an input to the shell console.
 const INPUT_BUFFER_SIZE: usize = 128;
 
+/// Case control keys state booleans.
 static mut SHIFT_PRESSED: bool = false;
 static mut CAPS_LOCK_ON: bool = false;
 
+/// Internal function to assemble the prompt contents.
 fn render_prompt(_vga_index: &mut isize) {
     let path = get_path() as &[u8];
 
@@ -25,12 +28,14 @@ fn render_prompt(_vga_index: &mut isize) {
     printb!(path);
     print!("", vga::Color::Green);
     print!("] > ");
+    print!("", vga::Color::White);
 }
 
 //
 //  HARDWARE CURSOR HANDLING
 //
 
+/// Moves the hardware cursor according to the actual VGA index.
 pub fn move_cursor_index(vga_index: &mut isize) {
     let row = (*vga_index / 2) / 80;
     let col = (*vga_index / 2) % 80;
@@ -38,7 +43,7 @@ pub fn move_cursor_index(vga_index: &mut isize) {
     move_cursor(row as u16, col as u16);
 }
 
-/// Move the hardware cursor to (row, col)
+/// Move the hardware cursor to position defined as (row, col).
 pub fn move_cursor(row: u16, col: u16) {
     let pos: u16 = row * 80 + col; // 80 columns wide
 
@@ -55,15 +60,18 @@ pub fn move_cursor(row: u16, col: u16) {
 //  KEYBOARD HANDLING
 //
 
+/// Keeps the loop until a key is pressed.
 pub fn keyboard_wait_read() {
     while port::read(0x64) & 1 == 0 {}
 }
 
+/// Returns last scanned code from the keyboard.
 pub fn keyboard_read_scancode() -> u8 {
     keyboard_wait_read();
     port::read(0x60)
 }
 
+/// Main command shell loop. 
 pub fn keyboard_loop(vga_index: &mut isize) {
     let mut input_buffer = [0u8; INPUT_BUFFER_SIZE];
     let mut input_len = 0;
@@ -74,8 +82,6 @@ pub fn keyboard_loop(vga_index: &mut isize) {
 
     // Write prompt
     render_prompt(vga_index);
-    //move_cursor_index(vga_index);
-    //vga::screen::scroll(vga_index);
 
     loop {
         let key = keyboard_read_scancode();
@@ -108,7 +114,6 @@ pub fn keyboard_loop(vga_index: &mut isize) {
                     input_len = 0;
 
                     render_prompt(vga_index);
-                    //move_cursor_index(vga_index);
                     continue;
                 }
             }
@@ -132,8 +137,6 @@ pub fn keyboard_loop(vga_index: &mut isize) {
 
                 // Show new prompt
                 render_prompt(vga_index);
-                //move_cursor_index(vga_index);
-
                 continue;
             }
             // Tab key
@@ -153,43 +156,35 @@ pub fn keyboard_loop(vga_index: &mut isize) {
 
                 input_len += 1;
 
-                // Draw it on screen
+                // Draw the ASCII byte to the screen
                 printb!(&[ascii]);
-                //move_cursor_index(vga_index);
             }
         }
     };
 }
 
-fn handle_backspace(input_len: &mut usize, vga_index: &mut isize) {
+/// Runs operations when the Backspace key has been pressed.
+fn handle_backspace(input_len: &mut usize, _vga_index: &mut isize) {
     if *input_len > 0 {
         *input_len -= 1;
 
         print!("\r");
-
-        /*unsafe {
-            *vga_index -= 2; // Move cursor back one character
-            *vga::buffer::VGA_BUFFER.offset(*vga_index) = b' ';
-            *vga::buffer::VGA_BUFFER.offset(*vga_index + 1) = vga::buffer::Color::White as u8;
-        }*/
-        //move_cursor_index(vga_index);
     }
 }
 
+/// Runs specialized operations related to the Tab key.
 fn handle_tab_completion(input_buffer: &mut [u8; INPUT_BUFFER_SIZE], input_len: &mut usize, vga_index: &mut isize) {
     let mut input_cpy = [0u8; 128];
     input_cpy.copy_from_slice(input_buffer);
 
+    // Split the input to react accordingly
     let (cmd, prefix) = split_cmd(&input_cpy);
 
+    // Just render the help command output
     if prefix.len() == 0 {
         cmd::handle(b"help", vga_index);
         return;
     }
-
-    // Print passed prefix
-    //vga::write::string(vga_index, prefix, vga::buffer::Color::Yellow);
-    //newline(vga_index);
 
     let floppy = Floppy;
     let mut found = false;
@@ -202,6 +197,7 @@ fn handle_tab_completion(input_buffer: &mut [u8; INPUT_BUFFER_SIZE], input_len: 
                 }
 
                 let padded_prefix = pad_prefix(prefix);
+
                 fs.for_each_entry(PATH_CLUSTER, |entry| {
                     if entry.name[0] != 0x00 && entry.name[0] != 0xE5 {
 
@@ -214,18 +210,21 @@ fn handle_tab_completion(input_buffer: &mut [u8; INPUT_BUFFER_SIZE], input_len: 
                             return;
                         }
 
+                        // Copy the file name
                         if let Some(slice) = clean_name.get_mut(..name_end) {
                             if let Some(sl) = entry.name.get(..name_end) {
                                 slice.copy_from_slice(sl);
                             }
                         }
 
+                        // TODO: Review this, it is overeng'd to fix the linker panicking errors.
                         if ext_end <= 3 && name_end > 0 && name_end <= 8 && ext_end + name_end <= 12 {
-
+                            // Directories should not contain dots in their name (no extensions)
                             if cmd != b"cd" || ext_end != 0 {
                                 clean_name[name_end] = b'.';
                             }
 
+                            // Copy the file extension
                             if let Some(slice) = clean_name.get_mut(name_end + 1..name_end + ext_end + 1) {
                                 if let Some(sl) = entry.ext.get(..ext_end) {
                                     slice.copy_from_slice(sl);
@@ -233,30 +232,30 @@ fn handle_tab_completion(input_buffer: &mut [u8; INPUT_BUFFER_SIZE], input_len: 
                             }
                         }
 
+                        // Again, this fixes the linker error for panicking code
                         if prefix.len() > 8 {
                             return;
                         }
 
-                        // MATCH
+                        // Match found...
                         if entry.name.starts_with(&padded_prefix[..prefix.len()]) {
                             if cmd == b"cd" && entry.attr & 0x10 == 0 {
                                 return;
                             }
 
-                            for i in 0..prefix.len() {
+                            for _ in 0..prefix.len() {
                                 handle_backspace(input_len, vga_index);
                             }
 
                             print!("", video::vga::Color::Magenta);
                             printb!(&clean_name);
-                            //vga::write::string(vga_index, &clean_name, vga::buffer::Color::Pink);
-                            //move_cursor_index(vga_index);
                             found = true;
 
                             if cmd.len() > 10 || cmd.len() + 1 > 11 {
                                 return;
                             }
 
+                            // Ensure the command name is in the buffer
                             if let Some(slice) = input_buffer.get_mut(..cmd.len()) {
                                 slice.copy_from_slice(&cmd[..cmd.len()]);
                             }
@@ -267,6 +266,7 @@ fn handle_tab_completion(input_buffer: &mut [u8; INPUT_BUFFER_SIZE], input_len: 
                                 name_end
                             }; 
 
+                            // Copy the match into buffer
                             if let Some(slice) = input_buffer.get_mut(cmd.len() + 1..cmd.len() + 1 + clean_name_len) {
                                 if name_end + ext_end + 1 > 12 {
                                     return;
@@ -274,16 +274,15 @@ fn handle_tab_completion(input_buffer: &mut [u8; INPUT_BUFFER_SIZE], input_len: 
                                 slice.copy_from_slice(&clean_name[..clean_name_len]);
                             }
 
-                            *input_len += cmd.len() + 1 + clean_name_len; // adjust if necessary
+                            // Adjust the input buffer used length
+                            *input_len += cmd.len() + 1 + clean_name_len;
 
                             if *input_len > 128 {
                                 return;
                             }
 
-                            // Debug: print full input buffer
-                            //vga::write::string(vga_index, &input_buffer[..*input_len], vga::buffer::Color::Red);
-                            //vga::write::byte(vga_index, b'"', vga::buffer::Color::Red);
-                            //newline(vga_index);
+                            // Debug: record full input buffer
+                            debugln!(&input_buffer[..*input_len]);
                             return;
                         }
                     }
@@ -297,6 +296,7 @@ fn handle_tab_completion(input_buffer: &mut [u8; INPUT_BUFFER_SIZE], input_len: 
     }
 }
 
+/// Mapping function for the basic (printable) ASCII characters.
 pub fn scancode_to_ascii(sc: u8) -> Option<u8> {
     unsafe {
         match sc {
@@ -374,11 +374,13 @@ pub fn scancode_to_ascii(sc: u8) -> Option<u8> {
     }
 }
 
+/// Pads the provided filename stub to 11 characters to match the FAT12 format.
 fn pad_prefix(mut prefix: &[u8]) -> [u8; 11] {
     let mut padded = [b' '; 11];
 
     let mut i = 0;
     let mut j = 0;
+
     while i < prefix.len() && j < 11 {
         if prefix[i] == b'.' {
             j = 8; // Jump to extension part
@@ -394,28 +396,11 @@ fn pad_prefix(mut prefix: &[u8]) -> [u8; 11] {
 
 /// Splits a buffer into two parts at the first space (`b' '`),
 /// while skipping trailing zeros and handling missing space correctly
-pub fn _split_cmd(input: &[u8]) -> (&[u8], &[u8]) {
-    // Find the actual length before the first null byte
-    let len = input.iter().position(|&c| c == 0).unwrap_or(input.len());
-    let trimmed = &input[..len];
-
-    if let Some(space_pos) = trimmed.iter().position(|&c| c == b' ') {
-        let first = &trimmed[..space_pos];
-        let second = if space_pos + 1 < trimmed.len() {
-            &trimmed[space_pos + 1..]
-        } else {
-            &[]
-        };
-        (first, second)
-    } else {
-        (&[], trimmed)
-    }
-}
-
 pub fn split_cmd(input: &[u8]) -> (&[u8], &[u8]) {
     let len = input.iter().position(|&c| c == 0).unwrap_or(input.len());
     let trimmed = &input[..len];
 
+    // Break the input at first space
     if let Some(pos) = trimmed.iter().position(|&c| c == b' ') {
         let cmd = &trimmed[..pos];
         let mut rest = &trimmed[pos + 1..];

@@ -197,6 +197,7 @@ pub fn handle(input: &[u8], vga_index: &mut isize) {
             // Echo back the input
             error!("Unknown command: ");
             printb!(cmd_name);
+            println!();
         }
     }
 }

@@ -10,7 +10,7 @@ pub fn color_demo() {
         0xC, 0xD, 0xE, 0xF,
     ];
 
-    print!("Color test:\n\n");
+    print!("Color test:\n");
 
     let mut col = 0;
     for &color in colors.iter() {

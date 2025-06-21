@@ -1,18 +1,12 @@
-use crate::vga::{
-    write::{string, newline},
-    buffer::Color,
-};
+use crate::video::vga::Color;
 
-pub fn ascii_art(vga_index: &mut isize) {
-    string(vga_index, b"                 ____            ___  _____ ", Color::Green);
-    newline(vga_index);
-    string(vga_index, b" _ __ ___  _   _|___ \\ _____  __/ _ \\/ ____| ", Color::Green);
-    newline(vga_index);
-    string(vga_index, b"| '__/ _ \\| | | | __) / _ \\ \\/ / | | \\___ \\", Color::Green);
-    newline(vga_index);
-    string(vga_index, b"| | | (_) | |_| |/ __/  __/>  <| |_| |___) |", Color::Green);
-    newline(vga_index);
-    string(vga_index, b"|_|  \\___/ \\__,_|_____\\___/_/\\_\\____/|____/", Color::Green);
-    newline(vga_index);
-    newline(vga_index);
+pub fn ascii_art() {
+    print!("                 ____            ___  _____ \n", Color::Green);
+    print!(" _ __ ___  _   _|___ \\ _____  __/ _ \\/ ____| \n", Color::Green);
+    print!("| '__/ _ \\| | | | __) / _ \\ \\/ / | | \\___ \\\n", Color::Green);
+    print!("| | | (_) | |_| |/ __/  __/>  <| |_| |___) |\n", Color::Green);
+    print!("|_|  \\___/ \\__,_|_____\\___/_/\\_\\____/|____/\n\n", Color::Green);
+
+    // Set the fg color back to white on return
+    print!("", Color::White);
 }

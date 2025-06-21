@@ -14,9 +14,9 @@
 
 #[macro_use]
 mod debug;
-#[macro_use]
-mod macros;
 mod multiboot2;
+#[macro_use]
+mod video;
 
 // Core kernel modules
 mod acpi;
@@ -30,7 +30,6 @@ mod net;
 mod time;
 mod tui;
 mod vga;
-mod video;
 
 /// Kernel entrypoint
 #[unsafe(no_mangle)]
@@ -42,7 +41,7 @@ pub extern "C" fn kernel_main() {
     vga::screen::clear(vga_index);
 
     // Instantiate new Writer
-    macros::init_writer();
+    video::macros::init_writer();
 
     // Run init checks
     unsafe {

@@ -97,6 +97,22 @@ macro_rules! debugln {
     }};
 }
 
+#[macro_export]
+macro_rules! kprint {
+    ($buf:expr, $off:expr, $str:expr) => {
+        let len = $buf.len();
+
+        if *$off >= len || *$off + $str.len() >= len {
+            return;
+        }
+
+        if let Some(slice) = $buf.get_mut(*$off..*$off + $str.len()) {
+            slice.copy_from_slice($str);
+            *$off += $str.len();
+        }
+    };
+}
+
 use crate::fs::fat12::{block::Floppy, fs::Fs};
 
 pub fn dump_debug_log_to_file(vga_index: &mut isize) {

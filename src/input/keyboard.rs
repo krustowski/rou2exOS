@@ -282,7 +282,7 @@ fn handle_tab_completion(input_buffer: &mut [u8; INPUT_BUFFER_SIZE], input_len: 
                             }
 
                             // Debug: record full input buffer
-                            debugln!(&input_buffer[..*input_len]);
+                            //debugln!(&input_buffer[..*input_len]);
                             return;
                         }
                     }
@@ -375,7 +375,7 @@ pub fn scancode_to_ascii(sc: u8) -> Option<u8> {
 }
 
 /// Pads the provided filename stub to 11 characters to match the FAT12 format.
-fn pad_prefix(mut prefix: &[u8]) -> [u8; 11] {
+fn pad_prefix(prefix: &[u8]) -> [u8; 11] {
     let mut padded = [b' '; 11];
 
     let mut i = 0;
@@ -402,8 +402,10 @@ pub fn split_cmd(input: &[u8]) -> (&[u8], &[u8]) {
 
     // Break the input at first space
     if let Some(pos) = trimmed.iter().position(|&c| c == b' ') {
-        let cmd = &trimmed[..pos];
-        let mut rest = &trimmed[pos + 1..];
+
+        let cmd = trimmed.get(..pos).unwrap_or(&[]);
+        let mut rest = trimmed.get(pos + 1..).unwrap_or(&[]);
+
         while rest.first() == Some(&b' ') {
             rest = &rest[1..];
         }

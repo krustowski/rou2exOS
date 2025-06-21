@@ -1,8 +1,8 @@
-use crate::vga::{
-    write::{byte, string, newline},
-    buffer::Color,
-};
+use crate::{init::Buffer, video::vga::Color};
 
+use super::INIT_BUFFER;
+
+#[derive(PartialEq, Copy, Clone)]
 pub enum InitResult {
     Unknown,
     Passed,
@@ -27,15 +27,21 @@ impl InitResult {
 
 const MAX_MSG_LEN: usize = 60;
 
-pub fn print_result(message: &'static str, result: InitResult, vga_index: &mut isize) {
-    string(vga_index, message.as_bytes(), Color::White);
+pub fn print_result(message: &'static str, result: InitResult) {
+    let mut buf = Buffer::new();
+    
+    buf.append(message.as_bytes());
 
     for _ in 0..MAX_MSG_LEN - message.len() {
-        byte(vga_index, b'.', Color::White);
+        buf.append(b".");
     }
 
-    string(vga_index, b" [", Color::White);
-    string(vga_index, result.format().0, result.format().1);
-    string(vga_index, b"]", Color::White);
-    newline(vga_index);
+    buf.append(b" [");
+    buf.append(result.format().0);
+    buf.append(b"]\n");
+
+    if let Some(slice) = buf.buf.get(..buf.pos) {
+        //
+        INIT_BUFFER.lock().append(slice);
+    }
 }

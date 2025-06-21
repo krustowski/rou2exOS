@@ -1,13 +1,42 @@
 use core::fmt::{self, Write};
 use core::ptr::Unique;
 use crate::input::port;
+use spin::{mutex::Mutex};
+use core::sync::atomic::{AtomicBool, Ordering};
 
-/// VGA text mode buffer dimensions
+/// VGA text mode buffer dimensions.
 const BUFFER_WIDTH: usize = 80;
 const BUFFER_HEIGHT: usize = 25;
 const BUFFER_ADDRESS: usize = 0xb8000;
 
-/// VGA color attributes
+/// Wrapped Writer instance guarded by Mutex.
+pub static mut WRITER: Option<Mutex<Writer>> = None;
+
+/// Helper static boolean to ensure that the global Writer instance is created just once.
+static WRITER_INIT: AtomicBool = AtomicBool::new(false);
+
+/// Initializes the unique Writer instance.
+pub fn init_writer() {
+    if WRITER_INIT.compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst).is_ok() {
+        let writter = Writer::new();
+        unsafe {
+            WRITER = Some(Mutex::new(writter));
+        }
+    }
+}
+
+/// Returns a wrapped Writer instance guarded by Mutex in Option. Beware that this invocation locks
+/// the Writer instance and all print macros therefore can fail silently.
+pub fn get_writer() -> Option<spin::MutexGuard<'static, Writer>> {
+    if WRITER_INIT.load(Ordering::Relaxed) {
+        unsafe { WRITER.as_ref().map(|m| m.lock()) }
+    } else {
+        // Not initialized yet
+        None
+    }
+}
+
+/// VGA text mode colors (16 colors).
 #[allow(dead_code)]
 #[derive(Copy, Clone)]
 #[repr(u8)]
@@ -31,16 +60,19 @@ pub enum Color {
     White = 15,
 }
 
+/// Structure to abstract and combine the foreground and background color usage.
 #[derive(Copy, Clone)]
 #[repr(transparent)]
 struct ColorCode(u8);
 
 impl ColorCode {
+    /// Creates a new ColorCode instance to be used in text video mode implementations.
     fn new(fg: Color, bg: Color) -> Self {
         Self((bg as u8) << 4 | (fg as u8))
     }
 }
 
+/// Structure to abstract a single character on the VGA text mode screen.
 #[derive(Copy, Clone)]
 #[repr(C)]
 struct ScreenChar {
@@ -48,11 +80,14 @@ struct ScreenChar {
     color_code: ColorCode,
 }
 
+/// Buffer abstracts the whole VGA text mode screen with the 2D array to hold 80x25 ScreenChars.
 #[repr(transparent)]
 struct Buffer {
     chars: [[ScreenChar; BUFFER_WIDTH]; BUFFER_HEIGHT],
 }
 
+/// Writer encapsulates the VGA text mode abstractions with proper video operations as
+/// implementations.
 pub struct Writer {
     col_pos: usize,
     row_pos: usize,
@@ -61,6 +96,7 @@ pub struct Writer {
 }
 
 impl Write for Writer {
+    /// Writes an input string to VGA text mode screen.
     fn write_str(&mut self, s: &str) -> fmt::Result {
         let _ = self.write_str_raw(s);
         Ok(())
@@ -137,7 +173,7 @@ impl Writer {
 
     /// Move the hardware cursor to (row, col)
     fn move_cursor(&mut self) {
-        let pos: u16 = self.row_pos as u16 * 80 + self.col_pos as u16;
+        let pos: u16 = (self.row_pos * BUFFER_WIDTH + self.col_pos) as u16;
 
         // Set high byte
         port::write(0x3D4, 0x0E);

@@ -1,5 +1,6 @@
 use core::fmt::{self, Write};
 use core::ptr::Unique;
+use crate::input::port;
 
 /// VGA text mode buffer dimensions
 const BUFFER_WIDTH: usize = 80;
@@ -81,6 +82,11 @@ impl Writer {
     pub fn clear_screen(&mut self) {
         for row in 0..BUFFER_HEIGHT {
             self.clear_row(row);
+
+            self.col_pos = 0;
+            self.row_pos = 0;
+
+            self.move_cursor();
         }
     }
     
@@ -126,7 +132,22 @@ impl Writer {
                 }
             }
         }
+        self.move_cursor();
     }
+
+    /// Move the hardware cursor to (row, col)
+    fn move_cursor(&mut self) {
+        let pos: u16 = self.row_pos as u16 * 80 + self.col_pos as u16;
+
+        // Set high byte
+        port::write(0x3D4, 0x0E);
+        port::write(0x3D5, (pos >> 8) as u8);
+
+        // Set low byte
+        port::write(0x3D4, 0x0F);
+        port::write(0x3D5, (pos & 0xFF) as u8);
+    }
+
 
     /// Returns a mutable reference to the video buffer.
     fn buffer_mut(&mut self) -> &mut Buffer {
@@ -148,6 +169,7 @@ impl Writer {
             self.clear_row(BUFFER_HEIGHT - 1);
         }
         self.col_pos = 0;
+        self.move_cursor();
     }
 
     /// Clears the whole text row with the current ColorCode.

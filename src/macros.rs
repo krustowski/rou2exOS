@@ -8,7 +8,7 @@ pub static mut WRITER: Option<Mutex<Writer>> = None;
 /// Helper static boolean to ensure that the global Writer instance is created just once.
 static WRITER_INIT: AtomicBool = AtomicBool::new(false);
 
-/// Initializes the global Writer instance
+/// Initializes the unique Writer instance.
 pub fn init_writer() {
     if WRITER_INIT.compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst).is_ok() {
         let writter = Writer::new();

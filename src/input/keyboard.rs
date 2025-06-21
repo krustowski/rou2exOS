@@ -16,13 +16,13 @@ static mut CAPS_LOCK_ON: bool = false;
 fn render_prompt(vga_index: &mut isize) {
     let path = get_path() as &[u8];
 
-    vga::write::string(vga_index, b"[", vga::buffer::Color::Green);
-    vga::write::string(vga_index, USER, vga::buffer::Color::Green);
-    vga::write::string(vga_index, b"@", vga::buffer::Color::Green);
-    vga::write::string(vga_index, HOST, vga::buffer::Color::Green);
-    vga::write::string(vga_index, b":", vga::buffer::Color::Green);
-    vga::write::string(vga_index, path, vga::buffer::Color::Blue);
-    vga::write::string(vga_index, b"] > ", vga::buffer::Color::Green);
+    print!("[", vga::writer::Color::Green);
+    printb!(USER);
+    print!("@");
+    printb!(HOST);
+    print!(":");
+    printb!(path);
+    print!("] > ");
 }
 
 //
@@ -68,14 +68,11 @@ pub fn keyboard_loop(vga_index: &mut isize) {
 
     let mut ctrl_down = false;
 
-    vga::write::newline(vga_index);
-    vga::write::string(vga_index, b"Starting prompt...", vga::buffer::Color::White);
-    vga::write::newline(vga_index);
-    vga::write::newline(vga_index);
+    print!("\nStarting shell...\n\n");
 
     // Write prompt
     render_prompt(vga_index);
-    move_cursor_index(vga_index);
+    //move_cursor_index(vga_index);
     vga::screen::scroll(vga_index);
 
     loop {
@@ -105,7 +102,7 @@ pub fn keyboard_loop(vga_index: &mut isize) {
                     input_len = 0;
 
                     render_prompt(vga_index);
-                    move_cursor_index(vga_index);
+                    //move_cursor_index(vga_index);
                     continue;
                 }
             }
@@ -115,7 +112,8 @@ pub fn keyboard_loop(vga_index: &mut isize) {
             }
             0x1C => {
                 // ENTER key pressed
-                vga::write::newline(vga_index);
+                //vga::write::newline(vga_index);
+                println!();
 
                 let input_slice = input_buffer.get(..input_len).unwrap_or(&[]);
                 cmd::handle(input_slice, vga_index);
@@ -126,7 +124,7 @@ pub fn keyboard_loop(vga_index: &mut isize) {
 
                 // Show new prompt
                 render_prompt(vga_index);
-                move_cursor_index(vga_index);
+                //move_cursor_index(vga_index);
 
                 continue;
             }

@@ -30,7 +30,7 @@ mod net;
 mod time;
 mod tui;
 mod vga;
-//mod video;
+mod video;
 
 /// Kernel entrypoint
 #[unsafe(no_mangle)]
@@ -49,7 +49,7 @@ pub extern "C" fn kernel_main() {
         init::init(vga_index, init::config::multiboot_ptr as u64);
     }
 
-    // Run prompt loop
+    // Run the shell loop
     debugln!("Starting shell...");
     input::keyboard::keyboard_loop(vga_index);
 }

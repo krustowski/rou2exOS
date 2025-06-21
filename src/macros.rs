@@ -72,7 +72,7 @@ macro_rules! warn {
 macro_rules! printb {
     ($arg:expr) => {
         if let Some(mut writer) = $crate::macros::get_writer() { 
-            writer.set_color($crate::vga::writer::Color::White, $crate::vga::writer::Color::Black);
+            //writer.set_color($crate::vga::writer::Color::White, $crate::vga::writer::Color::Black);
             for b in $arg {
                 writer.write_byte(*b);
             }
@@ -97,7 +97,7 @@ macro_rules! println {
 macro_rules! print {
     ($arg:expr) => {
         if let Some(mut writer) = $crate::macros::get_writer() { 
-            writer.set_color($crate::vga::writer::Color::White, $crate::vga::writer::Color::Black);
+            //writer.set_color($crate::vga::writer::Color::White, $crate::vga::writer::Color::Black);
             writer.write_str_raw($arg);
         }
     };

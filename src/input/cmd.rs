@@ -74,7 +74,7 @@ static COMMANDS: &[Command] = &[
         name: b"ether",
         description: b"runs the Ethernet frame handler",
         function: cmd_ether,
-        hidden: false,
+        hidden: true,
     },
     Command {
         name: b"fsck",
@@ -92,13 +92,13 @@ static COMMANDS: &[Command] = &[
         name: b"http",
         description: b"runs a simple HTTP/UDP handler",
         function: cmd_http,
-        hidden: false,
+        hidden: true,
     },
     Command {
         name: b"menu",
         description: b"renders a sample menu",
         function: cmd_menu,
-        hidden: false,
+        hidden: true,
     },
     Command {
         name: b"mkdir",
@@ -116,7 +116,7 @@ static COMMANDS: &[Command] = &[
         name: b"ping",
         description: b"pings the host over the serial line (ICMP/SLIP)",
         function: cmd_ping,
-        hidden: false,
+        hidden: true,
     },
     Command {
         name: b"read",
@@ -152,7 +152,7 @@ static COMMANDS: &[Command] = &[
         name: b"tcp",
         description: b"tests the TCP implementation",
         function: cmd_tcp,
-        hidden: false,
+        hidden: true,
     },
     Command {
         name: b"time",
@@ -164,7 +164,7 @@ static COMMANDS: &[Command] = &[
         name: b"uptime",
         description: b"prints system uptime",
         function: cmd_uptime,
-        hidden: false,
+        hidden: true,
     },
     Command {
         name: b"version",
@@ -312,8 +312,6 @@ fn cmd_beep(_args: &[u8], _vga_index: &mut isize) {
 
 /// Changes the current directory to one matching an input from keyboard.
 fn cmd_cd(args: &[u8], vga_index: &mut isize) {
-    let floppy = Floppy;
-
     // 12 = name + extension + dot
     if args.len() == 0 || args.len() > 12 {
         unsafe {
@@ -337,6 +335,9 @@ fn cmd_cd(args: &[u8], vga_index: &mut isize) {
         slice.copy_from_slice(filename_input);
     }
 
+    let floppy = Floppy;
+
+    // Init the filesystem to look for a match
     match Fs::new(&floppy, vga_index) {
         Ok(fs) => {
             let mut cluster: u16 = 0;
@@ -363,6 +364,7 @@ fn cmd_cd(args: &[u8], vga_index: &mut isize) {
     }
 }
 
+/// Clears the screen and starts the TCP server accepting connections on TCP/12345. 
 fn cmd_chat(args: &[u8], vga_index: &mut isize) {
     crate::vga::screen::clear(vga_index);
 
@@ -372,18 +374,23 @@ fn cmd_chat(args: &[u8], vga_index: &mut isize) {
     if count > 0 {
         app::chat::tcp::handle_conns(vga_index, &ips);
     } else {
+        // Use dummy IP addresses to 
         app::chat::tcp::handle_conns(vga_index, &[[0u8; 4]; 4]);
     }
 }
 
+/// This just clears the whole screen with black background color.
 fn cmd_clear(_args: &[u8], vga_index: &mut isize) {
-    vga::screen::clear(vga_index);
+    clear_screen!();
 }
 
+/// Dumps the whole debug log to display and tries to write it to the DEBUG.TXT file too if
+/// filesystem is reachable.
 fn cmd_debug(_args: &[u8], vga_index: &mut isize) {
     debug::dump_debug_log_to_file(vga_index);
 }
 
+/// Prints the whole contents of the current directory.
 fn cmd_dir(_args: &[u8], vga_index: &mut isize) {
     let floppy = Floppy;
 
@@ -394,26 +401,28 @@ fn cmd_dir(_args: &[u8], vga_index: &mut isize) {
             }
         }
         Err(e) => {
-            crate::vga::write::string(vga_index, e.as_bytes(), crate::vga::buffer::Color::Red);
-            crate::vga::write::newline(vga_index);
+            error!(e);
+            error!();
         }
     }
 }
 
-fn cmd_echo(args: &[u8], vga_index: &mut isize) {
-    vga::write::string(vga_index, args, vga::buffer::Color::White);
-    vga::write::newline(vga_index);
+/// Echos the arguments back to the display.
+fn cmd_echo(args: &[u8], _vga_index: &mut isize) {
+    printb!(args);
+    println!();
 }
 
+/// Runs a simplistic text editor.
 fn cmd_ed(args: &[u8], vga_index: &mut isize) {
     let (filename_input, _) = keyboard::split_cmd(args);
 
     if filename_input.len() == 0 || filename_input.len() > 12 {
-        vga::write::string(vga_index, b"Usage: ed <filename>", vga::buffer::Color::Yellow);
-        newline(vga_index);
+        warn!("Usage: ed <filename>\n");
         return;
     }
 
+    // Copy the input into a space-padded slice
     let mut filename = [b' '; 12];
     if let Some(slice) = filename.get_mut(..filename_input.len()) {
         slice.copy_from_slice(filename_input);
@@ -421,85 +430,87 @@ fn cmd_ed(args: &[u8], vga_index: &mut isize) {
 
     //to_uppercase_ascii(&mut filename);
 
-    vga::screen::clear(vga_index);
+    // Run the editor
     app::editor::edit_file(&filename, vga_index);
-    vga::screen::clear(vga_index);
+    clear_screen!();
 }
 
+/// Experimental command function to test the Ethernet implementation.
 fn cmd_ether(_args: &[u8], vga_index: &mut isize) {
     app::ether::handle_packet(vga_index);
 }
 
+/// Filesystem check utility.
 fn cmd_fsck(_args: &[u8], vga_index: &mut isize) {
     run_check(vga_index);
 }
 
-
-fn cmd_help(_args: &[u8], vga_index: &mut isize) {
-    vga::write::string(vga_index, b"List of commands:", vga::buffer::Color::White);
-    vga::write::newline(vga_index);
+/// Meta command to dump all non-hidden commands.
+fn cmd_help(_args: &[u8], _vga_index: &mut isize) {
+    println!("List of commands:");
 
     for cmd in COMMANDS {
         if cmd.hidden {
             continue;
         }
 
-        vga::write::string(vga_index, b" ", vga::buffer::Color::Blue);
-        vga::write::string(vga_index, cmd.name, vga::buffer::Color::Blue);
-        vga::write::string(vga_index, b": ", vga::buffer::Color::Blue);
-        vga::write::string(vga_index, cmd.description, vga::buffer::Color::White);
-        vga::write::newline(vga_index);
+        // Print the command name and description
+        print!(" ", vga::writer::Color::Blue);
+        printb!(cmd.name);
+        print!(": ", vga::writer::Color::White);
+        printb!(cmd.description);
+        println!();
     }
 }
 
-fn cmd_snake(_args: &[u8], vga_index: &mut isize) {
-    app::snake::menu::menu_loop(vga_index);
-}
-
-fn cmd_http(_args: &[u8], vga_index: &mut isize) {
+/// Experimental command function to test the HTTP over UDP implementation.
+fn cmd_http(_args: &[u8], _vga_index: &mut isize) {
     fn callback(packet: &[u8]) -> u8 {
         if let Some((ipv4_header, ipv4_payload)) = net::ipv4::parse_packet(packet) {
+            // Match only UDP
             if ipv4_header.protocol != 17 {
                 return 1;
             }
 
+            // Handle the connection
             return app::http_udp::udp_handler(&ipv4_header, ipv4_payload);
         }
         0
     }
 
-    vga::write::newline(vga_index);
-    vga::write::string(vga_index, b"Starting a simple HTTP/UDP handler (hit any key to interrupt)...", vga::buffer::Color::White);
-    vga::write::newline(vga_index);
+    println!("Starting a simple HTTP/UDP handler (hit any key to interrupt)...");
 
     loop {
+        // Run the receive loop = try to extract an encapsulated IPv4 packet in SLIP
         let ret = net::ipv4::receive_loop(callback);
 
         if ret == 0 {
-            vga::write::string(vga_index, b"Received a HTTP request, sending response", vga::buffer::Color::White);
-            vga::write::newline(vga_index);
+            println!("Received a HTTP request, sending response");
         } else if ret == 3 {
-            vga::write::string(vga_index, b"Keyboard interrupt", vga::buffer::Color::White);
-            vga::write::newline(vga_index);
+            println!("Keyboard interrupt");
             break;
         }
     }
 }
 
+/// Experimental command function to evaluate the current TUI rendering options.
 fn cmd_menu(_args: &[u8], _vga_index: &mut isize) {
-    // Working sample, but loop without exit
+    // Working sample, but loops without exit
     //app::menu::menu_loop(vga_index);
 
+    // Set the labels
     let mut label1 = Label { x: 0, y: 0, text: "Play", attr: 0x0F };
     let mut label2 = Label { x: 0, y: 2, text: "Scores", attr: 0x0F };
     let mut label3 = Label { x: 0, y: 4, text: "Quit", attr: 0x0F };
 
+    // Create a container to hold all labels
     let mut menu = Container {
         x: 30,
         y: 10,
         children: [&mut label1, &mut label2, &mut label3],
     };
 
+    // Set the dimensions of a TUI window to render it with a proper title in the middle top
     let mut window = Window {
         x: 20,
         y: 5,
@@ -509,19 +520,20 @@ fn cmd_menu(_args: &[u8], _vga_index: &mut isize) {
         child: Some(&mut menu),
     };
 
+    // Run the experimental construction
     let mut app = TuiApp::new();
     app.set_root(&mut window);
     app.run();
 }
 
+/// Creates new subdirectory in the current directory.
 fn cmd_mkdir(args: &[u8], vga_index: &mut isize) {
-    let floppy = Floppy;
-
     if args.len() == 0 || args.len() > 11 {
-        crate::vga::write::string(vga_index, b"Usage: mkdir <dirname>", crate::vga::buffer::Color::Yellow);
-        crate::vga::write::newline(vga_index);
+        warn!("Usage: mkdir <dirname>\n");
         return;
     }
+
+    let floppy = Floppy;
 
     match Fs::new(&floppy, vga_index) {
         Ok(fs) => {
@@ -537,21 +549,20 @@ fn cmd_mkdir(args: &[u8], vga_index: &mut isize) {
             }
         }
         Err(e) => {
-            crate::vga::write::string(vga_index, e.as_bytes(), crate::vga::buffer::Color::Red);
-            crate::vga::write::newline(vga_index);
+            error!(e);
+            error!();
         }
     }
 }
 
-
+/// Renames given <old_name> to <new_name> in the current directory.
 fn cmd_mv(args: &[u8], vga_index: &mut isize) {
-    let floppy = Floppy;
-
     if args.len() == 0 {
-        crate::vga::write::string(vga_index, b"Usage: mv <old> <new>", crate::vga::buffer::Color::Yellow);
-        crate::vga::write::newline(vga_index);
+        warn!("Usage: mv <old> <new>");
         return;
     }
+
+    let floppy = Floppy;
 
     match Fs::new(&floppy, vga_index) {
         Ok(fs) => {
@@ -561,8 +572,7 @@ fn cmd_mv(args: &[u8], vga_index: &mut isize) {
             let mut new_filename: [u8; 11] = [b' '; 11];
 
             if new.len() == 0 || old.len() == 0 || old.len() > 11 || new.len() > 11 {
-                crate::vga::write::string(vga_index, b"Usage: mv <old> <new>", crate::vga::buffer::Color::Yellow);
-                crate::vga::write::newline(vga_index);
+                warn!("Usage: mv <old> <new>");
                 return;
             }
 
@@ -584,22 +594,25 @@ fn cmd_mv(args: &[u8], vga_index: &mut isize) {
             }
         }
         Err(e) => {
-            crate::vga::write::string(vga_index, e.as_bytes(), crate::vga::buffer::Color::Red);
-            crate::vga::write::newline(vga_index);
+            error!(e);
+            error!();
         }
     }
 }
 
-
-fn cmd_ping(args: &[u8], vga_index: &mut isize) {
+/// Sends an ICMP Echo request to the provided IPv4 address.
+fn cmd_ping(args: &[u8], _vga_index: &mut isize) {
+    // Extract the address(es) from the input
     let mut ips = [[0u8; 4]; MAX_IPS];
-    let count = parse_ip_args(args, &mut ips);
+    let _count = parse_ip_args(args, &mut ips);
 
+    // Set the ICMP parameters
     let protocol = 1;
     let identifier = 1342;
     let sequence_no = 1;
-    let payload = b"ping from r2"; // Optional payload
+    let payload = b"iEcho request from r2";
 
+    // Buffers for ICMP and IPv4 packets (ICMP packet prefixed by an IPv4 header)
     let mut icmp_buf = [0u8; 256];
     let mut ipv4_buf = [0u8; 1500];
 
@@ -607,23 +620,24 @@ fn cmd_ping(args: &[u8], vga_index: &mut isize) {
     let icmp_len = net::icmp::create_packet(8, identifier, sequence_no, payload, &mut icmp_buf);
     let icmp_slice = icmp_buf.get(..icmp_len).unwrap_or(&[]);
 
+    // Use the prepared ICMP packet as payload for IPv4 packet
     let ipv4_len = net::ipv4::create_packet(ips[0], ips[1], protocol, icmp_slice, &mut ipv4_buf);
     let ipv4_slice = ipv4_buf.get(..ipv4_len).unwrap_or(&[]);
 
-    vga::write::string(vga_index, b"Sending a ping packet...", vga::buffer::Color::White);
-    vga::write::newline(vga_index);
+    println!("Sending ICMP Echo request...");
 
     net::ipv4::send_packet(ipv4_slice);
 }
 
+/// This command function takes the argument, then tries to find a matching filename in the current
+/// directory, and finally it dumps its content to screen.
 fn cmd_read(args: &[u8], vga_index: &mut isize) {
-    let floppy = Floppy;
-
     if args.len() == 0 || args.len() > 11 {
-        crate::vga::write::string(vga_index, b"Usage: read <filename>", crate::vga::buffer::Color::Red);
-        crate::vga::write::newline(vga_index);
+        warn!("Usage: read <filename>\n");
         return;
     }
+
+    let floppy = Floppy;
 
     match Fs::new(&floppy, vga_index) {
         Ok(fs) => {
@@ -642,41 +656,47 @@ fn cmd_read(args: &[u8], vga_index: &mut isize) {
 
                     fs.read_file(cluster as u16, &mut buf, vga_index);
 
-                    crate::vga::write::string(vga_index, &buf, crate::vga::buffer::Color::Yellow);
-                    crate::vga::write::newline(vga_index);
+                    print!("Dumping file raw contents:\n", vga::writer::Color::DarkYellow);
+                    printb!(&buf);
+                    println!();
                 } else {
-                    crate::vga::write::string(vga_index, b"No such file", crate::vga::buffer::Color::Red);
-                    crate::vga::write::newline(vga_index);
+                    error!("No such file found");
                 }
             }
         }
         Err(e) => {
-            crate::vga::write::string(vga_index, e.as_bytes(), crate::vga::buffer::Color::Red);
-            crate::vga::write::newline(vga_index);
+            error!(e);
+            error!();
         }
     }
 }
 
-
+/// An experimental demonstration of the ICMP Echo request handler. The implementation sends ICMP
+/// Echo response back to the original sender via IPv4/SLIP.
 fn cmd_response(_args: &[u8], vga_index: &mut isize) {
     fn callback(packet: &[u8]) -> u8 {
         if let Some((ipv4_header, ipv4_payload)) = net::ipv4::parse_packet(packet) {
+            // Match only ICMP packets
             if ipv4_header.protocol != 1 {
                 return 1;
             }
 
+            // Extract the ICMP header and (optional) payload
             if let Some((icmp_header, icmp_payload)) = net::icmp::parse_packet(ipv4_payload) {
+                // Type 8 is Echo request
                 if icmp_header.icmp_type != 8 {
                     return 2;
                 }
 
+                // Prepare buffers for new packets.
                 let mut icmp_buf = [0u8; 64];
                 let mut ipv4_buf = [0u8; 1500];
 
+                // Create an ICMP Echo response packet...
                 let icmp_len = net::icmp::create_packet(0, icmp_header.identifier, icmp_header.sequence_number, icmp_payload, &mut icmp_buf);
                 let icmp_slice = icmp_buf.get(..icmp_len).unwrap_or(&[]);
 
-                //let ipv4_len = net::ipv4::create_packet(ipv4_header.dest_ip, ipv4_header.source_ip, ipv4_header.protocol, &icmp_buf[..icmp_len], &mut ipv4_buf);
+                // ...and prefix it with IPv4 header.
                 let ipv4_len = net::ipv4::create_packet(ipv4_header.dest_ip, ipv4_header.source_ip, ipv4_header.protocol, icmp_slice, &mut ipv4_buf);
                 let ipv4_slice = ipv4_buf.get(..ipv4_len).unwrap_or(&[]);
 
@@ -686,38 +706,40 @@ fn cmd_response(_args: &[u8], vga_index: &mut isize) {
         0
     }
 
-    vga::write::newline(vga_index);
-    vga::write::string(vga_index, b"Waiting for an ICMP echo request (hit any key to interrupt)...", vga::buffer::Color::White);
-    vga::write::newline(vga_index);
+    println!("Waiting for an ICMP echo request (hit any key to interrupt)...");
 
     loop {
+        // Start the receive loop where SLIP frames are extracted from serial line and passed into
+        // the callback when complete
         let ret = net::ipv4::receive_loop(callback);
 
-        if ret == 0 {
-            vga::write::string(vga_index, b"Received a ping request, sending a response", vga::buffer::Color::White);
-            vga::write::newline(vga_index);
-            /*} else if ret == 1 {
-              vga::write::string(vga_index, b"Wrong IPv4 protocol (not ICMP) received", vga::buffer::Color::Green);
-              vga::write::newline(vga_index);*/
-    } else if ret == 2 {
-        vga::write::string(vga_index, b"Received a non-request ICMP packet", vga::buffer::Color::Green);
-        vga::write::newline(vga_index);
-    } else if ret == 3 {
-        vga::write::string(vga_index, b"Keyboard interrupt", vga::buffer::Color::White);
-        vga::write::newline(vga_index);
-        break;
-    }
+        match ret {
+            0 => {
+                println!("Received ICMP Echo request, sending Echo response back");
+            }
+            2 => {
+                println!("Received ICMP packet (not the Echo request), ignoring");
+            }
+            3 => {
+                println!("Keyboard interrupt");
+                break;
+            }
+            _ => {
+                // Hide this as it would spam the screen 
+                //println!("Unknown IPv4 protocol number (not ICMP)");
+            }
+        }
     }
 }
 
+/// Removes a file in the current directory according to the input.
 fn cmd_rm(args: &[u8], vga_index: &mut isize) {
-    let floppy = Floppy;
-
     if args.len() == 0 || args.len() > 11 {
-        crate::vga::write::string(vga_index, b"Usage: rm <filename>", crate::vga::buffer::Color::Yellow);
-        crate::vga::write::newline(vga_index);
+        warn!("Usage: rm <filename>\n");
         return;
     }
+
+    let floppy = Floppy;
 
     match Fs::new(&floppy, vga_index) {
         Ok(fs) => {
@@ -735,33 +757,42 @@ fn cmd_rm(args: &[u8], vga_index: &mut isize) {
             }
         }
         Err(e) => {
-            crate::vga::write::string(vga_index, e.as_bytes(), crate::vga::buffer::Color::Red);
-            crate::vga::write::newline(vga_index);
+            error!(e);
+            error!();
         }
     }
 }
 
+/// Experimental command function to demonstrate the current state of the shutdown process
+/// implemented.
+fn cmd_shutdown(_args: &[u8], _vga_index: &mut isize) {
+    print!("\n\n --- Shutting down the system", vga::writer::Color::DarkCyan);
 
-fn cmd_shutdown(_args: &[u8], vga_index: &mut isize) {
-    vga::write::newline(vga_index);
-    vga::write::string(vga_index, b" --- Shutting down", vga::buffer::Color::Cyan);
-
+    // Burn some CPU time
     for _ in 0..3 {
         for _ in 0..3_500_000 {
             unsafe {
                 core::arch::asm!("nop");
             }
         }
-        vga::write::string(vga_index, b". ", vga::buffer::Color::Cyan);
+        printb!(b". ");
     }
 
+    // Invoke the ACPI shutdown attempt (if present)
     acpi::shutdown::shutdown();
 }
 
+/// Meta command to run the Snake game.
+fn cmd_snake(_args: &[u8], vga_index: &mut isize) {
+    app::snake::menu::menu_loop(vga_index);
+}
+
+/// Experimental command function to demonstrate the implementation state of the TCP/IP stack.
 fn cmd_tcp(_args: &[u8], vga_index: &mut isize) {
     app::tcp_handler::handle(vga_index);
 }
 
+/// Prints current time and date in UTC.
 fn cmd_time(_args: &[u8], vga_index: &mut isize) {
     let (y, mo, d, h, m, s) = time::rtc::read_rtc_full();
 

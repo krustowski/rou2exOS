@@ -22,7 +22,7 @@ checksum = "5c8214115b7bf84099f1309324e63141d4c5d7cc26862f97a0a857dbefe165bd"
 
 [[package]]
 name = "kernel"
-version = "0.7.6"
+version = "0.8.0"
 dependencies = [
  "lazy_static",
  "spin",

@@ -18,6 +18,7 @@ struct Command {
     name: &'static [u8],
     description: &'static [u8],
     function: fn(args: &[u8], vga_index: &mut isize),
+    hidden: bool,
 }
 
 static COMMANDS: &[Command] = &[
@@ -25,144 +26,168 @@ static COMMANDS: &[Command] = &[
         name: b"beep",
         description: b"beeps",
         function: cmd_beep,
+        hidden: false,
     },
     Command {
         name: b"cd",
         description: b"changes the current directory",
         function: cmd_cd,
+        hidden: false,
     },
     Command {
         name: b"chat",
         description: b"starts a chat",
         function: cmd_chat,
+        hidden: false,
     },
     Command {
         name: b"cls",
         description: b"clears the screen",
         function: cmd_clear,
+        hidden: false,
     },
     Command {
         name: b"debug",
         description: b"dumps the debug log into a file",
         function: cmd_debug,
+        hidden: false,
     },
     Command {
         name: b"dir",
         description: b"lists the current directory",
         function: cmd_dir,
+        hidden: false,
     },
     Command {
         name: b"echo",
         description: b"echos the arguments",
         function: cmd_echo,
+        hidden: false,
     },
     Command {
         name: b"ed",
         description: b"runs a minimalistic text editor",
         function: cmd_ed,
+        hidden: false,
     },
     Command {
         name: b"ether",
         description: b"runs the Ethernet frame handler",
         function: cmd_ether,
+        hidden: false,
     },
     Command {
         name: b"fsck",
         description: b"runs the filesystem check",
         function: cmd_fsck,
+        hidden: false,
     },
     Command {
         name: b"help",
         description: b"shows this output",
         function: cmd_help,
+        hidden: false,
     },
     Command {
         name: b"http",
         description: b"runs a simple HTTP/UDP handler",
         function: cmd_http,
+        hidden: false,
     },
     Command {
         name: b"menu",
         description: b"renders a sample menu",
         function: cmd_menu,
+        hidden: false,
     },
     Command {
         name: b"mkdir",
         description: b"creates a subdirectory",
         function: cmd_mkdir,
+        hidden: false,
     },
     Command {
         name: b"mv",
         description: b"renames a file",
         function: cmd_mv,
+        hidden: false,
     },
     Command {
         name: b"ping",
         description: b"pings the host over the serial line (ICMP/SLIP)",
         function: cmd_ping,
+        hidden: false,
     },
     Command {
         name: b"read",
         description: b"prints the output of a file",
         function: cmd_read,
+        hidden: false,
     },
     Command {
         name: b"response",
         description: b"waits for ICMP/SLIP request to come, then sends a response back",
         function: cmd_response,
+        hidden: false,
     },
     Command {
         name: b"rm",
         description: b"removes a file",
         function: cmd_rm,
+        hidden: false,
     },
     Command {
         name: b"shutdown",
         description: b"shuts down the system",
         function: cmd_shutdown,
+        hidden: false,
     },
     Command {
         name: b"snake",
         description: b"runs a simple VGA text mode snake-like game",
         function: cmd_snake,
+        hidden: false,
     },
     Command {
         name: b"tcp",
         description: b"tests the TCP implementation",
         function: cmd_tcp,
+        hidden: false,
     },
     Command {
         name: b"time",
         description: b"prints system time and date",
         function: cmd_time,
+        hidden: false,
     },
     Command {
         name: b"uptime",
         description: b"prints system uptime",
         function: cmd_uptime,
+        hidden: false,
     },
     Command {
         name: b"version",
         description: b"prints the kernel version",
         function: cmd_version,
+        hidden: false,
     },
     Command {
         name: b"write",
         description: b"writes arguments to a sample file on floppy",
         function: cmd_write,
+        hidden: false,
     }
 ];
 
+/// Handle takes in an input from keyboard and tries to match it to a defined Command to execute it
+/// with given arguments.
 pub fn handle(input: &[u8], vga_index: &mut isize) {
-    // Only for strings!
-    /*let mut parts = input.splitn(2, ' ');
-      let cmd_name = parts.next().unwrap_or("");
-      let cmd_args = parts.next().unwrap_or("");*/
-
     let (cmd_name, cmd_args) = split_cmd(input);
 
     match find_cmd(cmd_name) {
         Some(cmd) => {
+            // Call the command function
             (cmd.function)(cmd_args, vga_index);
         }
         None => {
@@ -171,9 +196,8 @@ pub fn handle(input: &[u8], vga_index: &mut isize) {
             }
 
             // Echo back the input
-            vga::write::string(vga_index, b"unknown command: ", vga::buffer::Color::Red);
-            vga::write::string(vga_index, cmd_name, vga::buffer::Color::White);
-            vga::write::newline(vga_index);
+            error!("Unknown command: ");
+            printb!(cmd_name);
         }
     }
 }
@@ -183,6 +207,8 @@ pub fn handle(input: &[u8], vga_index: &mut isize) {
 //
 
 #[allow(clippy::manual_find)]
+/// Loops over the slice of defined commands and returns an Option of matching command via its
+/// name, or None otherwise.
 fn find_cmd(name: &[u8]) -> Option<&'static Command> {
     for cmd in COMMANDS {
         if cmd.name == name {
@@ -192,6 +218,7 @@ fn find_cmd(name: &[u8]) -> Option<&'static Command> {
     None
 }
 
+/// Splits the provided `input` in to tokens, where the delimitor is a single whitespace (space).
 pub fn split_cmd(input: &[u8]) -> (&[u8], &[u8]) {
     // Find the first space
     if let Some(pos) = input.iter().position(|&c| c == b' ') {
@@ -205,9 +232,12 @@ pub fn split_cmd(input: &[u8]) -> (&[u8], &[u8]) {
     }
 }
 
+/// Defines the maximum amount of IPv4 addresses that could be parsed from an input.
 const MAX_IPS: usize = 4;
 
-pub fn parse_ip_args(input: &[u8], out: &mut [[u8; 4]; MAX_IPS]) -> usize {
+/// This function takes in an input (&[u8]) of various length, and parses it into IPv4 addresses
+/// (up to MAX_IPS). Returns the parsed count of addresses.
+fn parse_ip_args(input: &[u8], out: &mut [[u8; 4]; MAX_IPS]) -> usize {
     let mut ip_count = 0;
     let mut i = 0;
     let len = input.len();
@@ -261,6 +291,7 @@ pub fn parse_ip_args(input: &[u8], out: &mut [[u8; 4]; MAX_IPS]) -> usize {
     ip_count
 }
 
+/// Used to make the FAT12-formatted filename into UPPERCASE.
 pub fn to_uppercase_ascii(input: &mut [u8; 11]) {
     for byte in input.iter_mut() {
         if *byte >= b'a' && *byte <= b'z' {
@@ -273,22 +304,18 @@ pub fn to_uppercase_ascii(input: &mut [u8; 11]) {
 //  COMMAND FUNCTIONS
 //
 
+/// Used to test the sound module, plays the mystery melody.
 fn cmd_beep(_args: &[u8], _vga_index: &mut isize) {
     audio::midi::play_melody();
-
-    /*sound::beep::beep(5000);
-
-    for _ in 0..3_000_000 {
-        unsafe { core::arch::asm!("nop"); }
-    }*/
-
     audio::beep::stop_beep();
 }
 
+/// Changes the current directory to one matching an input from keyboard.
 fn cmd_cd(args: &[u8], vga_index: &mut isize) {
     let floppy = Floppy;
 
-    if args.len() == 0 || args.len() > 11 {
+    // 12 = name + extension + dot
+    if args.len() == 0 || args.len() > 12 {
         unsafe {
             config::PATH_CLUSTER = 0;
             config::set_path(b"/");
@@ -296,14 +323,15 @@ fn cmd_cd(args: &[u8], vga_index: &mut isize) {
         return;
     }
 
+    // This split_cmd invocation trims the b'\0' tail from the input args.
     let (filename_input, _) = keyboard::split_cmd(args);
 
     if filename_input.len() == 0 || filename_input.len() > 12 {
-        vga::write::string(vga_index, b"Usage: ed <filename>", vga::buffer::Color::Yellow);
-        newline(vga_index);
+        warn!("Usage: cd <dirname>\n");
         return;
     }
 
+    // 12 = filename + ext + dot
     let mut filename = [b' '; 12];
     if let Some(slice) = filename.get_mut(..filename_input.len()) {
         slice.copy_from_slice(filename_input);
@@ -324,14 +352,13 @@ fn cmd_cd(args: &[u8], vga_index: &mut isize) {
                     config::PATH_CLUSTER = cluster as u16;
                     config::set_path(&filename_input);
                 } else {
-                    crate::vga::write::string(vga_index, b"No such directory", crate::vga::buffer::Color::Red);
-                    crate::vga::write::newline(vga_index);
+                    error!("No such directory\n");
                 }
             }
         }
         Err(e) => {
-            crate::vga::write::string(vga_index, e.as_bytes(), crate::vga::buffer::Color::Red);
-            crate::vga::write::newline(vga_index);
+            error!(e);
+            error!();
         }
     }
 }
@@ -413,6 +440,10 @@ fn cmd_help(_args: &[u8], vga_index: &mut isize) {
     vga::write::newline(vga_index);
 
     for cmd in COMMANDS {
+        if cmd.hidden {
+            continue;
+        }
+
         vga::write::string(vga_index, b" ", vga::buffer::Color::Blue);
         vga::write::string(vga_index, cmd.name, vga::buffer::Color::Blue);
         vga::write::string(vga_index, b": ", vga::buffer::Color::Blue);

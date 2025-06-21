@@ -48,6 +48,20 @@ macro_rules! warn {
     };
 }
 
+/// This macro takes in a reference to byte slice (&[u8]) and prints all its contents to display.
+#[macro_export]
+macro_rules! printb {
+    ($arg:expr) => {
+        if let Some(mut writer) = $crate::macros::get_writer() { 
+            writer.set_color(Color::White, Color::Black);
+            for b in $arg {
+                writer.write_byte(*b);
+            }
+        }
+    };
+}
+
+
 #[macro_export]
 macro_rules! println {
     () => ($crate::print!("\n"));
@@ -64,7 +78,6 @@ macro_rules! print {
             writer.set_color(Color::White, Color::Black);
             writer.write_str_raw($arg);
         }
-
     };
     ($arg:expr, $fg:expr) => {
         use crate::vga::writer::Color;

@@ -1,11 +1,26 @@
-use spin::Mutex;
+use spin::{mutex::Mutex};
+use core::sync::atomic::{AtomicBool, Ordering};
 use crate::vga::writer::{Writer};
 
 pub static mut WRITER: Option<Mutex<Writer>> = None;
+static WRITER_INIT: AtomicBool = AtomicBool::new(false);
 
+/// Initializes the global Writer instance
 pub fn init_writer() {
-    unsafe {
-        WRITER = Some(Mutex::new(Writer::new()));
+    if WRITER_INIT.compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst).is_ok() {
+        let writter = Writer::new();
+        unsafe {
+            WRITER = Some(Mutex::new(writter));
+        }
+    }
+}
+
+/// Returns a wrapped Writer instance guarded by Mutex in Option
+pub fn get_writer() -> Option<spin::MutexGuard<'static, Writer>> {
+    if WRITER_INIT.load(Ordering::Relaxed) {
+        unsafe { WRITER.as_ref().map(|m| m.lock()) }
+    } else {
+        None
     }
 }
 
@@ -34,44 +49,36 @@ macro_rules! warn {
 }
 
 #[macro_export]
-macro_rules! print {
-    ($arg:expr) => {
-        unsafe {
-            if let Some(writer) = &mut $crate::macros::WRITER {
-                let mut guard = writer.lock();
-                guard.set_color(Color::White, Color::Black);
-                guard.write_str_raw($arg);
-            }
-        }
-    };
-    ($arg:expr, $fg:expr) => {
-        use crate::vga::writer::Color;
-
-        unsafe {
-            if let Some(writer) = &mut $crate::macros::WRITER {
-                let mut guard = writer.lock();
-                guard.set_color($fg, Color::Black);
-                guard.write_str_raw($arg);
-            }
-        }
-    };
-    ($arg:expr, $fg:expr, $bg:expr) => ({
-        unsafe {
-            if let Some(writer) = &mut $crate::macros::WRITER {
-                let mut guard = writer.lock();
-                guard.set_color($fg, $bg);
-                guard.write_str_raw($arg);
-            }
-        }
+macro_rules! println {
+    () => ($crate::print!("\n"));
+    ($arg:expr) => ({
+        $crate::print!($arg);
+        $crate::print!("\n");
     });
 }
 
 #[macro_export]
-macro_rules! println {
-    () => ($crate::print!("\n"));
-    ($arg:expr) => ({
-        $crate::print!("\n");
-        $crate::print!($arg);
+macro_rules! print {
+    ($arg:expr) => {
+        if let Some(mut writer) = $crate::macros::get_writer() { 
+            writer.set_color(Color::White, Color::Black);
+            writer.write_str_raw($arg);
+        }
+
+    };
+    ($arg:expr, $fg:expr) => {
+        use crate::vga::writer::Color;
+
+        if let Some(mut writer) = $crate::macros::get_writer() { 
+            writer.set_color($fg, Color::Black);
+            writer.write_str_raw($arg);
+        }
+    };
+    ($arg:expr, $fg:expr, $bg:expr) => ({
+        if let Some(mut writer) = $crate::macros::get_writer() { 
+            writer.set_color($fg, $bg);
+            writer.write_str_raw($arg);
+        }
     });
 }
 

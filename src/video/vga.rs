@@ -70,6 +70,11 @@ impl ColorCode {
     fn new(fg: Color, bg: Color) -> Self {
         Self((bg as u8) << 4 | (fg as u8))
     }
+
+    /// Creates a new ColorCode instance, while the input is numeric.
+    fn new_from_num(fg: u8, bg: u8) -> Self {
+        Self(bg << 4 | fg)
+    }
 }
 
 /// Structure to abstract a single character on the VGA text mode screen.
@@ -131,6 +136,11 @@ impl Writer {
         self.color_code = ColorCode::new(fg, bg)
     }
 
+    /// Sets the specified ColorCode from provided fg and bg colors, defined as u8.
+    pub fn set_color_num(&mut self, fg: u8, bg: u8) {
+        self.color_code = ColorCode::new_from_num(fg, bg)
+    }
+
     /// Meta function to support printing static strings.
     pub fn write_str_raw(&mut self, s: &str) {
         for &byte in s.as_bytes() {
@@ -157,6 +167,7 @@ impl Writer {
                 let color_code = self.color_code;
                 let buf = self.buffer_mut();
 
+                // Let's safely put the character to screen
                 if let Some(row_buf) = buf.chars.get_mut(row) {
                     if let Some(cell) = row_buf.get_mut(col) {
                         *cell = ScreenChar {

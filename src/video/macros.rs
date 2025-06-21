@@ -99,13 +99,13 @@ macro_rules! print {
     };
     ($arg:expr, $fg:expr) => {
         if let Some(mut writer) = $crate::video::vga::get_writer() { 
-            writer.set_color($fg, $crate::video::vga::Color::Black);
+            writer.set_color_num($fg as u8, $crate::video::vga::Color::Black as u8);
             writer.write_str_raw($arg);
         }
     };
     ($arg:expr, $fg:expr, $bg:expr) => ({
         if let Some(mut writer) = $crate::video::vga::get_writer() { 
-            writer.set_color($fg, $bg);
+            writer.set_color_num($fg as u8, $bg as u8);
             writer.write_str_raw($arg);
         }
     });

@@ -141,6 +141,32 @@ impl Writer {
     pub fn write_byte(&mut self, byte: u8) {
         match byte {
             b'\n' => self.new_line(),
+            b'\r' => {
+                // Backspace = move cursor back and overwrite the ScreenChar on that position
+                let mut row = self.row_pos;
+                let mut col = self.col_pos;
+
+                // Decrement the row position if we hit the left boundary of screen
+                if col == 0 {
+                    row -= 1;
+                    col = BUFFER_WIDTH;
+                } else {
+                    col -= 1;
+                }
+
+                let color_code = self.color_code;
+                let buf = self.buffer_mut();
+
+                if let Some(row_buf) = buf.chars.get_mut(row) {
+                    if let Some(cell) = row_buf.get_mut(col) {
+                        *cell = ScreenChar {
+                            ascii_character: b' ',
+                            color_code,
+                        };
+                        self.col_pos = col;
+                    }
+                }
+            }
             byte => {
                 if self.col_pos >= BUFFER_WIDTH {
                     self.new_line();

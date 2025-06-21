@@ -1,7 +1,8 @@
 use crate::fs::fat12::{fs::Fs, block::Floppy};
 use crate::init::config::PATH_CLUSTER;
 use crate::input::keyboard::{self, keyboard_read_scancode};
-use crate::vga::{buffer::Color, screen::clear, write::{string, newline}, writer::Writer};
+use crate::vga::{buffer::Color, screen::clear, write::{string, newline}};
+use crate::video::vga::Writer;
 
 pub const MAX_LINES: usize = 100;
 pub const MAX_LINE_LEN: usize = 80;

@@ -7,7 +7,7 @@ use crate::fs::fat12::{block::Floppy, fs::Fs, check::run_check};
 use crate::init::config::PATH_CLUSTER;
 use crate::net;
 use crate::time;
-use crate::vga;
+use crate::video;
 use crate::input::keyboard;
 use crate::tui::{widget::{Container, Window, Label}, app::TuiApp};
 
@@ -379,7 +379,7 @@ fn cmd_chat(args: &[u8], vga_index: &mut isize) {
 }
 
 /// This just clears the whole screen with black background color.
-fn cmd_clear(_args: &[u8], vga_index: &mut isize) {
+fn cmd_clear(_args: &[u8], _vga_index: &mut isize) {
     clear_screen!();
 }
 
@@ -454,9 +454,9 @@ fn cmd_help(_args: &[u8], _vga_index: &mut isize) {
         }
 
         // Print the command name and description
-        print!(" ", vga::writer::Color::Blue);
+        print!(" ", video::vga::Color::Blue);
         printb!(cmd.name);
-        print!(": ", vga::writer::Color::White);
+        print!(": ", video::vga::Color::White);
         printb!(cmd.description);
         println!();
     }
@@ -655,7 +655,7 @@ fn cmd_read(args: &[u8], vga_index: &mut isize) {
 
                     fs.read_file(cluster as u16, &mut buf, vga_index);
 
-                    print!("Dumping file raw contents:\n", vga::writer::Color::DarkYellow);
+                    print!("Dumping file raw contents:\n", video::vga::Color::DarkYellow);
                     printb!(&buf);
                     println!();
                 } else {
@@ -765,7 +765,7 @@ fn cmd_rm(args: &[u8], vga_index: &mut isize) {
 /// Experimental command function to demonstrate the current state of the shutdown process
 /// implemented.
 fn cmd_shutdown(_args: &[u8], _vga_index: &mut isize) {
-    print!("\n\n --- Shutting down the system", vga::writer::Color::DarkCyan);
+    print!("\n\n --- Shutting down the system", video::vga::Color::DarkCyan);
 
     // Burn some CPU time
     for _ in 0..3 {

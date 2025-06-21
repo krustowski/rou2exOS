@@ -1,27 +1,29 @@
 use crate::fs::fat12::{block::Floppy, fs::Fs, entry::Entry};
 use crate::init::config::PATH_CLUSTER;
 use crate::net::serial::ready;
-use crate::vga;
 use crate::input::cmd;
 use crate::input::port;
 use crate::init::config::{HOST, PATH, USER, get_path};
 use crate::vga::screen::clear;
 use crate::vga::write::newline;
+use crate::video::{self, vga};
 
 const INPUT_BUFFER_SIZE: usize = 128;
 
 static mut SHIFT_PRESSED: bool = false;
 static mut CAPS_LOCK_ON: bool = false;
 
-fn render_prompt(vga_index: &mut isize) {
+fn render_prompt(_vga_index: &mut isize) {
     let path = get_path() as &[u8];
 
-    print!("[", vga::writer::Color::Green);
+    print!("[", vga::Color::Green);
     printb!(USER);
     print!("@");
     printb!(HOST);
     print!(":");
+    print!("", vga::Color::Blue);
     printb!(path);
+    print!("", vga::Color::Green);
     print!("] > ");
 }
 
@@ -73,7 +75,7 @@ pub fn keyboard_loop(vga_index: &mut isize) {
     // Write prompt
     render_prompt(vga_index);
     //move_cursor_index(vga_index);
-    vga::screen::scroll(vga_index);
+    //vga::screen::scroll(vga_index);
 
     loop {
         let key = keyboard_read_scancode();
@@ -84,18 +86,22 @@ pub fn keyboard_loop(vga_index: &mut isize) {
             if released == 0x1D {
                 ctrl_down = false;
             }
+
+            // Update the special key state
             scancode_to_ascii(key);
             continue;
         }
 
         match key {
+            // Control key
             0x1D => {
                 ctrl_down = true;
                 continue;
             }
+            // L key
             0x26 => {
                 if ctrl_down {
-                    clear(vga_index);
+                    clear_screen!();
 
                     // Clear input buffer
                     input_buffer = [0u8; 128];
@@ -106,15 +112,17 @@ pub fn keyboard_loop(vga_index: &mut isize) {
                     continue;
                 }
             }
-            0x0E => { // Backspace
+            // Backspace key
+            0x0E => {
                 handle_backspace(&mut input_len, vga_index);
                 continue;
             }
+            // Enter key
             0x1C => {
-                // ENTER key pressed
-                //vga::write::newline(vga_index);
+                // Break the line with a newline
                 println!();
 
+                // Extract the input from buffer and hand it to command handler
                 let input_slice = input_buffer.get(..input_len).unwrap_or(&[]);
                 cmd::handle(input_slice, vga_index);
 
@@ -128,8 +136,8 @@ pub fn keyboard_loop(vga_index: &mut isize) {
 
                 continue;
             }
+            // Tab key
             0x0F => {
-                // TAB
                 handle_tab_completion(&mut input_buffer, &mut input_len, vga_index);
                 continue;
             }
@@ -146,12 +154,8 @@ pub fn keyboard_loop(vga_index: &mut isize) {
                 input_len += 1;
 
                 // Draw it on screen
-                unsafe {
-                    *vga::buffer::VGA_BUFFER.offset(*vga_index) = ascii;
-                    *vga::buffer::VGA_BUFFER.offset(*vga_index + 1) = vga::buffer::Color::White as u8;
-                    *vga_index += 2;
-                }
-                move_cursor_index(vga_index);
+                printb!(&[ascii]);
+                //move_cursor_index(vga_index);
             }
         }
     };
@@ -160,12 +164,15 @@ pub fn keyboard_loop(vga_index: &mut isize) {
 fn handle_backspace(input_len: &mut usize, vga_index: &mut isize) {
     if *input_len > 0 {
         *input_len -= 1;
-        unsafe {
+
+        print!("\r");
+
+        /*unsafe {
             *vga_index -= 2; // Move cursor back one character
             *vga::buffer::VGA_BUFFER.offset(*vga_index) = b' ';
             *vga::buffer::VGA_BUFFER.offset(*vga_index + 1) = vga::buffer::Color::White as u8;
-        }
-        move_cursor_index(vga_index);
+        }*/
+        //move_cursor_index(vga_index);
     }
 }
 
@@ -240,8 +247,10 @@ fn handle_tab_completion(input_buffer: &mut [u8; INPUT_BUFFER_SIZE], input_len: 
                                 handle_backspace(input_len, vga_index);
                             }
 
-                            vga::write::string(vga_index, &clean_name, vga::buffer::Color::Pink);
-                            move_cursor_index(vga_index);
+                            print!("", video::vga::Color::Magenta);
+                            printb!(&clean_name);
+                            //vga::write::string(vga_index, &clean_name, vga::buffer::Color::Pink);
+                            //move_cursor_index(vga_index);
                             found = true;
 
                             if cmd.len() > 10 || cmd.len() + 1 > 11 {
@@ -282,8 +291,8 @@ fn handle_tab_completion(input_buffer: &mut [u8; INPUT_BUFFER_SIZE], input_len: 
             }
         }
         Err(e) => {
-            vga::write::string(vga_index, e.as_bytes(), vga::buffer::Color::Red);
-            newline(vga_index);
+            error!(e);
+            error!();
         }
     }
 }

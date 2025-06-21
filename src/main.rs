@@ -40,8 +40,8 @@ pub extern "C" fn kernel_main() {
     let vga_index: &mut isize = &mut 0;
     vga::screen::clear(vga_index);
 
-    // Instantiate new Writer
-    video::macros::init_writer();
+    // Instantiate new VGA Writer
+    video::vga::init_writer();
 
     // Run init checks
     unsafe {

@@ -35,7 +35,7 @@ link:
 		-T linker.ld \
 		-n \
 		--gc-sections \
-		-o iso/boot/kernel.elf \
+		-o iso/boot/kernel_graphics.elf \
 		${KERNEL_OBJ} iso/boot/boot.o
 
 build_iso:
@@ -90,6 +90,15 @@ run_iso_net:
 		-device rtl8139,netdev=net0 \
 		-serial pty
 
+PTY_NUMBER ?= pty
+run_iso_pty: 
+	@qemu-system-x86_64 \
+		-boot d \
+		-m 2G \
+		-vga std \
+		-cdrom r2.iso \
+		-serial ${PTY_NUMBER}
+
 run_iso_floppy: build_floppy
 	@qemu-system-x86_64 \
 		-boot d \
@@ -113,10 +122,9 @@ run_iso_debug:
 	@qemu-system-x86_64 \
 		-boot d \
 		-m 2G \
-		-vga std \
 		-cdrom r2.iso \
 		-fda fat.img \
-		-d int,cpu_reset \
+		-d int,cpu_reset,page \
 		-no-reboot \
 		-no-shutdown \
 		-serial stdio

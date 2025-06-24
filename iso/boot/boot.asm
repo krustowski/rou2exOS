@@ -30,9 +30,16 @@ p3_fb_table:
     	resq 512
 p2_fb_table:
     	resq 512
+
 p1_fb_table:
-    	resq 512
+    	resb 4096
+p1_fb_table_0:
+    	resb 4096
+p1_fb_table_1:
+    	resb 4096
 p1_fb_table_2:      
+	resb 4096
+p1_fb_table_3:      
 	resb 4096
 
 p1_low_table:
@@ -193,6 +200,14 @@ page_fault_handler:
     popa                       
     iret                       
 
+section .data 
+
+FB_P1_TABLES:
+    dq p1_fb_table_0
+    dq p1_fb_table_1
+    dq p1_fb_table_2
+    dq p1_fb_table_3
+
 ;
 ;
 ;
@@ -200,8 +215,8 @@ page_fault_handler:
 section .text
 
 %define FB_PHYS     0xFD000000
-%define FB_VIRT     0xC0000000
-%define PAGE_COUNT  (0x400000 / 0x1000)  ; 4 MiB / 4 KiB = 1024 pages
+%define FB_VIRT     0xFFFF800000000000
+%define PAGE_COUNT  4096  ;(0x400000 / 0x1000)  ; 4 MiB / 4 KiB = 1024 pages
 %define PAGE_FLAGS  0b11
 
 zero_table:
@@ -231,7 +246,16 @@ set_up_page_tables:
     lea edi, [p2_fb_table]
     call zero_table
 
-    lea edi, [p1_fb_table]
+    lea edi, [p1_fb_table_0]
+    call zero_table
+
+    lea edi, [p1_fb_table_1]
+    call zero_table
+
+    lea edi, [p1_fb_table_2]
+    call zero_table
+
+    lea edi, [p1_fb_table_3]
     call zero_table
 
     lea edi, [p1_page_tables]
@@ -250,6 +274,7 @@ set_up_page_tables:
     mov dword [p3_table + 0 * 8 + 4], 0
 
     ; Identity map 0–1 GiB with 2 MiB pages
+
     xor ecx, ecx
 .map_1gib:
     mov eax, 0x200000
@@ -262,23 +287,21 @@ set_up_page_tables:
     cmp ecx, 512
     jne .map_1gib
 
-    ;-----------------------------------------
-    ; Identity-map your own page table memory
-    ; Assume p1_page_tables = 0x134000
+    ; Identity-map 
 
     mov eax, p1_page_tables
     or eax, PAGE_FLAGS
-    mov [p2_table + 1 * 8], eax   ; Place under p2[1]
+    mov [p2_table + 1 * 8], eax  
     mov dword [p2_table + 1 * 8 + 4], 0
 
     mov eax, p1_page_tables_2
     or eax, PAGE_FLAGS
-    mov [p2_table + 2 * 8], eax   ; Place under p2[1]
+    mov [p2_table + 2 * 8], eax  
     mov dword [p2_table + 2 * 8 + 4], 0
 
     xor ecx, 0
 .map_self:
-    mov eax, 0x131000        ; first page table
+    mov eax, 0x131000        
     add eax, ecx
     or eax, PAGE_FLAGS
     mov edi, p1_page_tables
@@ -323,34 +346,77 @@ set_up_page_tables:
     mov [p3_fb_table + 0 * 8], eax
     mov dword [p3_fb_table + 0 * 8 + 4], 0
 
-    mov eax, p1_fb_table
+    mov eax, p1_fb_table_0
     or eax, PAGE_FLAGS
     mov [p2_fb_table + 0 * 8], eax
     mov dword [p2_fb_table + 0 * 8 + 4], 0
 
-    xor ecx, ecx
-.map_fb:
+    mov eax, p1_fb_table_1
+    or eax, PAGE_FLAGS
+    mov [p2_fb_table + 1 * 8], eax
+    mov dword [p2_fb_table + 1 * 8 + 4], 0
+
+    mov eax, p1_fb_table_2
+    or eax, PAGE_FLAGS
+    mov [p2_fb_table + 2 * 8], eax
+    mov dword [p2_fb_table + 2 * 8 + 4], 0
+
+    mov eax, p1_fb_table_3
+    or eax, PAGE_FLAGS
+    mov [p2_fb_table + 3 * 8], eax
+    mov dword [p2_fb_table + 3 * 8 + 4], 0
+
+    ; Inputs:
+    ;   FB_PHYS = physical address of framebuffer
+    ;   FB_P1_TABLES = array of pointers to p1 tables (must be preallocated)
+    ;   FB_PAGE_COUNT = total pages to map (FB_SIZE >> 12)
+
+    xor ecx, ecx            ; ecx = page offset in bytes
+    xor esi, esi            ; esi = table index (which p1 table)
+.map_fb_dynamic:
     mov eax, FB_PHYS
-    add eax, ecx
+    add eax, ecx            ; eax = physical addr of current page
     or eax, PAGE_FLAGS
 
-    mov edi, p1_fb_table
-    mov ebx, ecx
-    shr ebx, 12 
-    shl ebx, 3 
-    add edi, ebx
+    ; Calculate current P1 table from array
+    mov ebx, esi
+    shl ebx, 3              ; ebx = esi * 8 (size of pointer)
+    mov edi, [FB_P1_TABLES + ebx] ; edi = pointer to current p1 table
 
-    mov [edi], eax 
+    ; Calculate index inside current P1 table
+    mov ebx, ecx
+    shr ebx, 12             ; ebx = ecx / 4096 (page index)
+    and ebx, 511            ; index in current p1 table (0–511)
+    shl ebx, 3              ; offset in bytes
+
+    add edi, ebx
+    mov [edi], eax
     mov dword [edi + 4], 0
 
-    ;mov [p1_fb_table + ecx * 8], eax
-    ;mov dword [p1_fb_table + ecx * 8 + 4], 0
+    add ecx, 0x1000         ; next page
+    cmp ecx, PAGE_COUNT * 0x1000
+    jae .done_fb_map
 
-    add ecx, 0x1000
-    cmp ecx, PAGE_COUNT
-    jb .map_fb
+    ; Switch to next p1 table every 512 pages
+    mov ebx, ecx
+    shr ebx, 12
+    and ebx, 511
+    cmp ebx, 0
+    jne .map_fb_dynamic
+    inc esi
+    cmp esi, (PAGE_COUNT + 511) / 512
+    jae .done_fb_map
+    jmp .map_fb_dynamic
 
+.done_fb_map:
     ret
+
+
+
+
+
+
+
 
 
 enable_paging:

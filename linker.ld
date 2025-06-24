@@ -56,5 +56,10 @@ SECTIONS {
     p3_fb_table  = .;  . = . + 4K;
     p2_fb_table  = .;  . = . + 4K;
     p1_fb_table  = .;  . = . + 4K;
+
+    p1_fb_table_0  = .;  . = . + 4K;
+    p1_fb_table_1  = .;  . = . + 4K;
+    p1_fb_table_2  = .;  . = . + 4K;
+    p1_fb_table_3  = .;  . = . + 4K;
 }
 

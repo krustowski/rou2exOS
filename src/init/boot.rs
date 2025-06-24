@@ -1,6 +1,6 @@
-use x86_64::VirtAddr;
+use x86_64::{registers::control::Cr3Flags, structures::paging::PhysFrame, PhysAddr, VirtAddr};
 
-use crate::{debug::dump_debug_log_to_file, init::{config::{p1_fb_table, p1_fb_table_2, p2_fb_table, p3_fb_table, p4_table}, }, vga::{
+use crate::{debug::dump_debug_log_to_file, init::{config::{p1_fb_table, p1_fb_table_2, p2_fb_table, p3_fb_table, p4_table}, font::{draw_text, FONT_RAW}}, mem, vga::{
     buffer::Color, write::{newline, number, string}
 } };
 use super::{result::InitResult};
@@ -150,46 +150,59 @@ pub unsafe fn parse_multiboot2_info(vga_index: &mut isize, base_addr: usize) -> 
                 debugn!(fb_tag.height as u64);
                 debugln!("");
 
+                debug!("Pitch: ");
+                debugn!(fb_tag.pitch);
+                debugln!("");
+
+
                 use core::ptr;
+                use x86_64::registers::control::Cr3;
 
                 unsafe {
-                    let fb_ptr = 0xFFFF_FF80_0000_0000 as *mut u32;
+                    let p4_ptr = &p4_table as *const _ as *mut u64;
 
-                    /*super::video::map_framebuffer(
-                        fb_tag.addr,                       
-                        0xFFFF_FF80_0000_0000,               
-                        8 * 1024 * 1024,                  
-                        &mut P4_TABLE,
-                        &mut P3_FB,
-                        &mut [&mut P2_FB_0, &mut P2_FB_1],
-                        &mut [
-                        &mut P1_FB_0, &mut P1_FB_1,
-                        &mut P1_FB_2, &mut P1_FB_3,
-                        &mut P1_FB_4, &mut P1_FB_5,
-                        &mut P1_FB_6, &mut P1_FB_7,
-                        &mut P1_FB_8, &mut P1_FB_9,
-                        &mut P1_FB_10, &mut P1_FB_11,
-                        &mut P1_FB_12, &mut P1_FB_13,
-                        &mut P1_FB_14, &mut P1_FB_15,
-                        ],
+                    let p4_virt = &p4_table as *const _ as usize; // virtual address
+                    let p4_phys = p4_virt; // only if identity-mapped!
+
+                    //
+
+                    let virt_base = 0xFFFF_FF80_0000_0000u64;
+                    let fb_ptr = virt_base as *mut u32;
+
+                    let test_ptr = virt_base as *mut u32;
+                    *test_ptr = 0xFFFFFFFF; 
+
+                    //crate::mem::pages::identity_map(p4_table as *mut u64, 4 * 1024 * 1024);
+                    //crate::mem::pages::identity_map(p4_table as *mut u64, 0x1000);
+
+                    /*crate::mem::pages::map_32mb(
+                        p4_ptr, 
+                        fb_tag.addr as usize, 
+                        virt_base as usize,
                     );*/
 
-                    x86_64::instructions::tlb::flush_all();
+                    //x86_64::instructions::tlb::flush_all();
+                    //Cr3::write(PhysFrame::from_start_address(PhysAddr::new(p4_phys as u64)).unwrap(), Cr3Flags::empty());
 
-                    let fb_size = (fb_tag.pitch * fb_tag.height) as usize;
+
+                    //let fb_size = (fb_tag.pitch * fb_tag.height) as usize;
                     //let fb = unsafe { core::slice::from_raw_parts_mut(fb_ptr, fb_size) };
 
                     for y in 0..fb_tag.height  {
-                      for x in 0..fb_tag.width  {
-                      let offset = y * fb_tag.pitch + x * (fb_tag.bpp as u32 / 8);
-                      let pixel = fb_ptr.add(offset as usize);
+                        for x in 0..fb_tag.width  {
+                            //let offset = y * fb_tag.pitch + x * (fb_tag.bpp as u32 / 8);
+                            let offset = y * fb_tag.pitch / 4 + x;
+                            let color = x + y % 255;
 
-                      ptr::write(pixel, 0x00);                    
-                      ptr::write(pixel.add(1), 0xFF);      
-                      ptr::write(pixel.add(2), 0x00);      
-                      ptr::write(pixel.add(3), 0xFF);      
-                      }
-                   }
+                            fb_ptr.add(offset as usize).write_volatile(color);
+
+                            draw_text(fb_ptr, 50, 50, x as usize, y as usize, FONT_RAW, "A", [0xf0; 4]);
+
+                            //ptr::write(pixel, 0x0F);                    
+                            //ptr::write(pixel.add(1), y % 255);      
+                            //ptr::write(pixel.add(2), 0xFF);      
+                        }
+                    }
                 }
 
                 dump_debug_log_to_file(&mut 0);

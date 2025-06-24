@@ -7,7 +7,7 @@ A second iteration of the RoureXOS operating system, rewritten in Rust.
 
 ![rou2exOS startup](https://blog.vxn.dev/images/posts/rou2exos/cover.webp)
 
-To run the OS, you can use the attached ISO image from any Release, and run it in QEMU emulator. The system was also tested on x86_64 baremetal (booted from the USB flash disk).
+To run the OS, you can use the attached ISO image from any Release, and run it in QEMU emulator. The system was also tested on the x86_64 baremetal (booted from the USB flash disk).
 
 ## How to build and run
 
@@ -22,8 +22,11 @@ dnf install xorriso net-tools grub2-tools qemu qemu-common qemu-system-x86
 # image with GRUB stage1 bootloader
 make build
 
-# run the QEMU emulation with ISO image (respectively with additional floppy image attached as well)
+# run the QEMU emulation with ISO image
 make run_iso
+
+# create a floppy image and attach it to virtual machine (will enable filesystem-related features)
+# please do note that the floppy image is overwritten every time you hit dis target
 make run_iso_floppy
 
 # (alternative) run the kernel exclusively only (needs the `bootloader` dependency in Cargo.toml to be added)
@@ -33,10 +36,10 @@ make run
 
 ## How to test ICMP/SLIP 
 
-Run the kernel in QEMU to get the `pty` number in stdout:
+Start a virtual machine to receive the `pty` handle:
 
 ```
-make run
+make run_iso
 
 char device redirected to /dev/pts/3 (label serial0)
 ```
@@ -52,5 +55,15 @@ Catch packets using `tcpdump`:
 
 ```
 sudo tcpdump -i sl0
+```
+
+Run the `response` command in the system shell to handle ICMP
+```rou2exOS
+response
+```
+
+Now you should be able to ping the machine from your machine
+```
+ping 192.168.3.2
 ```
 

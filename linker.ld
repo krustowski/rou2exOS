@@ -8,7 +8,6 @@ SECTIONS {
     }
 
     .text : {
-        /**(.text._start)*/
         *(.text*)
     }
 
@@ -27,38 +26,35 @@ SECTIONS {
 	KEEP(*(.multiboot_ptr))
     }
 
-    /*.tss : AT(0x1000) {
-        *(.tss)    /* TSS will be placed at the specified address (0x1000 in this example) */
-    /*}*/
-
     .gdt : {
-        *(.gdt)    /* GDT descriptor data */
+        *(.gdt)  
     }
 
     .idt : {
-        *(.idt)    /* IDT descriptor data */
+        *(.idt)   
     }
 
     /* Stack */
     . = ALIGN(16);
     stack_bottom = .;
-    . = . + 16K; /* 16 KiB */
+    . = . + 16K; 
     stack_top = .;
 
     /* Define a symbol for the start of the heap */
     . = ALIGN(16);
     __heap_start = .;
-    . = . + 64K; /* Reserve 64 KiB for heap */
+    . = . + 64K; 
     __heap_end = .;
 
     . = ALIGN(4K);
-    pml4_table = .;
-    . = . + 4K;
-    pdpt_table = .;
-    . = . + 4K;
-    pd_table = .;
-    . = . + 4K;
-    pt_table = .;
-    . = . + 4K;
+    pml4_table = .;    . = . + 4K;
+    pdpt_table = .;    . = . + 4K;
+    pd_table   = .;    . = . + 4K;
+    pt_table   = .;    . = . + 4K;
+
+    p4_table     = .;  . = . + 4K;
+    p3_fb_table  = .;  . = . + 4K;
+    p2_fb_table  = .;  . = . + 4K;
+    p1_fb_table  = .;  . = . + 4K;
 }
 

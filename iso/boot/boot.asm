@@ -3,46 +3,44 @@
 
 BITS 32
 
-;section .multiboot2_header
-;align 8
-
-;MB2_MAGIC        equ 0xe85250d6
-;MB2_ARCH         equ 0x0
-;MB2_HEADER_LEN   equ header_end - header_start
-;MB2_CHECKSUM     equ -(MB2_MAGIC + MB2_ARCH + MB2_HEADER_LEN)
-
-;header_start:
-;    dd MB2_MAGIC
-;    dd MB2_ARCH
-;    dd MB2_HEADER_LEN
-;    dd MB2_CHECKSUM
-
-   ; Framebuffer tag
-    ;dw 5 	; type (framebuffer)
-    ;dw 0        ; flags
-    ;dd 24	; size
-    ;dd 1024	; width
-    ;dd 768	; height
-    ;dd 32	; depth
-    ;dd 0
-
-    ; End tag (type = 0, size = 8)
-;    dw 0
-;    dw 0
-;    dd 8
-;header_end:
-
 section .bss
 align 4096
-p4_table:
+
+pml4_table:    
+	resq 512
+pdpt_table:    
+	resq 512
+pd_table:      
+	resq 512      
+pt_table:      
+	resq 512      
+
+p4_table:           
+	resb 4096
+p3_table:           
+	resb 4096
+p2_table:           
+	resb 4096
+p1_page_tables:     
+	resb 4096
+p1_page_tables_2:   
+	resb 4096
+
+p3_fb_table:
+    	resq 512
+p2_fb_table:
+    	resq 512
+p1_fb_table:
+    	resq 512
+p1_fb_table_2:      
+	resb 4096
+
+p1_low_table:
+    resq 512
+p1_extra_table:
     resb 4096
-p3_table:
+p1_table_page_tables:
     resb 4096
-p2_table:
-    resb 4096
-;stack_bottom:
-;    resb 64
-;stack_top:
 
 align 16
 ist1_stack:
@@ -60,18 +58,10 @@ global multiboot_ptr
 multiboot_ptr:
     resq 1
 
-;align 16
-;tss:
-    ; IST pointers (7 entries), each 8 bytes
-;    resq 1                  ; RSP0 (not used but must exist)
-;    resq 1                  ; RSP1
-;    resq 1                  ; RSP2
-;    resq 1                  ; IST1
-;    resq 6                  ; IST2–IST7
-;    resq 1                  ; Reserved
-;    resw 0                   ; IO Map base (disable I/O map)
-;    resw 0
-;tss_end:
+align 16
+stack_bottom:
+    resb 64
+stack_top:
 
 ;
 ;
@@ -82,10 +72,14 @@ align 4
 
 extern kernel_main
 
-extern pml4_table
-extern pdpt_table
-extern pd_table
-extern pt_table
+global p4_table
+global p3_table
+global p2_table
+
+global p3_fb_table
+global p2_fb_table
+global p1_fb_table
+global p1_fb_table_2
 
 global _start
 global debug_flag
@@ -95,31 +89,31 @@ debug_flag:
 _start:
     mov [multiboot_ptr], ebx
 
+    mov eax, p4_table
+    mov cr3, eax
+
     cli
 
-    ;call setup_paging
     call set_up_page_tables
-    call enable_paging
 
     mov dword [0xb8000 + 80], 0x2f4b2f4f
-    ;hlt
 
     call load_gdt
     call load_idt
 
-    ; Set protected mode segments
-    mov ax, 0x10       ; data segment selector
+    mov ax, 0x10      
     mov ds, ax
     mov es, ax
     mov fs, ax
     mov gs, ax
     mov ss, ax
 
-    ;call enable_long_mode
+    call enable_paging
 
     ; Load 64-bit code segment and jump
     jmp 0x08:long_mode_entry
-    ;jmp $
+
+    jmp $
 
 load_gdt:
     lgdt [gdt_descriptor]
@@ -138,58 +132,6 @@ load_idt:
     lidt [idt_ptr]
     ret
 
-; Set up page tables
-setup_paging:
-    ; Clear tables
-
-    ; PML4[511] → PDP @ 0x2000
-    mov eax, pdpt_table
-    or eax, 0x03        		; Present + Writable
-    mov [0x1000 + 8 * 511], eax  	; PML4 entry pointing to PDPT
-
-    ; PDP[0] → PD @ 0x3000
-    mov eax, pd_table
-    or eax, 0x03
-    mov [0x2000 + 8 * 0], eax
-
-    ; PD[0] → 2 MiB large page at 0x00100000 (kernel)
-    mov eax, 0x00100000        		; Kernel page starting at 0x00100000
-    or eax, 0x83               		; Present + Writable + LargePage
-    mov [0x3000 + 8 * 0], eax    	; PD entry pointing to 2MB page
-
-    ; Identity map 0x00000000 for safe booting
-    mov eax, 0x00000000        		; Map the first 4KiB
-    or eax, 0x03               		; Present + Writable
-    mov [0x4000 + 8*0], eax    		; PT entry
-
-    ret
-
-; Enable Long Mode Paging
-enable_long_mode:
-    ; Load PML4 into CR3
-    mov eax, pml4_table        	; Must correspond to the PML4 table
-
-    ;mov eax, 0x1000        	; Must correspond to the PML4 table
-    mov cr3, eax
-
-    ; Enable PAE (Physical Address Extension, necessary for 64-bit)
-    mov eax, cr4
-    or eax, 1 << 5         	; Set the PAE bit in CR4
-    mov cr4, eax
-
-    ; Enable Long Mode (EFER.LME = 1)
-    mov ecx, 0xC0000080    	; EFER MSR
-    rdmsr                   	; Read MSR
-    or eax, 1 << 8          	; Set LME bit to enable long mode
-    wrmsr                   	; Write back to EFER MSR
-
-    ; Enable Paging (CR0.PG = 1)
-    mov eax, cr0
-    or eax, 1 << 31        	; Set paging bit in CR0
-    mov cr0, eax
-
-    ret
-
 ;
 ;
 ;
@@ -201,10 +143,10 @@ gdt_start:
     dq 0x0000000000000000
 
     ; Kernel code segment (offset 0x08)
-    dq 0x00af9a000000ffff
+    dq 0x00AF9A000000FFFF
 
     ; Kernel data segment (offset 0x10)
-    dq 0x00af92000000ffff
+    dq 0x00AF92000000FFFF
 
     ; User code segment (offset 0x18)
     dq 0x00affa000000ffff
@@ -212,15 +154,6 @@ gdt_start:
     ; User data segment (offset 0x20)
     dq 0x00aff2000000ffff
 
-    ; TSS descriptor (offset 0x28, needs two entries: 16 bytes total)
-    ;dw tss_end - tss - 1               ; [0:15]  Limit 0:15
-    ;dw tss               		; [16:31] Base 0:15
-    ;db tss >> 16              		; [32:39] Base 16:23
-    ;db 0x89                        	; [40:47] Type=0x9 (TSS), Present=1
-    ;db 0x00              		; [48:51] Limit 16:19
-    ;db tss >> 24              		; [52:59] Base 24:31
-    ;dd tss >> 32              		; [64:95] Base 32:63
-    ;dd 0x00                         	; [96:127] Reserved
 gdt_tss_low: 
     dq 0
 gdt__tss_high:
@@ -231,31 +164,6 @@ gdt_end:
 gdt_descriptor:
     dw gdt_end - gdt_start - 1
     dq gdt_start
-
-
-;tss:
-;    dq 0x0                    ; Previous TSS Link (set to 0 for no previous task)
-;    dq 0x0                    ; ESP0 (main stack address) - Hardcoded address
-;    dw 0x10                   ; SS0 (stack segment for privilege level 0)
-;    dw 0x0                    ; Unused padding
-;    dq ist1_stack_top         ; IST1 (interrupt stack 1) - Hardcoded address
-;    dq 0x0                    ; Unused IST2, IST3, etc., (can be set to 0 if not needed)
-;    dq 0x0
-;    dq 0x0
-;    dq 0x0
-;    dq 0x0
-;    dq 0x0
-;    dq 0x0                    ; Unused fields (reserved)
-;    dq 0x0                    ; Unused fields (reserved)
-;    dq 0x0                    ; Unused fields (reserved)
-;    dq 0x0                    ; Unused fields (reserved)
-;    dq 0x0                    ; Unused fields (reserved)
-;    dq 0x0                    ; Unused fields (reserved)
-;    dq 0x0                    ; Unused fields (reserved)
-;    dq 0x0                    ; Unused fields (reserved)
-;    dq 0x0                    ; Unused fields (reserved)
-;tss_end:
-
 
 ; Define a 256-entry dummy IDT (null handlers)
 idt_ptr:
@@ -277,98 +185,236 @@ idt_end:
 
 ; Page Fault Handler (INT 0x0E)
 page_fault_handler:
-    pusha                      ; Save registers
+    pusha                      
 
-    ; Get the error code and fault address from the stack
     mov eax, [esp + 8]         ; Error code
     mov ebx, [esp + 12]        ; Faulting address (CR2)
 
-    ; Check for specific error codes or handle them
-    ; Error code: [Reserved|ID|Reserved|User|Fault|Protection]
-    ; More logic to handle fault types goes here
-
-    ; For example, if the page was not present:
-    ; - One might want to load the page from swap or handle the fault
-
-    ; In this example, we'll just print a message (we can print via serial port or VGA)
-    ; Here goes the error handling code or panic, depending on set requirements
-
-    hlt                        ; Halt the system (in case of an unhandled fault)
-
-    popa                       ; Restore registers
-    iret                       ; Return from interrupt
+    popa                       
+    iret                       
 
 ;
 ;
 ;
 
-set_up_page_tables:
-    ; Map first P4 entry to P3 table
-    mov eax, p3_table
-    or eax, 0b11 		; Present + writable
-    mov [p4_table], eax
+section .text
 
-    ; Map first P3 entry to P2 table
-    mov eax, p2_table
-    or eax, 0b11 		; Present + writable
-    mov [p3_table], eax
+%define FB_PHYS     0xFD000000
+%define FB_VIRT     0xC0000000
+%define PAGE_COUNT  (0x400000 / 0x1000)  ; 4 MiB / 4 KiB = 1024 pages
+%define PAGE_FLAGS  0b11
 
-    ; Map each P2 entry to a huge 2MiB page
-    mov ecx, 0         		; counter variable
+zero_table:
+    mov ecx, 512          
+    xor eax, eax        
 
-.map_p2_table:
-    ; Map ecx-th P2 entry to a huge page that starts at address 2MiB*ecx
-    mov eax, 0x200000  			; 2MiB
-    mul ecx            			; Start address of ecx-th page
-    or eax, 0b10000011 			; Present + writable + huge
-    mov [p2_table + ecx * 8], eax 	; Map ecx-th entry
-
-    inc ecx            ; Increase counter
-    cmp ecx, 512       ; If counter == 512, the whole P2 table is mapped
-    jne .map_p2_table  ; Else map the next entry
+.zero_loop:
+    mov [edi], eax
+    add edi, 8
+    loop .zero_loop
 
     ret
 
-enable_paging:
-    ; Load P4 to cr3 register (cpu uses this to access the P4 table)
-    mov eax, p4_table
-    mov cr3, eax
+set_up_page_tables:
+    lea edi, [p4_table]
+    call zero_table
 
-    ; Enable PAE-flag in cr4 (Physical Address Extension)
+    lea edi, [p3_table]
+    call zero_table
+
+    lea edi, [p3_fb_table]
+    call zero_table
+
+    lea edi, [p2_table]
+    call zero_table
+
+    lea edi, [p2_fb_table]
+    call zero_table
+
+    lea edi, [p1_fb_table]
+    call zero_table
+
+    lea edi, [p1_page_tables]
+    call zero_table
+
+    ; Map P4[0] → P3
+    mov eax, p3_table
+    or eax, PAGE_FLAGS
+    mov [p4_table + 0 * 8], eax
+    mov dword [p4_table + 0 * 8 + 4], 0
+
+    ; Map P3[0] → P2
+    mov eax, p2_table
+    or eax, PAGE_FLAGS
+    mov [p3_table + 0 * 8], eax
+    mov dword [p3_table + 0 * 8 + 4], 0
+
+    ; Identity map 0–1 GiB with 2 MiB pages
+    xor ecx, ecx
+.map_1gib:
+    mov eax, 0x200000
+    mul ecx
+    or eax, 0b10000011        
+    mov [p2_table + ecx * 8], eax
+    mov dword [p2_table + ecx * 8 + 4], 0
+
+    inc ecx
+    cmp ecx, 512
+    jne .map_1gib
+
+    ;-----------------------------------------
+    ; Identity-map your own page table memory
+    ; Assume p1_page_tables = 0x134000
+
+    mov eax, p1_page_tables
+    or eax, PAGE_FLAGS
+    mov [p2_table + 1 * 8], eax   ; Place under p2[1]
+    mov dword [p2_table + 1 * 8 + 4], 0
+
+    mov eax, p1_page_tables_2
+    or eax, PAGE_FLAGS
+    mov [p2_table + 2 * 8], eax   ; Place under p2[1]
+    mov dword [p2_table + 2 * 8 + 4], 0
+
+    xor ecx, 0
+.map_self:
+    mov eax, 0x131000        ; first page table
+    add eax, ecx
+    or eax, PAGE_FLAGS
+    mov edi, p1_page_tables
+    mov ebx, ecx
+    shr ebx, 12
+    shl ebx, 3
+    add edi, ebx
+
+    mov [edi], eax
+    mov dword [edi + 4], 0
+
+    add ecx, 0x1000
+    cmp ecx, 0x40000
+    jb .map_self
+
+.map_self_2:
+    mov eax, 0x13e000        
+    add eax, ecx
+    or eax, PAGE_FLAGS
+    mov edi, p1_page_tables_2
+    mov ebx, ecx
+    shr ebx, 12
+    shl ebx, 3
+    add edi, ebx
+
+    mov [edi], eax
+    mov dword [edi + 4], 0
+
+    add ecx, 0x1000
+    cmp ecx, 0x40000
+    jb .map_self_2
+
+    ; Framebuffer
+
+    mov eax, p3_fb_table
+    or eax, PAGE_FLAGS
+    mov [p4_table + 511 * 8], eax
+    mov dword [p4_table + 511 * 8 + 4], 0
+
+    mov eax, p2_fb_table
+    or eax, PAGE_FLAGS
+    mov [p3_fb_table + 0 * 8], eax
+    mov dword [p3_fb_table + 0 * 8 + 4], 0
+
+    mov eax, p1_fb_table
+    or eax, PAGE_FLAGS
+    mov [p2_fb_table + 0 * 8], eax
+    mov dword [p2_fb_table + 0 * 8 + 4], 0
+
+    xor ecx, ecx
+.map_fb:
+    mov eax, FB_PHYS
+    add eax, ecx
+    or eax, PAGE_FLAGS
+
+    mov edi, p1_fb_table
+    mov ebx, ecx
+    shr ebx, 12 
+    shl ebx, 3 
+    add edi, ebx
+
+    mov [edi], eax 
+    mov dword [edi + 4], 0
+
+    ;mov [p1_fb_table + ecx * 8], eax
+    ;mov dword [p1_fb_table + ecx * 8 + 4], 0
+
+    add ecx, 0x1000
+    cmp ecx, PAGE_COUNT
+    jb .map_fb
+
+    ret
+
+
+enable_paging:
     mov eax, cr4
     or eax, 1 << 5
     mov cr4, eax
 
-    ; Set the long mode bit in the EFER MSR (model specific register)
     mov ecx, 0xC0000080
     rdmsr
     or eax, 1 << 8
     wrmsr
 
-    ; Enable paging in the cr0 register
+    ;mov eax, p4_table
+    ;mov cr3, eax
+
     mov eax, cr0
     or eax, 1 << 31
     mov cr0, eax
 
     ret
-
 ;
 ;
 ;
 
 BITS 64
 
+section .text
+
+enable_paging_64:
+    mov rax, pml4_table
+    mov cr3, rax
+
+    ; CR4: enable PAE
+    mov rax, cr4
+    or rax, 1 << 5        ; PAE
+    mov cr4, rax
+
+    ; EFER: enable long mode
+    mov ecx, 0xC0000080   ; EFER MSR
+    rdmsr
+    or eax, 1 << 8        ; LME
+    wrmsr
+
+    ; CR0: enable paging
+    mov rax, cr0
+    or rax, 1 << 31       ; PG
+    mov cr0, rax
+
+    ret
+
+
 long_mode_entry:
+    ; TLB flush
+    mov rax, cr3
+    mov cr3, rax
+
     mov ax, 0x10
     mov ds, ax
     mov es, ax
+    mov fs, ax
+    mov gs, ax
     mov ss, ax
 
-    ;call load_tss
-    ;mov ax, 0x28
-    ;ltr ax
-
-    ; Clear the stack (assume we got 1MB+ memory)
+    ; Clear the stack (assume there'S 1MB+ memory)
     mov rsp, 0x80000
     call kernel_main
 

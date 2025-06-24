@@ -3,16 +3,61 @@ pub mod boot;
 pub mod color;
 pub mod config;
 pub mod cpu;
+pub mod font;
 pub mod fs;
 pub mod heap;
 pub mod result;
-pub mod vga;
+pub mod video;
 
 use spin::Mutex;
 
 const BUFFER_SIZE: usize = 1024;
 
 static INIT_BUFFER: Mutex<Buffer> = Mutex::new(Buffer::new());
+
+pub fn init(vga_index: &mut isize, multiboot_ptr: u64) {
+    debugln!("Kernel init start");
+
+    result::print_result(
+        "Load kernel", 
+        result::InitResult::Passed,
+    );
+
+    result::print_result(
+        "Check 64-bit Long Mode", 
+        cpu::check_mode(),
+    );
+
+    result::print_result(
+        "Initialize heap allocator", 
+        heap::print_result(vga_index),
+    );
+
+    result::print_result(
+        "Read Multiboot2 tags", 
+        boot::print_info(vga_index, multiboot_ptr),
+    );
+
+    // TODO: Check the video mode
+
+    let video_result = result::InitResult::Passed;
+
+    result::print_result(
+        "Check floppy drive", 
+        fs::check_floppy(vga_index),
+    );
+
+    // TODO: Fallback to floppy to dump debug logs + init buffer
+    if video_result == result::InitResult::Passed {
+        INIT_BUFFER.lock().flush();
+    }
+
+    color::color_demo();
+    ascii::ascii_art();
+
+    // Play startup melody
+    crate::audio::midi::play_melody();
+}
 
 struct Buffer {
     buf: [u8; 1024],
@@ -50,49 +95,3 @@ impl Buffer {
     }
 }
 
-pub fn init(vga_index: &mut isize, multiboot_ptr: u64) {
-    debugln!("Kernel init start");
-
-    result::print_result(
-        "Load kernel", 
-        result::InitResult::Passed,
-    );
-
-    result::print_result(
-        "Check 64-bit Long Mode", 
-        cpu::check_mode(),
-    );
-
-    result::print_result(
-        "Initialize heap allocator", 
-        heap::print_result(vga_index),
-    );
-
-    result::print_result(
-        "Read Multiboot2 tags", 
-        boot::print_info(vga_index, multiboot_ptr),
-    );
-
-    let video_result = vga::print_result();
-
-    result::print_result(
-        "Initialize VGA writer", 
-        *&video_result,
-    );
-
-    result::print_result(
-        "Check floppy drive", 
-        fs::check_floppy(vga_index),
-    );
-
-    // TODO: Fallback to floppy to dump debug logs + init buffer
-    if video_result == result::InitResult::Passed {
-        INIT_BUFFER.lock().flush();
-    }
-
-    color::color_demo();
-    ascii::ascii_art();
-
-    // Play startup melody
-    crate::audio::midi::play_melody();
-}

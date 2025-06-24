@@ -134,6 +134,14 @@ pub fn dump_debug_log_to_file(vga_index: &mut isize) {
             string(vga_index, e.as_bytes(), Color::Red);
         }
     }
+
+    use crate::net::serial;
+
+    serial::init();
+
+    for b in dbg.data() {
+        serial::write(*b);
+    }
 }
 
 fn print_stack_info() {

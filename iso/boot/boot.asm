@@ -1,5 +1,5 @@
-; iso/boot/boot.asm
-; NASM syntax - Multiboot2 compliant 64-bit kernel loader for GRUB
+; boot.asm
+; NASM syntax - stage2 bootloader to set GDT, IDT and memory paging before jumping into 64bit mode
 
 BITS 32
 
@@ -56,7 +56,7 @@ ist1_stack_top:
 
 align 16
 tss:
-    ; TSS layout: 104 bytes (enough for x86_64 TSS)
+    ; TSS layout: 104 bytes 
     resb 104
 tss_end:
 
@@ -174,20 +174,20 @@ gdt_descriptor:
 
 ; Define a 256-entry dummy IDT (null handlers)
 idt_ptr:
-    dw idt_end - idt_start - 1   ; Limit (size - 1)
-    dq idt_start                 ; Base
+    dw idt_end - idt_start - 1  
+    dq idt_start            
 
 idt_start:
     ; Page fault handler (vector 0x0E)
-    dq page_fault_handler     ; Address of the handler
+    dq page_fault_handler    
     dw 0x08                   ; Code segment (kernel code segment)
-    db 0                      ; Reserved
+    db 0                    
     db 0x8E                   ; Type: interrupt gate (present, DPL = 0)
-    dw 0                      ; Reserved
+    dw 0                     
     dd 0
-    dq 0                      ; Reserved (Upper part of handler address)
+    dq 0                      
 
-    times 256 dq 0            ; 256 null descriptors (each 16 bytes in 64-bit)
+    times 256 dq 0            
 idt_end:
 
 ; Page Fault Handler (INT 0x0E)
@@ -196,6 +196,8 @@ page_fault_handler:
 
     mov eax, [esp + 8]         ; Error code
     mov ebx, [esp + 12]        ; Faulting address (CR2)
+
+    ; ...
 
     popa                       
     iret                       
@@ -215,8 +217,8 @@ FB_P1_TABLES:
 section .text
 
 %define FB_PHYS     0xFD000000
-%define FB_VIRT     0xFFFF800000000000
-%define PAGE_COUNT  4096  ;(0x400000 / 0x1000)  ; 4 MiB / 4 KiB = 1024 pages
+%define FB_VIRT     0xFFFFFF8000000000
+%define PAGE_COUNT  4096  
 %define PAGE_FLAGS  0b11
 
 zero_table:
@@ -366,34 +368,29 @@ set_up_page_tables:
     mov [p2_fb_table + 3 * 8], eax
     mov dword [p2_fb_table + 3 * 8 + 4], 0
 
-    ; Inputs:
-    ;   FB_PHYS = physical address of framebuffer
-    ;   FB_P1_TABLES = array of pointers to p1 tables (must be preallocated)
-    ;   FB_PAGE_COUNT = total pages to map (FB_SIZE >> 12)
+    ; Framebuffer P1 pages
 
-    xor ecx, ecx            ; ecx = page offset in bytes
-    xor esi, esi            ; esi = table index (which p1 table)
+    xor ecx, ecx            
+    xor esi, esi            
 .map_fb_dynamic:
     mov eax, FB_PHYS
-    add eax, ecx            ; eax = physical addr of current page
+    add eax, ecx            
     or eax, PAGE_FLAGS
 
-    ; Calculate current P1 table from array
     mov ebx, esi
-    shl ebx, 3              ; ebx = esi * 8 (size of pointer)
-    mov edi, [FB_P1_TABLES + ebx] ; edi = pointer to current p1 table
+    shl ebx, 3              
+    mov edi, [FB_P1_TABLES + ebx] 
 
-    ; Calculate index inside current P1 table
     mov ebx, ecx
-    shr ebx, 12             ; ebx = ecx / 4096 (page index)
-    and ebx, 511            ; index in current p1 table (0–511)
-    shl ebx, 3              ; offset in bytes
+    shr ebx, 12             
+    and ebx, 511            
+    shl ebx, 3              
 
     add edi, ebx
     mov [edi], eax
     mov dword [edi + 4], 0
 
-    add ecx, 0x1000         ; next page
+    add ecx, 0x1000         
     cmp ecx, PAGE_COUNT * 0x1000
     jae .done_fb_map
 
@@ -410,14 +407,6 @@ set_up_page_tables:
 
 .done_fb_map:
     ret
-
-
-
-
-
-
-
-
 
 enable_paging:
     mov eax, cr4
@@ -451,7 +440,7 @@ enable_paging_64:
 
     ; CR4: enable PAE
     mov rax, cr4
-    or rax, 1 << 5        ; PAE
+    or rax, 1 << 5        
     mov cr4, rax
 
     ; EFER: enable long mode

@@ -10,6 +10,10 @@ authors = ["krusty <krusty@vxn.dev>"]
 x86_64 = { version = "0.15.2", default-features = false, features = ["instructions", "abi_x86_interrupt"] }
 spin = "0.9"
 
+[features]
+kernel_text = []
+kernel_graphics = []
+
 [dependencies.lazy_static]
 version = "1.0"
 features = ["spin_no_std"]

@@ -1,6 +1,6 @@
 use x86_64::{registers::control::Cr3Flags, structures::paging::PhysFrame, PhysAddr, VirtAddr};
 
-use crate::{debug::dump_debug_log_to_file, init::{config::{p1_fb_table, p1_fb_table_2, p2_fb_table, p3_fb_table, p4_table}, font::{draw_text, FONT_RAW}}, mem, vga::{
+use crate::{debug::dump_debug_log_to_file, init::{config::{p1_fb_table, p1_fb_table_2, p2_fb_table, p3_fb_table, p4_table}, font::{draw_char, draw_text, draw_text_psf, parse_psf, FONT_RAW}}, mem, vga::{
     buffer::Color, write::{newline, number, string}
 } };
 use super::{result::InitResult};
@@ -33,10 +33,10 @@ pub struct TagHeader {
 #[repr(C)]
 #[derive(Debug)]
 struct MemoryMapTag {
-    typ: u32,           // = 6
-    size: u32,          // size of this tag including entries
-    entry_size: u32,    // size of each entry (usually 24 bytes)
-    entry_version: u32, // usually 0
+    typ: u32,       
+    size: u32,          
+    entry_size: u32,
+    entry_version: u32, 
                         
 }
 
@@ -45,8 +45,8 @@ struct MemoryMapTag {
 struct MemoryMapEntry {
     base_addr: u64,
     length: u64,
-    typ: u32,       // 1 = usable RAM
-    reserved: u32,  // must be 0
+    typ: u32,   
+    reserved: u32,  
 }
 
 #[derive(Clone,Copy)]
@@ -185,23 +185,29 @@ pub unsafe fn parse_multiboot2_info(vga_index: &mut isize, base_addr: usize) -> 
                     //Cr3::write(PhysFrame::from_start_address(PhysAddr::new(p4_phys as u64)).unwrap(), Cr3Flags::empty());
 
 
-                    //let fb_size = (fb_tag.pitch * fb_tag.height) as usize;
-                    //let fb = unsafe { core::slice::from_raw_parts_mut(fb_ptr, fb_size) };
-
                     for y in 0..fb_tag.height  {
                         for x in 0..fb_tag.width  {
                             //let offset = y * fb_tag.pitch + x * (fb_tag.bpp as u32 / 8);
                             let offset = y * fb_tag.pitch / 4 + x;
-                            let color = x + y % 255;
+                            let color = 0x00ff00ff;
 
-                            fb_ptr.add(offset as usize).write_volatile(color);
-
-                            draw_text(fb_ptr, 50, 50, x as usize, y as usize, FONT_RAW, "A", [0xf0; 4]);
-
-                            //ptr::write(pixel, 0x0F);                    
-                            //ptr::write(pixel.add(1), y % 255);      
-                            //ptr::write(pixel.add(2), 0xFF);      
+                            fb_ptr.add(offset as usize).write_volatile(y % 99);
+                            fb_ptr.add(offset as usize + 1).write_volatile(x -color % 2550);
+                            fb_ptr.add(offset as usize + 2).write_volatile(color);
                         }
+                    }
+
+                    for y in 100..116 {
+                        for x in 100..108 {
+                            super::font::put_pixel(x, y, 0x0000FF, fb_ptr, 4096, 32);
+                        }
+                    }
+
+                    if let Some(font) = parse_psf(FONT_RAW) {
+                        draw_text_psf("TEST", &font, 100, 100, 0xdeadbeef, fb_ptr, fb_tag.pitch as usize, fb_tag.bpp as usize);
+
+                        draw_char(b'A', 150, 120, fb_ptr, fb_tag.pitch as usize, 0xdeadbeef, FONT_RAW);
+
                     }
                 }
 
@@ -229,25 +235,4 @@ pub unsafe fn parse_multiboot2_info(vga_index: &mut isize, base_addr: usize) -> 
 fn align_up(x: usize, align: usize) -> usize {
     (x + align - 1) & !(align - 1)
 }
-
-static mut P4_TABLE: [u64; 512] = [0; 512];
-static mut P3_FB: [u64; 512] = [0; 512];
-static mut P2_FB_0: [u64; 512] = [0; 512];
-static mut P2_FB_1: [u64; 512] = [0; 512];
-static mut P1_FB_0: [u64; 512] = [0; 512];
-static mut P1_FB_1: [u64; 512] = [0; 512];
-static mut P1_FB_2: [u64; 512] = [0; 512];
-static mut P1_FB_3: [u64; 512] = [0; 512];
-static mut P1_FB_4: [u64; 512] = [0; 512];
-static mut P1_FB_5: [u64; 512] = [0; 512];
-static mut P1_FB_6: [u64; 512] = [0; 512];
-static mut P1_FB_7: [u64; 512] = [0; 512];
-static mut P1_FB_8: [u64; 512] = [0; 512];
-static mut P1_FB_9: [u64; 512] = [0; 512];
-static mut P1_FB_10: [u64; 512] = [0; 512];
-static mut P1_FB_11: [u64; 512] = [0; 512];
-static mut P1_FB_12: [u64; 512] = [0; 512];
-static mut P1_FB_13: [u64; 512] = [0; 512];
-static mut P1_FB_14: [u64; 512] = [0; 512];
-static mut P1_FB_15: [u64; 512] = [0; 512];
 

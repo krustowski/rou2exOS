@@ -1,12 +1,3 @@
-#[repr(C)]
-pub struct PSF1Header {
-    magic: [u8; 2], 
-    mode: u8,
-    charsize: u8,
-}
-
-pub static FONT_RAW: &[u8] = include_bytes!("../../poppins.psf");
-
 pub fn draw_char(c: u8, x: usize, y: usize, fb: *mut u32, pitch: usize, fg: u32, font: &[u8]) {
     let char_size = font[3] as usize;
     //let glyph = &font[4 + (c as usize * char_size)..];
@@ -29,37 +20,12 @@ pub fn draw_char(c: u8, x: usize, y: usize, fb: *mut u32, pitch: usize, fg: u32,
     }
 }
 
+//
+//
+//
+
 pub fn print_result() -> super::result::InitResult {
     super::result::InitResult::Unknown
-}
-
-//
-//
-//
-
-const SCREEN_WIDTH: usize = 1024;
-const SCREEN_HEIGHT: usize = 768;
-const FONT_WIDTH: usize = 8;
-const FONT_HEIGHT: usize = 16;
-
-pub static FONT: &[u8] = include_bytes!("../../poppins.psf"); 
-
-
-pub unsafe fn put_pixel(x: usize, y: usize, color: u32, framebuffer: *mut u32, pitch: usize, bpp: usize) {
-    let index = y * pitch + x * (bpp / 8);
-    //if index + 3 < framebuffer.len() {
-        framebuffer.add(index).write_volatile(color & 0xFF);
-        framebuffer.add(index + 1).write_volatile((color >> 8) & 0xFF);
-        framebuffer.add(index + 2).write_volatile((color >> 16) & 0xFF);
-    //}
-}
-
-pub fn draw_text(s: &str, x: usize, y: usize, color: u32, framebuffer: *mut u32, pitch: usize, bpp: usize) {
-    let mut cx = x;
-    for ch in s.bytes() {
-        draw_char(ch, x, y, framebuffer, pitch, color, FONT);
-        cx += FONT_WIDTH;
-    }
 }
 
 //
@@ -78,7 +44,8 @@ pub struct PsfFont<'a> {
 pub fn parse_psf(psf: &[u8]) -> Option<PsfFont> {
     if psf.starts_with(&[0x36, 0x04]) { // PSF1
         let glyph_size = psf[3] as usize;
-        let num_glyphs = if psf[2] & 0x01 != 0 { 512 } else { 256 };
+        //let num_glyphs = if psf[2] & 0x01 != 0 { 512 } else { 256 };
+
         Some(PsfFont {
             glyphs: &psf[4..],
             bytes_per_glyph: glyph_size,
@@ -90,6 +57,7 @@ pub fn parse_psf(psf: &[u8]) -> Option<PsfFont> {
         let glyph_size = u32::from_le_bytes(psf[20..24].try_into().unwrap()) as usize;
         let height = u32::from_le_bytes(psf[24..28].try_into().unwrap()) as usize;
         let width = u32::from_le_bytes(psf[28..32].try_into().unwrap()) as usize;
+
         Some(PsfFont {
             glyphs: &psf[header_len..],
             bytes_per_glyph: glyph_size,
@@ -101,16 +69,7 @@ pub fn parse_psf(psf: &[u8]) -> Option<PsfFont> {
     }
 }
 
-fn draw_char_psf(
-    font: &PsfFont,
-    ch: u8,
-    x: usize,
-    y: usize,
-    color: u32,
-    framebuffer: *mut u32,
-    pitch: usize,
-    bpp: usize,
-) {
+fn draw_char_psf(font: &PsfFont, ch: u8, x: usize, y: usize, color: u32, framebuffer: *mut u32, pitch: usize, bpp: usize) {
     let glyph_start = ch as usize * font.bytes_per_glyph;
     let glyph = &font.glyphs[glyph_start..glyph_start + font.bytes_per_glyph];
 
@@ -118,23 +77,21 @@ fn draw_char_psf(
         let row_byte = glyph[row];
         for col in 0..font.width {
             if (row_byte >> (7 - col)) & 1 != 0 {
-                unsafe { put_pixel(x + col, y + row, color, framebuffer, pitch, bpp); };
+                unsafe { 
+                    let offset = (y + row) * 4096 / 4 + (x + col);
+
+                    framebuffer.add(offset as usize).write_volatile(0xdeadbeef);
+                    //framebuffer.add(offset as usize + 1).write_volatile(0xfefab0);
+                    //framebuffer.add(offset as usize + 2).write_volatile(0xdeadbeef);
+                }
             }
         }
     }
 }
 
-pub fn draw_text_psf(
-    text: &str,
-    font: &PsfFont,
-    x: usize,
-    y: usize,
-    color: u32,
-    framebuffer: *mut u32,
-    pitch: usize,
-    bpp: usize,
-) {
+pub fn draw_text_psf(text: &str, font: &PsfFont, x: usize, y: usize, color: u32, framebuffer: *mut u32, pitch: usize, bpp: usize) {
     let mut cx = x;
+
     for ch in text.bytes() {
         draw_char_psf(font, ch, cx, y, color, framebuffer, pitch, bpp);
         cx += font.width;

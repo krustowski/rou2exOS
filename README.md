@@ -67,3 +67,13 @@ Now you should be able to ping the machine from your machine
 ping 192.168.3.2
 ```
 
+## How to convert and import a font (graphics mode)
+
+Download a font (ideally in PSF format), add the selected font file into `src/video/fonts` as `console.psf`.
+
+To convert a font from BDF format use the `bdf2psf` utility (should be available in the Linux distro repos). We especially want to render the font to Framebuffer (`--fb` flag). An example command syntax is shown below.
+
+```shell
+bdf2psf --fb terminus-font-4.49.1/ter-u16b.bdf /usr/share/bdf2psf/standard.equivalents /usr/share/bdf2psf/ascii.set 256 console.psf
+```
+

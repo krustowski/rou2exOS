@@ -49,4 +49,14 @@ pub fn map_framebuffer(
     }
 }
 
+pub fn print_result(fb: &super::boot::FramebufferTag) -> super::result::InitResult {
+    use crate::video;
 
+    video::mode::init_video(fb);
+
+    if let Some(_) = video::mode::get_video_mode() {
+        return super::result::InitResult::Passed;
+    }
+
+    super::result::InitResult::Failed
+}

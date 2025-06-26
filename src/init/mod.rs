@@ -14,9 +14,14 @@ use spin::Mutex;
 const BUFFER_SIZE: usize = 1024;
 
 static INIT_BUFFER: Mutex<Buffer> = Mutex::new(Buffer::new());
+static mut FRAMEBUFFER: Option<boot::FramebufferTag> = None;
 
 pub fn init(vga_index: &mut isize, multiboot_ptr: u64) {
     debugln!("Kernel init start");
+
+    let mut framebuffer_tag: boot::FramebufferTag = boot::FramebufferTag{
+        ..Default::default()
+    };
 
     result::print_result(
         "Load kernel", 
@@ -35,12 +40,15 @@ pub fn init(vga_index: &mut isize, multiboot_ptr: u64) {
 
     result::print_result(
         "Read Multiboot2 tags", 
-        boot::print_info(vga_index, multiboot_ptr),
+        boot::print_info(vga_index, multiboot_ptr, &mut framebuffer_tag),
     );
 
-    // TODO: Check the video mode
+    let video_result = video::print_result(&framebuffer_tag);
 
-    let video_result = result::InitResult::Passed;
+    result::print_result(
+        "Initialize video", 
+        video_result,
+    );
 
     result::print_result(
         "Check floppy drive", 

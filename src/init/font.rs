@@ -32,7 +32,7 @@ pub fn print_result() -> super::result::InitResult {
 //
 //
 
-static PSF_FONT: &[u8] = include_bytes!("../../poppins.psf");
+pub static PSF_FONT: &[u8] = include_bytes!("../../poppins.psf");
 
 pub struct PsfFont<'a> {
     glyphs: &'a [u8],
@@ -71,18 +71,20 @@ pub fn parse_psf(psf: &[u8]) -> Option<PsfFont> {
 
 fn draw_char_psf(font: &PsfFont, ch: u8, x: usize, y: usize, color: u32, framebuffer: *mut u32, pitch: usize, bpp: usize) {
     let glyph_start = ch as usize * font.bytes_per_glyph;
-    let glyph = &font.glyphs[glyph_start..glyph_start + font.bytes_per_glyph];
+    //let glyph = &font.glyphs[glyph_start..glyph_start + font.bytes_per_glyph];
 
-    for row in 0..font.height {
-        let row_byte = glyph[row];
-        for col in 0..font.width {
-            if (row_byte >> (7 - col)) & 1 != 0 {
-                unsafe { 
-                    let offset = (y + row) * 4096 / 4 + (x + col);
+    if let Some(glyph) = font.glyphs.get(glyph_start..glyph_start + font.bytes_per_glyph) {
+        for row in 0..font.height {
+            let row_byte = glyph[row];
+            for col in 0..font.width {
+                if (row_byte >> (7 - col)) & 1 != 0 {
+                    unsafe { 
+                        let offset = (y + row) * 4096 / 4 + (x + col);
 
-                    framebuffer.add(offset as usize).write_volatile(0xdeadbeef);
-                    //framebuffer.add(offset as usize + 1).write_volatile(0xfefab0);
-                    //framebuffer.add(offset as usize + 2).write_volatile(0xdeadbeef);
+                        framebuffer.add(offset as usize).write_volatile(0xdeadbeef);
+                        //framebuffer.add(offset as usize + 1).write_volatile(0xfefab0);
+                        //framebuffer.add(offset as usize + 2).write_volatile(0xdeadbeef);
+                    }
                 }
             }
         }

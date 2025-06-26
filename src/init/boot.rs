@@ -1,15 +1,15 @@
-use crate::{debug::dump_debug_log_to_file, init::{config::{p1_fb_table, p1_fb_table_2, p2_fb_table, p3_fb_table, p4_table}, font::{draw_char, draw_test_char, draw_text, draw_text_psf, parse_psf, FONT_RAW}}, mem, vga::{
+use crate::{debug::dump_debug_log_to_file, init::{config::{p1_fb_table, p1_fb_table_2, p2_fb_table, p3_fb_table, p4_table}, font::{draw_text_psf, parse_psf}}, mem, vga::{
     buffer::Color, write::{newline, number, string}
 } };
 use super::{result::InitResult};
 
-pub fn print_info(vga_index: &mut isize, multiboot_ptr: u64) -> InitResult {
+pub fn print_info(vga_index: &mut isize, multiboot_ptr: u64, mut fb_tag: &FramebufferTag) -> InitResult {
     unsafe {
         debug!("Multiboot2 pointer: ");
         debugn!(multiboot_ptr);
         debugln!("");
 
-        if parse_multiboot2_info(vga_index, (multiboot_ptr as u32) as usize) > 0 {
+        if parse_multiboot2_info(vga_index, (multiboot_ptr as u32) as usize, fb_tag) > 0 {
             return InitResult::Passed;
         }
     }
@@ -47,21 +47,21 @@ struct MemoryMapEntry {
     reserved: u32,  
 }
 
-#[derive(Clone,Copy)]
+#[derive(Clone,Copy,Default)]
 #[repr(C, packed)]
 pub struct FramebufferTag {
-    typ: u32,
+    pub typ: u32,
     pub size: u32,
     pub addr: u64,
     pub pitch: u32,
     pub width: u32,
     pub height: u32,
     pub bpp: u8,
-    fb_type: u8,
-    reserved: u16,
+    pub fb_type: u8,
+    pub reserved: u16,
 }
 
-pub unsafe fn parse_multiboot2_info(_vga_index: &mut isize, base_addr: usize) -> usize {
+pub unsafe fn parse_multiboot2_info(_vga_index: &mut isize, base_addr: usize, mut fb_tag: &FramebufferTag) -> usize {
     // Ensure alignment (Multiboot2 requires 8-byte aligned structure)
     let addr = align_up(base_addr, 8);
 
@@ -134,7 +134,7 @@ pub unsafe fn parse_multiboot2_info(_vga_index: &mut isize, base_addr: usize) ->
             8 => {
                 debugln!("Framebuffer tag: ");
 
-                let fb_tag = &*(ptr as *const FramebufferTag);
+                fb_tag = &*(ptr as *const FramebufferTag);
 
                 debug!("Framebuffer address: ");
                 debugn!(fb_tag.addr as u64);
@@ -201,8 +201,9 @@ pub unsafe fn parse_multiboot2_info(_vga_index: &mut isize, base_addr: usize) ->
                             }
                             }*/
 
-                    if let Some(font) = parse_psf(FONT_RAW) {
+                    if let Some(font) = parse_psf(super::font::PSF_FONT) {
                         draw_text_psf("[guest@rou2ex:/] > ", &font, 25, 30, 0xdeadbeef, fb_ptr, fb_tag.pitch as usize, fb_tag.bpp as usize);
+                        draw_text_psf("[guest@rou2ex:/] > ", &font, 25, 50, 0xdeadbeef, fb_ptr, fb_tag.pitch as usize, fb_tag.bpp as usize);
 
                         //draw_char("ABCDEFGHIJKLMNOPQRSTUVWXYZ", 35, 35, fb_ptr, fb_tag.pitch as usize, 0xdeadbeef, FONT_RAW);
                     }

@@ -37,20 +37,20 @@ pub extern "C" fn kernel_main() {
     debugln!("Kernel loaded");
 
     // VGA buffer position (LEGACY)
-    let vga_index: &mut isize = &mut 0;
-    vga::screen::clear(vga_index);
-
-    // Instantiate new VGA Writer
-    video::vga::init_writer();
+    clear_screen!();
 
     // Run init checks
     unsafe {
-        init::init(vga_index, init::config::multiboot_ptr as u64);
+        init::init(init::config::multiboot_ptr as u64);
     }
+
+    // TODO: REmove: Instantiate new VGA Writer
+    video::vga::init_writer();
+
 
     // Run the shell loop
     debugln!("Starting shell...");
-    input::keyboard::keyboard_loop(vga_index);
+    input::keyboard::keyboard_loop();
 }
 
 //

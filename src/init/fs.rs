@@ -1,4 +1,4 @@
-use crate::fs::fat12::{block::Floppy, fs::Fs};
+use crate::fs::fat12::{block::Floppy, fs::Filesystem};
 use crate::vga::{
     write::{string, newline},
     buffer::Color,
@@ -8,13 +8,12 @@ use super::{
     result,
 };
 
-pub fn check_floppy(vga_index: &mut isize) -> result::InitResult {
-    let floppy = Floppy;
-    Floppy::init();
+pub fn check_floppy() -> result::InitResult {
+    let floppy = Floppy::init();
 
     let res: result::InitResult;
 
-    match Fs::new(&floppy, vga_index) {
+    match Filesystem::new(&floppy) {
         Ok(_) => {
             res = result::InitResult::Passed
         }
@@ -34,7 +33,7 @@ pub fn check_floppy(vga_index: &mut isize) -> result::InitResult {
     res
 } 
 
-pub fn print_info(vga_index: &mut isize) {
+/*pub fn print_info(vga_index: &mut isize) {
     let floppy = Floppy;
     Floppy::init();
 
@@ -52,4 +51,4 @@ pub fn print_info(vga_index: &mut isize) {
             newline(vga_index);
         }
     }
-}
+}*/

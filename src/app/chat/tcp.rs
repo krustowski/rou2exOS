@@ -149,7 +149,7 @@ fn filter_and_close_conns(conns: &mut [Option<tcp::TcpConnection>; ipv4::MAX_CON
     HandleState::ConnOK
 }
 
-pub fn handle_conns(vga_index: &mut isize, ips: &[[u8; 4]; 4]) {
+pub fn handle_conns(ips: &[[u8; 4]; 4]) {
     fn callback(conns: &mut [Option<tcp::TcpConnection>; ipv4::MAX_CONNS], packet: &[u8]) -> HandleState {
         if let Some((ipv4_header, ipv4_payload)) = ipv4::parse_packet(packet) {
             if let Some((tcp_header, payload)) = tcp::parse_packet(ipv4_payload) {
@@ -335,7 +335,7 @@ pub fn handle_conns(vga_index: &mut isize, ips: &[[u8; 4]; 4]) {
             }
         }
     }
-    clear(vga_index);
+    clear_screen!()
 }
 
 fn for_each_conn<'a, F, R>(conns: &'a mut [Option<TcpConnection>], mut f: F) -> Option<R> where F: FnMut(&'a mut TcpConnection) -> Option<R> {

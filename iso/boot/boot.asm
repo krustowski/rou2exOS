@@ -6,6 +6,10 @@ BITS 32
 section .bss
 align 4096
 
+global dma
+dma:
+	resb 4096
+
 pml4_table:    
 	resq 512
 pdpt_table:    
@@ -78,6 +82,9 @@ section .text
 align 4
 
 extern kernel_main
+global _start
+
+global dma_buffer
 
 global p4_table
 global p3_table
@@ -88,7 +95,6 @@ global p2_fb_table
 global p1_fb_table
 global p1_fb_table_2
 
-global _start
 global debug_flag
 debug_flag:
     db 0    ; 1 = enabled

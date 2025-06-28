@@ -1,13 +1,14 @@
 ENTRY(_start)
 
 SECTIONS {
-    . = 0x100000; /* load address of kernel in memory (1MB) */
+    . = 0x100000; /* 1 MB offset */
 
     .multiboot2_header : ALIGN(4K) {
         KEEP(*(.multiboot2_header))
     }
 
     .text : {
+	*(.text.entry)
         *(.text*)
     }
 
@@ -40,7 +41,7 @@ SECTIONS {
     . = . + 16K; 
     stack_top = .;
 
-    /* Define a symbol for the start of the heap */
+    /* Heap */
     . = ALIGN(16);
     __heap_start = .;
     . = . + 64K; 
@@ -61,5 +62,11 @@ SECTIONS {
     p1_fb_table_1  = .;  . = . + 4K;
     p1_fb_table_2  = .;  . = . + 4K;
     p1_fb_table_3  = .;  . = . + 4K;
+
+    . = 0x80000; 
+    .dma : ALIGN(512) {
+        KEEP(*(.dma))
+    }
+
 }
 

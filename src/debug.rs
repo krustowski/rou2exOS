@@ -1,5 +1,6 @@
 use core::fmt::{self, Write};
 use spin::Mutex;
+use crate::{clear_screen, error, printb, println};
 use crate::vga::{write::string, buffer::Color, screen};
 
 const DEBUG_LOG_SIZE: usize = 8192;
@@ -98,6 +99,19 @@ macro_rules! debugln {
 }
 
 #[macro_export]
+macro_rules! rprint {
+    ($data:expr) => {
+        use crate::net::serial;
+
+        //serial::init();
+
+        for b in $data.as_bytes() {
+            serial::write(*b);
+        }
+    };
+}
+
+#[macro_export]
 macro_rules! kprint {
     ($buf:expr, $off:expr, $str:expr) => {
         let len = $buf.len();
@@ -113,25 +127,25 @@ macro_rules! kprint {
     };
 }
 
-use crate::fs::fat12::{block::Floppy, fs::Fs};
+use crate::fs::fat12::{block::Floppy, fs::Filesystem};
 
-pub fn dump_debug_log_to_file(vga_index: &mut isize) {
+pub fn dump_debug_log_to_file() {
     let dbg = DEBUG_LOG.lock();
 
     let floppy = Floppy;
 
     // Dump log to display
-    screen::clear(&mut 0);
-    string(&mut 0, dbg.data(), Color::Yellow);
+    clear_screen!();
+    printb!(dbg.data());
 
-    match Fs::new(&floppy, vga_index) {
+    match Filesystem::new(&floppy) {
         Ok(fs) => {
             // Dump debug data into the DEBUG.TXT file in root directory
-            fs.write_file(0, b"DEBUG   TXT", dbg.data(), vga_index);
+            fs.write_file(0, b"DEBUG   TXT", dbg.data());
         }
         Err(e) => {
             debugln!(e);
-            string(vga_index, e.as_bytes(), Color::Red);
+            error!(e);
         }
     }
 

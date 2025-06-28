@@ -89,13 +89,16 @@ pub unsafe fn inb(port: u16) -> u8 {
 //  https://wiki.osdev.org/ISA_DMA
 //
 
-extern "C" {
+/*extern "C" {
     static mut dma: [u8; 512];
-}
+}*/
 
 #[unsafe(link_section = ".dma")]
-#[unsafe(no_mangle)]
-static mut DMA_BUFFER: [u8; 512] = [0u8; 512];
+pub static mut dma: [u8; 512] = [0; 512];
+
+//#[unsafe(link_section = ".dma")]
+//#[unsafe(no_mangle)]
+//static mut DMA_BUFFER: [u8; 512] = [0u8; 512];
 
 const DOR: u16 = 0x3F2;
 const MSR: u16 = 0x3F4;
@@ -132,7 +135,11 @@ impl Floppy {
 
             let count = 512;
 
-            let addr = &dma as *const _ as usize;
+            //let addr = &dma as *const _ as usize;
+            let addr = dma.as_ptr() as u32;
+
+            debugn!(&dma as *const _ as usize);
+            debugln!("");
 
             let page = ((addr >> 16) & 0xFF) as u8;
             let offset = (addr & 0xFFFF) as u16;
@@ -224,7 +231,6 @@ impl Floppy {
             // Wait until interrupt is fired
             loop {
                 let status = inb(0x3F4);
-
                 if status & 0x80 != 0 {
                     break;
                 }
@@ -249,7 +255,7 @@ impl Floppy {
         let (c, h, s) = self.lba_to_chs(lba);
 
         unsafe {
-            //dma_init(DMA_BUFFER.as_ptr() as u32, 512);
+            Self::init();
             self.set_read_mode();
 
             self.send_byte(0x46);          // Read data
@@ -263,14 +269,17 @@ impl Floppy {
             self.send_byte(0xFF);          // DTL (don't care for 512B)
 
             self.wait_for_irq();    // Wait for IRQ 6
+            
+            for i in 0..10 {
+                debugn!(dma[i]);
+            }
+            debugln!("");
 
             // Copy from DMA buffer to output
-            if let Some(slice) = dma.get_mut(..) {
-                buffer.copy_from_slice(&DMA_BUFFER);
+            core::ptr::copy_nonoverlapping(dma.as_ptr(), buffer.as_mut_ptr(), 512);
 
-                for byte in slice.iter_mut() {
-                    *byte = 0;
-                }
+            for byte in dma.iter_mut() {
+                *byte = 0;
             }
         }
     }

@@ -21,6 +21,8 @@ impl<'a, D: BlockDevice> Filesystem<'a, D> {
 
         let mut found_fat = false;
 
+        debug!(sector);
+
         // Search for the FAT12 label in the boot sector
         for i in 0..512 - 5 {
             if let Some(slice) = sector.get(i..i + 5) {
@@ -75,7 +77,7 @@ impl<'a, D: BlockDevice> Filesystem<'a, D> {
     }
 
     /// read_file loads the seector data into the buffer provided
-    fn read_file(&self, start_cluster: u16, sector_buf: &mut [u8; 512]) {
+    pub fn read_file(&self, start_cluster: u16, sector_buf: &mut [u8; 512]) {
         let mut current_cluster = start_cluster;
 
         loop {
@@ -144,7 +146,7 @@ impl<'a, D: BlockDevice> Filesystem<'a, D> {
     }
 
     /// write_file method is a directory-agnostic function to write files into the filesystem
-    fn write_file(&self, dir_cluster: u16, filename: &[u8; 11], data: &[u8]) {
+    pub fn write_file(&self, dir_cluster: u16, filename: &[u8; 11], data: &[u8]) {
         // If file exists, free its clusters
         if let Some((entry_lba, entry_offset, dir_entry)) =
             self.find_dir_entry_mut(dir_cluster, filename)
@@ -444,7 +446,7 @@ impl<'a, D: BlockDevice> Filesystem<'a, D> {
     }
 
     /// Takes in an old filename to be replaced with the new filename in the current directory
-    fn rename_file(&self, dir_cluster: u16, old_filename: &[u8; 11], new_filename: &[u8; 11]) {
+    pub fn rename_file(&self, dir_cluster: u16, old_filename: &[u8; 11], new_filename: &[u8; 11]) {
         let entry_size = core::mem::size_of::<Entry>();
         let entries_per_sector = 512 / entry_size;
         let mut sector_buf = [0u8; 512];
@@ -522,7 +524,7 @@ impl<'a, D: BlockDevice> Filesystem<'a, D> {
     }
 
     /// Deletes a file referenced by filename in the current directory
-    fn delete_file(&self, dir_cluster: u16, filename: &[u8; 11]) {
+    pub fn delete_file(&self, dir_cluster: u16, filename: &[u8; 11]) {
         let entry_size = core::mem::size_of::<Entry>();
         let entries_per_sector = 512 / entry_size;
 
@@ -616,7 +618,7 @@ impl<'a, D: BlockDevice> Filesystem<'a, D> {
     }
 
     /// Iterates over the given directory entries and provides a closure
-    fn for_each_entry<F: FnMut(&Entry)>(&self, dir_cluster: u16, mut f: F) {
+    pub fn for_each_entry<F: FnMut(&Entry)>(&self, dir_cluster: u16, mut f: F) {
         let entry_size = core::mem::size_of::<Entry>();
         let entries_per_sector = 512 / entry_size;
         let mut buf = [0u8; 512];
@@ -674,7 +676,7 @@ impl<'a, D: BlockDevice> Filesystem<'a, D> {
     }
 
     /// Creates a new directory (folder) in the given scope/directory
-    pub fn create_subdirectory(&self, name: &[u8; 11], parent_cluster: u16, vga_index: &mut isize) {
+    pub fn create_subdirectory(&self, name: &[u8; 11], parent_cluster: u16) {
         let cluster = self.allocate_cluster();
         if cluster == 0 {
             // Handle full FAT
@@ -733,7 +735,7 @@ impl<'a, D: BlockDevice> Filesystem<'a, D> {
     }
 
     /// Lists all entries of a given directory
-    fn list_dir(&self, start_cluster: u16, entry_name: &[u8; 11]) -> isize {
+    pub fn list_dir(&self, start_cluster: u16, entry_name: &[u8; 11]) -> isize {
         let mut status: isize = 0;
 
         self.for_each_entry(start_cluster, | entry | {

@@ -1,4 +1,4 @@
-use crate::fs::fat12::{entry::Entry, fs::Fs, table::FatTable, block::Floppy}; 
+use crate::fs::fat12::{entry::Entry, fs::Filesystem, table::FatTable, block::Floppy}; 
 use crate::vga::{write::{newline, number, string}, buffer::Color};
 
 pub struct CheckReport {
@@ -8,8 +8,8 @@ pub struct CheckReport {
     pub invalid_entries: usize,
 }
 
-pub fn run_check(vga_index: &mut isize) -> CheckReport {
-    let fat = FatTable::load(vga_index);
+pub fn run_check() -> CheckReport {
+    let fat = FatTable::load();
     let mut report = CheckReport {
         errors: 0,
         orphan_clusters: 0,
@@ -19,7 +19,7 @@ pub fn run_check(vga_index: &mut isize) -> CheckReport {
 
     let mut used_clusters = [false; 4096]; // FAT12 max: 0xFF4 (4084 entries)
 
-    scan_directory(0, &fat, &mut used_clusters, &mut report, vga_index, 0);
+    scan_directory(0, &fat, &mut used_clusters, &mut report, 0);
 
     // Check the FAT for unreferenced or multiply referenced clusters
     for cluster in 2..fat.total_clusters() {
@@ -29,24 +29,23 @@ pub fn run_check(vga_index: &mut isize) -> CheckReport {
             continue;
 
             // Debug: print orphan clusters
-            string(vga_index, b" -> Orphan cluster: ", Color::Yellow);
-            number(vga_index, cluster as u64);
-            newline(vga_index);
+            //print!(" -> Orphan cluster: ");
+            //printn!(cluster);
         }
     }
 
-    string(vga_index, b"Done. Error count: ", Color::Green);
-    number(vga_index, report.errors as u64);
-    string(vga_index, b", Orphan clusters: ", Color::Green);
-    number(vga_index, report.orphan_clusters as u64);
-    string(vga_index, b", Cross-linked: ", Color::Green);
-    number(vga_index, report.cross_linked as u64);
-    string(vga_index, b", Invalid entries: ", Color::Green);
-    number(vga_index, report.invalid_entries as u64);
-    newline(vga_index);
-    newline(vga_index);
+    /*print!("Done. Error count: ");
+    printn!(report.errors as u64);
+    print!(", Orphan clusters: ");
+    printn!(report.orphan_clusters as u64);
+    print!(", Cross-linked: ");
+    printn!(report.cross_linked as u64);
+    print!(", Invalid entries: ");
+    printn!(report.invalid_entries as u64);
+    println!();
+    println!();*/
 
-    report
+    return report;
 }
 
 fn scan_directory(
@@ -54,19 +53,19 @@ fn scan_directory(
     fat: &FatTable,
     used: &mut [bool; 4096],
     report: &mut CheckReport,
-    vga_index: &mut isize,
     depth: usize,
 ) {
-    let floppy = Floppy;
-
     if depth > 64 {
-        string(vga_index, b" -> Recursion depth exceeded", Color::Red);
-        newline(vga_index);
+        error!(" -> Recursion depth exceeded");
+        println!();
+
         report.errors += 1;
         return;
     }
 
-    match Fs::new(&floppy, vga_index) {
+    let floppy = Floppy::init();
+
+    match Filesystem::new(&floppy) {
         Ok(fs) => {
             fs.for_each_entry(start_cluster, |entry| {
                 if entry.name[0] == 0x00 || entry.name[0] == 0xE5 {
@@ -83,22 +82,23 @@ fn scan_directory(
                 }
 
                 if entry.attr & 0x10 != 0 && entry.file_size != 0 {
-                    string(vga_index, b" -> Directory has non-zero value: ", Color::Red);
-                    number(vga_index, entry.start_cluster as u64);
-                    newline(vga_index);
+                    error!(" -> Directory has non-zero value: ");
+                    printn!(entry.start_cluster as u64);
+                    println!();
+
                     report.errors += 1;
                 }
 
                 if entry.start_cluster < 2 {
-                    string(vga_index, b" -> Warning: entry with cluster < 2: ", Color::Yellow);
-                    number(vga_index, entry.start_cluster as u64);
-                    newline(vga_index);
+                    warn!(" -> Warning: entry with cluster < 2: ");
+                    printn!(entry.start_cluster as u64);
+                    println!();
                     return;
                 }
 
                 if entry.start_cluster == start_cluster {
-                    string(vga_index, b" -> Skipping self-recursive directory", Color::Yellow);
-                    newline(vga_index);
+                    warn!(" -> Skipping self-recursive directory");
+                    println!();
                     return;
                 }
 
@@ -108,11 +108,11 @@ fn scan_directory(
                 }
 
                 if entry.attr & 0x10 != 0 {
-                    scan_directory(entry.start_cluster, fat, used, report, vga_index, depth + 1);
+                    scan_directory(entry.start_cluster, fat, used, report, depth + 1);
                 } else {
-                    validate_chain(entry.start_cluster, fat, used, report, vga_index);
+                    validate_chain(entry.start_cluster, fat, used, report);
                 }
-            }, &mut 0);
+            });
         }
         Err(e) => {}
     }
@@ -131,23 +131,23 @@ pub fn validate_chain(
     fat: &FatTable,
     used: &mut [bool; 4096],
     report: &mut CheckReport,
-    vga_index: &mut isize,
 ) {
     let mut cluster = start;
 
     while fat.is_valid_cluster(cluster) && !fat.is_end_of_chain(cluster) {
         if cluster as usize >= used.len() {
-            string(vga_index, b" -> Cluster out of bounds: ", Color::Red);
-            number(vga_index, cluster as u64);
-            newline(vga_index);
+            error!(" -> Cluster out of bounds: ");
+            printn!(cluster as u64);
+            println!();
+
             report.errors += 1;
             return;
         }
 
         if used[cluster as usize] {
-            string(vga_index, b" -> Cross-linked cluster: ", Color::Red);
-            number(vga_index, cluster as u64);
-            newline(vga_index);
+            error!(" -> Cross-linked cluster: ");
+            printn!(cluster as u64);
+
             report.cross_linked += 1;
             return;
         }
@@ -158,8 +158,9 @@ pub fn validate_chain(
             Some(next) if next >= 0xFF8 => break,
             Some(next) => cluster = next,
             None => {
-                string(vga_index, b" -> Invalid chain entry", Color::Red);
-                newline(vga_index);
+                error!(" -> Invalid chain entry");
+                println!();
+
                 report.errors += 1;
                 break;
             }

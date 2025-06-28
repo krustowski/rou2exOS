@@ -1,11 +1,9 @@
-use crate::vga::{write::{byte, string, newline, number}};
-
 pub trait BlockDevice {
     /// Reads 1 sector (usually 512 bytes) at the given LBA into `buffer`
-    fn read_sector(&self, lba: u64, buffer: &mut [u8; 512], vga_index: &mut isize);
+    fn read_sector(&self, lba: u64, buffer: &mut [u8; 512]);
 
     /// Writes 1 sector from `buffer` to `lba`
-    fn write_sector(&self, lba: u64, buffer: &[u8; 512], vga_index: &mut isize);
+    fn write_sector(&self, lba: u64, buffer: &[u8; 512]);
 }
 
 static mut DISK_DATA: [u8; 1024 * 512] = [0u8; 1024 * 512]; // 1024 sectors
@@ -30,13 +28,13 @@ impl MemDisk {
 }
 
 impl BlockDevice for MemDisk {
-    fn read_sector(&self, lba: u64, buffer: &mut [u8; 512], _vga_index: &mut isize) {
+    fn read_sector(&self, lba: u64, buffer: &mut [u8; 512]) {
         let offset = self.sector_offset(lba);
         let slice = &self.data[offset..offset + 512];
         buffer.copy_from_slice(slice);
     }
 
-    fn write_sector(&self, _lba: u64, _buffer: &[u8; 512], _vga_index: &mut isize) {
+    fn write_sector(&self, _lba: u64, _buffer: &[u8; 512]) {
         //let offset = self.sector_offset(lba);
         //let slice = &self.data[offset..offset + 512];
         //slice.copy_from_slice(buffer);
@@ -50,16 +48,17 @@ impl BlockDevice for MemDisk {
 pub struct Floppy;
 
 impl BlockDevice for Floppy {
-    fn read_sector(&self, lba: u64, buffer: &mut [u8; 512], vga_index: &mut isize) {
+    fn read_sector(&self, lba: u64, buffer: &mut [u8; 512]) {
         debugln!("Floppy read_sector()");
-        Self::read_sector_dma(lba, buffer, vga_index);
+
+        self.read_sector(lba, buffer);
     }
 
-    fn write_sector(&self, lba: u64, buffer: &[u8; 512], vga_index: &mut isize) {
+    fn write_sector(&self, lba: u64, buffer: &[u8; 512]) {
         debugln!("Floppy write_sector()");
 
-        let (cylinder, head, sector) = lba_to_chs(lba);
-        self.fdc_write_sector(cylinder, head, sector, buffer, vga_index);
+        let (cylinder, head, sector) = self.lba_to_chs(lba);
+        self.write_sector(cylinder, head, sector, buffer);
     }
 }
 
@@ -85,21 +84,18 @@ pub unsafe fn inb(port: u16) -> u8 {
     val
 }
 
-pub fn lba_to_chs(lba: u64) -> (u8, u8, u8) {
-    let sectors_per_track = 18;
-    let heads = 2;
+//
+//  DMA
+//  https://wiki.osdev.org/ISA_DMA
+//
 
-    let cylinder = (lba / (sectors_per_track * heads)) as u8;
-    let temp = lba % (sectors_per_track * heads);
-    let head = (temp / sectors_per_track) as u8;
-    let sector = (temp % sectors_per_track + 1) as u8; // 1-based
-
-    (cylinder, head, sector)
+extern "C" {
+    static mut dma: [u8; 512];
 }
 
-//
-//
-//
+#[unsafe(link_section = ".dma")]
+#[unsafe(no_mangle)]
+static mut DMA_BUFFER: [u8; 512] = [0u8; 512];
 
 const DOR: u16 = 0x3F2;
 const MSR: u16 = 0x3F4;
@@ -110,11 +106,6 @@ const FDC_MSR: u16 = 0x3F4;
 const FDC_DATA: u16 = 0x3F5;
 
 const FDC_CMD_SEEK: u8 = 0x0F;
-
-
-#[unsafe(link_section = ".dma")]
-#[unsafe(no_mangle)]
-static mut DMA_BUFFER: [u8; 512] = [0u8; 512];
 
 const DMA_CHANNEL: u8 = 0x02;
 const DMA_ADDR_REG: u16 = 0x04; // Channel 2
@@ -130,120 +121,73 @@ const DMA_PAGE_2: u16 = 0x81;
 const DMA_BUFFER_ADDR: u32 = 0x1000; // Physical address, must be < 64 KiB and page-aligned
 const DMA_BUFFER_SIZE: u16 = 512;    // 1 sector
 
-pub unsafe fn dma_init(buffer_phys: u32, count: u16) {
-    let addr = buffer_phys;
-    let page = ((addr >> 16) & 0xFF) as u8;
-    let offset = (addr & 0xFFFF) as u16;
-
-    // Mask channel 2
-    outb(0x0A, 0x06);
-
-    // Reset flip-flop
-    outb(0x0C, 0xFF);
-
-    // Address (low then high)
-    outb(DMA_ADDR_REG, (offset & 0xFF) as u8);
-    outb(DMA_ADDR_REG, (offset >> 8) as u8);
-
-    // Count (low then high), count - 1!
-    let count = count - 1;
-    outb(DMA_COUNT_REG, (count & 0xFF) as u8);
-    outb(DMA_COUNT_REG, (count >> 8) as u8);
-
-    // Page
-    outb(DMA_PAGE_REG, page);
-
-    // Unmask channel 2
-    outb(0x0A, DMA_CHANNEL);
-}
-
-pub unsafe fn dma_set_read_mode() {
-    // Mode: single transfer, address increment, read, channel 2
-    outb(0x0B, 0x56);
-}
-
-pub unsafe fn dma_set_write_mode() {
-    // Mode: single transfer, address increment, write, channel 2
-    outb(0x0B, 0x52); // 0101_0010
-}
-
 //
 //
 //
-
-fn wait_msr_ready() {
-    for _ in 0..100000 {
-        if unsafe { inb(MSR) } & 0x80 != 0 {
-            return;
-        }
-    }
-}
-
-fn floppy_write_cmd(byte: u8) {
-    wait_msr_ready();
-    unsafe { outb(FIFO, byte) };
-}
-
-fn motor_on() {
-    unsafe {
-        outb(DOR, 0x1C); // Enable drive 0, motor on
-    }
-}
-
-fn wait_for_data() {
-    for _ in 0..1000000 {
-        let st = unsafe { inb(MSR) };
-        if st & 0xC0 == 0xC0 {
-            return; // RQM + DIO: data ready for CPU to read
-        }
-    }
-}
-
-fn fdc_wait_ready() {
-    // Wait for RQM and DIO = 1 (ready to send command)
-    loop {
-        let msr = unsafe { inb(FDC_MSR) };
-        if (msr & 0xC0) == 0x80 {
-            break;
-        }
-    }
-}
-
-fn fdc_send_byte(byte: u8) {
-    fdc_wait_ready();
-    unsafe { outb(FDC_DATA, byte); }
-}
-
-fn fdc_read_byte() -> u8 {
-    fdc_wait_ready();
-    unsafe { inb(FDC_DATA) }
-}
-
-/// Sense interrupt result (returns st0, cylinder)
-fn fdc_sense_interrupt() -> (u8, u8) {
-    fdc_send_byte(0x08);
-    let st0 = fdc_read_byte();
-    let cyl = fdc_read_byte();
-    (st0, cyl)
-}
-
-/// Dummy IRQ wait
-fn fdc_wait_irq() {
-    // This should block until IRQ6 is received
-    // This should be a semaphore or atomic flag
-    for _ in 0..1000000 {
-        // spin-loop / delay
-    }
-}
 
 impl Floppy {
-    pub fn init() {
+    pub fn init() -> Self {
         unsafe {
-            outb(0x3F2, 0x1C); // Motor on, DMA/IRQ enabled
+            outb(DOR, 0x1C); // Motor on, DMA/IRQ enabled
+
+            let count = 512;
+
+            let addr = &dma as *const _ as usize;
+
+            let page = ((addr >> 16) & 0xFF) as u8;
+            let offset = (addr & 0xFFFF) as u16;
+
+            // Mask channel 2+0
+            outb(0x0A, 0x06);
+
+            // Reset flip-flop
+            outb(0x0C, 0xFF);
+
+            // Address (low then high)
+            outb(DMA_ADDR_REG, (offset & 0xFF) as u8);
+            outb(DMA_ADDR_REG, (offset >> 8) as u8);
+
+            // Count (low then high), count - 1!
+            let count = count - 1;
+            outb(DMA_COUNT_REG, (count & 0xFF) as u8);
+            outb(DMA_COUNT_REG, (count >> 8) as u8);
+
+            // Page
+            outb(DMA_PAGE_REG, page);
+
+            // Unmask channel 2
+            outb(0x0A, DMA_CHANNEL);
+        }
+        Self
+    }
+
+    fn set_read_mode(&self) {
+        unsafe {
+            // Mode: single transfer, address increment, read, channel 2
+            outb(0x0B, 0x56);
         }
     }
 
-    fn send_byte(byte: u8) {
+    fn set_write_mode(&self) {
+        unsafe {
+            // Mode: single transfer, address increment, write, channel 2
+            outb(0x0B, 0x52); // 0101_0010
+        }
+    }
+
+    fn lba_to_chs(&self, lba: u64) -> (u8, u8, u8) {
+        let sectors_per_track = 18;
+        let heads = 2;
+
+        let cylinder = (lba / (sectors_per_track * heads)) as u8;
+        let temp = lba % (sectors_per_track * heads);
+        let head = (temp / sectors_per_track) as u8;
+        let sector = (temp % sectors_per_track + 1) as u8; // 1-based
+
+        (cylinder, head, sector)
+    }
+
+    fn send_byte(&self, byte: u8) {
         unsafe {
             for _ in 0..100000 {
                 if inb(0x3F4) & 0x80 != 0 {
@@ -254,7 +198,7 @@ impl Floppy {
         }
     }
 
-    fn read_byte() -> u8 {
+    fn read_byte(&self) -> u8 {
         unsafe {
             for _ in 0..100000 {
                 if inb(0x3F4) & 0x80 != 0 {
@@ -265,75 +209,73 @@ impl Floppy {
         }
     }
 
-    pub unsafe fn fdc_wait_irq(vga_index: &mut isize) {
-        // Wait until interrupt is fired (simulate or use actual IRQ handling)
-        // For now: a naive delay loop or poll status.
+    fn wait_ready(&self) {
+        // Wait for RQM and DIO = 1 (ready to send command)
         loop {
-            let status = inb(0x3F4);
-            if status & 0x80 != 0 {
+            let msr = unsafe { inb(FDC_MSR) };
+            if (msr & 0xC0) == 0x80 {
                 break;
             }
         }
-
-        // Read floppy IRQ status
-        Self::send_byte(0x08); // Sense interrupt
-                               //
-        let st0 = Floppy::read_byte(); // bit 7 = 1 means error
-        let st1 = Floppy::read_byte();
-        let st2 = Floppy::read_byte();
-        let cylinder = Floppy::read_byte();
-        let head = Floppy::read_byte();
-        let sector = Floppy::read_byte();
-        let bytesize = Floppy::read_byte(); // Sector size as N where size = 128 << N
-
-        /*crate::vga::write::string(vga_index, b"ST0: ", crate::vga::buffer::Color::Pink);
-          crate::vga::write::number(vga_index, st0 as u64);
-          crate::vga::write::string(vga_index, b", ST1: ", crate::vga::buffer::Color::Pink);
-          crate::vga::write::number(vga_index, st1 as u64);
-          crate::vga::write::string(vga_index, b", ST2: ", crate::vga::buffer::Color::Pink);
-          crate::vga::write::number(vga_index, st2 as u64);
-          crate::vga::write::newline(vga_index);*/
     }
 
-    pub fn read_sector_dma(lba: u64, buffer: &mut [u8; 512], vga_index: &mut isize) {
-        let (c, h, s) = lba_to_chs(lba);
+    fn wait_for_irq(&self) {
+        unsafe {
+            // Wait until interrupt is fired
+            loop {
+                let status = inb(0x3F4);
 
-        /*crate::vga::write::string(vga_index, b"LBA: ", crate::vga::buffer::Color::Cyan);
-          crate::vga::write::number(vga_index, lba);
-          crate::vga::write::string(vga_index, b"; CHS: ", crate::vga::buffer::Color::Cyan);
-          crate::vga::write::number(vga_index, c as u64);
-          crate::vga::write::string(vga_index, b", ", crate::vga::buffer::Color::Cyan);
-          crate::vga::write::number(vga_index, h as u64);
-          crate::vga::write::string(vga_index, b", ", crate::vga::buffer::Color::Cyan);
-          crate::vga::write::number(vga_index, s as u64);
-          crate::vga::write::newline(vga_index);*/
+                if status & 0x80 != 0 {
+                    break;
+                }
+            }
+
+            // Read floppy IRQ status
+            self.send_byte(0x08); // Sense interrupt
+
+            let st0 = self.read_byte(); // bit 7 = 1 means error
+            let st1 = self.read_byte();
+            let st2 = self.read_byte();
+            let cylinder = self.read_byte();
+            let head = self.read_byte();
+            let sector = self.read_byte();
+            let bytesize = self.read_byte(); // Sector size as N where size = 128 << N
+
+            // TODO: Dump controller status, check for errors
+        }
+    }
+
+    fn read_sector(&self, lba: u64, buffer: &mut [u8; 512]) {
+        let (c, h, s) = self.lba_to_chs(lba);
 
         unsafe {
-            dma_init(DMA_BUFFER.as_ptr() as u32, 512);
-            dma_set_read_mode();
+            //dma_init(DMA_BUFFER.as_ptr() as u32, 512);
+            self.set_read_mode();
 
-            Self::send_byte(0x46);          // Read data
-            Self::send_byte((h << 2) | 0);  // drive 0, head
-            Self::send_byte(c);             // Cylinder
-            Self::send_byte(h);             // Head
-            Self::send_byte(s);             // Sector (1-based)
-            Self::send_byte(2);             // 512 = 2^2
-            Self::send_byte(18);            // Last sector
-            Self::send_byte(0x1B);          // GAP3
-            Self::send_byte(0xFF);          // DTL (don't care for 512B)
+            self.send_byte(0x46);          // Read data
+            self.send_byte((h << 2) | 0);  // drive 0, head
+            self.send_byte(c);             // Cylinder
+            self.send_byte(h);             // Head
+            self.send_byte(s);             // Sector (1-based)
+            self.send_byte(2);             // 512 = 2^2
+            self.send_byte(18);            // Last sector
+            self.send_byte(0x1B);          // GAP3
+            self.send_byte(0xFF);          // DTL (don't care for 512B)
 
-            Self::fdc_wait_irq(vga_index); // Wait for IRQ 6 (must be handled)
+            self.wait_for_irq();    // Wait for IRQ 6
 
             // Copy from DMA buffer to output
-            buffer.copy_from_slice(&DMA_BUFFER);
+            if let Some(slice) = dma.get_mut(..) {
+                buffer.copy_from_slice(&DMA_BUFFER);
 
-            for byte in DMA_BUFFER.iter_mut() {
-                *byte = 0;
+                for byte in slice.iter_mut() {
+                    *byte = 0;
+                }
             }
         }
     }
 
-    pub fn fdc_dma_setup_write(&self, data: &[u8; 512]) {
+    fn setup_write(&self, data: &[u8; 512]) {
         unsafe {
             // Copy data to the known DMA buffer
             core::ptr::copy_nonoverlapping(data.as_ptr(), DMA_BUFFER_ADDR as *mut u8, 512);
@@ -371,7 +313,7 @@ impl Floppy {
     /// - `drive`: 0 (A:) or 1 (B:)
     /// - `cylinder`: track number (0..79)
     /// - `head`: 0 or 1
-    pub fn fdc_seek(&self, drive: u8, cylinder: u8, head: u8, vga_index: &mut isize) {
+    fn seek(&self, drive: u8, cylinder: u8, head: u8) {
         // Select drive in DOR
         let motor_bit = 1 << (4 + drive); // Bit 4 = motor for drive 0
         let dor_value = (drive & 0x03) | 0x0C | motor_bit;
@@ -380,58 +322,51 @@ impl Floppy {
         }
 
         // Wait until FDC is ready
-        fdc_wait_ready();
+        self.wait_ready();
 
         // Send SEEK command
         unsafe {
-            fdc_send_byte(FDC_CMD_SEEK);
-            fdc_send_byte((head << 2) | (drive & 0x03)); // Head & drive combined
-            fdc_send_byte(cylinder);
+            self.send_byte(FDC_CMD_SEEK);
+            self.send_byte((head << 2) | (drive & 0x03)); // Head & drive combined
+            self.send_byte(cylinder);
+
+            // Wait for IRQ6
+            self.wait_for_irq();
+
+            // TODO: Verify the seek result (sense the interrupt)
         }
-
-        // Wait for IRQ6
-        fdc_wait_irq();
-
-        unsafe {
-            //Self::fdc_wait_irq(vga_index); // wait for IRQ 6 (must be handled)
-        }
-
-        // TODO: Verify the seek result (sense the interrupt)
     }
 
-
-    pub fn fdc_write_sector(&self, cylinder: u8, head: u8, sector: u8, data: &[u8; 512], vga_index: &mut isize) {
+    fn write_sector(&self, cylinder: u8, head: u8, sector: u8, data: &[u8; 512]) {
         unsafe {
             //core::arch::asm!("sti");
-            dma_init(DMA_BUFFER.as_ptr() as u32, 512);
-            //dma_set_write_mode();
+            self.set_write_mode();
 
-            self.fdc_seek(1, cylinder, head, vga_index);
+            self.seek(1, cylinder, head);
 
-            fdc_wait_ready(); // Wait until FDC is ready for commands
+            self.wait_ready();
 
             outb(DOR, 0x1C);   // Enable motor and controller
-            self.fdc_dma_setup_write(data); // Setup DMA for writing
+            self.setup_write(data); // Setup DMA for writing
 
             // Send command packet to FDC
-            Self::send_byte(CMD_WRITE_SECTOR);
-            Self::send_byte((head << 2) | 0);   // Drive 0, head
-            Self::send_byte(cylinder);          // Cylinder number
-            Self::send_byte(head);              // Head
-            Self::send_byte(sector);            // Sector number (starts at 1)
-            Self::send_byte(2);                 // 512 bytes/sector => 2^2 = 512
-            Self::send_byte(18);                // Sectors/track (usually 18)
-            Self::send_byte(0x1B);              // GAP3 length (standard = 0x1B)
-            Self::send_byte(0xFF);              // Data length (0xFF for default)
+            self.send_byte(CMD_WRITE_SECTOR);
+            self.send_byte((head << 2) | 0);   // Drive 0, head
+            self.send_byte(cylinder);          // Cylinder number
+            self.send_byte(head);              // Head
+            self.send_byte(sector);            // Sector number (starts at 1)
+            self.send_byte(2);                 // 512 bytes/sector => 2^2 = 512
+            self.send_byte(18);                // Sectors/track (usually 18)
+            self.send_byte(0x1B);              // GAP3 length (standard = 0x1B)
+            self.send_byte(0xFF);              // Data length (0xFF for default)
 
-            //self.fdc_wait_irq(vga_index);
-            Self::fdc_wait_irq(vga_index); // wait for IRQ 6 (must be handled)
+            self.wait_for_irq(); // wait for IRQ 6 (must be handled)
 
             //let status = fdc_read_result();
 
             //core::arch::asm!("cli");
 
-            // Check status for errors
+            // TODO: Check status for errors
             //status.iter().all(|&s| s & 0xC0 == 0)
         }
     }

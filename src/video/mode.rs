@@ -1,4 +1,5 @@
-enum VideoMode {
+#[derive(Copy,Clone)]
+pub enum VideoMode {
     Framebuffer {
         address: *mut u8,
         pitch: usize,
@@ -20,6 +21,12 @@ pub fn init_video(fb: &crate::init::boot::FramebufferTag) {
         height: fb.height as usize,
         bpp: fb.bpp,
     });
+    }
+}
+
+pub fn get_video_mode() -> Option<VideoMode> {
+    unsafe {
+        return VIDEO_MODE;
     }
 }
 

@@ -1,16 +1,16 @@
-use crate::{fs::fat12::{block::Floppy, fs::Fs}, init::config::PATH_CLUSTER};
+use crate::{fs::fat12::{block::Floppy, fs::Filesystem}, init::config::PATH_CLUSTER};
 use super::engine::Point;
 
 pub const MAX_WALLS: usize = 128;
 
-pub fn load_level_from_file<const N: usize>(filename: &[u8; 7], vga_index: &mut isize) -> ([Point; N], usize) {
+pub fn load_level_from_file<const N: usize>(filename: &[u8; 7]) -> ([Point; N], usize) {
     let mut buf = [0u8; 512];
     let mut walls = [Point { x: 0, y: 0 }; N];
     let mut count = 0;
 
-    let floppy = Floppy;
+    let floppy = Floppy::init();
 
-    match Fs::new(&floppy, vga_index) {
+    match Filesystem::new(&floppy) {
         Ok(fs) => {
             unsafe {
                 fs.for_each_entry(PATH_CLUSTER, |entry| {
@@ -19,9 +19,9 @@ pub fn load_level_from_file<const N: usize>(filename: &[u8; 7], vga_index: &mut 
                     }
 
                     if entry.name.starts_with(filename) && entry.ext.starts_with(b"TXT") {
-                        fs.read_file(entry.start_cluster, &mut buf, vga_index);
+                        fs.read_file(entry.start_cluster, &mut buf);
                     }
-                }, &mut 0);
+                });
             }
         }
         Err(e) => {}
@@ -61,7 +61,7 @@ pub fn load_level_from_file<const N: usize>(filename: &[u8; 7], vga_index: &mut 
     (walls, count)
 }
 
-pub fn load_level_by_number<const N: usize>(level_number: u8, vga_index: &mut isize) -> ([Point; N], usize) {
+pub fn load_level_by_number<const N: usize>(level_number: u8) -> ([Point; N], usize) {
     let mut filename = *b"LEVEL00";
 
     // Convert level number into two-digit ASCII (01 to 99)
@@ -70,6 +70,6 @@ pub fn load_level_by_number<const N: usize>(level_number: u8, vga_index: &mut is
     filename[5] = tens;
     filename[6] = ones;
 
-    load_level_from_file::<N>(&filename,  vga_index)
+    load_level_from_file::<N>(&filename)
 }
 

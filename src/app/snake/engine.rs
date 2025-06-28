@@ -12,6 +12,8 @@ const KEY_DOWN: u8 = 0x50;
 const KEY_LEFT: u8 = 0x4B;
 const KEY_RIGHT: u8 = 0x4D;
 
+static mut VGA_LOCAL: &mut isize = &mut 0;
+
 #[derive(Clone,Copy)]
 enum CellType {
     Empty,
@@ -56,6 +58,10 @@ impl Snake {
     fn new() -> Self {
         let mut x = [0; MAX_LEN];
         let mut y = [0; MAX_LEN];
+
+        unsafe {
+            *VGA_LOCAL = 0;
+        }
 
         if let Some(xx) = x.get_mut(0) {
             *xx = 40;
@@ -110,23 +116,27 @@ impl Snake {
         }
     }
 
-    fn draw(&self, vga_index: &mut isize) {
+    fn draw(&self) {
         for i in 0..self.len {
             let ch = if i == 0 { b"@" } else { b"o" };
             //draw_char(self.x[i], self.y[i], ch, 0x0A);
             if let (Some(x), Some(y)) = (self.x.get(i), self.y.get(i)) {
-                *vga_index = 2 * (*y as isize * WIDTH + *x as isize);
-                crate::vga::write::string(vga_index, ch, crate::vga::buffer::Color::Yellow);
+                unsafe {
+                    *VGA_LOCAL = 2 * (*y as isize * WIDTH + *x as isize);
+                    crate::vga::write::string(VGA_LOCAL, ch, crate::vga::buffer::Color::Yellow);
+                }
             }
         }
     }
 
-    fn clear(&self, vga_index: &mut isize) {
+    fn clear(&self) {
         for i in 0..self.len {
             //draw_char(self.x[i], self.y[i], b' ', 0x0F);
             if let (Some(x), Some(y)) = (self.x.get(i), self.y.get(i)) {
-                *vga_index = 2 * (*y as isize * WIDTH + *x as isize);
-                crate::vga::write::string(vga_index, b" ", crate::vga::buffer::Color::Black);
+                unsafe {
+                    *VGA_LOCAL = 2 * (*y as isize * WIDTH + *x as isize);
+                    crate::vga::write::string(VGA_LOCAL, b" ", crate::vga::buffer::Color::Black);
+                }
             }
         }
     }
@@ -142,18 +152,22 @@ impl Snake {
     }
 }
 
-fn draw_food(x: usize, y: usize, vga_index: &mut isize) {
-    *vga_index = 2 * (y as isize * WIDTH + x as isize);
-    crate::vga::write::string(vga_index, b"*", crate::vga::buffer::Color::Green);
+fn draw_food(x: usize, y: usize) {
+    unsafe {
+        *VGA_LOCAL = 2 * (y as isize * WIDTH + x as isize);
+        crate::vga::write::string(VGA_LOCAL, b"*", crate::vga::buffer::Color::Green);
+    }
 }
 
-fn draw_walls(walls: &[Point], vga_index: &mut isize, ch: u8) {
+fn draw_walls(walls: &[Point], ch: u8) {
     for wall in walls {
         if wall.x == 0 && wall.y == 0 {
             continue;
         }
 
-        draw_char(wall.x, wall.y, ch, crate::vga::buffer::Color::Red, vga_index);
+        unsafe {
+            draw_char(wall.x, wall.y, ch, crate::vga::buffer::Color::Red);
+        }
     }
 }
 
@@ -170,18 +184,22 @@ fn simple_hash(x: usize) -> usize {
     (x ^ 0x5f5f5f5f).wrapping_mul(2654435761)
 }
 
-fn draw_string(mut x: usize, y: usize, s: &[u8], color: crate::vga::buffer::Color, vga_index: &mut isize) {
+fn draw_string(mut x: usize, y: usize, s: &[u8], color: crate::vga::buffer::Color) {
     for &c in s {
-        draw_char(x, y, c, color, vga_index);
-        x += 1;
+        unsafe {
+            draw_char(x, y, c, color);
+            x += 1;
+        }
     }
 }
 
-fn write_number(mut x: usize, y: usize, mut value: usize, vga_index: &mut isize) {
+fn write_number(mut x: usize, y: usize, mut value: usize) {
     // Handle 0 explicitly
     if value == 0 {
-        draw_char(x, y, b'0', crate::vga::buffer::Color::White, vga_index);
-        return;
+        unsafe {
+            draw_char(x, y, b'0', crate::vga::buffer::Color::White);
+            return;
+        }
     }
 
     let mut digits = [0u8; 10]; // up to 10 digits
@@ -201,22 +219,27 @@ fn write_number(mut x: usize, y: usize, mut value: usize, vga_index: &mut isize)
         i -= 1;
 
         if let Some(d) = digits.get(i) {
-            draw_char(x, y, *d, crate::vga::buffer::Color::White, vga_index);
+            unsafe {
+                draw_char(x, y, *d, crate::vga::buffer::Color::White);
+            }
         }
 
         x += 1;
     }
 }
 
-fn draw_char(x: usize, y: usize, ch: u8, color: crate::vga::buffer::Color, vga_index: &mut isize) {
+fn draw_char(x: usize, y: usize, ch: u8, color: crate::vga::buffer::Color) {
     let index = 2 * (y * WIDTH as usize + x);
 
-    *vga_index = 2 * (y as isize * WIDTH + x as isize);
-    crate::vga::write::byte(vga_index, ch, color);
+    unsafe {
+        *VGA_LOCAL = 2 * (y as isize * WIDTH + x as isize);
+        crate::vga::write::byte(VGA_LOCAL, ch, color);
+    }
 }
 
-fn save_score_window(vga_index: &mut isize) {
-    clear(vga_index);
+fn save_score_window() {
+    clear_screen!();
+
     let menu = ["Please wait..."];
     unsafe {
         super::menu::SELECTED = 1;
@@ -227,8 +250,9 @@ fn save_score_window(vga_index: &mut isize) {
 }
 
 
-fn game_over(vga_index: &mut isize) {
-    clear(vga_index);
+fn game_over() {
+    clear_screen!();
+
     let menu = ["Game Over", "Back to menu"];
     unsafe {
         super::menu::SELECTED = 1;
@@ -236,7 +260,7 @@ fn game_over(vga_index: &mut isize) {
 
     draw_window(26, 6, 25, 10, Some("Game Over"));
     draw_menu(32, 9, &menu);
-    
+
     loop {
         let scancode = crate::input::keyboard::keyboard_read_scancode();
 
@@ -250,7 +274,7 @@ fn game_over(vga_index: &mut isize) {
 //
 //
 
-pub fn run(vga_index: &mut isize) {
+pub fn run() {
     let mut snake = Snake::new();
 
     let mut move_count = 0;
@@ -263,17 +287,18 @@ pub fn run(vga_index: &mut isize) {
 
     let mut level = 1;
 
-    let (mut walls, mut wall_count) = load_level_by_number::<{ super::level::MAX_WALLS }>(level as u8, vga_index);
+    let (mut walls, mut wall_count) = load_level_by_number::<{ super::level::MAX_WALLS }>(level as u8);
 
 
     loop {
         let code = read_scancode();
 
         if code == 0x01 {
-            save_score_window(vga_index);
-            update_high_scores(score, vga_index);
-            clear(vga_index);
-            game_over(vga_index);
+            clear_screen!();
+
+            save_score_window();
+            update_high_scores(score);
+            game_over();
             break;
         }
 
@@ -290,16 +315,16 @@ pub fn run(vga_index: &mut isize) {
         if score % 30 == 0 && snake.len - 3 != 0 {
             level = (score / 30) + 1;
 
-            draw_walls(&walls, vga_index, b' ');
-            (walls, wall_count) = load_level_by_number::<{ super::level::MAX_WALLS }>(level as u8, vga_index);
+            draw_walls(&walls, b' ');
+            (walls, wall_count) = load_level_by_number::<{ super::level::MAX_WALLS }>(level as u8);
 
-            snake.clear(vga_index);
+            snake.clear();
             snake = Snake::new();
         }
 
         move_count += 1;
 
-        snake.clear(vga_index);
+        snake.clear();
         snake.step();
 
         // Check if snake ate the food
@@ -335,24 +360,26 @@ pub fn run(vga_index: &mut isize) {
 
             for wall in walls {
                 if wall.x == *x && wall.y == *y {
-                    update_high_scores(score, vga_index);
-                    game_over(vga_index);
+                    update_high_scores(score);
+                    game_over();
                     return;
                 }
             }
         }
 
-        snake.draw(vga_index);
+        snake.draw();
 
-        draw_walls(&walls, vga_index, b'#');
-        draw_food(food_x, food_y, vga_index);
+        draw_walls(&walls, b'#');
+        draw_food(food_x, food_y);
 
-        draw_string(0, 0, b"Level: ", crate::vga::buffer::Color::White, vga_index);
-        write_number(7, 0, level as usize, vga_index);
-        draw_string(10, 0, b"Score: ", crate::vga::buffer::Color::White, vga_index);
-        write_number(17, 0, score as usize, vga_index);
-        draw_string(21, 0, b"Moves: ", crate::vga::buffer::Color::White, vga_index);
-        write_number(28, 0, move_count as usize, vga_index);
+        unsafe {
+            draw_string(0, 0, b"Level: ", crate::vga::buffer::Color::White);
+            write_number(7, 0, level as usize);
+            draw_string(10, 0, b"Score: ", crate::vga::buffer::Color::White);
+            write_number(17, 0, score as usize);
+            draw_string(21, 0, b"Moves: ", crate::vga::buffer::Color::White);
+            write_number(28, 0, move_count as usize);
+        }
 
         delay();
     }

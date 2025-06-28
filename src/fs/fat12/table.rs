@@ -1,6 +1,4 @@
-use crate::fs::fat12::{block::Floppy, fs::Fs};
-
-use super::block::BlockDevice;
+use crate::fs::fat12::{block::{BlockDevice, Floppy}, fs::Filesystem};
 
 /// The number of bytes in a sector
 const BYTES_PER_SECTOR: usize = 512;
@@ -23,18 +21,18 @@ pub struct FatTable {
 }
 
 impl FatTable {
-    pub fn load(vga_index: &mut isize) -> Self {
+    pub fn load() -> Self {
         let mut data = [0u8; FAT_SECTORS * BYTES_PER_SECTOR];
 
         let floppy = Floppy;
         let mut buf: [u8; 512] = [0u8; BYTES_PER_SECTOR];
 
-        match Fs::new(&floppy, vga_index) {
+        match Filesystem::new(&floppy) {
             Ok(fs) => {
         for i in 0..FAT_SECTORS {
 
             //fs.device.read_sector(FAT_START_SECTOR + i as u16, &mut data[i * BYTES_PER_SECTOR..][..BYTES_PER_SECTOR], vga_index);
-            fs.device.read_sector((FAT_START_SECTOR + i as u16) as u64, &mut buf, vga_index);
+            fs.device.read_sector((FAT_START_SECTOR + i as u16) as u64, &mut buf);
             data[i * BYTES_PER_SECTOR..(i + 1) * BYTES_PER_SECTOR].copy_from_slice(&buf);
         }
         Self { data }

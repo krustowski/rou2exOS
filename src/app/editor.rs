@@ -1,4 +1,4 @@
-use crate::fs::fat12::{fs::Fs, block::Floppy};
+use crate::fs::fat12::{fs::Filesystem, block::Floppy};
 use crate::init::config::PATH_CLUSTER;
 use crate::input::keyboard::{self, keyboard_read_scancode};
 use crate::vga::{buffer::Color, screen::clear, write::{string, newline}};
@@ -191,13 +191,13 @@ impl Editor {
     }
 }
 
-pub fn edit_file(file_name: &[u8; 12], vga_index: &mut isize) {
-    let floppy = Floppy;
+pub fn edit_file(file_name: &[u8; 12]) {
+    let floppy = Floppy::init();
 
-    match Fs::new(&floppy, vga_index) {
+    match Filesystem::new(&floppy) {
         Err(e) => {
-            string(vga_index, e.as_bytes(), Color::Red);
-            newline(vga_index);
+            error!(e);
+            error!();
             return;
         }
         Ok(fs) => {
@@ -221,12 +221,12 @@ pub fn edit_file(file_name: &[u8; 12], vga_index: &mut isize) {
                             return;
                         }
                     }
-                }, &mut 0);
+                });
 
                 if cluster <= 0 {
                     return;
                 }
-                fs.read_file(cluster, &mut file_buf, vga_index);
+                fs.read_file(cluster, &mut file_buf);
             }
 
             let mut editor = Editor::new();
@@ -235,7 +235,8 @@ pub fn edit_file(file_name: &[u8; 12], vga_index: &mut isize) {
             let mut ctrl_down = false;
 
             loop {
-                clear(vga_index);
+                clear_screen!();
+
                 let mut wr = Writer::new(); // RECREATE each frame
                 editor.render(&mut wr, file_name);
 
@@ -273,7 +274,7 @@ pub fn edit_file(file_name: &[u8; 12], vga_index: &mut isize) {
                                         filename[..name.len()].copy_from_slice(name);
                                         filename[8..8 + ext.len()].copy_from_slice(ext);
 
-                                        fs.write_file(PATH_CLUSTER, &filename, slice, vga_index);
+                                        fs.write_file(PATH_CLUSTER, &filename, slice);
                                     }
                                 }
                             }

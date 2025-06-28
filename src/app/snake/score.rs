@@ -1,15 +1,15 @@
 use crate::{
     app::snake::menu::{draw_menu, draw_window}, fs::fat12::{
         block::Floppy, 
-        fs::Fs}, init::config::PATH_CLUSTER, input::keyboard::keyboard_read_scancode, slice_end_index_len_fail, vga::{buffer::VGA_BUFFER, write::{byte, newline, number, string}}
+        fs::Filesystem}, init::config::PATH_CLUSTER, input::keyboard::keyboard_read_scancode, slice_end_index_len_fail, vga::{buffer::VGA_BUFFER, write::{byte, newline, number, string}}
 };
 
-const HIGH_SCORE_FILE: &[u8; 11] = b"SKSCORE BIN";
+const HIGH_SCORE_FILE: &[u8; 11] = b"SKSCORE DAT";
 const SCORE_LEN: usize = 5;
 
 type Error = &'static str;
 
-pub fn render_scores_window(scores: &[u32; SCORE_LEN], vga_index: &mut isize) {
+pub fn render_scores_window(scores: &[u32; SCORE_LEN]) {
     let mut menu: [&str; SCORE_LEN] = [""; SCORE_LEN];
 
     static mut buf0: [u8; 32] = [0u8; 32];
@@ -38,14 +38,13 @@ pub fn render_scores_window(scores: &[u32; SCORE_LEN], vga_index: &mut isize) {
     }
 }
 
-pub fn save_high_scores_fat12(scores: &[u32; SCORE_LEN], vga_index: &mut isize) -> Result<(), Error> {
-    let floppy = Floppy;
+pub fn save_high_scores_fat12(scores: &[u32; SCORE_LEN]) -> Result<(), Error> {
+    let floppy = Floppy::init();
 
     // Serialize scores as little endian u32
     let mut buf = [0u8; 4 * SCORE_LEN];
 
     for (i, &score) in scores.iter().enumerate() {
-
         if i >= buf.len() {
             break;
         }
@@ -53,22 +52,12 @@ pub fn save_high_scores_fat12(scores: &[u32; SCORE_LEN], vga_index: &mut isize) 
         buf[i * 4..i * 4 + 4].copy_from_slice(&score.to_le_bytes());
     }
 
-    match Fs::new(&floppy, vga_index) {
+    match Filesystem::new(&floppy) {
         Ok(fs) => {
-            let cluster: u16 = 0;
+            //let cluster: u16 = 0;
 
             unsafe {
-                /*fs.for_each_entry(PATH_CLUSTER, |entry| {
-                    if entry.name[0] == 0x00 || entry.name[0] = 0xE5 || entry.attr & 0x10 != 0 {
-                        return;
-                    }
-
-                    if entry.name.starts_with(b"SKSCORE") && entry.ext.starts_with(b"BIN") {
-                        cluster = entry.start_cluster;
-                    }
-                }, vga_index);*/
-
-                fs.write_file(PATH_CLUSTER, HIGH_SCORE_FILE, &buf, vga_index);
+                fs.write_file(PATH_CLUSTER, HIGH_SCORE_FILE, &buf);
             }
         }
         Err(e) => {}
@@ -77,8 +66,8 @@ pub fn save_high_scores_fat12(scores: &[u32; SCORE_LEN], vga_index: &mut isize) 
     Ok(())
 }
 
-pub fn update_high_scores(score: u32, vga_index: &mut isize) {
-    if let Some(mut scores) = load_high_scores_fat12(vga_index) {
+pub fn update_high_scores(score: u32) {
+    if let Some(mut scores) = load_high_scores_fat12() {
         scores.sort_unstable_by(|a, b| b.cmp(a));
 
         let mut scores_new = [0u32; 6];
@@ -95,19 +84,19 @@ pub fn update_high_scores(score: u32, vga_index: &mut isize) {
             scores[i] = scores_new[i];
         }
 
-        save_high_scores_fat12(&scores, vga_index);
+        save_high_scores_fat12(&scores);
     } else {
         let mut scores = [0u32; SCORE_LEN];
         scores[0] = score;
-        save_high_scores_fat12(&scores, vga_index);
+        save_high_scores_fat12(&scores);
     }
 }
 
-pub fn load_high_scores_fat12(vga_index: &mut isize) -> Option<[u32; SCORE_LEN]> {
-    let floppy = Floppy;
+pub fn load_high_scores_fat12() -> Option<[u32; SCORE_LEN]> {
+    let floppy = Floppy::init();
     let mut sector_buf = [0u8; 512];
 
-    match Fs::new(&floppy, vga_index) {
+    match Filesystem::new(&floppy) {
         Ok(fs) => {
             let mut cluster: u16 = 0;
 
@@ -117,17 +106,17 @@ pub fn load_high_scores_fat12(vga_index: &mut isize) -> Option<[u32; SCORE_LEN]>
                         return;
                     }
 
-                    if entry.name.starts_with(b"SKSCORE") && entry.ext.starts_with(b"BIN") {
+                    if entry.name.starts_with(b"SKSCORE") && entry.ext.starts_with(b"DAT") {
                         cluster = entry.start_cluster;
                     }
-                }, vga_index);
+                });
             }
 
             if cluster == 0 {
                 return None;
             }
 
-            fs.read_file(cluster, &mut sector_buf, vga_index);
+            fs.read_file(cluster, &mut sector_buf);
         }
         Err(_) => return None
     }

@@ -1,10 +1,10 @@
-use crate::{net::ethernet, vga::write::string};
+use crate::{net::ethernet};
 
-pub fn handle_packet(vga_index: &mut isize) {
+pub fn handle_packet() {
     fn callback(packet: &[u8]) -> u8 {
         1
     }
     if ethernet::receive_loop(callback) == 1 {
-        string(vga_index, b"Reveived an Ethernet frame!", crate::vga::buffer::Color::Green);
+        println!("Reveived an Ethernet frame!")
     }
 }

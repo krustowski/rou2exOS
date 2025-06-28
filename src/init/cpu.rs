@@ -5,13 +5,6 @@ use crate::vga::{
 };
 use super::result;
 
-pub fn print_mode(vga_index: &mut isize) {
-    string(vga_index, b"CPU mode: ", Color::White);
-    string(vga_index, check_cpu_mode().as_bytes(), Color::Green);
-
-    newline(vga_index);
-}
-
 pub fn check_mode() -> crate::init::result::InitResult {
     let mode = check_cpu_mode();
 

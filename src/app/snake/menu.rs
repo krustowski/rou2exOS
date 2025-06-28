@@ -20,9 +20,10 @@ const MENU_WINDOW_HEIGHT: usize = 12;
 
 pub static mut SELECTED: usize = 0;
 
-pub fn menu_loop(vga_index: &mut isize) {
+pub fn menu_loop() {
     move_cursor(30, 0);
-    clear(vga_index);
+    clear_screen!();
+
     let menu = ["New game", "High scores", "Exit to shell"];
 
     draw_window(MENU_WINDOW_X, MENU_WINDOW_Y, MENU_WINDOW_WIDTH, MENU_WINDOW_HEIGHT, Some("Snake"));
@@ -43,12 +44,12 @@ pub fn menu_loop(vga_index: &mut isize) {
                     }
                 }
                 KEY_ENTER => {
-                    if handle_enter(vga_index) {
+                    if handle_enter() {
                         return;
                     }
                 }
                 KEY_ESC => {
-                    clear(vga_index);
+                    clear_screen!();
                     return;
                 }
                 _ => {}
@@ -59,31 +60,32 @@ pub fn menu_loop(vga_index: &mut isize) {
     }
 }
 
-fn handle_enter(vga_index: &mut isize) -> bool {
+fn handle_enter() -> bool {
     unsafe {
         match SELECTED {
             0 => {
-                clear(vga_index);
-                run(vga_index);
+                clear_screen!();
+                run();
 
-                clear(vga_index);
+                clear_screen!();
                 draw_window(MENU_WINDOW_X, MENU_WINDOW_Y, MENU_WINDOW_WIDTH, MENU_WINDOW_HEIGHT, Some("Snake"));
             }
             1 => {
-                if let Some(scores) = load_high_scores_fat12(vga_index) {
-                    clear(vga_index);
-                    SELECTED = 0;
-                    render_scores_window(&scores, vga_index);
+                if let Some(scores) = load_high_scores_fat12() {
+                    clear_screen!();
 
-                    clear(vga_index);
+                    SELECTED = 0;
+                    render_scores_window(&scores);
+
+                    clear_screen!();
                     draw_window(MENU_WINDOW_X, MENU_WINDOW_Y, MENU_WINDOW_WIDTH, MENU_WINDOW_HEIGHT, Some("Snake"));
                 }
                 //
             }
             _ => {
-                clear(vga_index);
+                clear_screen!();
                 SELECTED = 0;
-                move_cursor_index(vga_index);
+                //move_cursor_index(vga_index);
                 return true;
             }
         }

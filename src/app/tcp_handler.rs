@@ -2,7 +2,7 @@ use crate::net::ipv4;
 use crate::net::tcp;
 use crate::vga;
 
-pub fn handle(vga_index: &mut isize) {
+pub fn handle() {
     fn callback(conns: &mut [Option<tcp::TcpConnection>; ipv4::MAX_CONNS], packet: &[u8]) -> u8 {
         if let Some((ipv4_header, ipv4_payload)) = ipv4::parse_packet(packet) {
             if let Some((tcp_header, payload)) = tcp::parse_packet(ipv4_payload) {
@@ -81,37 +81,28 @@ pub fn handle(vga_index: &mut isize) {
     //let mut conns: [Option<tcp::TcpConnection>; ipv4::MAX_CONNS] = [None, None, None, None];
     let mut conns: [Option<tcp::TcpConnection>; ipv4::MAX_CONNS] = Default::default();
 
-    vga::write::newline(vga_index);
-    vga::write::string(vga_index, b"Starting a simple TCP tester (hit any key to interrupt)...", vga::buffer::Color::White);
-    vga::write::newline(vga_index);
+    println!("Starting a simple TCP tester (hit any key to interrupt)...");
 
     loop {
         let ret = ipv4::receive_loop_tcp(&mut conns, callback);
 
         if ret == 0 {
-            vga::write::string(vga_index, b"Received SYN", vga::buffer::Color::White);
-            vga::write::newline(vga_index);
+            println!("Received SYN");
 
         } else if ret == 1 {
-            vga::write::string(vga_index, b"Received ACK", vga::buffer::Color::White);
-            vga::write::newline(vga_index);
+            println!("Received ACK");
         } else if ret == 2 {
-            vga::write::string(vga_index, b"Received FIN", vga::buffer::Color::White);
-            vga::write::newline(vga_index);
+            println!("Received FIN");
             //break;
         } else if ret == 3 {
-            vga::write::string(vga_index, b"Keyboard interrupt", vga::buffer::Color::White);
-            vga::write::newline(vga_index);
+            println!("Keyboard interrupt");
             break;
         } else if ret == 253 {
-            vga::write::string(vga_index, b"Freed socket", vga::buffer::Color::White);
-            vga::write::newline(vga_index);
+            println!("Freed socket");
         } else if ret == 254 {
-            vga::write::string(vga_index, b"Unknown conn", vga::buffer::Color::White);
-            vga::write::newline(vga_index);
+            println!("Unknown conn");
         } else if ret == 255 {
-            vga::write::string(vga_index, b"No free slots", vga::buffer::Color::White);
-            vga::write::newline(vga_index);
+            println!("No free slots");
         }
     }
 }

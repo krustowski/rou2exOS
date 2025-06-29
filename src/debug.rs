@@ -99,14 +99,24 @@ macro_rules! debugln {
 }
 
 #[macro_export]
+macro_rules! rprintn {
+    ($n:expr) => {{
+        let mut buf = [0u8; 20];
+        let s = $crate::debug::u64_to_dec_str($n as u64, &mut buf);
+
+        for b in s {
+            $crate::net::serial::write(*b);
+        }
+    }};
+}
+
+#[macro_export]
 macro_rules! rprint {
     ($data:expr) => {
-        use crate::net::serial;
-
         //serial::init();
 
         for b in $data.as_bytes() {
-            serial::write(*b);
+            $crate::net::serial::write(*b);
         }
     };
 }

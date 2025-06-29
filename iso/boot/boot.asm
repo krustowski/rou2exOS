@@ -6,9 +6,9 @@ BITS 32
 section .bss
 align 4096
 
-global dma
-dma:
-	resb 4096
+;global dma
+;dma:
+;	resb 4096
 
 pml4_table:    
 	resq 512
@@ -84,7 +84,7 @@ align 4
 extern kernel_main
 global _start
 
-global dma_buffer
+global dma
 
 global p4_table
 global p3_table
@@ -94,6 +94,9 @@ global p3_fb_table
 global p2_fb_table
 global p1_fb_table
 global p1_fb_table_2
+
+global gdt_descriptor
+global idt_ptr
 
 global debug_flag
 debug_flag:
@@ -281,7 +284,7 @@ set_up_page_tables:
     mov [p3_table + 0 * 8], eax
     mov dword [p3_table + 0 * 8 + 4], 0
 
-    ; Identity map 0–1 GiB with 2 MiB pages
+    ; Identity map 1 GB using huge pages
 
     xor ecx, ecx
 .map_1gib:
@@ -342,7 +345,7 @@ set_up_page_tables:
     cmp ecx, 0x40000
     jb .map_self_2
 
-    ; Framebuffer
+    ; Framebuffer init
 
     mov eax, p3_fb_table
     or eax, PAGE_FLAGS

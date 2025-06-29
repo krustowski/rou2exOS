@@ -1,8 +1,8 @@
-global int80_stub
+global int7f_isr
 extern syscall_handler
 
 section .text
-int80_stub:
+int7f_isr:
     push rax
     push rbx
     push rcx

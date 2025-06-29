@@ -53,11 +53,11 @@ pub fn load_idt() {
 }
 
 extern "C" {
-    fn int80_stub(); // defined in assembly
+    fn int7f_isr(); // defined in assembly
 }
 
-pub fn init_int80() {
-    let handler_addr = unsafe { int80_stub as u64 };
+pub fn init_int7f() {
+    let handler_addr = unsafe { int7f_isr as u64 };
 
     let entry = IdtEntry64::new(
         handler_addr,
@@ -67,7 +67,7 @@ pub fn init_int80() {
     );
 
     unsafe {
-        IDT[0x80] = entry;
+        IDT[0x7f] = entry;
     }
 }
 

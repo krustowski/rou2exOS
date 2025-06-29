@@ -20,6 +20,7 @@ mod video;
 
 // Core kernel modules
 mod acpi;
+mod api;
 mod app;
 mod audio;
 mod fs;
@@ -39,14 +40,13 @@ pub extern "C" fn kernel_main() {
     // VGA buffer position (LEGACY)
     clear_screen!();
 
+    // TODO: REmove: Instantiate new VGA Writer
+    video::vga::init_writer();
+
     // Run init checks
     unsafe {
         init::init(init::config::multiboot_ptr as u64);
     }
-
-    // TODO: REmove: Instantiate new VGA Writer
-    video::vga::init_writer();
-
 
     // Run the shell loop
     debugln!("Starting shell...");

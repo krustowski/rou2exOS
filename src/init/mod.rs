@@ -5,6 +5,7 @@ pub mod config;
 pub mod cpu;
 pub mod font;
 pub mod fs;
+pub mod idt;
 pub mod heap;
 pub mod result;
 pub mod video;
@@ -31,6 +32,11 @@ pub fn init(multiboot_ptr: u64) {
     result::print_result(
         "Check 64-bit Long Mode", 
         cpu::check_mode(),
+    );
+
+    result::print_result(
+        "Reload IDT and ISRs", 
+        idt::get_result()
     );
 
     result::print_result(

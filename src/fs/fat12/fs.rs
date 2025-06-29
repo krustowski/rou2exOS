@@ -72,7 +72,7 @@ impl<'a, D: BlockDevice> Filesystem<'a, D> {
     }
 
     /// cluster_to_lba method takes in a cluster number and returns its LBA address
-    fn cluster_to_lba(&self, cluster: u16) -> u64 {
+    pub fn cluster_to_lba(&self, cluster: u16) -> u64 {
         self.data_start_lba + ((cluster as u64 - 2) * self.sectors_per_cluster as u64)
     }
 
@@ -95,7 +95,7 @@ impl<'a, D: BlockDevice> Filesystem<'a, D> {
 
     /// read_fat12_entry method reads through the FAT table to find chains of sectors used by such
     /// cluster provided
-    fn read_fat12_entry(&self, cluster: u16) -> u16 {
+    pub fn read_fat12_entry(&self, cluster: u16) -> u16 {
         let fat_offset = (cluster as usize * 3) / 2;
         let sector = (fat_offset / 512) as u64;
         let offset_in_sector = fat_offset % 512;
@@ -761,7 +761,7 @@ impl<'a, D: BlockDevice> Filesystem<'a, D> {
         status
     }
 
-    fn print_name(&self, entry: &Entry) {
+    pub fn print_name(&self, entry: &Entry) {
         let mut printed_dot = false;
         let mut file_len: usize = 0;
 

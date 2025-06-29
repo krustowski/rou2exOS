@@ -1,9 +1,12 @@
 use crate::acpi;
 use crate::app;
 use crate::audio;
+use crate::fs::fat12::block::BlockDevice;
+use crate::fs::fat12::entry;
 use crate::init::config;
 use crate::debug;
 use crate::fs::fat12::{block::Floppy, fs::Filesystem, check::run_check};
+use crate::init::config::get_path;
 use crate::init::config::PATH_CLUSTER;
 use crate::net;
 use crate::time;
@@ -133,6 +136,12 @@ static COMMANDS: &[Command] = &[
         name: b"rm",
         description: b"removes a file",
         function: cmd_rm,
+        hidden: false,
+    },
+    Command {
+        name: b"run",
+        description: b"loads the binary executable in memory and gives it the control",
+        function: cmd_run,
         hidden: false,
     },
     Command {
@@ -392,12 +401,18 @@ fn cmd_debug(_args: &[u8]) {
 
 /// Prints the whole contents of the current directory.
 fn cmd_dir(_args: &[u8]) {
-    let floppy = Floppy::init();
+    let floppy = Floppy;
 
     match Filesystem::new(&floppy) {
         Ok(fs) => {
             unsafe {
-                fs.list_dir(config::PATH_CLUSTER, &[b' '; 11]);
+                fs.for_each_entry(PATH_CLUSTER, | entry | {
+                    if entry.name[0] == 0x00 || entry.name[0] == 0xE5 || entry.name[0] == 0xFF {
+                        return;
+                    }
+
+                    fs.print_name(entry);
+                });
             }
         }
         Err(e) => {
@@ -756,6 +771,115 @@ fn cmd_rm(args: &[u8]) {
 
             unsafe {
                 fs.delete_file(PATH_CLUSTER, &filename);
+            }
+        }
+        Err(e) => {
+            error!(e);
+            error!();
+        }
+    }
+}
+
+fn cmd_run(args: &[u8]) {
+    if args.len() == 0 || args.len() > 12 {
+        warn!("usage: run <binary name>");
+        return;
+    }
+
+    // This split_cmd invocation trims the b'\0' tail from the input args.
+    let (filename_input, _) = keyboard::split_cmd(args);
+
+    if filename_input.len() == 0 || filename_input.len() > 12 {
+        warn!("Usage: run <binary name>\n");
+        return;
+    }
+
+    // 12 = filename + ext + dot
+    let mut filename = [b' '; 12];
+    if let Some(slice) = filename.get_mut(..filename_input.len()) {
+        slice.copy_from_slice(filename_input);
+    }
+
+    let floppy = Floppy::init();
+
+    // Init the filesystem to look for a match
+    match Filesystem::new(&floppy) {
+        Ok(fs) => {
+            unsafe {
+                let mut cluster: u16 = 0;
+                let mut offset = 0;
+                let mut size = 0;
+
+                fs.for_each_entry(config::PATH_CLUSTER, |entry| {
+                    if entry.name.starts_with(&filename_input) {
+                        cluster = entry.start_cluster;
+                        size = entry.file_size;
+                        return;
+                    }
+                });
+
+                rprint!("Size: ");
+                rprintn!(size);
+                rprint!("\n");
+
+                if cluster == 0 {
+                    error!("no such file found");
+                    error!();
+                    return;
+                }
+
+                let load_addr: usize = 0x600_000;
+
+                while size - offset > 0 {
+                    let lba = fs.cluster_to_lba(cluster);
+                    let mut sector = [0u8; 512];
+
+                    fs.device.read_sector(lba, &mut sector);
+
+                    let dst = load_addr as *mut u8;
+
+                    //core::ptr::copy_nonoverlapping(sector.as_ptr(), dst.add(offset as usize), 512.min((size - offset) as usize));
+
+                    //rprint!("loading binary data to memory segment\n");
+                    for i in 0..512 {
+                        if let Some(byte) = sector.get(i) {
+                            *dst.add(i + offset as usize) = *byte;
+                        }
+                    }
+
+                    cluster = fs.read_fat12_entry(cluster);
+
+                    rprint!("Cluster: ");
+                    rprintn!(cluster);
+                    rprint!("\n");
+
+                    if cluster >= 0xFF8 || cluster == 0 {
+                        break;
+                    }
+
+                    //rprint!("offset++\n");
+                    offset += 512;
+                }
+
+                let arg: u32 = 5;
+                let result: u32;
+
+                /*core::arch::asm!(
+                    "mov rsp, {0}",
+                    "call {1}",
+                    in(reg) 0x700000usize, // stack top
+                    in(reg) 0x600000usize, // entry point
+                    lateout("rax") result
+                );*/
+
+                //let entry: EntryFn = core::mem::transmute(BINARY_START);
+                let entry: extern "C" fn(u32) -> u32 = core::mem::transmute(load_addr as *mut u8);
+                result = entry(arg);
+                
+                rprint!("Program returned: ");
+                rprintn!(result);
+                rprint!("\n");
+
             }
         }
         Err(e) => {

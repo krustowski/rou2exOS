@@ -919,20 +919,34 @@ fn cmd_write(args: &[u8], vga_index: &mut isize) {
 fn cmd_dd(args: &[u8], vga_index: &mut isize) {
     if args.len() == 0 {
         println!("Usage: dd if=<input> of=<output> [bs=<blocksize>] [count=<blocks>] [skip=<blocks>] [seek=<blocks>] [status=<level>]");
-        println!("       dd format [fs=<filesystem>] [drive=<device>]");
+        println!("       dd [format] [fs=<filesystem>] [bs=<sectorsize>] [if=<input>] [of=<output>] [drive=<device>]");
         println!("Examples:");
-        println!("  dd if=file1.txt of=file2.txt bs=256 count=4    - copy with custom block size and count");
+        println!("  dd if=file1.txt of=file2.txt bs=256 count=4    - copy with 256-byte blocks");
+        println!("  dd if=/dev/zero of=/dev/fda bs=1024 count=100  - write zeros with 1KB blocks");
         println!("  dd if=file1.txt of=file2.txt skip=2 seek=1     - copy with input/output offsets");
-        println!("  dd format fs=fat12                             - format with FAT12 filesystem");
-        println!("  dd format fs=raw                               - raw format (zero-fill)");
+        println!("  dd fs=fat12 bs=512                             - format FAT12 with 512-byte sectors");
+        println!("  dd fs=raw bs=1024                              - raw format with 1KB block size");
+        println!("  dd fs=raw if=data.txt                          - raw format from input file");
+        println!("  dd fs=fat12 of=disk.img                        - create FAT12 image file");
+        println!("  dd fs=raw if=data.txt of=image.img             - create raw image from file");
         println!("  dd status=progress                             - show transfer progress");
+        println!("Block size (bs=) controls sector size for disk operations (1-4096 bytes)");
         return;
     }
 
     let args_str = core::str::from_utf8(args).unwrap_or("");
     
-    if args_str.starts_with("format") {
-        cmd_dd_format_enhanced(args_str, vga_index);
+    let is_format_operation = args_str.starts_with("format") || args_str.contains("fs=");
+    
+    if is_format_operation {
+        let format_args = if args_str.starts_with("format ") {
+            &args_str[7..]
+        } else if args_str.starts_with("format") {
+            &args_str[6..]
+        } else {
+            args_str
+        };
+        cmd_dd_format_enhanced(format_args, vga_index);
         return;
     }
 
@@ -989,18 +1003,50 @@ fn cmd_dd(args: &[u8], vga_index: &mut isize) {
 fn cmd_dd_format_enhanced(args: &str, vga_index: &mut isize) {
     let mut filesystem = "fat12";
     let mut drive = "floppy";
+    let mut block_size = 512;
+    let mut input_file = "";
+    let mut output_file = "";
     
     for arg in args.split_whitespace() {
         if arg.starts_with("fs=") {
             filesystem = &arg[3..];
         } else if arg.starts_with("drive=") {
             drive = &arg[6..];
+        } else if arg.starts_with("bs=") {
+            if let Ok(bs) = arg[3..].parse::<usize>() {
+                if bs > 0 && bs <= 4096 {
+                    block_size = bs;
+                } else {
+                    error!("Invalid block size for format (must be 1-4096)\n");
+                    return;
+                }
+            }
+        } else if arg.starts_with("if=") {
+            input_file = &arg[3..];
+        } else if arg.starts_with("of=") {
+            output_file = &arg[3..];
         }
     }
     
     match filesystem {
-        "fat12" => cmd_dd_format_fat12(vga_index),
-        "raw" => cmd_dd_format_raw(vga_index),
+        "fat12" => {
+            if output_file.is_empty() {
+                cmd_dd_format_fat12_with_block_size(block_size, vga_index);
+            } else {
+                cmd_dd_format_fat12_to_file(output_file, block_size, vga_index);
+            }
+        },
+        "raw" => {
+            if output_file.is_empty() {
+                if input_file.is_empty() {
+                    cmd_dd_format_raw_with_block_size(block_size, vga_index);
+                } else {
+                    cmd_dd_format_raw_from_file(input_file, block_size, vga_index);
+                }
+            } else {
+                cmd_dd_format_raw_to_file(input_file, output_file, block_size, vga_index);
+            }
+        },
         _ => {
             error!("Unsupported filesystem: ");
             printb!(filesystem.as_bytes());
@@ -1011,9 +1057,16 @@ fn cmd_dd_format_enhanced(args: &str, vga_index: &mut isize) {
 }
 
 fn cmd_dd_format_fat12(vga_index: &mut isize) {
-    println!("Formatting floppy disk with FAT12 filesystem...");
+    cmd_dd_format_fat12_with_block_size(512, vga_index);
+}
+
+fn cmd_dd_format_fat12_with_block_size(block_size: usize, vga_index: &mut isize) {
+    print!("Formatting floppy disk with FAT12 filesystem (bs=", video::vga::Color::Yellow);
+    printn!(block_size as u64);
+    println!(")...");
     
     let floppy = Floppy;
+    let sectors_per_block = (block_size + 511) / 512;
     
     let mut boot_sector = [0u8; 512];
     
@@ -1023,10 +1076,10 @@ fn cmd_dd_format_fat12(vga_index: &mut isize) {
     
     boot_sector[3..11].copy_from_slice(b"MSWIN4.1");
     
-    boot_sector[11] = 0x00;
-    boot_sector[12] = 0x02;
+    boot_sector[11] = (block_size & 0xFF) as u8;
+    boot_sector[12] = ((block_size >> 8) & 0xFF) as u8;
     
-    boot_sector[13] = 0x01;
+    boot_sector[13] = sectors_per_block as u8;
     
     boot_sector[14] = 0x01;
     boot_sector[15] = 0x00;
@@ -1082,29 +1135,68 @@ fn cmd_dd_format_fat12(vga_index: &mut isize) {
         floppy.write_sector(sector, &zero_sector, vga_index);
     }
     
-    println!("Floppy disk formatted successfully with FAT12 filesystem");
+    print!("FAT12 format completed with ", video::vga::Color::Green);
+    printn!(block_size as u64);
+    println!(" byte sectors");
 }
 
 fn cmd_dd_format_raw(vga_index: &mut isize) {
-    println!("Performing raw format (zero-fill) of floppy disk...");
+    cmd_dd_format_raw_with_block_size(512, vga_index);
+}
+
+fn cmd_dd_format_raw_with_block_size(block_size: usize, vga_index: &mut isize) {
+    print!("Performing raw format (zero-fill) with block size ", video::vga::Color::Yellow);
+    printn!(block_size as u64);
+    println!(" bytes...");
     
     let floppy = Floppy;
-    let zero_sector = [0u8; 512];
+    let sectors_per_block = (block_size + 511) / 512;
+    let total_blocks = 2880 / sectors_per_block;
     
-    for sector in 0..2880 {
-        floppy.write_sector(sector, &zero_sector, vga_index);
+    let mut zero_buffer = [0u8; 4096];
+    if block_size > 4096 {
+        error!("Block size too large for raw format (max 4096)\n");
+        return;
+    }
+    
+    for block_idx in 0..total_blocks {
+        let start_sector = block_idx * sectors_per_block;
         
-        if sector % 288 == 0 {
+        for sector_offset in 0..sectors_per_block {
+            let sector = start_sector + sector_offset;
+            if sector >= 2880 {
+                break;
+            }
+            
+            let buffer_start = sector_offset * 512;
+            let buffer_end = core::cmp::min(buffer_start + 512, block_size);
+            
+            if buffer_end > buffer_start {
+                let mut sector_buffer = [0u8; 512];
+                let copy_len = buffer_end - buffer_start;
+                sector_buffer[..copy_len].copy_from_slice(&zero_buffer[buffer_start..buffer_end]);
+                floppy.write_sector(sector as u64, &sector_buffer, vga_index);
+            }
+        }
+        
+        if block_idx % (total_blocks / 10).max(1) == 0 {
             print!("Progress: ", video::vga::Color::Yellow);
-            printn!((sector * 100 / 2880) as u64);
+            printn!((block_idx * 100 / total_blocks) as u64);
             println!("%");
         }
     }
     
-    println!("Raw format completed - disk zeroed");
+    print!("Raw format completed - ", video::vga::Color::Green);
+    printn!((total_blocks * block_size) as u64);
+    println!(" bytes zeroed");
 }
 
 fn cmd_dd_copy_enhanced(input: &str, output: &str, block_size: usize, count: Option<usize>, skip: usize, seek: usize, status: &str, vga_index: &mut isize) {
+    if input == "/dev/zero" || output.starts_with("/dev/") {
+        cmd_dd_raw_device_copy(input, output, block_size, count, skip, seek, status, vga_index);
+        return;
+    }
+    
     let floppy = Floppy;
     
     match Fs::new(&floppy, vga_index) {
@@ -1129,10 +1221,14 @@ fn cmd_dd_copy_enhanced(input: &str, output: &str, block_size: usize, count: Opt
                 let input_cluster = fs.list_dir(config::PATH_CLUSTER, &input_filename, vga_index);
                 
                 if input_cluster > 0 {
-                    let mut buffer = [0u8; 512];
-                    fs.read_file(input_cluster as u16, &mut buffer, vga_index);
+                    let mut buffer = [0u8; 4096];
+                    let read_size = core::cmp::min(buffer.len(), block_size * 8);
+                    let mut file_buffer = [0u8; 512];
+                    fs.read_file(input_cluster as u16, &mut file_buffer, vga_index);
+                    let copy_size = core::cmp::min(read_size, 512);
+                    buffer[..copy_size].copy_from_slice(&file_buffer[..copy_size]);
                     
-                    let data_len = buffer.iter().position(|&x| x == 0).unwrap_or(512);
+                    let data_len = buffer[..read_size].iter().position(|&x| x == 0).unwrap_or(read_size);
                     
                     let skip_bytes = skip * block_size;
                     let seek_bytes = seek * block_size;
@@ -1193,6 +1289,376 @@ fn cmd_dd_copy_enhanced(input: &str, output: &str, block_size: usize, count: Opt
                     println!();
                 }
             }
+        }
+        Err(e) => {
+            error!(e);
+            error!();
+        }
+    }
+}
+
+fn cmd_dd_raw_device_copy(input: &str, output: &str, block_size: usize, count: Option<usize>, skip: usize, seek: usize, status: &str, vga_index: &mut isize) {
+    let floppy = Floppy;
+    
+    if status == "progress" || status == "noxfer" {
+        print!("Raw device copy: ", video::vga::Color::Yellow);
+        printb!(input.as_bytes());
+        print!(" -> ", video::vga::Color::Yellow);
+        printb!(output.as_bytes());
+        print!(" (bs=", video::vga::Color::Yellow);
+        printn!(block_size as u64);
+        println!(")");
+    }
+    
+    let sectors_per_block = (block_size + 511) / 512;
+    let start_sector = skip * sectors_per_block;
+    let output_start_sector = seek * sectors_per_block;
+    
+    let total_blocks = if let Some(c) = count { c } else { 2880 / sectors_per_block };
+    
+    if input == "/dev/zero" {
+        let mut zero_buffer = [0u8; 4096];
+        if block_size > 4096 {
+            error!("Block size too large for device copy (max 4096)\n");
+            return;
+        }
+        
+        for block_idx in 0..total_blocks {
+            let sector = output_start_sector + (block_idx * sectors_per_block);
+            
+            if sector + sectors_per_block > 2880 {
+                break;
+            }
+            
+            for sector_offset in 0..sectors_per_block {
+                let current_sector = sector + sector_offset;
+                let buffer_start = sector_offset * 512;
+                let buffer_end = core::cmp::min(buffer_start + 512, block_size);
+                
+                if buffer_end > buffer_start {
+                    let mut sector_buffer = [0u8; 512];
+                    let copy_len = buffer_end - buffer_start;
+                    sector_buffer[..copy_len].copy_from_slice(&zero_buffer[buffer_start..buffer_end]);
+                    floppy.write_sector(current_sector as u64, &sector_buffer, vga_index);
+                }
+            }
+            
+            if status == "progress" && block_idx % 10 == 0 {
+                print!("Progress: ", video::vga::Color::Yellow);
+                printn!((block_idx * 100 / total_blocks) as u64);
+                println!("%");
+            }
+        }
+        
+        print!("Wrote ", video::vga::Color::Green);
+        printn!((total_blocks * block_size) as u64);
+        println!(" zero bytes to device");
+    } else if output.starts_with("/dev/") {
+        let mut buffer = [0u8; 4096];
+        if block_size > 4096 {
+            error!("Block size too large for device copy (max 4096)\n");
+            return;
+        }
+        
+        for block_idx in 0..total_blocks {
+            let input_sector = start_sector + (block_idx * sectors_per_block);
+            let output_sector = output_start_sector + (block_idx * sectors_per_block);
+            
+            if input_sector + sectors_per_block > 2880 || output_sector + sectors_per_block > 2880 {
+                break;
+            }
+            
+            for sector_offset in 0..sectors_per_block {
+                let current_input_sector = input_sector + sector_offset;
+                let current_output_sector = output_sector + sector_offset;
+                let buffer_start = sector_offset * 512;
+                let buffer_end = core::cmp::min(buffer_start + 512, block_size);
+                
+                if buffer_end > buffer_start {
+                    let mut sector_buffer = [0u8; 512];
+                    floppy.read_sector(current_input_sector as u64, &mut sector_buffer, vga_index);
+                    
+                    let copy_len = buffer_end - buffer_start;
+                    buffer[buffer_start..buffer_end].copy_from_slice(&sector_buffer[..copy_len]);
+                    
+                    floppy.write_sector(current_output_sector as u64, &sector_buffer, vga_index);
+                }
+            }
+            
+            if status == "progress" && block_idx % 10 == 0 {
+                print!("Progress: ", video::vga::Color::Yellow);
+                printn!((block_idx * 100 / total_blocks) as u64);
+                println!("%");
+            }
+        }
+        
+        print!("Copied ", video::vga::Color::Green);
+        printn!((total_blocks * block_size) as u64);
+        println!(" bytes between devices");
+    }
+}
+
+fn cmd_dd_format_raw_from_file(input_file: &str, block_size: usize, vga_index: &mut isize) {
+    print!("Performing raw format from file ", video::vga::Color::Yellow);
+    printb!(input_file.as_bytes());
+    print!(" with block size ", video::vga::Color::Yellow);
+    printn!(block_size as u64);
+    println!(" bytes...");
+    
+    let floppy = Floppy;
+    
+    match Fs::new(&floppy, vga_index) {
+        Ok(fs) => {
+            let mut input_filename = [b' '; 11];
+            
+            if input_file.len() > 8 {
+                error!("Input filename too long (max 8 characters)\n");
+                return;
+            }
+            
+            input_filename[..input_file.len()].copy_from_slice(input_file.as_bytes());
+            input_filename[8..11].copy_from_slice(b"TXT");
+            to_uppercase_ascii(&mut input_filename);
+            
+            unsafe {
+                let input_cluster = fs.list_dir(config::PATH_CLUSTER, &input_filename, vga_index);
+                
+                if input_cluster > 0 {
+                    let mut buffer = [0u8; 4096];
+                    let read_size = core::cmp::min(buffer.len(), block_size * 8);
+                    let mut file_buffer = [0u8; 512];
+                    fs.read_file(input_cluster as u16, &mut file_buffer, vga_index);
+                    let copy_size = core::cmp::min(read_size, 512);
+                    buffer[..copy_size].copy_from_slice(&file_buffer[..copy_size]);
+                    
+                    let data_len = buffer[..read_size].iter().position(|&x| x == 0).unwrap_or(read_size);
+                    
+                    let sectors_per_block = (block_size + 511) / 512;
+                    let total_blocks = 2880 / sectors_per_block;
+                    
+                    for block_idx in 0..total_blocks {
+                        let start_sector = block_idx * sectors_per_block;
+                        
+                        for sector_offset in 0..sectors_per_block {
+                            let sector = start_sector + sector_offset;
+                            if sector >= 2880 {
+                                break;
+                            }
+                            
+                            let buffer_start = sector_offset * 512;
+                            let buffer_end = core::cmp::min(buffer_start + 512, block_size);
+                            
+                            if buffer_end > buffer_start {
+                                let mut sector_buffer = [0u8; 512];
+                                let copy_len = buffer_end - buffer_start;
+                                
+                                let data_offset = (block_idx * block_size + buffer_start) % data_len;
+                                let available_data = core::cmp::min(copy_len, data_len - data_offset);
+                                
+                                if available_data > 0 {
+                                    sector_buffer[..available_data].copy_from_slice(&buffer[data_offset..data_offset + available_data]);
+                                }
+                                
+                                floppy.write_sector(sector as u64, &sector_buffer, vga_index);
+                            }
+                        }
+                        
+                        if block_idx % (total_blocks / 10).max(1) == 0 {
+                            print!("Progress: ", video::vga::Color::Yellow);
+                            printn!((block_idx * 100 / total_blocks) as u64);
+                            println!("%");
+                        }
+                    }
+                    
+                    print!("Raw format from file completed - ", video::vga::Color::Green);
+                    printn!((total_blocks * block_size) as u64);
+                    println!(" bytes written");
+                } else {
+                    error!("Input file not found: ");
+                    printb!(input_file.as_bytes());
+                    println!();
+                }
+            }
+        }
+        Err(e) => {
+            error!(e);
+            error!();
+        }
+    }
+}
+
+fn cmd_dd_format_fat12_to_file(output_file: &str, block_size: usize, vga_index: &mut isize) {
+    print!("Formatting FAT12 to file ", video::vga::Color::Yellow);
+    printb!(output_file.as_bytes());
+    print!(" with block size ", video::vga::Color::Yellow);
+    printn!(block_size as u64);
+    println!(" bytes...");
+    
+    let floppy = Floppy;
+    
+    match Fs::new(&floppy, vga_index) {
+        Ok(fs) => {
+            let mut output_filename = [b' '; 11];
+            
+            if output_file.len() > 8 {
+                error!("Output filename too long (max 8 characters)\n");
+                return;
+            }
+            
+            output_filename[..output_file.len()].copy_from_slice(output_file.as_bytes());
+            output_filename[8..11].copy_from_slice(b"IMG");
+            to_uppercase_ascii(&mut output_filename);
+            
+            let mut image_data = [0u8; 1474560];
+            
+            let sectors_per_block = (block_size + 511) / 512;
+            
+            let mut boot_sector = [0u8; 512];
+            
+            boot_sector[0] = 0xEB;
+            boot_sector[1] = 0x3C;
+            boot_sector[2] = 0x90;
+            
+            boot_sector[3..11].copy_from_slice(b"MSWIN4.1");
+            
+            boot_sector[11] = (block_size & 0xFF) as u8;
+            boot_sector[12] = ((block_size >> 8) & 0xFF) as u8;
+            
+            boot_sector[13] = sectors_per_block as u8;
+            
+            boot_sector[14] = 0x01;
+            boot_sector[15] = 0x00;
+            
+            boot_sector[16] = 0x02;
+            
+            boot_sector[17] = 0xE0;
+            boot_sector[18] = 0x00;
+            
+            boot_sector[19] = 0x40;
+            boot_sector[20] = 0x0B;
+            
+            boot_sector[21] = 0xF0;
+            
+            boot_sector[22] = 0x09;
+            boot_sector[23] = 0x00;
+            
+            boot_sector[24] = 0x12;
+            boot_sector[25] = 0x00;
+            
+            boot_sector[26] = 0x02;
+            boot_sector[27] = 0x00;
+            
+            boot_sector[28] = 0x00;
+            boot_sector[29] = 0x00;
+            boot_sector[30] = 0x00;
+            boot_sector[31] = 0x00;
+            
+            boot_sector[54..59].copy_from_slice(b"FAT12");
+            
+            boot_sector[510] = 0x55;
+            boot_sector[511] = 0xAA;
+            
+            image_data[..512].copy_from_slice(&boot_sector);
+            
+            let mut fat_sector = [0u8; 512];
+            fat_sector[0] = 0xF0;
+            fat_sector[1] = 0xFF;
+            fat_sector[2] = 0xFF;
+            
+            image_data[512..1024].copy_from_slice(&fat_sector);
+            image_data[5120..5632].copy_from_slice(&fat_sector);
+            
+            unsafe {
+                fs.write_file(config::PATH_CLUSTER, &output_filename, &image_data, vga_index);
+            }
+            
+            print!("FAT12 image created: ", video::vga::Color::Green);
+            printb!(output_file.as_bytes());
+            println!();
+        }
+        Err(e) => {
+            error!(e);
+            error!();
+        }
+    }
+}
+
+fn cmd_dd_format_raw_to_file(input_file: &str, output_file: &str, block_size: usize, vga_index: &mut isize) {
+    print!("Creating raw image ", video::vga::Color::Yellow);
+    printb!(output_file.as_bytes());
+    
+    if !input_file.is_empty() {
+        print!(" from ", video::vga::Color::Yellow);
+        printb!(input_file.as_bytes());
+    }
+    
+    print!(" with block size ", video::vga::Color::Yellow);
+    printn!(block_size as u64);
+    println!(" bytes...");
+    
+    let floppy = Floppy;
+    
+    match Fs::new(&floppy, vga_index) {
+        Ok(fs) => {
+            let mut output_filename = [b' '; 11];
+            
+            if output_file.len() > 8 {
+                error!("Output filename too long (max 8 characters)\n");
+                return;
+            }
+            
+            output_filename[..output_file.len()].copy_from_slice(output_file.as_bytes());
+            output_filename[8..11].copy_from_slice(b"IMG");
+            to_uppercase_ascii(&mut output_filename);
+            
+            let mut image_data = [0u8; 1474560];
+            
+            if !input_file.is_empty() {
+                let mut input_filename = [b' '; 11];
+                
+                if input_file.len() > 8 {
+                    error!("Input filename too long (max 8 characters)\n");
+                    return;
+                }
+                
+                input_filename[..input_file.len()].copy_from_slice(input_file.as_bytes());
+                input_filename[8..11].copy_from_slice(b"TXT");
+                to_uppercase_ascii(&mut input_filename);
+                
+                unsafe {
+                    let input_cluster = fs.list_dir(config::PATH_CLUSTER, &input_filename, vga_index);
+                    
+                    if input_cluster > 0 {
+                        let mut buffer = [0u8; 4096];
+                        let mut file_buffer = [0u8; 512];
+                        fs.read_file(input_cluster as u16, &mut file_buffer, vga_index);
+                        buffer[..512].copy_from_slice(&file_buffer);
+                        
+                        let data_len = buffer.iter().position(|&x| x == 0).unwrap_or(4096);
+                        
+                        for i in 0..image_data.len() {
+                            if data_len > 0 {
+                                image_data[i] = buffer[i % data_len];
+                            }
+                        }
+                    } else {
+                        error!("Input file not found: ");
+                        printb!(input_file.as_bytes());
+                        println!();
+                        return;
+                    }
+                }
+            }
+            
+            unsafe {
+                fs.write_file(config::PATH_CLUSTER, &output_filename, &image_data, vga_index);
+            }
+            
+            print!("Raw image created: ", video::vga::Color::Green);
+            printb!(output_file.as_bytes());
+            print!(" (", video::vga::Color::Green);
+            printn!(image_data.len() as u64);
+            println!(" bytes)");
         }
         Err(e) => {
             error!(e);

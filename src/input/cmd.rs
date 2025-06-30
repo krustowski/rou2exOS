@@ -919,7 +919,7 @@ fn cmd_write(args: &[u8], vga_index: &mut isize) {
 fn cmd_dd(args: &[u8], vga_index: &mut isize) {
     if args.len() == 0 {
         println!("Usage: dd if=<input> of=<output> [bs=<blocksize>] [count=<blocks>] [skip=<blocks>] [seek=<blocks>] [status=<level>]");
-        println!("       dd [format] [fs=<filesystem>] [bs=<sectorsize>] [if=<input>] [of=<output>] [drive=<device>]");
+        println!("       dd fs=<filesystem> [bs=<sectorsize>] [if=<input>] [of=<output>] [drive=<device>]");
         println!("Examples:");
         println!("  dd if=file1.txt of=file2.txt bs=256 count=4    - copy with 256-byte blocks");
         println!("  dd if=/dev/zero of=/dev/fda bs=1024 count=100  - write zeros with 1KB blocks");
@@ -929,7 +929,7 @@ fn cmd_dd(args: &[u8], vga_index: &mut isize) {
         println!("  dd fs=raw if=data.txt                          - raw format from input file");
         println!("  dd fs=fat12 of=disk.img                        - create FAT12 image file");
         println!("  dd fs=raw if=data.txt of=image.img             - create raw image from file");
-        println!("  dd status=progress                             - show transfer progress");
+        println!("  dd if=file.txt of=copy.txt status=progress     - show transfer progress");
         println!("Block size (bs=) controls sector size for disk operations (1-4096 bytes)");
         return;
     }

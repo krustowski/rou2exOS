@@ -3,7 +3,7 @@ use crate::app;
 use crate::audio;
 use crate::init::config;
 use crate::debug;
-use crate::fs::fat12::{block::Floppy, fs::Fs, check::run_check};
+use crate::fs::fat12::{block::{Floppy, BlockDevice}, fs::Fs, check::run_check};
 use crate::init::config::PATH_CLUSTER;
 use crate::net;
 use crate::time;
@@ -175,6 +175,12 @@ static COMMANDS: &[Command] = &[
         name: b"write",
         description: b"writes arguments to a sample file on floppy",
         function: cmd_write,
+        hidden: false,
+    },
+    Command {
+        name: b"dd",
+        description: b"disk utility for copying and converting data",
+        function: cmd_dd,
         hidden: false,
     }
 ];
@@ -901,6 +907,184 @@ fn cmd_write(args: &[u8], vga_index: &mut isize) {
 
             unsafe {
                 fs.write_file(PATH_CLUSTER, &name, content, vga_index);
+            }
+        }
+        Err(e) => {
+            error!(e);
+            error!();
+        }
+    }
+}
+
+fn cmd_dd(args: &[u8], vga_index: &mut isize) {
+    if args.len() == 0 {
+        println!("Usage: dd if=<input> of=<output> [bs=<blocksize>] [count=<blocks>]");
+        println!("       dd format [drive]");
+        println!("Examples:");
+        println!("  dd if=file1.txt of=file2.txt    - copy file1.txt to file2.txt");
+        println!("  dd format                       - format the floppy disk");
+        return;
+    }
+
+    let args_str = core::str::from_utf8(args).unwrap_or("");
+    
+    if args_str.starts_with("format") {
+        cmd_dd_format(vga_index);
+        return;
+    }
+
+    let mut input_file: Option<&str> = None;
+    let mut output_file: Option<&str> = None;
+    let mut block_size: usize = 512;
+    let mut count: Option<usize> = None;
+
+    for arg in args_str.split_whitespace() {
+        if arg.starts_with("if=") {
+            input_file = Some(&arg[3..]);
+        } else if arg.starts_with("of=") {
+            output_file = Some(&arg[3..]);
+        } else if arg.starts_with("bs=") {
+            if let Ok(bs) = arg[3..].parse::<usize>() {
+                block_size = bs;
+            }
+        } else if arg.starts_with("count=") {
+            if let Ok(c) = arg[6..].parse::<usize>() {
+                count = Some(c);
+            }
+        }
+    }
+
+    match (input_file, output_file) {
+        (Some(input), Some(output)) => {
+            cmd_dd_copy(input, output, block_size, count, vga_index);
+        }
+        _ => {
+            error!("Missing if= or of= parameter\n");
+            println!("Usage: dd if=<input> of=<output> [bs=<blocksize>] [count=<blocks>]");
+        }
+    }
+}
+
+fn cmd_dd_format(vga_index: &mut isize) {
+    println!("Formatting floppy disk with FAT12 filesystem...");
+    
+    let floppy = Floppy;
+    
+    let mut boot_sector = [0u8; 512];
+    
+    boot_sector[0] = 0xEB;
+    boot_sector[1] = 0x3C;
+    boot_sector[2] = 0x90;
+    
+    boot_sector[3..11].copy_from_slice(b"MSWIN4.1");
+    
+    boot_sector[11] = 0x00;
+    boot_sector[12] = 0x02;
+    
+    boot_sector[13] = 0x01;
+    
+    boot_sector[14] = 0x01;
+    boot_sector[15] = 0x00;
+    
+    boot_sector[16] = 0x02;
+    
+    boot_sector[17] = 0xE0;
+    boot_sector[18] = 0x00;
+    
+    boot_sector[19] = 0x40;
+    boot_sector[20] = 0x0B;
+    
+    boot_sector[21] = 0xF0;
+    
+    boot_sector[22] = 0x09;
+    boot_sector[23] = 0x00;
+    
+    boot_sector[24] = 0x12;
+    boot_sector[25] = 0x00;
+    
+    boot_sector[26] = 0x02;
+    boot_sector[27] = 0x00;
+    
+    boot_sector[28] = 0x00;
+    boot_sector[29] = 0x00;
+    boot_sector[30] = 0x00;
+    boot_sector[31] = 0x00;
+    
+    boot_sector[54..59].copy_from_slice(b"FAT12");
+    
+    boot_sector[510] = 0x55;
+    boot_sector[511] = 0xAA;
+    
+    floppy.write_sector(0, &boot_sector, vga_index);
+    
+    let mut fat_sector = [0u8; 512];
+    fat_sector[0] = 0xF0;
+    fat_sector[1] = 0xFF;
+    fat_sector[2] = 0xFF;
+    
+    floppy.write_sector(1, &fat_sector, vga_index);
+    floppy.write_sector(10, &fat_sector, vga_index);
+    
+    let zero_sector = [0u8; 512];
+    for sector in 2..9 {
+        floppy.write_sector(sector, &zero_sector, vga_index);
+    }
+    for sector in 11..18 {
+        floppy.write_sector(sector, &zero_sector, vga_index);
+    }
+    
+    for sector in 19..33 {
+        floppy.write_sector(sector, &zero_sector, vga_index);
+    }
+    
+    println!("Floppy disk formatted successfully with FAT12 filesystem");
+}
+
+fn cmd_dd_copy(input: &str, output: &str, _block_size: usize, _count: Option<usize>, vga_index: &mut isize) {
+    let floppy = Floppy;
+    
+    match Fs::new(&floppy, vga_index) {
+        Ok(fs) => {
+            let mut input_filename = [b' '; 11];
+            let mut output_filename = [b' '; 11];
+            
+            if input.len() > 8 || output.len() > 8 {
+                error!("Filename too long (max 8 characters)\n");
+                return;
+            }
+            
+            input_filename[..input.len()].copy_from_slice(input.as_bytes());
+            input_filename[8..11].copy_from_slice(b"TXT");
+            to_uppercase_ascii(&mut input_filename);
+            
+            output_filename[..output.len()].copy_from_slice(output.as_bytes());
+            output_filename[8..11].copy_from_slice(b"TXT");
+            to_uppercase_ascii(&mut output_filename);
+            
+            unsafe {
+                let input_cluster = fs.list_dir(config::PATH_CLUSTER, &input_filename, vga_index);
+                
+                if input_cluster > 0 {
+                    let mut buffer = [0u8; 512];
+                    fs.read_file(input_cluster as u16, &mut buffer, vga_index);
+                    
+                    let data_len = buffer.iter().position(|&x| x == 0).unwrap_or(512);
+                    let data_slice = &buffer[..data_len];
+                    
+                    fs.write_file(config::PATH_CLUSTER, &output_filename, data_slice, vga_index);
+                    
+                    print!("Copied ", video::vga::Color::Green);
+                    printn!(data_len as u64);
+                    print!(" bytes from ", video::vga::Color::Green);
+                    printb!(input.as_bytes());
+                    print!(" to ", video::vga::Color::Green);
+                    printb!(output.as_bytes());
+                    println!();
+                } else {
+                    error!("Input file not found: ");
+                    printb!(input.as_bytes());
+                    println!();
+                }
             }
         }
         Err(e) => {

@@ -179,7 +179,7 @@ static COMMANDS: &[Command] = &[
     },
     Command {
         name: b"dd",
-        description: b"disk utility for copying and converting data",
+        description: b"define and dump data; copy and convert across them",
         function: cmd_dd,
         hidden: false,
     }

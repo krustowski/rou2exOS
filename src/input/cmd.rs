@@ -918,18 +918,21 @@ fn cmd_write(args: &[u8], vga_index: &mut isize) {
 
 fn cmd_dd(args: &[u8], vga_index: &mut isize) {
     if args.len() == 0 {
-        println!("Usage: dd if=<input> of=<output> [bs=<blocksize>] [count=<blocks>]");
-        println!("       dd format [drive]");
+        println!("Usage: dd if=<input> of=<output> [bs=<blocksize>] [count=<blocks>] [skip=<blocks>] [seek=<blocks>] [status=<level>]");
+        println!("       dd format [fs=<filesystem>] [drive=<device>]");
         println!("Examples:");
-        println!("  dd if=file1.txt of=file2.txt    - copy file1.txt to file2.txt");
-        println!("  dd format                       - format the floppy disk");
+        println!("  dd if=file1.txt of=file2.txt bs=256 count=4    - copy with custom block size and count");
+        println!("  dd if=file1.txt of=file2.txt skip=2 seek=1     - copy with input/output offsets");
+        println!("  dd format fs=fat12                             - format with FAT12 filesystem");
+        println!("  dd format fs=raw                               - raw format (zero-fill)");
+        println!("  dd status=progress                             - show transfer progress");
         return;
     }
 
     let args_str = core::str::from_utf8(args).unwrap_or("");
     
     if args_str.starts_with("format") {
-        cmd_dd_format(vga_index);
+        cmd_dd_format_enhanced(args_str, vga_index);
         return;
     }
 
@@ -937,6 +940,9 @@ fn cmd_dd(args: &[u8], vga_index: &mut isize) {
     let mut output_file: Option<&str> = None;
     let mut block_size: usize = 512;
     let mut count: Option<usize> = None;
+    let mut skip: usize = 0;
+    let mut seek: usize = 0;
+    let mut status: &str = "none";
 
     for arg in args_str.split_whitespace() {
         if arg.starts_with("if=") {
@@ -945,27 +951,66 @@ fn cmd_dd(args: &[u8], vga_index: &mut isize) {
             output_file = Some(&arg[3..]);
         } else if arg.starts_with("bs=") {
             if let Ok(bs) = arg[3..].parse::<usize>() {
-                block_size = bs;
+                if bs > 0 && bs <= 4096 {
+                    block_size = bs;
+                } else {
+                    error!("Invalid block size (must be 1-4096)\n");
+                    return;
+                }
             }
         } else if arg.starts_with("count=") {
             if let Ok(c) = arg[6..].parse::<usize>() {
                 count = Some(c);
             }
+        } else if arg.starts_with("skip=") {
+            if let Ok(s) = arg[5..].parse::<usize>() {
+                skip = s;
+            }
+        } else if arg.starts_with("seek=") {
+            if let Ok(s) = arg[5..].parse::<usize>() {
+                seek = s;
+            }
+        } else if arg.starts_with("status=") {
+            status = &arg[7..];
         }
     }
 
     match (input_file, output_file) {
         (Some(input), Some(output)) => {
-            cmd_dd_copy(input, output, block_size, count, vga_index);
+            cmd_dd_copy_enhanced(input, output, block_size, count, skip, seek, status, vga_index);
         }
         _ => {
             error!("Missing if= or of= parameter\n");
-            println!("Usage: dd if=<input> of=<output> [bs=<blocksize>] [count=<blocks>]");
+            println!("Usage: dd if=<input> of=<output> [bs=<blocksize>] [count=<blocks>] [skip=<blocks>] [seek=<blocks>]");
         }
     }
 }
 
-fn cmd_dd_format(vga_index: &mut isize) {
+fn cmd_dd_format_enhanced(args: &str, vga_index: &mut isize) {
+    let mut filesystem = "fat12";
+    let mut drive = "floppy";
+    
+    for arg in args.split_whitespace() {
+        if arg.starts_with("fs=") {
+            filesystem = &arg[3..];
+        } else if arg.starts_with("drive=") {
+            drive = &arg[6..];
+        }
+    }
+    
+    match filesystem {
+        "fat12" => cmd_dd_format_fat12(vga_index),
+        "raw" => cmd_dd_format_raw(vga_index),
+        _ => {
+            error!("Unsupported filesystem: ");
+            printb!(filesystem.as_bytes());
+            println!();
+            println!("Supported filesystems: fat12, raw");
+        }
+    }
+}
+
+fn cmd_dd_format_fat12(vga_index: &mut isize) {
     println!("Formatting floppy disk with FAT12 filesystem...");
     
     let floppy = Floppy;
@@ -1040,7 +1085,26 @@ fn cmd_dd_format(vga_index: &mut isize) {
     println!("Floppy disk formatted successfully with FAT12 filesystem");
 }
 
-fn cmd_dd_copy(input: &str, output: &str, _block_size: usize, _count: Option<usize>, vga_index: &mut isize) {
+fn cmd_dd_format_raw(vga_index: &mut isize) {
+    println!("Performing raw format (zero-fill) of floppy disk...");
+    
+    let floppy = Floppy;
+    let zero_sector = [0u8; 512];
+    
+    for sector in 0..2880 {
+        floppy.write_sector(sector, &zero_sector, vga_index);
+        
+        if sector % 288 == 0 {
+            print!("Progress: ", video::vga::Color::Yellow);
+            printn!((sector * 100 / 2880) as u64);
+            println!("%");
+        }
+    }
+    
+    println!("Raw format completed - disk zeroed");
+}
+
+fn cmd_dd_copy_enhanced(input: &str, output: &str, block_size: usize, count: Option<usize>, skip: usize, seek: usize, status: &str, vga_index: &mut isize) {
     let floppy = Floppy;
     
     match Fs::new(&floppy, vga_index) {
@@ -1069,17 +1133,60 @@ fn cmd_dd_copy(input: &str, output: &str, _block_size: usize, _count: Option<usi
                     fs.read_file(input_cluster as u16, &mut buffer, vga_index);
                     
                     let data_len = buffer.iter().position(|&x| x == 0).unwrap_or(512);
-                    let data_slice = &buffer[..data_len];
+                    
+                    let skip_bytes = skip * block_size;
+                    let seek_bytes = seek * block_size;
+                    
+                    if skip_bytes >= data_len {
+                        error!("Skip offset beyond file size\n");
+                        return;
+                    }
+                    
+                    let start_pos = skip_bytes;
+                    let max_copy_len = data_len - start_pos;
+                    
+                    let copy_len = if let Some(c) = count {
+                        core::cmp::min(c * block_size, max_copy_len)
+                    } else {
+                        max_copy_len
+                    };
+                    
+                    if copy_len == 0 {
+                        println!("No data to copy");
+                        return;
+                    }
+                    
+                    let data_slice = &buffer[start_pos..start_pos + copy_len];
+                    
+                    if status == "progress" || status == "noxfer" {
+                        print!("Copying ", video::vga::Color::Yellow);
+                        printn!(copy_len as u64);
+                        print!(" bytes (bs=", video::vga::Color::Yellow);
+                        printn!(block_size as u64);
+                        print!(", skip=", video::vga::Color::Yellow);
+                        printn!(skip as u64);
+                        print!(", seek=", video::vga::Color::Yellow);
+                        printn!(seek as u64);
+                        println!(")");
+                    }
                     
                     fs.write_file(config::PATH_CLUSTER, &output_filename, data_slice, vga_index);
                     
                     print!("Copied ", video::vga::Color::Green);
-                    printn!(data_len as u64);
+                    printn!(copy_len as u64);
                     print!(" bytes from ", video::vga::Color::Green);
                     printb!(input.as_bytes());
                     print!(" to ", video::vga::Color::Green);
                     printb!(output.as_bytes());
                     println!();
+                    
+                    if status == "progress" {
+                        let blocks_copied = (copy_len + block_size - 1) / block_size;
+                        printn!(blocks_copied as u64);
+                        print!(" blocks (", video::vga::Color::Cyan);
+                        printn!(block_size as u64);
+                        println!(" bytes each) copied");
+                    }
                 } else {
                     error!("Input file not found: ");
                     printb!(input.as_bytes());

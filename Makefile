@@ -75,7 +75,7 @@ build_floppy:
 		fat.img
 	@echo "Hello from floppy!" > /tmp/hello.txt
 	@mcopy -i fat.img /tmp/hello.txt ::HELLO.TXT 
-	@mcopy -i fat.img ./app.bin ::PRINT.BIN
+	@mcopy -i fat.img ./print.bin ::PRINT.BIN
 
 #
 #  RUN

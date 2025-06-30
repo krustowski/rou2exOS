@@ -5,3 +5,7 @@
 /iso/boot/kernel*
 /r2.iso
 /fat.img
+/*.bin
+/*.elf
+/*.out
+/*.o

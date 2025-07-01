@@ -36,8 +36,8 @@ nasm:
 		iso/boot/boot.asm
 	@nasm \
 		-f elf64 \
-		-o src/api/int_7f.o \
-		src/api/int_7f.asm
+		-o src/abi/int_7f.o \
+		src/abi/int_7f.asm
 
 link:
 	@ld.lld \
@@ -47,7 +47,7 @@ link:
 		--gc-sections \
 		-o iso/boot/kernel_text.elf \
 		iso/boot/boot.o \
-		src/api/int_7f.o \
+		src/abi/int_7f.o \
 		$(shell ls -t target/kernel_text/x86_64-r2/release/deps/kernel-*o | head -1)
 	@ld.lld \
 		--verbose \
@@ -56,7 +56,7 @@ link:
 		--gc-sections \
 		-o iso/boot/kernel_graphics.elf \
 		iso/boot/boot.o \
-		src/api/int_7f.o \
+		src/abi/int_7f.o \
 		$(shell ls -t target/kernel_graphics/x86_64-r2/release/deps/kernel-*o | head -1)
 
 build_iso:

@@ -186,6 +186,7 @@ idt_ptr:
     dw idt_end - idt_start - 1  
     dq idt_start            
 
+extern page_fault_handler
 idt_start:
     ; Page fault handler (vector 0x0E)
     dq page_fault_handler    
@@ -198,18 +199,6 @@ idt_start:
 
     times 256 dq 0            
 idt_end:
-
-; Page Fault Handler (INT 0x0E)
-page_fault_handler:
-    pusha                      
-
-    mov eax, [esp + 8]         ; Error code
-    mov ebx, [esp + 12]        ; Faulting address (CR2)
-
-    ; ...
-
-    popa                       
-    iret                       
 
 section .data 
 

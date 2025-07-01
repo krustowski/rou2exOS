@@ -1,11 +1,11 @@
-use crate::api::idt::{init_int7f, load_idt};
+use crate::abi::idt::{install_isrs, load_idt};
 
 pub fn get_result() -> super::result::InitResult {
-    debugln!("Loading IDT");
-    load_idt();
+    debugln!("Installing Exception handlers and ISRs");
+    install_isrs();
 
-    debugln!("Installing int 0x7f ISR");
-    init_int7f();
+    debugln!("Reloading IDT");
+    load_idt();
 
     super::result::InitResult::Passed
 }

@@ -2,7 +2,7 @@
 /// for interrupt 0x7f. 
 #[no_mangle]
 pub extern "C" fn syscall_handler() {
-    let (syscall_no, arg1, arg2): (u64, u64, u64);
+    let (syscall_no, arg1, arg2, ret): (u64, u64, u64, u64);
 
     unsafe {
         core::arch::asm!(
@@ -15,9 +15,25 @@ pub extern "C" fn syscall_handler() {
         );
     }
 
+    debug!("syscall_handler: called: ");
+    debugn!(syscall_no);
+    debug!(", arg1: ");
+    debugn!(arg1);
+    debug!(", arg2: ");
+    debugn!(arg2);
+    debug!("\n");
+
+    rprint!("syscall_handler: called: ");
+    rprintn!(syscall_no);
+    rprint!(", arg1: ");
+    rprintn!(arg1);
+    rprint!(", arg2: ");
+    rprintn!(arg2);
+    rprint!("\n");
+
     match syscall_no {
-        1 => {
-            debug!("Syscall 01 called!\n");
+        0x10 => {
+            // TODO: Verify the pointer!
 
             let ptr = arg1 as *const u8;
             let len = arg2 as usize;
@@ -25,23 +41,22 @@ pub extern "C" fn syscall_handler() {
 
             printb!(slice);
             println!("");
+
+            ret = 0;
         }
         _ => {
             debug!("Unknown syscall: ");
             debugn!(syscall_no);
-            debug!(", arg1: ");
-            debugn!(arg1);
-            debug!(", arg2: ");
-            debugn!(arg2);
             debugln!("");
+
+            ret = 0xff;
         }
     }
 
     unsafe {
         core::arch::asm!(
-            //"mov rax, {0}",
             "mov rax, {0}",
-            in(reg) 42u64,
+            in(reg) ret,
         );
     }
 }

@@ -3,13 +3,13 @@ use crate::{debug::dump_debug_log_to_file, init::{config::{p1_fb_table, p1_fb_ta
 } };
 use super::{result::InitResult};
 
-pub fn print_info(vga_index: &mut isize, multiboot_ptr: u64, mut fb_tag: &FramebufferTag) -> InitResult {
+pub fn print_info(multiboot_ptr: u64, mut fb_tag: &FramebufferTag) -> InitResult {
     unsafe {
         debug!("Multiboot2 pointer: ");
         debugn!(multiboot_ptr);
         debugln!("");
 
-        if parse_multiboot2_info(vga_index, (multiboot_ptr as u32) as usize, fb_tag) > 0 {
+        if parse_multiboot2_info((multiboot_ptr as u32) as usize, fb_tag) > 0 {
             return InitResult::Passed;
         }
     }
@@ -61,7 +61,7 @@ pub struct FramebufferTag {
     pub reserved: u16,
 }
 
-pub unsafe fn parse_multiboot2_info(_vga_index: &mut isize, base_addr: usize, mut fb_tag: &FramebufferTag) -> usize {
+pub unsafe fn parse_multiboot2_info(base_addr: usize, mut fb_tag: &FramebufferTag) -> usize {
     // Ensure alignment (Multiboot2 requires 8-byte aligned structure)
     let addr = align_up(base_addr, 8);
 
@@ -200,10 +200,14 @@ pub unsafe fn parse_multiboot2_info(_vga_index: &mut isize, base_addr: usize, mu
                             super::font::put_pixel(x, y, 0xdeadbeef, fb_ptr, 4096, 32);
                             }
                             }*/
+                    draw_rect(fb_ptr, 150, 150, 100, 100, 4096, 0x00ffffff);
+                    draw_rect(fb_ptr, 250, 250, 100, 100, 4096, 0x00ff0000);
+                    draw_rect(fb_ptr, 350, 350, 100, 100, 4096, 0x0000ff00);
+                    draw_rect(fb_ptr, 450, 450, 100, 100, 4096, 0x000000ff);
 
                     if let Some(font) = parse_psf(super::font::PSF_FONT) {
-                        draw_text_psf("[guest@rou2ex:/] > ", &font, 25, 30, 0xdeadbeef, fb_ptr, fb_tag.pitch as usize, fb_tag.bpp as usize);
-                        draw_text_psf("[guest@rou2ex:/] > ", &font, 25, 50, 0xdeadbeef, fb_ptr, fb_tag.pitch as usize, fb_tag.bpp as usize);
+                        draw_text_psf("[guest@rou2ex:/] > ", &font, 25, 30, 0x0000ff00, fb_ptr, fb_tag.pitch as usize, fb_tag.bpp as usize);
+                        draw_text_psf("[guest@rou2ex:/] > ", &font, 25, 50, 0x00ffd700, fb_ptr, fb_tag.pitch as usize, fb_tag.bpp as usize);
 
                         //draw_char("ABCDEFGHIJKLMNOPQRSTUVWXYZ", 35, 35, fb_ptr, fb_tag.pitch as usize, 0xdeadbeef, FONT_RAW);
                     }
@@ -212,7 +216,7 @@ pub unsafe fn parse_multiboot2_info(_vga_index: &mut isize, base_addr: usize, mu
                     //draw_text_psf("ABCDEFGHIJKLMNOPQRSTUVWXYZ",&FONT_RAW, 35, 35, 0x00ff00, fb_ptr, fb_tag.pitch, fb_tag.bpp);
                 }
 
-                dump_debug_log_to_file(&mut 0);
+                //dump_debug_log_to_file();
 
             }
             _ => {
@@ -236,4 +240,15 @@ pub unsafe fn parse_multiboot2_info(_vga_index: &mut isize, base_addr: usize, mu
 fn align_up(x: usize, align: usize) -> usize {
     (x + align - 1) & !(align - 1)
 }
+
+pub unsafe fn draw_rect(ptr: *mut u32, x0: usize, y0: usize, w: usize, h: usize, pitch: usize, color: u32) {
+    for y in y0..(y0 + h) {
+        for x in x0..(x0 + w) {
+            let offset = y * (pitch / 4) + x;
+
+            ptr.add(offset).write_volatile(color);
+        }
+    }
+}
+
 

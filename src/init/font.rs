@@ -32,7 +32,7 @@ pub fn print_result() -> super::result::InitResult {
 //
 //
 
-pub static PSF_FONT: &[u8] = include_bytes!("../../poppins.psf");
+pub static PSF_FONT: &[u8] = include_bytes!("../../terminus-font.psf");
 
 pub struct PsfFont<'a> {
     glyphs: &'a [u8],
@@ -81,7 +81,7 @@ fn draw_char_psf(font: &PsfFont, ch: u8, x: usize, y: usize, color: u32, framebu
                     unsafe { 
                         let offset = (y + row) * 4096 / 4 + (x + col);
 
-                        framebuffer.add(offset as usize).write_volatile(0xdeadbeef);
+                        framebuffer.add(offset as usize + 1).write_volatile(color);
                         //framebuffer.add(offset as usize + 1).write_volatile(0xfefab0);
                         //framebuffer.add(offset as usize + 2).write_volatile(0xdeadbeef);
                     }

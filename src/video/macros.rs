@@ -59,7 +59,7 @@ macro_rules! printn {
 
         if $arg == 0 {
             print!("0");
-            return;
+            //return 
         }
 
         let mut num = $arg;

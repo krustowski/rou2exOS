@@ -19,8 +19,8 @@ mod multiboot2;
 mod video;
 
 // Core kernel modules
+mod abi;
 mod acpi;
-mod api;
 mod app;
 mod audio;
 mod fs;
@@ -50,6 +50,7 @@ pub extern "C" fn kernel_main() {
 
     // Run the shell loop
     debugln!("Starting shell...");
+    println!("Starting shell...\n");
     input::keyboard::keyboard_loop();
 }
 

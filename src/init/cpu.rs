@@ -8,11 +8,30 @@ use super::result;
 pub fn check_mode() -> crate::init::result::InitResult {
     let mode = check_cpu_mode();
 
+    enable_sse();
+
     if mode.as_bytes().len() > 5 && mode.as_bytes()[0..4] == *b"Long" {
         return result::InitResult::Passed;
     }
 
     result::InitResult::Failed
+}
+
+fn enable_sse() {
+    unsafe {
+        // Enable SSE + FXSR in CR4
+        let mut cr4: u64;
+        asm!("mov {}, cr4", out(reg) cr4);
+        cr4 |= (1 << 9) | (1 << 10); // OSFXSR (bit 9), OSXMMEXCPT (bit 10)
+        asm!("mov cr4, {}", in(reg) cr4);
+
+        // Clear EM (bit 2), Set MP (bit 1) in CR0
+        let mut cr0: u64;
+        asm!("mov {}, cr0", out(reg) cr0);
+        cr0 &= !(1 << 2); // Clear EM (disable emulation)
+        cr0 |= 1 << 1;    // Set MP (monitor co-processor)
+        asm!("mov cr0, {}", in(reg) cr0);
+    }
 }
 
 /// Function to check CPU mode using CPUID instruction

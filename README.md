@@ -15,7 +15,8 @@ To run the OS, you can use the attached ISO image from any Release, and run it i
 # install Rust and its dependencies
 make init
 
-# make sure you have `xorriso`, `net-tools` and `grub2-tools` (or just grub-tools) installed (Linux)
+# make sure you have `xorriso`, `net-tools` and `grub2-tools` (or just grub-tools) 
+# installed (Linux)
 dnf install xorriso net-tools grub2-tools qemu qemu-common qemu-system-x86
 
 # compile the kernel and stage2 bootloader, link it into an ELF binary and bake into an ISO
@@ -26,10 +27,11 @@ make build
 make run_iso
 
 # create a floppy image and attach it to virtual machine (will enable filesystem-related features)
-# please do note that the floppy image is overwritten every time you hit dis target
+# please do note that the floppy image is overwritten every time you hit this target
 make run_iso_floppy
 
-# (alternative) run the kernel exclusively only (needs the `bootloader` dependency in Cargo.toml to be added)
+# (alternative) run the kernel exclusively only (needs the `bootloader` 
+# dependency in Cargo.toml to be added)
 cargo bootimage
 make run
 ```

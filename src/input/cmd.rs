@@ -1,22 +1,27 @@
 use crate::acpi;
 use crate::app;
 use crate::audio;
+use crate::fs::fat12::block::BlockDevice;
+use crate::fs::fat12::entry;
 use crate::init::config;
 use crate::debug;
-use crate::fs::fat12::{block::{Floppy, BlockDevice}, fs::Fs, check::run_check};
+use crate::fs::fat12::{block::{Floppy, BlockDevice}, fs::{Fs,Filesystem}, check::run_check};
+use crate::init::config::get_path;
 use crate::init::config::PATH_CLUSTER;
+use crate::init::result;
+use crate::input::keyboard::keyboard_loop;
 use crate::net;
 use crate::time;
 use crate::video;
 use crate::input::keyboard;
 use crate::tui::{widget::{Container, Window, Label}, app::TuiApp};
 
-const KERNEL_VERSION: &[u8] = b"0.8.0";
+const KERNEL_VERSION: &[u8] = b"0.8.1";
 
 struct Command {
     name: &'static [u8],
     description: &'static [u8],
-    function: fn(args: &[u8], vga_index: &mut isize),
+    function: fn(args: &[u8]),
     hidden: bool,
 }
 
@@ -136,6 +141,12 @@ static COMMANDS: &[Command] = &[
         hidden: false,
     },
     Command {
+        name: b"run",
+        description: b"loads the binary executable in memory and gives it the control",
+        function: cmd_run,
+        hidden: false,
+    },
+    Command {
         name: b"shutdown",
         description: b"shuts down the system",
         function: cmd_shutdown,
@@ -187,13 +198,13 @@ static COMMANDS: &[Command] = &[
 
 /// Handle takes in an input from keyboard and tries to match it to a defined Command to execute it
 /// with given arguments.
-pub fn handle(input: &[u8], vga_index: &mut isize) {
+pub fn handle(input: &[u8]) {
     let (cmd_name, cmd_args) = split_cmd(input);
 
     match find_cmd(cmd_name) {
         Some(cmd) => {
             // Call the command function
-            (cmd.function)(cmd_args, vga_index);
+            (cmd.function)(cmd_args);
         }
         None => {
             if input.is_empty() {
@@ -311,13 +322,13 @@ pub fn to_uppercase_ascii(input: &mut [u8; 11]) {
 //
 
 /// Used to test the sound module, plays the mystery melody.
-fn cmd_beep(_args: &[u8], _vga_index: &mut isize) {
+fn cmd_beep(_args: &[u8]) {
     audio::midi::play_melody();
     audio::beep::stop_beep();
 }
 
 /// Changes the current directory to one matching an input from keyboard.
-fn cmd_cd(args: &[u8], vga_index: &mut isize) {
+fn cmd_cd(args: &[u8]) {
     // 12 = name + extension + dot
     if args.len() == 0 || args.len() > 12 {
         unsafe {
@@ -341,10 +352,10 @@ fn cmd_cd(args: &[u8], vga_index: &mut isize) {
         slice.copy_from_slice(filename_input);
     }
 
-    let floppy = Floppy;
+    let floppy = Floppy::init();
 
     // Init the filesystem to look for a match
-    match Fs::new(&floppy, vga_index) {
+    match Filesystem::new(&floppy) {
         Ok(fs) => {
             let mut cluster: u16 = 0;
 
@@ -353,7 +364,7 @@ fn cmd_cd(args: &[u8], vga_index: &mut isize) {
                     if entry.name.starts_with(&filename_input) {
                         cluster = entry.start_cluster;
                     }
-                }, vga_index);
+                });
 
                 if cluster > 0 {
                     config::PATH_CLUSTER = cluster as u16;
@@ -371,39 +382,45 @@ fn cmd_cd(args: &[u8], vga_index: &mut isize) {
 }
 
 /// Clears the screen and starts the TCP server accepting connections on TCP/12345. 
-fn cmd_chat(args: &[u8], vga_index: &mut isize) {
-    crate::vga::screen::clear(vga_index);
+fn cmd_chat(args: &[u8]) {
+    clear_screen!();
 
     let mut ips = [[0u8; 4]; MAX_IPS];
     let count = parse_ip_args(args, &mut ips);
 
     if count > 0 {
-        app::chat::tcp::handle_conns(vga_index, &ips);
+        app::chat::tcp::handle_conns(&ips);
     } else {
         // Use dummy IP addresses to 
-        app::chat::tcp::handle_conns(vga_index, &[[0u8; 4]; 4]);
+        app::chat::tcp::handle_conns(&[[0u8; 4]; 4]);
     }
 }
 
 /// This just clears the whole screen with black background color.
-fn cmd_clear(_args: &[u8], _vga_index: &mut isize) {
+fn cmd_clear(_args: &[u8]) {
     clear_screen!();
 }
 
 /// Dumps the whole debug log to display and tries to write it to the DEBUG.TXT file too if
 /// filesystem is reachable.
-fn cmd_debug(_args: &[u8], vga_index: &mut isize) {
-    debug::dump_debug_log_to_file(vga_index);
+fn cmd_debug(_args: &[u8]) {
+    debug::dump_debug_log_to_file();
 }
 
 /// Prints the whole contents of the current directory.
-fn cmd_dir(_args: &[u8], vga_index: &mut isize) {
+fn cmd_dir(_args: &[u8]) {
     let floppy = Floppy;
 
-    match Fs::new(&floppy, vga_index) {
+    match Filesystem::new(&floppy) {
         Ok(fs) => {
             unsafe {
-                fs.list_dir(config::PATH_CLUSTER, &[b' '; 11], vga_index);
+                fs.for_each_entry(PATH_CLUSTER, | entry | {
+                    if entry.name[0] == 0x00 || entry.name[0] == 0xE5 || entry.name[0] == 0xFF {
+                        return;
+                    }
+
+                    fs.print_name(entry);
+                });
             }
         }
         Err(e) => {
@@ -414,13 +431,13 @@ fn cmd_dir(_args: &[u8], vga_index: &mut isize) {
 }
 
 /// Echos the arguments back to the display.
-fn cmd_echo(args: &[u8], _vga_index: &mut isize) {
+fn cmd_echo(args: &[u8]) {
     printb!(args);
     println!();
 }
 
 /// Runs a simplistic text editor.
-fn cmd_ed(args: &[u8], vga_index: &mut isize) {
+fn cmd_ed(args: &[u8]) {
     let (filename_input, _) = keyboard::split_cmd(args);
 
     if filename_input.len() == 0 || filename_input.len() > 12 {
@@ -437,22 +454,22 @@ fn cmd_ed(args: &[u8], vga_index: &mut isize) {
     //to_uppercase_ascii(&mut filename);
 
     // Run the editor
-    app::editor::edit_file(&filename, vga_index);
+    app::editor::edit_file(&filename);
     clear_screen!();
 }
 
 /// Experimental command function to test the Ethernet implementation.
-fn cmd_ether(_args: &[u8], vga_index: &mut isize) {
-    app::ether::handle_packet(vga_index);
+fn cmd_ether(_args: &[u8]) {
+    app::ether::handle_packet();
 }
 
 /// Filesystem check utility.
-fn cmd_fsck(_args: &[u8], vga_index: &mut isize) {
-    run_check(vga_index);
+fn cmd_fsck(_args: &[u8]) {
+    run_check();
 }
 
 /// Meta command to dump all non-hidden commands.
-fn cmd_help(_args: &[u8], _vga_index: &mut isize) {
+fn cmd_help(_args: &[u8]) {
     println!("List of commands:");
 
     for cmd in COMMANDS {
@@ -470,7 +487,7 @@ fn cmd_help(_args: &[u8], _vga_index: &mut isize) {
 }
 
 /// Experimental command function to test the HTTP over UDP implementation.
-fn cmd_http(_args: &[u8], _vga_index: &mut isize) {
+fn cmd_http(_args: &[u8]) {
     fn callback(packet: &[u8]) -> u8 {
         if let Some((ipv4_header, ipv4_payload)) = net::ipv4::parse_packet(packet) {
             // Match only UDP
@@ -500,7 +517,7 @@ fn cmd_http(_args: &[u8], _vga_index: &mut isize) {
 }
 
 /// Experimental command function to evaluate the current TUI rendering options.
-fn cmd_menu(_args: &[u8], _vga_index: &mut isize) {
+fn cmd_menu(_args: &[u8]) {
     // Working sample, but loops without exit
     //app::menu::menu_loop(vga_index);
 
@@ -533,7 +550,7 @@ fn cmd_menu(_args: &[u8], _vga_index: &mut isize) {
 }
 
 /// Creates new subdirectory in the current directory.
-fn cmd_mkdir(args: &[u8], vga_index: &mut isize) {
+fn cmd_mkdir(args: &[u8]) {
     if args.len() == 0 || args.len() > 11 {
         warn!("Usage: mkdir <dirname>\n");
         return;
@@ -541,7 +558,7 @@ fn cmd_mkdir(args: &[u8], vga_index: &mut isize) {
 
     let floppy = Floppy;
 
-    match Fs::new(&floppy, vga_index) {
+    match Filesystem::new(&floppy) {
         Ok(fs) => {
             let mut filename: [u8; 11] = [b' '; 11];
 
@@ -551,7 +568,7 @@ fn cmd_mkdir(args: &[u8], vga_index: &mut isize) {
 
             to_uppercase_ascii(&mut filename);
             unsafe {
-                fs.create_subdirectory(&filename, PATH_CLUSTER, vga_index);
+                fs.create_subdirectory(&filename, PATH_CLUSTER);
             }
         }
         Err(e) => {
@@ -562,15 +579,15 @@ fn cmd_mkdir(args: &[u8], vga_index: &mut isize) {
 }
 
 /// Renames given <old_name> to <new_name> in the current directory.
-fn cmd_mv(args: &[u8], vga_index: &mut isize) {
+fn cmd_mv(args: &[u8]) {
     if args.len() == 0 {
         warn!("Usage: mv <old> <new>");
         return;
     }
 
-    let floppy = Floppy;
+    let floppy = Floppy::init();
 
-    match Fs::new(&floppy, vga_index) {
+    match Filesystem::new(&floppy) {
         Ok(fs) => {
             let (old, new) = split_cmd(args);
 
@@ -596,7 +613,7 @@ fn cmd_mv(args: &[u8], vga_index: &mut isize) {
             to_uppercase_ascii(&mut new_filename);
 
             unsafe {
-                fs.rename_file(PATH_CLUSTER, &old_filename, &new_filename, vga_index);
+                fs.rename_file(PATH_CLUSTER, &old_filename, &new_filename);
             }
         }
         Err(e) => {
@@ -607,7 +624,7 @@ fn cmd_mv(args: &[u8], vga_index: &mut isize) {
 }
 
 /// Sends an ICMP Echo request to the provided IPv4 address.
-fn cmd_ping(args: &[u8], _vga_index: &mut isize) {
+fn cmd_ping(args: &[u8]) {
     // Extract the address(es) from the input
     let mut ips = [[0u8; 4]; MAX_IPS];
     let _count = parse_ip_args(args, &mut ips);
@@ -637,15 +654,15 @@ fn cmd_ping(args: &[u8], _vga_index: &mut isize) {
 
 /// This command function takes the argument, then tries to find a matching filename in the current
 /// directory, and finally it dumps its content to screen.
-fn cmd_read(args: &[u8], vga_index: &mut isize) {
+fn cmd_read(args: &[u8]) {
     if args.len() == 0 || args.len() > 11 {
         warn!("Usage: read <filename>\n");
         return;
     }
 
-    let floppy = Floppy;
+    let floppy = Floppy::init();
 
-    match Fs::new(&floppy, vga_index) {
+    match Filesystem::new(&floppy) {
         Ok(fs) => {
             let mut filename = [b' '; 11];
 
@@ -655,12 +672,14 @@ fn cmd_read(args: &[u8], vga_index: &mut isize) {
             to_uppercase_ascii(&mut filename);
 
             unsafe {
-                let cluster = fs.list_dir(config::PATH_CLUSTER, &filename, vga_index);
+                // TODO: tix this
+                //let cluster = fs.list_dir(config::PATH_CLUSTER, &filename);
+                let cluster = 0;
 
                 if cluster > 0 {
                     let mut buf = [0u8; 512];
 
-                    fs.read_file(cluster as u16, &mut buf, vga_index);
+                    fs.read_file(cluster as u16, &mut buf);
 
                     print!("Dumping file raw contents:\n", video::vga::Color::DarkYellow);
                     printb!(&buf);
@@ -679,7 +698,7 @@ fn cmd_read(args: &[u8], vga_index: &mut isize) {
 
 /// An experimental demonstration of the ICMP Echo request handler. The implementation sends ICMP
 /// Echo response back to the original sender via IPv4/SLIP.
-fn cmd_response(_args: &[u8], vga_index: &mut isize) {
+fn cmd_response(_args: &[u8]) {
     fn callback(packet: &[u8]) -> u8 {
         if let Some((ipv4_header, ipv4_payload)) = net::ipv4::parse_packet(packet) {
             // Match only ICMP packets
@@ -739,15 +758,15 @@ fn cmd_response(_args: &[u8], vga_index: &mut isize) {
 }
 
 /// Removes a file in the current directory according to the input.
-fn cmd_rm(args: &[u8], vga_index: &mut isize) {
+fn cmd_rm(args: &[u8]) {
     if args.len() == 0 || args.len() > 11 {
         warn!("Usage: rm <filename>\n");
         return;
     }
 
-    let floppy = Floppy;
+    let floppy = Floppy::init();
 
-    match Fs::new(&floppy, vga_index) {
+    match Filesystem::new(&floppy) {
         Ok(fs) => {
             let mut filename: [u8; 11] = [b' '; 11];
 
@@ -759,7 +778,7 @@ fn cmd_rm(args: &[u8], vga_index: &mut isize) {
             to_uppercase_ascii(&mut filename);
 
             unsafe {
-                fs.delete_file(PATH_CLUSTER, &filename, vga_index);
+                fs.delete_file(PATH_CLUSTER, &filename);
             }
         }
         Err(e) => {
@@ -769,9 +788,157 @@ fn cmd_rm(args: &[u8], vga_index: &mut isize) {
     }
 }
 
+fn cmd_run(args: &[u8]) {
+    if args.len() == 0 || args.len() > 12 {
+        warn!("usage: run <binary name>");
+        return;
+    }
+
+    // This split_cmd invocation trims the b'\0' tail from the input args.
+    let (filename_input, _) = keyboard::split_cmd(args);
+
+    if filename_input.len() == 0 || filename_input.len() > 12 {
+        warn!("Usage: run <binary name>\n");
+        return;
+    }
+
+    // 12 = filename + ext + dot
+    let mut filename = [b' '; 12];
+    if let Some(slice) = filename.get_mut(..filename_input.len()) {
+        slice.copy_from_slice(filename_input);
+    }
+
+    let floppy = Floppy::init();
+
+    // Init the filesystem to look for a match
+    match Filesystem::new(&floppy) {
+        Ok(fs) => {
+            unsafe {
+                let mut cluster: u16 = 0;
+                let mut offset = 0;
+                let mut size = 0;
+
+                fs.for_each_entry(config::PATH_CLUSTER, |entry| {
+                    if entry.name.starts_with(&filename_input) {
+                        cluster = entry.start_cluster;
+                        size = entry.file_size;
+                        return;
+                    }
+                });
+
+                rprint!("Size: ");
+                rprintn!(size);
+                rprint!("\n");
+
+                if cluster == 0 {
+                    error!("no such file found");
+                    error!();
+                    return;
+                }
+
+                let load_addr: usize = 0x600_000;
+
+                while size - offset > 0 {
+                    let lba = fs.cluster_to_lba(cluster);
+                    let mut sector = [0u8; 512];
+
+                    fs.device.read_sector(lba, &mut sector);
+
+                    let dst = load_addr as *mut u8;
+
+                    //core::ptr::copy_nonoverlapping(sector.as_ptr(), dst.add(offset as usize), 512.min((size - offset) as usize));
+
+                    //rprint!("loading binary data to memory segment\n");
+                    for i in 0..512 {
+                        if let Some(byte) = sector.get(i) {
+                            *dst.add(i + offset as usize) = *byte;
+                        }
+                    }
+
+                    cluster = fs.read_fat12_entry(cluster);
+
+                    rprint!("Cluster: ");
+                    rprintn!(cluster);
+                    rprint!("\n");
+
+                    if cluster >= 0xFF8 || cluster == 0 {
+                        break;
+                    }
+
+                    //rprint!("offset++\n");
+                    offset += 512;
+                }
+
+                //let entry: extern "C" fn(u32) -> u32 = core::mem::transmute((load_addr + 0x00) as *mut u8);
+                let entry: extern "C" fn(u32) -> u32 = core::mem::transmute((load_addr + 0x41) as *mut u8);
+                let arg: u32 = 5;
+
+                //let result = run_program(entry, arg);
+                let result = entry(arg);
+
+                rprint!("Program returned: ");
+                rprintn!(result);
+                rprint!("\n");
+
+            }
+        }
+        Err(e) => {
+            error!(e);
+            error!();
+        }
+    }
+}
+
+const USER_STACK_SIZE: usize = 0x8000; // 32 KiB
+static mut USER_STACK: [u8; USER_STACK_SIZE] = [0; USER_STACK_SIZE];
+
+unsafe extern "C" fn user_program_return() -> ! {
+    core::arch::asm!(
+        "mov rdi, rax",     
+        "jmp {handler}",
+        handler = sym handle_program_return,
+        options(noreturn)
+    );
+}
+
+extern "C" fn handle_program_return(retval: u64) {
+    rprint!("Program returned: ");
+    rprintn!(retval);
+    rprint!("\n");
+    
+    keyboard_loop();
+}
+
+unsafe fn run_program(entry: extern "C" fn(u32) -> u32, arg: u32) -> u32 {
+    let mut ret: u32;
+
+    // Get stack top
+    let user_stack_top = USER_STACK.as_ptr().add(USER_STACK_SIZE);
+
+    let return_addr = user_program_return() as usize;
+
+    core::arch::asm!(
+        "mov {old_rsp}, rsp",
+        "mov rsp, {stack}",
+        "push {ret_addr}",
+        "mov rdi, {arg:r}",
+        "call {entry}",
+        "mov rsp, {old_rsp}",
+        stack = in(reg) user_stack_top.offset(-8),
+        ret_addr = in(reg) return_addr,
+        entry = in(reg) entry,
+        old_rsp = lateout(reg) _,
+        arg = in(reg) arg,
+        out("rax") ret,
+        options(nostack),
+    );
+
+    ret
+}
+
 /// Experimental command function to demonstrate the current state of the shutdown process
 /// implemented.
-fn cmd_shutdown(_args: &[u8], _vga_index: &mut isize) {
+fn cmd_shutdown(_args: &[u8]) {
     print!("\n\n --- Shutting down the system", video::vga::Color::DarkCyan);
 
     // Burn some CPU time
@@ -789,17 +956,17 @@ fn cmd_shutdown(_args: &[u8], _vga_index: &mut isize) {
 }
 
 /// Meta command to run the Snake game.
-fn cmd_snake(_args: &[u8], vga_index: &mut isize) {
-    app::snake::menu::menu_loop(vga_index);
+fn cmd_snake(_args: &[u8]) {
+    app::snake::menu::menu_loop();
 }
 
 /// Experimental command function to demonstrate the implementation state of the TCP/IP stack.
-fn cmd_tcp(_args: &[u8], vga_index: &mut isize) {
-    app::tcp_handler::handle(vga_index);
+fn cmd_tcp(_args: &[u8]) {
+    app::tcp_handler::handle();
 }
 
 /// Prints current time and date in UTC as read from RTC in CMOS.
-fn cmd_time(_args: &[u8], _vga_index: &mut isize) {
+fn cmd_time(_args: &[u8]) {
     let (y, mo, d, h, m, s) = time::rtc::read_rtc_full();
 
     print!("RTC Time: ");
@@ -843,7 +1010,7 @@ fn cmd_time(_args: &[u8], _vga_index: &mut isize) {
 }
 
 /// Experimental command function to show the system uptime.
-fn cmd_uptime(_args: &[u8], vga_index: &mut isize) {
+fn cmd_uptime(_args: &[u8]) {
     let total_seconds = time::acpi::get_uptime_seconds();
 
     let h = total_seconds / 3600;
@@ -872,17 +1039,17 @@ fn cmd_uptime(_args: &[u8], vga_index: &mut isize) {
 }
 
 /// Prints system information set, mainly version and name.
-fn cmd_version(_args: &[u8], vga_index: &mut isize) {
+fn cmd_version(_args: &[u8]) {
     print!("Version: ");
     printb!(KERNEL_VERSION);
     println!();
 }
 
 /// Experimental command function to demonstrate the possibility of writing to files in FAT12 filesystem.
-fn cmd_write(args: &[u8], vga_index: &mut isize) {
-    let floppy = Floppy;
+fn cmd_write(args: &[u8]) {
+    let floppy = Floppy::init();
 
-    match Fs::new(&floppy, vga_index) {
+    match Filesystem::new(&floppy) {
         Ok(fs) => {
             let (filename, content) = split_cmd(args);
 
@@ -906,7 +1073,7 @@ fn cmd_write(args: &[u8], vga_index: &mut isize) {
             to_uppercase_ascii(&mut name);
 
             unsafe {
-                fs.write_file(PATH_CLUSTER, &name, content, vga_index);
+                fs.write_file(PATH_CLUSTER, &name, content);
             }
         }
         Err(e) => {

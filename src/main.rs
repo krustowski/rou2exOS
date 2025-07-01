@@ -19,6 +19,7 @@ mod multiboot2;
 mod video;
 
 // Core kernel modules
+mod abi;
 mod acpi;
 mod app;
 mod audio;
@@ -37,20 +38,20 @@ pub extern "C" fn kernel_main() {
     debugln!("Kernel loaded");
 
     // VGA buffer position (LEGACY)
-    let vga_index: &mut isize = &mut 0;
-    vga::screen::clear(vga_index);
+    clear_screen!();
 
-    // Instantiate new VGA Writer
+    // TODO: REmove: Instantiate new VGA Writer
     video::vga::init_writer();
 
     // Run init checks
     unsafe {
-        init::init(vga_index, init::config::multiboot_ptr as u64);
+        init::init(init::config::multiboot_ptr as u64);
     }
 
     // Run the shell loop
     debugln!("Starting shell...");
-    input::keyboard::keyboard_loop(vga_index);
+    println!("Starting shell...\n");
+    input::keyboard::keyboard_loop();
 }
 
 //

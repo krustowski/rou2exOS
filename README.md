@@ -5,11 +5,20 @@ A second iteration of the RoureXOS operating system, rewritten in Rust.
 + [Original RoureXOS (a blog post)](https://krusty.space/projects/rourexos/)
 + [rou2exOS Rusted Edition (a blog post)](https://blog.vxn.dev/rou2exos-rusted-edition)
 
-![rou2exOS startup](https://blog.vxn.dev/images/posts/rou2exos/cover.webp)
+The goal of this project is to make the rou2exOS kernel to follow the microkernel architecture. For purposes of the external program development, there are two key links to consider opening when thinking about extending the system:
 
-To run the OS, you can use the attached ISO image from any Release, and run it in QEMU emulator. The system was also tested on the x86_64 baremetal (booted from the USB flash disk).
++ [ABI specification document](/docs/ABI_OVERVIEW.md)
++ [Syscall client implementation examples](https://github.com/krustowski/rou2exOS-apps) (aka `rou2exOS` Apps)
 
-## How to build and run
+![rou2exOS startup](/.github/img/r2-kernel-boot.png)
+
+To run the OS, you can use the attached ISO image from any [Release](https://github.com/krustowski/rou2exOS/releases), and run it in QEMU emulator. The system was also tested on the x86_64 baremetal (booted from the USB flash disk). To enable the filesystem functionalities, attach a IMG file to QEMU as well (in virtual floppy drive A).
+
+```
+qemu-system-x86_64 -boot d -cdrom r2.iso -fda fat.img
+```
+
+## How to build and run from source
 
 ```shell
 # install Rust and its dependencies
@@ -67,5 +76,15 @@ response
 Now you should be able to ping the machine from your machine
 ```
 ping 192.168.3.2
+```
+
+## How to convert and import a font (graphics mode)
+
+Download a font (ideally in PSF format), add the selected font file into `src/video/fonts` as `console.psf`.
+
+To convert a font from BDF format use the `bdf2psf` utility (should be available in the Linux distro repos). We especially want to render the font to Framebuffer (`--fb` flag). An example command syntax is shown below.
+
+```shell
+bdf2psf --fb terminus-font-4.49.1/ter-u16b.bdf /usr/share/bdf2psf/standard.equivalents /usr/share/bdf2psf/ascii.set 256 console.psf
 ```
 

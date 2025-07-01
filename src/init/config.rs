@@ -26,6 +26,25 @@ pub fn get_path() -> &'static [u8] {
 //
 
 extern "C" {
+    pub static mut p4_table: [u64; 512];
+}
+
+extern "C" {
+    pub static p3_table: u64;
+}
+
+extern "C" {
+    pub static p2_table: u64;
+}
+
+extern "C" {
+    pub static mut p3_fb_table: [u64; 512];
+    pub static mut p2_fb_table: [u64; 512];
+    pub static mut p1_fb_table: [u64; 512];
+    pub static mut p1_fb_table_2: [u64; 512];
+}
+
+extern "C" {
     pub static multiboot_ptr: u32;
 }
 

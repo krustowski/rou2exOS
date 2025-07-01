@@ -1,4 +1,4 @@
-use crate::fs::fat12::{block::Floppy, fs::Fs, entry::Entry};
+use crate::fs::fat12::{block::Floppy, fs::Filesystem};
 use crate::init::config::PATH_CLUSTER;
 use crate::net::serial::ready;
 use crate::input::cmd;
@@ -16,7 +16,7 @@ static mut SHIFT_PRESSED: bool = false;
 static mut CAPS_LOCK_ON: bool = false;
 
 /// Internal function to assemble the prompt contents.
-fn render_prompt(_vga_index: &mut isize) {
+fn render_prompt() {
     let path = get_path() as &[u8];
 
     print!("[", vga::Color::Green);
@@ -72,16 +72,16 @@ pub fn keyboard_read_scancode() -> u8 {
 }
 
 /// Main command shell loop. 
-pub fn keyboard_loop(vga_index: &mut isize) {
+pub fn keyboard_loop() -> ! {
     let mut input_buffer = [0u8; INPUT_BUFFER_SIZE];
     let mut input_len = 0;
 
     let mut ctrl_down = false;
 
-    print!("\nStarting shell...\n\n");
+    //print!("\nStarting shell...\n\n");
 
     // Write prompt
-    render_prompt(vga_index);
+    render_prompt();
 
     loop {
         let key = keyboard_read_scancode();
@@ -113,13 +113,13 @@ pub fn keyboard_loop(vga_index: &mut isize) {
                     input_buffer = [0u8; 128];
                     input_len = 0;
 
-                    render_prompt(vga_index);
+                    render_prompt();
                     continue;
                 }
             }
             // Backspace key
             0x0E => {
-                handle_backspace(&mut input_len, vga_index);
+                handle_backspace(&mut input_len);
                 continue;
             }
             // Enter key
@@ -129,19 +129,19 @@ pub fn keyboard_loop(vga_index: &mut isize) {
 
                 // Extract the input from buffer and hand it to command handler
                 let input_slice = input_buffer.get(..input_len).unwrap_or(&[]);
-                cmd::handle(input_slice, vga_index);
+                cmd::handle(input_slice);
 
                 // Clear input buffer
                 input_buffer = [0u8; 128];
                 input_len = 0;
 
                 // Show new prompt
-                render_prompt(vga_index);
+                render_prompt();
                 continue;
             }
             // Tab key
             0x0F => {
-                handle_tab_completion(&mut input_buffer, &mut input_len, vga_index);
+                handle_tab_completion(&mut input_buffer, &mut input_len);
                 continue;
             }
             _ => {}
@@ -164,7 +164,7 @@ pub fn keyboard_loop(vga_index: &mut isize) {
 }
 
 /// Runs operations when the Backspace key has been pressed.
-fn handle_backspace(input_len: &mut usize, _vga_index: &mut isize) {
+fn handle_backspace(input_len: &mut usize) {
     if *input_len > 0 {
         *input_len -= 1;
 
@@ -173,7 +173,7 @@ fn handle_backspace(input_len: &mut usize, _vga_index: &mut isize) {
 }
 
 /// Runs specialized operations related to the Tab key.
-fn handle_tab_completion(input_buffer: &mut [u8; INPUT_BUFFER_SIZE], input_len: &mut usize, vga_index: &mut isize) {
+fn handle_tab_completion(input_buffer: &mut [u8; INPUT_BUFFER_SIZE], input_len: &mut usize) {
     let mut input_cpy = [0u8; 128];
     input_cpy.copy_from_slice(input_buffer);
 
@@ -182,14 +182,14 @@ fn handle_tab_completion(input_buffer: &mut [u8; INPUT_BUFFER_SIZE], input_len: 
 
     // Just render the help command output
     if prefix.len() == 0 {
-        cmd::handle(b"help", vga_index);
+        cmd::handle(b"help");
         return;
     }
 
-    let floppy = Floppy;
+    let floppy = Floppy::init();
     let mut found = false;
 
-    match Fs::new(&floppy, vga_index) {
+    match Filesystem::new(&floppy) {
         Ok(fs) => {
             unsafe {
                 if prefix.len() > 8 {
@@ -244,7 +244,7 @@ fn handle_tab_completion(input_buffer: &mut [u8; INPUT_BUFFER_SIZE], input_len: 
                             }
 
                             for _ in 0..prefix.len() {
-                                handle_backspace(input_len, vga_index);
+                                handle_backspace(input_len);
                             }
 
                             print!("", video::vga::Color::Magenta);
@@ -286,7 +286,7 @@ fn handle_tab_completion(input_buffer: &mut [u8; INPUT_BUFFER_SIZE], input_len: 
                             return;
                         }
                     }
-                }, &mut 0);
+                });
             }
         }
         Err(e) => {

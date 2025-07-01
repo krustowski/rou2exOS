@@ -16,18 +16,28 @@ build: compile_kernel nasm link build_iso
 #@cargo rustc --release --target x86_64-r2.json -- -C relocation-model=static --emit=obj
 compile_kernel:
 	@cargo rustc \
+		--features kernel_text \
+		--target-dir target/kernel_text \
 		--release \
 		-Z build-std=core,compiler_builtins \
 		--target x86_64-r2.json \
 		-- --emit=obj
-
+	@cargo rustc \
+		--features kernel_graphics \
+		--target-dir target/kernel_graphics \
+		--release \
+		-Z build-std=core,compiler_builtins \
+		--target x86_64-r2.json \
+		-- --emit=obj
 nasm:
 	@nasm \
 		-f elf64 \
 		-o iso/boot/boot.o \
 		iso/boot/boot.asm
-
-KERNEL_OBJ := $(shell ls -t target/x86_64-r2/release/deps/kernel-*.o | head -1)
+	@nasm \
+		-f elf64 \
+		-o src/abi/int_7f.o \
+		src/abi/int_7f.asm
 
 link:
 	@ld.lld \
@@ -35,8 +45,19 @@ link:
 		-T linker.ld \
 		-n \
 		--gc-sections \
-		-o iso/boot/kernel.elf \
-		${KERNEL_OBJ} iso/boot/boot.o
+		-o iso/boot/kernel_text.elf \
+		iso/boot/boot.o \
+		src/abi/int_7f.o \
+		$(shell ls -t target/kernel_text/x86_64-r2/release/deps/kernel-*o | head -1)
+	@ld.lld \
+		--verbose \
+		-T linker.ld \
+		-n \
+		--gc-sections \
+		-o iso/boot/kernel_graphics.elf \
+		iso/boot/boot.o \
+		src/abi/int_7f.o \
+		$(shell ls -t target/kernel_graphics/x86_64-r2/release/deps/kernel-*o | head -1)
 
 build_iso:
 	@grub2-mkrescue \
@@ -53,8 +74,8 @@ build_floppy:
 		-F 12 \
 		fat.img
 	@echo "Hello from floppy!" > /tmp/hello.txt
-	@mcopy \
-		-i fat.img /tmp/hello.txt ::HELLO.TXT
+	@mcopy -i fat.img /tmp/hello.txt ::HELLO.TXT 
+	@mcopy -i fat.img ./print.bin ::PRINT.BIN
 
 #
 #  RUN
@@ -90,6 +111,15 @@ run_iso_net:
 		-device rtl8139,netdev=net0 \
 		-serial pty
 
+PTY_NUMBER ?= pty
+run_iso_pty: 
+	@qemu-system-x86_64 \
+		-boot d \
+		-m 2G \
+		-vga std \
+		-cdrom r2.iso \
+		-serial ${PTY_NUMBER}
+
 run_iso_floppy: build_floppy
 	@qemu-system-x86_64 \
 		-boot d \
@@ -112,11 +142,10 @@ run_iso_floppy_drive:
 run_iso_debug: 
 	@qemu-system-x86_64 \
 		-boot d \
-		-m 2G \
-		-vga std \
+		-m 4G \
 		-cdrom r2.iso \
 		-fda fat.img \
-		-d int,cpu_reset \
+		-d int,cpu_reset,page \
 		-no-reboot \
 		-no-shutdown \
 		-serial stdio

@@ -12,9 +12,13 @@ The goal of this project is to make the rou2exOS kernel to follow the microkerne
 
 ![rou2exOS startup](/.github/img/r2-kernel-boot.png)
 
-To run the OS, you can use the attached ISO image from any Release, and run it in QEMU emulator. The system was also tested on the x86_64 baremetal (booted from the USB flash disk).
+To run the OS, you can use the attached ISO image from any [Release](https://github.com/krustowski/rou2exOS/releases), and run it in QEMU emulator. The system was also tested on the x86_64 baremetal (booted from the USB flash disk). To enable the filesystem functionalities, attach a IMG file to QEMU as well (in virtual floppy drive A).
 
-## How to build and run
+```
+qemu-system-x86_64 -boot d -cdrom r2.iso -fda fat.img
+```
+
+## How to build and run from source
 
 ```shell
 # install Rust and its dependencies

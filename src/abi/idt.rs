@@ -107,6 +107,22 @@ extern "C" fn page_fault_handler(stack_frame: u64, error_code: u64) {
     warn!("\nStack frame: ");
     printn!(stack_frame);
     print!("\n\n");
+
+    keyboard_loop();
+}
+
+#[no_mangle]
+#[link_section = ".text"]
+extern "C" fn general_protection_fault_handler(error_code: u64) {
+    unsafe {
+        error!("EXCEPTION: GENERAL PROTECTION FAULT");
+
+        warn!("\nError code: ");
+        printn!(error_code);
+        print!("\n\n");
+
+        keyboard_loop();
+    }
 }
 
 #[no_mangle]
@@ -174,6 +190,13 @@ pub fn install_isrs() {
         0b1110_1110,      // present, DPL=3, 64-bit interrupt gate
     );
 
+    let entry_0d = IdtEntry64::new(
+        general_protection_fault_handler as u64,
+        0x08,             
+        0,                
+        0b1110_1110,      // present, DPL=3, 64-bit interrupt gate
+    );
+
     let entry_0e = IdtEntry64::new(
         page_fault_handler as u64,
         0x08,             
@@ -191,6 +214,7 @@ pub fn install_isrs() {
     unsafe {
         IDT[0x06] = entry_06;
         IDT[0x08] = entry_08;
+        IDT[0x0d] = entry_0d;
         IDT[0x0e] = entry_0e;
         IDT[0x7f] = entry_7f;
     }

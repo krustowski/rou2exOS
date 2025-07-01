@@ -8,6 +8,8 @@ use crate::debug;
 use crate::fs::fat12::{block::Floppy, fs::Filesystem, check::run_check};
 use crate::init::config::get_path;
 use crate::init::config::PATH_CLUSTER;
+use crate::init::result;
+use crate::input::keyboard::keyboard_loop;
 use crate::net;
 use crate::time;
 use crate::video;
@@ -861,21 +863,13 @@ fn cmd_run(args: &[u8]) {
                     offset += 512;
                 }
 
+                //let entry: extern "C" fn(u32) -> u32 = core::mem::transmute((load_addr + 0x00) as *mut u8);
+                let entry: extern "C" fn(u32) -> u32 = core::mem::transmute((load_addr + 0x41) as *mut u8);
                 let arg: u32 = 5;
-                let result: u32;
 
-                /*core::arch::asm!(
-                    "mov rsp, {0}",
-                    "call {1}",
-                    in(reg) 0x700000usize, // stack top
-                    in(reg) 0x600000usize, // entry point
-                    lateout("rax") result
-                );*/
+                //let result = run_program(entry, arg);
+                let result = entry(arg);
 
-                //let entry: EntryFn = core::mem::transmute(BINARY_START);
-                let entry: extern "C" fn(u32) -> u32 = core::mem::transmute(load_addr as *mut u8);
-                result = entry(arg);
-                
                 rprint!("Program returned: ");
                 rprintn!(result);
                 rprint!("\n");
@@ -887,6 +881,53 @@ fn cmd_run(args: &[u8]) {
             error!();
         }
     }
+}
+
+const USER_STACK_SIZE: usize = 0x8000; // 32 KiB
+static mut USER_STACK: [u8; USER_STACK_SIZE] = [0; USER_STACK_SIZE];
+
+unsafe extern "C" fn user_program_return() -> ! {
+    core::arch::asm!(
+        "mov rdi, rax",     
+        "jmp {handler}",
+        handler = sym handle_program_return,
+        options(noreturn)
+    );
+}
+
+extern "C" fn handle_program_return(retval: u64) {
+    rprint!("Program returned: ");
+    rprintn!(retval);
+    rprint!("\n");
+    
+    keyboard_loop();
+}
+
+unsafe fn run_program(entry: extern "C" fn(u32) -> u32, arg: u32) -> u32 {
+    let mut ret: u32;
+
+    // Get stack top
+    let user_stack_top = USER_STACK.as_ptr().add(USER_STACK_SIZE);
+
+    let return_addr = user_program_return() as usize;
+
+    core::arch::asm!(
+        "mov {old_rsp}, rsp",
+        "mov rsp, {stack}",
+        "push {ret_addr}",
+        "mov rdi, {arg:r}",
+        "call {entry}",
+        "mov rsp, {old_rsp}",
+        stack = in(reg) user_stack_top.offset(-8),
+        ret_addr = in(reg) return_addr,
+        entry = in(reg) entry,
+        old_rsp = lateout(reg) _,
+        arg = in(reg) arg,
+        out("rax") ret,
+        options(nostack),
+    );
+
+    ret
 }
 
 /// Experimental command function to demonstrate the current state of the shutdown process

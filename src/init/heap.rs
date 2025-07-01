@@ -3,7 +3,7 @@ use core::ptr;
 
 use super::result::InitResult;
 
-pub fn print_result(vga_index: &mut isize) -> InitResult {
+pub fn print_result() -> InitResult {
     if !init_heap_allocator() {
         return InitResult::Failed;
     }

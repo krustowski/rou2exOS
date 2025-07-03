@@ -38,6 +38,10 @@ nasm:
 		-f elf64 \
 		-o src/abi/int_7f.o \
 		src/abi/int_7f.asm
+	@nasm \
+		-f elf64 \
+		-o src/abi/int_80.o \
+		src/abi/int_80.asm
 
 link:
 	@ld.lld \
@@ -48,6 +52,7 @@ link:
 		-o iso/boot/kernel_text.elf \
 		iso/boot/boot.o \
 		src/abi/int_7f.o \
+		src/abi/int_80.o \
 		$(shell ls -t target/kernel_text/x86_64-r2/release/deps/kernel-*o | head -1)
 	@ld.lld \
 		--verbose \
@@ -57,6 +62,7 @@ link:
 		-o iso/boot/kernel_graphics.elf \
 		iso/boot/boot.o \
 		src/abi/int_7f.o \
+		src/abi/int_80.o \
 		$(shell ls -t target/kernel_graphics/x86_64-r2/release/deps/kernel-*o | head -1)
 
 build_iso:
@@ -76,6 +82,8 @@ build_floppy:
 	@echo "Hello from floppy!" > /tmp/hello.txt
 	@mcopy -i fat.img /tmp/hello.txt ::HELLO.TXT 
 	@mcopy -i fat.img ./print.bin ::PRINT.BIN
+	@mcopy -i fat.img ./print.elf ::PRINT.ELF
+	@mcopy -i fat.img ./go.elf ::GO.ELF
 
 #
 #  RUN

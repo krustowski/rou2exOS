@@ -9,6 +9,7 @@ pub fn check_mode() -> crate::init::result::InitResult {
     let mode = check_cpu_mode();
 
     enable_sse();
+    enable_syscalls();
 
     if mode.as_bytes().len() > 5 && mode.as_bytes()[0..4] == *b"Long" {
         return result::InitResult::Passed;
@@ -67,3 +68,62 @@ fn cpuid(eax: u32) -> u32 {
     }
     result
 }
+
+//
+//  CPU SYSCALL
+//
+
+const IA32_EFER: u32 = 0xC0000080;
+const IA32_LSTAR: u32 = 0xC0000082;
+
+unsafe fn wrmsr(msr: u32, value: u64) {
+    let low = value as u32;
+    let high = (value >> 32) as u32;
+    asm!(
+        "wrmsr",
+        in("ecx") msr,
+        in("eax") low,
+        in("edx") high,
+        options(nostack, preserves_flags)
+    );
+}
+
+unsafe fn rdmsr(msr: u32) -> u64 {
+    let low: u32;
+    let high: u32;
+    asm!(
+        "rdmsr",
+        in("ecx") msr,
+        out("eax") low,
+        out("edx") high,
+        options(nostack, preserves_flags)
+    );
+    ((high as u64) << 32) | (low as u64)
+}
+
+// Your syscall handler (just returns for now)
+#[unsafe(naked)]
+unsafe extern "C" fn syscall_handler() -> () {
+    core::arch::naked_asm!(
+        "swapgs",           // swap GS base to kernel GS base
+        "push rcx",         // save RCX (return RIP)
+        "push r11",         // save R11 (RFLAGS)
+        // here you could call Rust code or handle syscall number in rax
+        "pop r11",
+        "pop rcx",
+        "sysretq",
+    );
+}
+
+fn enable_syscalls() {
+    unsafe {
+        // Set IA32_LSTAR to syscall_handler address
+        wrmsr(IA32_LSTAR, syscall_handler as u64);
+
+        // Enable syscall/sysret in EFER (bit 0 = SCE)
+        let mut efer = rdmsr(IA32_EFER);
+        efer |= 1;  // set SCE bit
+        wrmsr(IA32_EFER, efer);
+    }
+}
+

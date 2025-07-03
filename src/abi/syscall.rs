@@ -1,3 +1,5 @@
+use crate::input::{elf::kernel_return};
+
 /// This function is the syscall ABI dispatching routine. It is called exclusively from the ISR 
 /// for interrupt 0x7f. 
 #[no_mangle]
@@ -33,6 +35,18 @@ pub extern "C" fn syscall_handler() {
     rprint!("\n");
 
     match syscall_no {
+        0x00 => {
+            // PROCESS/TASK EXIT 
+            unsafe {
+                core::arch::asm!(
+                    //"mov rsp, $0x190000",
+                    "mov rdi, {0}",
+                    "jmp kernel_return",
+                    in(reg) arg1
+                );
+            };
+        }
+
         0x10 => {
             // TODO: Verify the pointer!
 

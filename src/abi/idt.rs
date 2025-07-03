@@ -177,6 +177,7 @@ pub fn load_idt() {
     }
 }
 
+/// https://phrack.org/issues/59/4
 pub fn install_isrs() {
     let entry_06 = IdtEntry64::new(
         invalid_opcode_handler as u64,
@@ -208,7 +209,7 @@ pub fn install_isrs() {
 
     let entry_7f = IdtEntry64::new(
         int7f_isr as u64,
-        0x1b,             
+        0x08,
         0,                
         0b1110_1110,      // present, DPL=3, 64-bit interrupt gate
     );

@@ -69,7 +69,7 @@ align 16
 global tss64
 tss64:
     resb 104
-
+    
 align 4
 global multiboot_ptr
 multiboot_ptr:
@@ -103,8 +103,8 @@ global p1_fb_table_2
 
 global gdt_start
 global gdt_end
-global gdt_tss_descriptor
 global gdt_descriptor
+global gdt_tss_descriptor
 global idt_ptr
 
 global debug_flag
@@ -331,50 +331,50 @@ set_up_page_tables:
 
     ; Identity-map 
 
-    mov eax, p1_page_tables
-    or eax, PAGE_FLAGS
-    mov [p2_table + 1 * 8], eax  
-    mov dword [p2_table + 1 * 8 + 4], 0
+;    mov eax, p1_page_tables
+;    or eax, PAGE_FLAGS
+;    mov [p2_table + 1 * 8], eax  
+;    mov dword [p2_table + 1 * 8 + 4], 0
 
-    mov eax, p1_page_tables_2
-    or eax, PAGE_FLAGS
-    mov [p2_table + 2 * 8], eax  
-    mov dword [p2_table + 2 * 8 + 4], 0
+;    mov eax, p1_page_tables_2
+;    or eax, PAGE_FLAGS
+;    mov [p2_table + 2 * 8], eax  
+;    mov dword [p2_table + 2 * 8 + 4], 0
 
-    xor ecx, 0
-.map_self:
-    mov eax, 0x131000        
-    add eax, ecx
-    or eax, PAGE_FLAGS
-    mov edi, p1_page_tables
-    mov ebx, ecx
-    shr ebx, 12
-    shl ebx, 3
-    add edi, ebx
+;    xor ecx, 0
+;.map_self:
+;    mov eax, 0x131000        
+;    add eax, ecx
+;    or eax, PAGE_FLAGS
+;    mov edi, p1_page_tables
+;    mov ebx, ecx
+;    shr ebx, 12
+;    shl ebx, 3
+;    add edi, ebx
 
-    mov [edi], eax
-    mov dword [edi + 4], 0
+;    mov [edi], eax
+;    mov dword [edi + 4], 0
 
-    add ecx, 0x1000
-    cmp ecx, 0x40000
-    jb .map_self
+;    add ecx, 0x1000
+;    cmp ecx, 0x80000
+;    jb .map_self
 
-.map_self_2:
-    mov eax, 0x13e000        
-    add eax, ecx
-    or eax, PAGE_FLAGS
-    mov edi, p1_page_tables_2
-    mov ebx, ecx
-    shr ebx, 12
-    shl ebx, 3
-    add edi, ebx
+;.map_self_2:
+;    mov eax, 0x13e000        
+;    add eax, ecx
+;    or eax, PAGE_FLAGS
+;    mov edi, p1_page_tables_2
+;    mov ebx, ecx
+;    shr ebx, 12
+;    shl ebx, 3
+;    add edi, ebx
 
-    mov [edi], eax
-    mov dword [edi + 4], 0
+;    mov [edi], eax
+;    mov dword [edi + 4], 0
 
-    add ecx, 0x1000
-    cmp ecx, 0x40000
-    jb .map_self_2
+;    add ecx, 0x1000
+;    cmp ecx, 0x40000
+;    jb .map_self_2
 
     ; Framebuffer init
 
@@ -488,7 +488,7 @@ long_mode_entry:
     mov ss, ax
 
     ; Clear the stack
-    mov rsp, 0x80_000
+    mov rsp, 0x190000
     call kernel_main
 
     hlt

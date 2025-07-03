@@ -1,5 +1,7 @@
+;
 ; boot.asm
 ; NASM syntax - stage2 bootloader to set GDT, IDT and memory paging before jumping into 64bit mode
+;
 
 BITS 32
 
@@ -28,6 +30,11 @@ p2_table:
 p1_page_tables:     
 	resb 4096
 p1_page_tables_2:   
+	resb 4096
+
+p1_userspace_0:
+	resb 4096
+p1_userspace_1:
 	resb 4096
 
 p3_fb_table:
@@ -59,10 +66,9 @@ ist1_stack:
 ist1_stack_top:
 
 align 16
-tss:
-    ; TSS layout: 104 bytes 
+global tss64
+tss64:
     resb 104
-tss_end:
 
 align 4
 global multiboot_ptr
@@ -75,7 +81,7 @@ stack_bottom:
 stack_top:
 
 ;
-;
+;  Text Section + Absolute Kernel Entry Point
 ;
 
 section .text
@@ -95,6 +101,9 @@ global p2_fb_table
 global p1_fb_table
 global p1_fb_table_2
 
+global gdt_start
+global gdt_end
+global gdt_tss_descriptor
 global gdt_descriptor
 global idt_ptr
 
@@ -114,6 +123,7 @@ _start:
 
     mov dword [0xb8000 + 80], 0x2f4b2f4f
 
+    ;call load_tss
     call load_gdt
     call load_idt
 
@@ -138,7 +148,7 @@ load_gdt:
 load_tss:
     ; Set IST1 stack pointer
     mov eax, ist1_stack_top
-    mov [tss + 36], eax
+    mov [gdt_tss_descriptor + 36], eax
 
     mov ax, 0x28
     ltr ax
@@ -149,11 +159,12 @@ load_idt:
     ret
 
 ;
-;
+;  Global Descriptor Table + Task State Segment
 ;
 
 section .rodata
 align 8
+
 gdt_start:
     ; Null descriptor
     dq 0x0000000000000000
@@ -170,16 +181,25 @@ gdt_start:
     ; User data segment (offset 0x20)
     dq 0x00aff2000000ffff
 
-gdt_tss_low: 
-    dq 0
-gdt__tss_high:
-    dq 0
+gdt_tss_descriptor:
+    dw 0x0067                 ; limit
+    dw 0                      ; base low 16 (will patch)
+    db 0                      ; base mid 8 (will patch)
+    db 0x89                   ; access byte
+    db 0                      ; flags + limit high nibble
+    db 0                      ; base high 8
+    dd 0                      ; base upper 32 bits
+    dd 0                      ; reserved
 
 gdt_end:
 
 gdt_descriptor:
     dw gdt_end - gdt_start - 1
     dq gdt_start
+
+;
+;  Interrupt Descriptor Table
+;
 
 ; Define a 256-entry dummy IDT (null handlers)
 idt_ptr:
@@ -200,6 +220,10 @@ idt_start:
     times 256 dq 0            
 idt_end:
 
+;
+;
+;
+
 section .data 
 
 FB_P1_TABLES:
@@ -209,7 +233,7 @@ FB_P1_TABLES:
     dq p1_fb_table_3
 
 ;
-;
+;  Page Tables Zeroing & Mapping
 ;
 
 section .text
@@ -261,15 +285,21 @@ set_up_page_tables:
     lea edi, [p1_page_tables]
     call zero_table
 
+    lea edi, [p1_userspace_0]
+    call zero_table
+
+    lea edi, [p1_userspace_1]
+    call zero_table
+
     ; Map P4[0] → P3
     mov eax, p3_table
-    or eax, PAGE_FLAGS
+    or eax, 0b111
     mov [p4_table + 0 * 8], eax
     mov dword [p4_table + 0 * 8 + 4], 0
 
     ; Map P3[0] → P2
     mov eax, p2_table
-    or eax, PAGE_FLAGS
+    or eax, 0b111
     mov [p3_table + 0 * 8], eax
     mov dword [p3_table + 0 * 8 + 4], 0
 
@@ -286,6 +316,18 @@ set_up_page_tables:
     inc ecx
     cmp ecx, 512
     jne .map_1gib
+
+    ; Allow CPL=3 access at 0x600_000--0x800_000
+
+    mov eax, 0x600000
+    or eax, 0b11100111
+    mov [p2_table + 3 * 8], eax
+    mov dword [p2_table + 3 * 8 + 4], 0 
+
+    mov eax, 0x800000
+    or eax, 0b11100111
+    mov [p2_table + 4 * 8], eax
+    mov dword [p2_table + 4 * 8 + 4], 0 
 
     ; Identity-map 
 
@@ -424,36 +466,14 @@ enable_paging:
     mov cr0, eax
 
     ret
+
 ;
-;
+;  Long Mode Entry Point
 ;
 
 BITS 64
 
 section .text
-
-enable_paging_64:
-    mov rax, pml4_table
-    mov cr3, rax
-
-    ; CR4: enable PAE
-    mov rax, cr4
-    or rax, 1 << 5        
-    mov cr4, rax
-
-    ; EFER: enable long mode
-    mov ecx, 0xC0000080   ; EFER MSR
-    rdmsr
-    or eax, 1 << 8        ; LME
-    wrmsr
-
-    ; CR0: enable paging
-    mov rax, cr0
-    or rax, 1 << 31       ; PG
-    mov cr0, rax
-
-    ret
-
 
 long_mode_entry:
     ; TLB flush
@@ -467,8 +487,8 @@ long_mode_entry:
     mov gs, ax
     mov ss, ax
 
-    ; Clear the stack (assume there'S 1MB+ memory)
-    mov rsp, 0x80000
+    ; Clear the stack
+    mov rsp, 0x80_000
     call kernel_main
 
     hlt

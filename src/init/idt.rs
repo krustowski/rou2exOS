@@ -1,3 +1,5 @@
+use x86_64::registers::debug;
+
 use crate::abi::idt::{install_isrs, load_idt};
 
 pub fn get_result() -> super::result::InitResult {
@@ -7,8 +9,12 @@ pub fn get_result() -> super::result::InitResult {
     debugln!("Reloading IDT");
     load_idt();
 
+    debugln!("Initializing TSS");
+    init_tss();
+
     debugln!("Resetting TSS");
-    setup_tss_descriptor(0x90_000, 0x67);
+    let base_addr = unsafe { &tss64 as *const Tss64 as u64 };
+    setup_tss_descriptor(base_addr as u64, 0x67);
 
     debugln!("Reloading GDT");
     reload_gdt();
@@ -20,7 +26,7 @@ pub fn get_result() -> super::result::InitResult {
 }
 
 extern "C" {
-    static mut tss64: [u8; 104];
+    static mut tss64: Tss64;
     static mut gdt_start: u8;
     static mut gdt_end: u8;
     static mut gdt_tss_descriptor: [u8; 16];
@@ -86,8 +92,6 @@ fn make_tss_descriptor(base: u64, limit: u32) -> [u8; 16] {
     // Flags: limit high 4 bits + granularity + 64-bit flag + others
     desc[6] = ((limit >> 16) & 0xF) as u8;
 
-    // For TSS, the G (granularity) bit and L (64-bit) bit are zero, so just limit bits
-
     // Base high 8 bits
     desc[7] = ((base >> 24) & 0xFF) as u8;
 
@@ -106,3 +110,37 @@ fn make_tss_descriptor(base: u64, limit: u32) -> [u8; 16] {
     desc
 }
 
+#[repr(C, packed)]
+struct Tss64 {
+    reserved0: u32,
+    rsp0: u64,
+    rsp1: u64,
+    rsp2: u64,
+    reserved1: u64,
+    ist1: u64,
+    ist2: u64,
+    ist3: u64,
+    ist4: u64,
+    ist5: u64,
+    ist6: u64,
+    ist7: u64,
+    reserved2: u64,
+    reserved3: u16,
+    io_map_base: u16,
+}
+
+fn init_tss() {
+    unsafe {
+        // Zero out the whole TSS first (probably redundant if in .bss)
+        core::ptr::write_bytes(&mut tss64 as *mut _ as *mut u8, 0, core::mem::size_of::<Tss64>());
+
+        // Set kernel stack (top) pointer for ring 0 (rsp0)
+        tss64.rsp0 = 0x190000;
+
+        // IST pointers (interrupt stacks)
+        // tss64.ist1 = some_stack_address;
+
+        // IO Map base: set to size of TSS to disable IO bitmap
+        tss64.io_map_base = core::mem::size_of::<Tss64>() as u16;
+    }
+}

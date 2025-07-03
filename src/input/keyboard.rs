@@ -72,7 +72,8 @@ pub fn keyboard_read_scancode() -> u8 {
 }
 
 /// Main command shell loop. 
-pub fn keyboard_loop() -> ! {
+#[unsafe(no_mangle)]
+pub extern "C" fn keyboard_loop() -> ! {
     let mut input_buffer = [0u8; INPUT_BUFFER_SIZE];
     let mut input_len = 0;
 

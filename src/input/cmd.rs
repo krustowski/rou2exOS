@@ -813,7 +813,7 @@ fn cmd_run(args: &[u8]) {
                 let mut size = 0;
 
                 fs.for_each_entry(config::PATH_CLUSTER, |entry| {
-                    if entry.name.starts_with(&filename_input) {
+                    if entry.name.starts_with(&filename_input) && entry.ext.starts_with(b"ELF") {
                         cluster = entry.start_cluster;
                         size = entry.file_size;
                         return;
@@ -830,7 +830,7 @@ fn cmd_run(args: &[u8]) {
                     return;
                 }
 
-                let load_addr: usize = 0x600_000;
+                let load_addr: u64 = 0x690_000;
 
                 while size - offset > 0 {
                     let lba = fs.cluster_to_lba(cluster);
@@ -842,7 +842,7 @@ fn cmd_run(args: &[u8]) {
 
                     //core::ptr::copy_nonoverlapping(sector.as_ptr(), dst.add(offset as usize), 512.min((size - offset) as usize));
 
-                    //rprint!("loading binary data to memory segment\n");
+                    rprint!("Loading ELF image to memory segment\n");
                     for i in 0..512 {
                         if let Some(byte) = sector.get(i) {
                             *dst.add(i + offset as usize) = *byte;
@@ -863,17 +863,53 @@ fn cmd_run(args: &[u8]) {
                     offset += 512;
                 }
 
-                //let entry: extern "C" fn(u32) -> u32 = core::mem::transmute((load_addr + 0x00) as *mut u8);
-                let entry: extern "C" fn(u32) -> u32 = core::mem::transmute((load_addr + 0x41) as *mut u8);
-                let arg: u32 = 5;
+                let arg: u64 = 555;
+                //let result: u32;
 
-                //let result = run_program(entry, arg);
-                let result = entry(arg);
+                //let entry_ptr = (load_addr + 0x18) as *const u64;
+                //let entry_addr = *entry_ptr;
+                //let entry_addr = core::ptr::read_unaligned((load_addr + 0x18) as *const u64);
+                let entry_ptr = (load_addr + 0x18) as *const u8;
 
-                rprint!("Program returned: ");
-                rprintn!(result);
+                rprint!("First 16 bytes (load_addr + 0x18): ");
+                for i in 0..16 {
+                    rprintn!(*(entry_ptr as *const u8).add(i));
+                    rprint!(" ");
+                }
                 rprint!("\n");
 
+                /*let entry_addr = u64::from_le_bytes([
+                    *entry_ptr.add(0),
+                    *entry_ptr.add(1),
+                    *entry_ptr.add(2),
+                    *entry_ptr.add(3),
+                    *entry_ptr.add(4),
+                    *entry_ptr.add(5),
+                    *entry_ptr.add(6),
+                    *entry_ptr.add(7),
+                ]);*/
+
+                // assume `elf_image` is a pointer to the loaded ELF file in memory
+                let entry_addr = super::elf::load_elf64(load_addr as usize);
+
+                rprint!("ELF entry point: ");
+                rprintn!(entry_addr);
+                rprint!("\n");
+
+                let stack_top = 0x700000;
+
+                // cast and jump
+                let entry_fn: extern "C" fn() -> u64 = core::mem::transmute(entry_addr as *const ());
+
+                rprint!("Jumping to the program entry point...\n");
+                //prg_fn();
+                //super::elf::jump_to_elf(entry_fn, stack_top);
+                super::elf::jump_to_elf(entry_fn, stack_top, arg);
+
+                //let entry: extern "C" fn(u32) -> u32 = core::mem::transmute((load_addr + 0x41) as *mut u8);
+
+                //let result = run_program(entry, arg);
+                //let result = entry(arg);
             }
         }
         Err(e) => {
@@ -899,7 +935,7 @@ extern "C" fn handle_program_return(retval: u64) {
     rprint!("Program returned: ");
     rprintn!(retval);
     rprint!("\n");
-    
+
     keyboard_loop();
 }
 

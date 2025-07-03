@@ -84,6 +84,7 @@ idt
 
 extern "C" {
     fn int7f_isr();
+    fn syscall_80h();
 }
 
 
@@ -149,6 +150,7 @@ extern "C" fn invalid_opcode_handler(stack_frame: *mut InterruptStackFrame) {
 #[link_section = ".text"]
 extern "C" fn double_fault_handler(stack_frame: InterruptStackFrame, error_code: u64) -> ! {
     error!("EXCEPTION: DOUBLE FAULT");
+
     warn!("\nError Code: ");
     printn!(error_code);
     warn!("\nStack frame: ");
@@ -206,7 +208,14 @@ pub fn install_isrs() {
 
     let entry_7f = IdtEntry64::new(
         int7f_isr as u64,
-        0x08,             
+        0x1b,             
+        0,                
+        0b1110_1110,      // present, DPL=3, 64-bit interrupt gate
+    );
+
+    let entry_80 = IdtEntry64::new(
+        syscall_80h as u64,
+        0x1b,             
         0,                
         0b1110_1110,      // present, DPL=3, 64-bit interrupt gate
     );
@@ -217,6 +226,7 @@ pub fn install_isrs() {
         IDT[0x0d] = entry_0d;
         IDT[0x0e] = entry_0e;
         IDT[0x7f] = entry_7f;
+        IDT[0x80] = entry_80;
     }
 }
 

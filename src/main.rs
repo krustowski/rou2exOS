@@ -28,6 +28,7 @@ mod init;
 mod input;
 mod mem;
 mod net;
+mod task;
 mod time;
 mod tui;
 mod vga;

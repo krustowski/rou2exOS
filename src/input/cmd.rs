@@ -159,6 +159,18 @@ static COMMANDS: &[Command] = &[
         hidden: false,
     },
     Command {
+        name: b"task",
+        description: b"starts a simple task scheduler",
+        function: cmd_task,
+        hidden: true,
+    },
+    Command {
+        name: b"tasks",
+        description: b"lists currently running tasks",
+        function: cmd_tasks,
+        hidden: true,
+    },
+    Command {
         name: b"tcp",
         description: b"tests the TCP implementation",
         function: cmd_tcp,
@@ -988,6 +1000,14 @@ fn cmd_shutdown(_args: &[u8]) {
 /// Meta command to run the Snake game.
 fn cmd_snake(_args: &[u8]) {
     app::snake::menu::menu_loop();
+}
+
+fn cmd_task(_args: &[u8]) {
+    crate::task::task::run_scheduler();
+}
+
+fn cmd_tasks(_args: &[u8]) {
+    crate::task::task::status();
 }
 
 /// Experimental command function to demonstrate the implementation state of the TCP/IP stack.

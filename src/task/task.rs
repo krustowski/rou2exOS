@@ -83,10 +83,10 @@ fn add_task(entry: extern "C" fn()) {
         rbx: 0, 
         rax: 0,
         rip: entry as usize,
-        cs: 0x08,    
+        cs: 0x1b,
         rflags: 0x202,
         rsp,
-        ss: 0x10,    
+        ss: 0x23,
     };
 
     unsafe {
@@ -206,10 +206,24 @@ pub extern "C" fn schedule() {
 #[no_mangle]
 #[unsafe(link_section = ".user_task.task1")]
 extern "C" fn task1() {
-    loop {
-        print!("[TASK 1]: bonjour\n");
+    #[unsafe(link_section = ".user_task.data1")]
+    static msg1: [u8; 18]= *b"[TASK 1]: bonjour\n";
 
-        for _ in 0..5_000_000 {
+    loop {
+        //print!("[TASK 1]: bonjour\n");
+
+        unsafe {
+            core::arch::asm!(
+                "mov rdi, {0}",
+                "mov rsi, {1:r}",
+                "mov rax, 0x10",
+                "int $0x7f",
+                in(reg) msg1.as_ptr(),
+                in(reg) msg1.len(),
+            );
+        }
+
+        for _ in 0..50_000_000 {
             unsafe { core::arch::asm!("nop"); }
         }
     }
@@ -218,25 +232,26 @@ extern "C" fn task1() {
 #[no_mangle]
 #[unsafe(link_section = ".user_task.task2")]
 extern "C" fn task2() {
-    loop {
-        print!("[TASK 2]: ohayou\n");
+    #[unsafe(link_section = ".user_task.data2")]
+    static msg2: [u8; 17] = *b"[TASK 2]: wowerz\n";
 
-        for _ in 0..5_000_000 {
+    loop {
+        //print!("[TASK 1]: bonjour\n");
+
+        unsafe {
+            core::arch::asm!(
+                "mov rdi, {0}",
+                "mov rsi, {1:r}",
+                "mov rax, 0x10",
+                "int $0x7f",
+                in(reg) msg2.as_ptr(),
+                in(reg) msg2.len(),
+            );
+        }
+
+        for _ in 0..50_000_000 {
             unsafe { core::arch::asm!("nop"); }
         }
-    }
-}
-
-fn int7f() {
-    unsafe {
-        core::arch::asm!(
-            "mov rax, 0x00",
-            "mov rdi, {0}",
-            "mov rsi, {1:r}",
-            "int $0x7f",
-            in(reg) 0x02 as u64,
-            in(reg) 0,
-        );
     }
 }
 

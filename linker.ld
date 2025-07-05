@@ -24,7 +24,7 @@ SECTIONS {
     .bss : {
         *(.bss*)
         *(COMMON)
-	KEEP(*(.multiboot_ptr))
+	/*KEEP(*(.multiboot_ptr))*/
     }
 
     .gdt : {
@@ -38,7 +38,7 @@ SECTIONS {
     /* Stack */
     . = ALIGN(16);
     stack_bottom = .;
-    . = . + 16K; 
+    . = . + 64K; 
     stack_top = .;
 
     /* Heap */
@@ -62,6 +62,11 @@ SECTIONS {
     p1_fb_table_1  = .;  . = . + 4K;
     p1_fb_table_2  = .;  . = . + 4K;
     p1_fb_table_3  = .;  . = . + 4K;
+
+    . = 0x650000;
+    .user_task : {
+	 *(.user_task*)
+    }
 
     . = 0x80000; 
     .dma : ALIGN(512) {

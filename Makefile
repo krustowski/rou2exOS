@@ -42,6 +42,10 @@ nasm:
 		-f elf64 \
 		-o src/abi/int_80.o \
 		src/abi/int_80.asm
+	@nasm \
+		-f elf64 \
+		-o src/task/context.o \
+		src/task/context.asm
 
 link:
 	@ld.lld \
@@ -53,6 +57,7 @@ link:
 		iso/boot/boot.o \
 		src/abi/int_7f.o \
 		src/abi/int_80.o \
+		src/task/context.o \
 		$(shell ls -t target/kernel_text/x86_64-r2/release/deps/kernel-*o | head -1)
 	@ld.lld \
 		--verbose \
@@ -63,6 +68,7 @@ link:
 		iso/boot/boot.o \
 		src/abi/int_7f.o \
 		src/abi/int_80.o \
+		src/task/context.o \
 		$(shell ls -t target/kernel_graphics/x86_64-r2/release/deps/kernel-*o | head -1)
 
 build_iso:

@@ -7,6 +7,7 @@ pub mod font;
 pub mod fs;
 pub mod idt;
 pub mod heap;
+pub mod pit;
 pub mod result;
 pub mod video;
 
@@ -54,6 +55,11 @@ pub fn init(multiboot_ptr: u64) {
     result::print_result(
         "Initialize video", 
         video_result,
+    );
+
+    result::print_result(
+        "Start PIC timer", 
+        pit::get_result(),
     );
 
     result::print_result(

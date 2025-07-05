@@ -66,12 +66,10 @@ ist1_stack:
 ist1_stack_top:
 
 align 16
-global tss64
 tss64:
     resb 104
     
 align 4
-global multiboot_ptr
 multiboot_ptr:
     resq 1
 
@@ -89,7 +87,9 @@ align 4
 
 extern kernel_main
 global _start
+global multiboot_ptr
 
+global tss64
 global dma
 
 global p4_table

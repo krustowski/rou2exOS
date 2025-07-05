@@ -1,4 +1,4 @@
-use crate::input::{elf::kernel_return};
+use crate::{input::elf::kernel_return, task::process::schedule};
 
 /// This function is the syscall ABI dispatching routine. It is called exclusively from the ISR 
 /// for interrupt 0x7f. 
@@ -37,18 +37,36 @@ pub extern "C" fn syscall_handler() {
     match syscall_no {
         0x00 => {
             // PROCESS/TASK EXIT 
+            rprint!("[TASK ");
+            rprintn!(arg1);
+            rprint!("]: bonjour\n");
+
             unsafe {
                 core::arch::asm!(
-                    //"mov rsp, $0x190000",
                     "mov rdi, {0}",
+                    "mov rsi, {1}",
+                    //"jmp kernel_return",
+                    "call end_task",
                     "jmp kernel_return",
-                    in(reg) arg1
+                    in(reg) arg1,
+                    in(reg) arg2,
                 );
             };
         }
 
+        0x02 => {
+            rprint!("[TASK ");
+            rprintn!(arg1);
+            rprint!("]: bonjour\n");
+
+            ret = 0;
+        }
+
         0x10 => {
-            // TODO: Verify the pointer!
+            if arg1 < 0x600000 || arg1 > 0x800000 {
+                ret = 0xfc;
+                return;
+            }
 
             let ptr = arg1 as *const u8;
             let len = arg2 as usize;
@@ -155,8 +173,11 @@ pub extern "C" fn syscall_handler() {
 }
 
 #[no_mangle]
-pub extern "C" fn syscall_handler_80h() {
+pub extern "C" fn syscall_80h() {
     let code: u64;
+
+    //schedule();
+    return;
 
     unsafe {
         core::arch::asm!(

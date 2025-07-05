@@ -177,6 +177,24 @@ pub fn load_idt() {
     }
 }
 
+#[no_mangle]
+extern "x86-interrupt" fn timer_handler(stack: &mut InterruptStackFrame) {
+    // Acknowledge the PIC
+    crate::input::port::write(0x20, 0x20);
+
+    crate::task::task::schedule();  // Switch tasks
+}
+
+extern "x86-interrupt" fn keyboard_handler(stack: &mut InterruptStackFrame) {
+    // Acknowledge the PIC
+    //crate::input::port::write(0x20, 0x20);
+}
+
+extern "x86-interrupt" fn floppy_drive_handler(stack: &mut InterruptStackFrame) {
+    // Acknowledge the PIC
+    //crate::input::port::write(0x20, 0x20);
+}
+
 /// https://phrack.org/issues/59/4
 pub fn install_isrs() {
     let entry_06 = IdtEntry64::new(
@@ -207,6 +225,27 @@ pub fn install_isrs() {
         0b1110_1110,      // present, DPL=3, 64-bit interrupt gate
     );
 
+    let entry_irq0 = IdtEntry64::new(
+        timer_handler as u64,
+        0x08,             
+        0,                
+        0b1110_1110,      // present, DPL=3, 64-bit interrupt gate
+    );
+
+    let entry_irq1 = IdtEntry64::new(
+        keyboard_handler as u64,
+        0x08,             
+        0,                
+        0b1110_1110,      // present, DPL=3, 64-bit interrupt gate
+    );
+
+    let entry_irq6 = IdtEntry64::new(
+        floppy_drive_handler as u64,
+        0x08,             
+        0,                
+        0b1110_1110,      // present, DPL=3, 64-bit interrupt gate
+    );
+
     let entry_7f = IdtEntry64::new(
         int7f_isr as u64,
         0x08,
@@ -216,7 +255,7 @@ pub fn install_isrs() {
 
     let entry_80 = IdtEntry64::new(
         syscall_80h as u64,
-        0x1b,             
+        0x08,             
         0,                
         0b1110_1110,      // present, DPL=3, 64-bit interrupt gate
     );
@@ -226,6 +265,9 @@ pub fn install_isrs() {
         IDT[0x08] = entry_08;
         IDT[0x0d] = entry_0d;
         IDT[0x0e] = entry_0e;
+        IDT[0x20] = entry_irq0;
+        IDT[0x21] = entry_irq1;
+        IDT[0x26] = entry_irq6;
         IDT[0x7f] = entry_7f;
         IDT[0x80] = entry_80;
     }

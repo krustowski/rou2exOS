@@ -64,7 +64,7 @@ extern "C" fn new_stack() -> u64 {
 
 fn add_task(entry: extern "C" fn()) {
     let stack = new_stack();
-    let rsp = stack + 0x4000 - 10; // top of stack
+    let rsp = stack + 0x4000 - 8; // top of stack
 
     let regs = Registers {
         r15: 0, 
@@ -83,10 +83,10 @@ fn add_task(entry: extern "C" fn()) {
         rbx: 0, 
         rax: 0,
         rip: entry as usize,
-        cs: 0x1b,
+        cs: 0x08,
         rflags: 0x202,
         rsp,
-        ss: 0x23,
+        ss: 0x10,
     };
 
     unsafe {
@@ -198,14 +198,64 @@ pub extern "C" fn schedule() {
                 //print!("[SCHEDULE] Task slot ");
                 //printn!(next);
                 //println!(" is None")
-            //}
+                //}
+    }
+    }
+}
+
+#[unsafe(no_mangle)]
+static mut PIPE: Option<super::pipe::Pipe> = None;
+
+#[unsafe(no_mangle)]
+extern "C" fn kern_task1() {
+    let mut ch: u8 = 0;
+
+    loop {
+        //println!("[TASK 1]");
+        unsafe {
+            if let Some(pipe) = PIPE.as_mut() {
+                //core::arch::asm!("cli");
+                pipe.write(ch);
+                ch += 1;
+                ch %= 0xff;
+                //core::arch::asm!("sti");
+            }
+
+            /*for _ in 0..50_000_000 {
+                core::arch::asm!("nop");
+            }*/
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
+extern "C" fn kern_task2() {
+    loop {
+        //println!("[TASK 2]");
+        unsafe {
+            if let Some(pipe) = PIPE.as_mut() {
+                //core::arch::asm!("cli");
+                let ch = pipe.read();
+
+                if ch == 0x00 {
+                    //core::arch::asm!("sti");
+                    continue;
+                }
+
+                printb!( &[ch % 25 + 65] );
+                //core::arch::asm!("sti");
+            }
+
+            /*for _ in 0..50_000_000 {
+                core::arch::asm!("nop");
+            }*/
         }
     }
 }
 
 #[no_mangle]
 #[unsafe(link_section = ".user_task.task1")]
-extern "C" fn task1() {
+extern "C" fn user_task1() {
     #[unsafe(link_section = ".user_task.data1")]
     static msg1: [u8; 18]= *b"[TASK 1]: bonjour\n";
 
@@ -231,7 +281,7 @@ extern "C" fn task1() {
 
 #[no_mangle]
 #[unsafe(link_section = ".user_task.task2")]
-extern "C" fn task2() {
+extern "C" fn user_task2() {
     #[unsafe(link_section = ".user_task.data2")]
     static msg2: [u8; 17] = *b"[TASK 2]: wowerz\n";
 
@@ -256,8 +306,12 @@ extern "C" fn task2() {
 }
 
 pub fn run_scheduler() {
-    add_task(task1);
-    add_task(task2);
+    unsafe {
+        PIPE = Some(super::pipe::Pipe::new(0));
+    }
+
+    add_task(kern_task1);
+    add_task(kern_task2);
     schedule();
 }
 

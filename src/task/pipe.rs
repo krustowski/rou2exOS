@@ -1,9 +1,10 @@
 const MAX_BUFFER_SIZE: usize = 4096;
 
+#[derive(Copy,Clone)]
 #[repr(C, packed)]
 pub struct Pipe {
-    pub buffer: [u8; MAX_BUFFER_SIZE],
-    pub id: u64,
+    buffer: [u8; MAX_BUFFER_SIZE],
+    id: u64,
     pub read_pos: usize,
     pub write_pos: usize,
 }

@@ -46,7 +46,7 @@ pub extern "C" fn syscall_handler() {
                     "mov rdi, {0}",
                     "mov rsi, {1}",
                     //"jmp kernel_return",
-                    "call end_task",
+                    //"call end_task",
                     "jmp kernel_return",
                     in(reg) arg1,
                     in(reg) arg2,
@@ -54,10 +54,39 @@ pub extern "C" fn syscall_handler() {
             };
         }
 
-        0x02 => {
-            rprint!("[TASK ");
-            rprintn!(arg1);
-            rprint!("]: bonjour\n");
+        0x01 => {
+            if arg2 < 0x600000 || arg1 > 0x800000 {
+                ret = 0xfc;
+                return;
+            }
+
+            let mut sysinfo_ptr = arg2 as *mut SysInfo;
+
+            match arg1 {
+                0x01 => {
+                    unsafe {
+                        let name = b"r2";
+                        let user = b"guest";
+                        let version = b"v0.8.3";
+
+                        if let Some(nm) = (*sysinfo_ptr).system_name.get_mut(0..name.len()) {
+                            nm.copy_from_slice(name);
+                        }
+
+                        if let Some(us) = (*sysinfo_ptr).system_user.get_mut(0..user.len()) {
+                            us.copy_from_slice(user);
+                        }
+
+                        if let Some(vn) = (*sysinfo_ptr).system_version.get_mut(0..version.len()) {
+                            vn.copy_from_slice(version);
+                        }
+                    }
+                }
+                0x02 => {
+                    //
+                }
+                _ => {}
+            }
 
             ret = 0;
         }
@@ -79,8 +108,6 @@ pub extern "C" fn syscall_handler() {
 
                 printb!(&[b]);
             }
-
-            println!("");
 
             ret = 0;
         }
@@ -204,3 +231,13 @@ pub extern "C" fn syscall_80h() {
         }
     }
 }
+
+#[repr(C, packed)]
+#[derive(Default)]
+pub struct SysInfo {
+    pub system_name: [u8; 32],
+    pub system_user: [u8; 32],
+    pub system_version: [u8; 8],
+    pub system_uptime: u32,
+}
+

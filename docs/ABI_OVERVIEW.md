@@ -38,8 +38,10 @@ Please note that this list is incomplete as listed syscalls have to be implement
 |  `0x29`|  pointer to file name string | pointer to uint64 (PID) | Execute a flat binary executable (.BIN usually). |
 |  `0x2a`|  pointer to file name string | pointer to uint64 (PID) | Execute an ELF64 executable (.ELF). |
 |        |        |        | **Networking operations** |
-|  `0x30`|  `0x01`|  pointer to array of network devices | List all network devices/interfaces available. |
-|  `0x31`|  `0x01`|  pointer to buffer | Create a new ICMP packet.  |
+|  `0x30`|  port identificator (ID) | pointer to value (uint64) | Send a value to a port specified in arg No. 1. |
+|  `0x31`|  port identificator (ID) | pointer to value (uint64) | Receive a value from a port specified in arg No. 1. |
+|  `0x32`|  `0x01`|  pointer to array of network devices | List all network devices/interfaces available. |
+|  `0x33`|  `0x01`|  pointer to buffer | Create a new ICMP packet.  |
 
 TBD
 

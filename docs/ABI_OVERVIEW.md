@@ -42,8 +42,9 @@ Please note that this list is incomplete as listed syscalls have to be implement
 |  `0x31`|  port identificator (ID) | pointer to value (uint64) | Receive a value from a port specified in arg No. 1. |
 |  `0x32`|  `0x01`|  pointer to array of network devices | List all network devices/interfaces available. |
 |  `0x33`|  `0x01`|  pointer to buffer | Create a new ICMP packet.  |
-
-TBD
+|        |        |        | **Audio operations** |
+|  `0x40`|  frequency in Hz | length in milliseconds | Play the frequency. |
+|  `0x41`|  `0x01`| pointer to the audio file | Play the audio file. |
 
 ### Type Definitions
 

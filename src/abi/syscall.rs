@@ -1,4 +1,4 @@
-use crate::{input::elf::kernel_return, task::process::schedule};
+use crate::{fs::fat12::{block::Floppy, fs::Filesystem}, input::elf::kernel_return, task::process::schedule};
 
 /// This function is the syscall ABI dispatching routine. It is called exclusively from the ISR 
 /// for interrupt 0x7f. 
@@ -111,6 +111,7 @@ pub extern "C" fn syscall_handler() {
 
             ret = 0;
         }
+
         0x20 => {
             let name_ptr = arg1 as *const u8;
 
@@ -182,8 +183,57 @@ pub extern "C" fn syscall_handler() {
 
             ret = 0;
         }
+
+        0x28 => {
+            let path = arg1;
+            let entries = arg2 as *mut [crate::fs::fat12::entry::Entry; 32];
+
+            let floppy = Floppy::init();
+            let mut offset = 0;
+
+            match Filesystem::new(&floppy) {
+                Ok(fs) => {
+                    fs.for_each_entry(path as u16, |entry| {
+                        if entry.name[0] == 0x00 || entry.name[0] == 0xE5 || entry.attr & 0x08 != 0x00 {
+                            return;
+                        }
+
+                        unsafe {
+                            if let Some(en) = (*entries).get_mut(offset) {
+                                *en = *entry;
+                                offset += 1;
+                            }
+                        }
+                    });
+                }
+                Err(e) => {}
+            }
+        }
+
+        0x30 => {
+            let port = arg1 as *const u16;
+            let value = arg2 as *const u32;
+
+            unsafe {
+                crate::input::port::write_u32(*port, *value);
+            }
+
+            ret = 0x00;
+        }
+
+        0x31 => {
+            let port = arg1 as *const u16;
+            let value = arg2 as *mut u32;
+
+            unsafe {
+                *value = crate::input::port::read_u32(*port);
+            }
+
+            ret = 0x00;
+        }
+
         _ => {
-            debug!("Unknown syscall: ");
+            debug!("Unknown or non-implemented syscall: ");
             debugn!(syscall_no);
             debugln!("");
 
@@ -193,7 +243,7 @@ pub extern "C" fn syscall_handler() {
 
     unsafe {
         core::arch::asm!(
-            "mov rax, {0}",
+            "mov rax, {0:r}",
             in(reg) ret,
         );
     }

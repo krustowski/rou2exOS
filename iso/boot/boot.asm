@@ -70,6 +70,8 @@ tss64:
     resb 104
     
 align 4
+multiboot_magic:
+    resq 1
 multiboot_ptr:
     resq 1
 
@@ -87,6 +89,8 @@ align 4
 
 extern kernel_main
 global _start
+
+global multiboot_magic
 global multiboot_ptr
 
 global tss64
@@ -112,6 +116,7 @@ debug_flag:
     db 0    ; 1 = enabled
 
 _start:
+    mov [multiboot_magic], eax
     mov [multiboot_ptr], ebx
 
     mov eax, p4_table
@@ -489,6 +494,10 @@ long_mode_entry:
 
     ; Clear the stack
     mov rsp, 0x190000
+
+    mov rsi, [multiboot_ptr]
+    mov rdi, [multiboot_magic]
+
     call kernel_main
 
     hlt

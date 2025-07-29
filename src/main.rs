@@ -35,7 +35,7 @@ mod vga;
 
 /// Kernel entrypoint
 #[unsafe(no_mangle)]
-pub extern "C" fn kernel_main() { 
+pub extern "C" fn kernel_main(multiboot2_magic: u32, multiboot_ptr: u32) { 
     debugln!("Kernel loaded");
 
     // VGA buffer position (LEGACY)
@@ -45,9 +45,7 @@ pub extern "C" fn kernel_main() {
     video::vga::init_writer();
 
     // Run init checks
-    unsafe {
-        init::init(init::config::multiboot_ptr as u64);
-    }
+    init::init(multiboot_ptr as u64);
 
     // Run the shell loop
     debugln!("Starting shell...");

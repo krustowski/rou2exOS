@@ -1,4 +1,4 @@
-const MAX_BUFFER_SIZE: usize = 4096;
+const MAX_BUFFER_SIZE: usize = 14096;
 
 #[derive(Copy,Clone)]
 #[repr(C, packed)]

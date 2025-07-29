@@ -64,7 +64,7 @@ extern "C" fn new_stack() -> u64 {
 
 fn add_task(entry: extern "C" fn()) {
     let stack = new_stack();
-    let rsp = stack + 0x4000 - 8; // top of stack
+    let rsp = stack + 0x90000 - 8; // top of stack
 
     let regs = Registers {
         r15: 0, 
@@ -210,45 +210,41 @@ static mut PIPE: Option<super::pipe::Pipe> = None;
 extern "C" fn kern_task1() {
     let mut ch: u8 = 0;
 
+    //println!("[TASK 1]: Start");
+
     loop {
-        //println!("[TASK 1]");
         unsafe {
             if let Some(pipe) = PIPE.as_mut() {
-                //core::arch::asm!("cli");
-                pipe.write(ch);
                 ch += 1;
-                ch %= 0xff;
-                //core::arch::asm!("sti");
-            }
+                pipe.write(ch);
 
-            /*for _ in 0..50_000_000 {
-                core::arch::asm!("nop");
-            }*/
+                if ch % 26 == 0 {
+                    ch = 0;
+                }
+
+                for i in 0..10_000 {
+                    core::arch::asm!("nop");
+                }
+            }
         }
     }
 }
 
 #[unsafe(no_mangle)]
 extern "C" fn kern_task2() {
+    //println!("[TASK 2]: Start");
+
     loop {
-        //println!("[TASK 2]");
         unsafe {
             if let Some(pipe) = PIPE.as_mut() {
-                //core::arch::asm!("cli");
                 let ch = pipe.read();
 
                 if ch == 0x00 {
-                    //core::arch::asm!("sti");
                     continue;
                 }
 
-                printb!( &[ch % 25 + 65] );
-                //core::arch::asm!("sti");
+                printb!( &[ch % 26 + 65] );
             }
-
-            /*for _ in 0..50_000_000 {
-                core::arch::asm!("nop");
-            }*/
         }
     }
 }
@@ -312,6 +308,6 @@ pub fn run_scheduler() {
 
     add_task(kern_task1);
     add_task(kern_task2);
-    schedule();
+    //schedule();
 }
 

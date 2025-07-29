@@ -21,7 +21,7 @@ context_switch:
     mov [rdi + 0x30], r9
     mov [rdi + 0x38], r8
     ;mov [rdi + 0x40], rdi
-    mov [rdi + 0x48], rsi
+    ;mov [rdi + 0x48], rsi
     mov [rdi + 0x50], rbp
     mov [rdi + 0x58], rdx
     mov [rdi + 0x60], rcx

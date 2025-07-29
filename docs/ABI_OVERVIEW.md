@@ -25,6 +25,7 @@ Please note that this list is incomplete as listed syscalls have to be implement
 |  `0x0f`|  pointer to type pointer | size in bytes to allocate | Allocate a memory block on heap. The pointer to the allocated block is returned in `RAX`, or is `0x00` if the allocation procedure fails. |
 |        |        |       | **Video output operations** |
 |  `0x10`|  pointer to string data | string length | Print provided string to terminal. |
+|  `0x11`|  `0x00` | `0x00` | Clear the screen. |
 |        |        |       | **Filesystem operations** |
 |  `0x20`|  pointer to file name string | pointer to buffer | Read a file specified in the first argument and load its contents into the buffer in argument 2. |
 |  `0x21`|  pointer to string data | pointer to buffer | Write the buffer into a file (overwrite it) specified by the first argument. File is created in the current directory if not exists. |
@@ -45,6 +46,7 @@ Please note that this list is incomplete as listed syscalls have to be implement
 |        |        |        | **Audio operations** |
 |  `0x40`|  frequency in Hz | length in milliseconds | Play the frequency. |
 |  `0x41`|  `0x01`| pointer to the audio file | Play the audio file. |
+|  `0x4f`|  `0x00`|  `0x00`| Stop the player. |
 
 ### Type Definitions
 

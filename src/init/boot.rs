@@ -61,6 +61,30 @@ pub struct FramebufferTag {
     pub reserved: u16,
 }
 
+#[repr(C, packed)]
+pub struct AcpiRSDPTag {
+    pub typ: u32,
+    pub size: u32,
+    pub signature: [u8; 8],
+    pub checksum: u8,
+    pub oemid: [u8; 6],
+    pub revision: u8,
+    pub rsdt_addr: u32,
+}
+
+#[repr(C, packed)]
+pub struct AcpiSDTHeader {
+    pub signature: [u8; 4],
+    pub length: u32,
+    pub revision: u8, 
+    pub checksum: u8,
+    pub oemid: [u8; 6],
+    pub oem_table_id: [u8; 8],
+    pub oem_revision: u32,
+    pub creator_id: u32,
+    pub creatpr_revision: u32,
+}
+
 pub unsafe fn parse_multiboot2_info(base_addr: usize, mut fb_tag: &FramebufferTag) -> usize {
     // Ensure alignment (Multiboot2 requires 8-byte aligned structure)
     let addr = align_up(base_addr, 8);
@@ -85,6 +109,7 @@ pub unsafe fn parse_multiboot2_info(base_addr: usize, mut fb_tag: &FramebufferTa
                 debugln!("End tag found");
                 break;
             }
+
             1 => {
                 debug!("Boot command line tag: ");
 
@@ -95,6 +120,7 @@ pub unsafe fn parse_multiboot2_info(base_addr: usize, mut fb_tag: &FramebufferTa
                 let cmdline = core::str::from_utf8_unchecked(raw_bytes);
                 debugln!(cmdline);
             }
+
             3 => {
                 debug!("Module tag found: ");
 
@@ -107,6 +133,7 @@ pub unsafe fn parse_multiboot2_info(base_addr: usize, mut fb_tag: &FramebufferTa
                 let cmdline = core::str::from_utf8_unchecked(raw_bytes);
                 debugln!(cmdline);
             }
+
             6 => {
                 debugln!("Memory map tag");
 
@@ -131,6 +158,7 @@ pub unsafe fn parse_multiboot2_info(base_addr: usize, mut fb_tag: &FramebufferTa
                     }
                 }
             }
+
             8 => {
                 debugln!("Framebuffer tag: ");
 
@@ -219,6 +247,20 @@ pub unsafe fn parse_multiboot2_info(base_addr: usize, mut fb_tag: &FramebufferTa
                 //dump_debug_log_to_file();
 
             }
+
+            14 => {
+                debugln!("ACPI v1 Root System Descriptor Pointer Tag");
+
+                let acpi_tag = &*(ptr as *const AcpiRSDPTag);
+                debug!("Signature: ");
+                debug!(acpi_tag.signature);
+                debug!("\nOEM: ");
+                debug!(acpi_tag.oemid);
+                debugln!("");
+
+                let acpi_sdt = &*(acpi_tag.rsdt_addr as *const AcpiSDTHeader);
+            }
+
             _ => {
                 debug!("Unknown tag: ");
                 debugn!(tag.typ);

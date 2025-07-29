@@ -73,7 +73,7 @@ pub unsafe fn remap_pic() {
 
 
 pub unsafe fn io_wait() {
-    write(0x80, 0); // classic way to wait for I/O
+    write(0x80, 0);
 }
 
 pub fn get_result() -> super::result::InitResult {

@@ -65,7 +65,7 @@ pub extern "C" fn syscall_handler() {
             match arg1 {
                 0x01 => {
                     unsafe {
-                        let name = b"r2";
+                        let name = b"rou2ex";
                         let user = b"guest";
                         let version = b"v0.8.3";
 
@@ -110,6 +110,15 @@ pub extern "C" fn syscall_handler() {
             }
 
             ret = 0;
+        }
+
+        0x11 => {
+            if arg1 != 0x00 || arg2 != 0x00 {
+                ret = 0xfc;
+                return;
+            }
+
+            clear_screen!();
         }
 
         0x20 => {
@@ -184,27 +193,37 @@ pub extern "C" fn syscall_handler() {
             ret = 0;
         }
 
+        /*
+         *  Syscall 0x28 --- List directory entries
+         *  
+         *  Arg1: dir cluster
+         *  Arg2: dir entries pointer
+         */
         0x28 => {
             let path = arg1;
-            let entries = arg2 as *mut [crate::fs::fat12::entry::Entry; 32];
+            let entries = arg2 as *mut crate::fs::fat12::entry::Entry;
+
+            let mut kentries: [crate::fs::fat12::entry::Entry; 32] = [crate::fs::fat12::entry::Entry::default(); 32];
+            let mut offset = 0;
 
             let floppy = Floppy::init();
-            let mut offset = 0;
 
             match Filesystem::new(&floppy) {
                 Ok(fs) => {
-                    fs.for_each_entry(path as u16, |entry| {
+                    fs.for_each_entry(0, |entry| {
                         if entry.name[0] == 0x00 || entry.name[0] == 0xE5 || entry.attr & 0x08 != 0x00 {
                             return;
                         }
 
-                        unsafe {
-                            if let Some(en) = (*entries).get_mut(offset) {
-                                *en = *entry;
-                                offset += 1;
-                            }
+                        if offset < kentries.len() {
+                            kentries[offset] = *entry;
+                            offset += 1;
                         }
                     });
+
+                    unsafe {
+                        core::ptr::copy_nonoverlapping(kentries.as_ptr(), entries, offset);
+                    }
                 }
                 Err(e) => {}
             }

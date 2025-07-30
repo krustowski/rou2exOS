@@ -1,11 +1,27 @@
-use crate::{fs::fat12::{block::Floppy, fs::Filesystem}, input::elf::kernel_return, task::process::schedule};
+use crate::{
+    fs::fat12::{block::Floppy, fs::Filesystem, entry::Entry}, 
+    //input::elf::kernel_return, 
+    //task::process::schedule,
+};
+
+const USERLAND_START: u64 = 0x600_000;
+const USERLAND_END: u64 = 0x800_000;
+
+enum SyscallReturnCode {
+    Okay = 0x00,
+    NotImplemented = 0xfb,
+    InvalidInput = 0xfc,
+    FilesystemError = 0xfd,
+    FileNotFound = 0xfe,
+    InvalidSyscall = 0xff,
+}
 
 /// This function is the syscall ABI dispatching routine. It is called exclusively from the ISR 
 /// for interrupt 0x7f. 
 #[no_mangle]
 pub extern "C" fn syscall_handler() {
     let (syscall_no, arg1, arg2): (u64, u64, u64);
-    let mut ret = 0;
+    let mut ret: SyscallReturnCode = SyscallReturnCode::Okay;
 
     unsafe {
         core::arch::asm!(
@@ -35,18 +51,21 @@ pub extern "C" fn syscall_handler() {
     rprint!("\n");
 
     match syscall_no {
+        /*
+         *  Syscall 0x00 --- Program graceful exit
+         *
+         *  Arg1: program/process/task ID
+         *  Arg2: program return code
+         */
         0x00 => {
-            // PROCESS/TASK EXIT 
             rprint!("[TASK ");
             rprintn!(arg1);
-            rprint!("]: bonjour\n");
+            rprint!("]: exit\n");
 
             unsafe {
                 core::arch::asm!(
                     "mov rdi, {0}",
                     "mov rsi, {1}",
-                    //"jmp kernel_return",
-                    //"call end_task",
                     "jmp kernel_return",
                     in(reg) arg1,
                     in(reg) arg2,
@@ -54,9 +73,16 @@ pub extern "C" fn syscall_handler() {
             };
         }
 
+        /*
+         *  Syscall 0x01 --- Get/Set system info
+         *
+         *  Arg1: 0x01 or 0x02
+         *  Arg2: pointer to system info struct (*mut SysInfo)
+         *
+         */
         0x01 => {
-            if arg2 < 0x600000 || arg1 > 0x800000 {
-                ret = 0xfc;
+            if arg2 < USERLAND_START || arg2 > USERLAND_END {
+                ret = SyscallReturnCode::InvalidInput;
                 return;
             }
 
@@ -83,17 +109,33 @@ pub extern "C" fn syscall_handler() {
                     }
                 }
                 0x02 => {
-                    //
+                    // TODO
                 }
                 _ => {}
             }
 
-            ret = 0;
+            ret = SyscallReturnCode::Okay;
         }
 
+        /*
+         *  Syscall 0x0f --- Allocate memory from heap
+         *
+         *  Arg1: pointer to type (*mut _)
+         *  Arg2: size in bytes to allocate
+         */
+        0x0f => {
+            // TODO
+        }
+
+        /*
+         *  Syscall 0x10 --- Print data to standard output
+         *
+         *  Arg1: pointer to data (&[u8])
+         *  Arg2: length in bytes to print
+         */
         0x10 => {
-            if arg1 < 0x600000 || arg1 > 0x800000 {
-                ret = 0xfc;
+            if arg1 < USERLAND_START || arg1 > USERLAND_END {
+                ret = SyscallReturnCode::InvalidInput;
                 return;
             }
 
@@ -109,25 +151,42 @@ pub extern "C" fn syscall_handler() {
                 printb!(&[b]);
             }
 
-            ret = 0;
+            ret = SyscallReturnCode::Okay;
         }
 
+        /*
+         *  Syscall 0x11 --- Clear the screen (standard output)
+         *
+         *  Arg1: 0x00
+         *  Arg2: 0x00
+         */
         0x11 => {
             if arg1 != 0x00 || arg2 != 0x00 {
-                ret = 0xfc;
+                ret = SyscallReturnCode::InvalidInput;
                 return;
             }
 
             clear_screen!();
+
+            ret = SyscallReturnCode::Okay;
         }
 
+        /*
+         *  Syscall 0x20 --- Read a file
+         *
+         *  Arg1: pointer to filename byte slice (&[u8])
+         *  Arg2: pointer to buffer (*mut [u8; 512])
+         */
         0x20 => {
+            if arg1 < USERLAND_START || arg1 > USERLAND_END || arg2 < USERLAND_START || arg2 > USERLAND_END {
+                ret = SyscallReturnCode::InvalidInput;
+                return;
+            }
+
             let name_ptr = arg1 as *const u8;
 
             let mut name = [b' '; 8];
             let mut ext = [b' '; 3];
-
-            // TODO: Verify the pointer!
 
             unsafe {
                 let mut i = 0;
@@ -158,27 +217,24 @@ pub extern "C" fn syscall_handler() {
             }
 
             let buf_ptr = arg2 as *mut [u8; 512];
-
-            use crate::fs::fat12::{block::Floppy, fs::Filesystem};
-
             let floppy = Floppy::init();
+            let mut file_read: bool = false;
 
             match Filesystem::new(&floppy) {
                 Ok(fs) => {
                     fs.for_each_entry(0, | entry | {
                         if entry.name[0] == 0x00 || entry.name[0] == 0xE5 || entry.attr & 0x08 != 0 || entry.attr & 0x10 != 0 {
-                            ret = 0xfe;
                             return;
                         }
 
                         unsafe {
                             if !entry.name.starts_with(&name) || !entry.ext.starts_with(&ext) {
-                                ret = 0xfc;
                                 return
                             }
 
                             // Read the file directly into the client's buffer
                             fs.read_file(entry.start_cluster, &mut *buf_ptr);
+                            file_read = true;
                         }
                     });
                 }
@@ -186,18 +242,102 @@ pub extern "C" fn syscall_handler() {
                     rprint!(e);
                     rprint!("\n");
 
-                    ret = 0xfd;
+                    ret = SyscallReturnCode::FilesystemError;
                 }
             }
 
-            ret = 0;
+            if !file_read {
+                ret = SyscallReturnCode::FileNotFound;
+                return;
+            }
+
+            ret = SyscallReturnCode::Okay;
+        }
+
+        /*
+         *  Syscall 0x21 --- Write buffer to file
+         *
+         *  Arg1: pointer to file name, byte slice (*const [u8])
+         *  Arg2: pointer to byte buffer (*mut [u8; 512])
+         */
+        0x21 => {
+            if arg1 < USERLAND_START || arg1 > USERLAND_END || arg2 < USERLAND_START || arg2 > USERLAND_END {
+                ret = SyscallReturnCode::InvalidInput;
+                return;
+            }
+
+            let name_ptr = arg1 as *const u8;
+
+            let mut name = [b' '; 8];
+            let mut ext = [b' '; 3];
+
+            unsafe {
+                let mut i = 0;
+                let mut saw_dot = false;
+                let mut ext_i = 0;
+
+                while *name_ptr.add(i) != 0 {
+                    let c = *name_ptr.add(i);
+                    if c == b'.' {
+                        saw_dot = true;
+                        i += 1;
+                        continue;
+                    }
+
+                    if !saw_dot {
+                        if i < 8 {
+                            name[i] = c.to_ascii_uppercase();
+                        }
+                    } else {
+                        if ext_i < 3 {
+                            ext[ext_i] = c.to_ascii_uppercase();
+                            ext_i += 1;
+                        }
+                    }
+
+                    i += 1;
+                }
+            }
+
+            let mut filename: [u8; 11] = [b' '; 11];
+            filename[0..8].copy_from_slice(&name);
+            filename[8..11].copy_from_slice(&ext);
+
+            let buf_ptr = arg2 as *const [u8; 512];
+            let floppy = Floppy::init();
+
+            match Filesystem::new(&floppy) {
+                Ok(fs) => {
+                    fs.for_each_entry(0, | entry | {
+                        if entry.name[0] == 0x00 || entry.name[0] == 0xE5 || entry.attr & 0x08 != 0 || entry.attr & 0x10 != 0 {
+                            return;
+                        }
+
+                        unsafe {
+                            if !entry.name.starts_with(&name) || !entry.ext.starts_with(&ext) {
+                                return
+                            }
+
+                            fs.write_file(0, &filename, &*buf_ptr);
+                        }
+                    });
+                }
+                Err(e) => {
+                    rprint!(e);
+                    rprint!("\n");
+
+                    ret = SyscallReturnCode::FilesystemError;
+                }
+            }
+
+            ret = SyscallReturnCode::Okay;
         }
 
         /*
          *  Syscall 0x28 --- List directory entries
          *  
-         *  Arg1: dir cluster
-         *  Arg2: dir entries pointer
+         *  Arg1: dir cluster ID
+         *  Arg2: dir entries pointer (*mut Entry)
          */
         0x28 => {
             let path = arg1;
@@ -229,6 +369,12 @@ pub extern "C" fn syscall_handler() {
             }
         }
 
+        /*
+         *  Syscall 0x30 --- Send value to port
+         *
+         *  Arg1: port ID
+         *  Arg2: pointer to value (u64)
+         */
         0x30 => {
             let port = arg1 as *const u16;
             let value = arg2 as *const u32;
@@ -237,9 +383,15 @@ pub extern "C" fn syscall_handler() {
                 crate::input::port::write_u32(*port, *value);
             }
 
-            ret = 0x00;
+            ret = SyscallReturnCode::Okay;
         }
 
+        /*
+         *  Syscall 0x31 --- Read value from port
+         *
+         *  Arg1: port ID
+         *  Arg2: pointer to value (u64)
+         */
         0x31 => {
             let port = arg1 as *const u16;
             let value = arg2 as *mut u32;
@@ -248,22 +400,26 @@ pub extern "C" fn syscall_handler() {
                 *value = crate::input::port::read_u32(*port);
             }
 
-            ret = 0x00;
+            ret = SyscallReturnCode::Okay;
         }
 
+        /*
+         *  Unknown syscall
+         */
         _ => {
-            debug!("Unknown or non-implemented syscall: ");
-            debugn!(syscall_no);
-            debugln!("");
+            rprint!("Unknown syscall: ");
+            rprintn!(syscall_no);
+            rprint!("\n");
 
-            ret = 0xff;
+            ret = SyscallReturnCode::InvalidSyscall;
         }
     }
 
+    // Write the response code
     unsafe {
         core::arch::asm!(
             "mov rax, {0:r}",
-            in(reg) ret,
+            in(reg) (ret as u64),
         );
     }
 }

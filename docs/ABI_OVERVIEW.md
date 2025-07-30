@@ -20,6 +20,7 @@ Please note that this list is incomplete as listed syscalls have to be implement
 
 | Syscall No. | Argument 1 | Argument 2 | Purpose/Command |
 |-------------|------------|------------|---------|
+|  `0x00`|  process ID | program return code | Graceful exit of a program/process/task. |
 |  `0x01`|  `0x01`|  pointer to SysInfo struct | Get the system information summary. Pointer in arg. 2 has to be casted to the SysInfo struct provided by a language library. Memory must be already allocated. |
 |        |  `0x02`|  pointer to SysInfo struct | Set the system information summary. Pointer in arg, 2 is a pointer to the SysInfo structure with new information items. |
 |  `0x0f`|  pointer to type pointer | size in bytes to allocate | Allocate a memory block on heap. The pointer to the allocated block is returned in `RAX`, or is `0x00` if the allocation procedure fails. |
@@ -34,7 +35,7 @@ Please note that this list is incomplete as listed syscalls have to be implement
 |  `0x24`|  cluster No. | pointer to next cluster No. int64 |  Read the FAT table and find next (or first) sector of provided cluster. |
 |  `0x25`|  cluster No. | value | Write into given cluster such value provided in the argument No. 2. |
 |  `0x26`|  pointer to the Entry structure | cluster No. (directory cluster) | Insert an Entry provided via the first argument into the directory with Cluster No. specified in the argument No. 2. |
-|  `0x27`|  parent cluster No. (current directory usually) | pointer to string data | Create a enw subdirectory in such parent directory specified by name in argument No. 2. |
+|  `0x27`|  parent cluster No. (current directory usually) | pointer to string data | Create a new subdirectory in such parent directory specified by name in argument No. 2. |
 |  `0x28`|  parent cluster No. | pointer to array of entries | List the current directory. |
 |  `0x29`|  pointer to file name string | pointer to uint64 (PID) | Execute a flat binary executable (.BIN usually). |
 |  `0x2a`|  pointer to file name string | pointer to uint64 (PID) | Execute an ELF64 executable (.ELF). |

@@ -2,6 +2,7 @@
 
 This overview document presents the rou2exOS (aka `r2`) kernel interface for external applications. Applications should utilize custom programming language libraries provided in [the apps repository](https://github.com/krustowski/rou2exOS-apps) and statically link them with their source code. Examples on how to use such libraries, how to compile them and link them are provided in directories named by concerned languages.
 
+
 ## Syscall Specification
 
 The system call (syscall) is a procedure for requesting or modifying of kernel components, modules and drivers. Syscalls use the software interrupts (`int 0x7f`) under the hood to notify the CPU and kernel to take an action. Parameters of a syscall are passed using the CPU registers that are listed below.
@@ -12,7 +13,8 @@ Please note that all values passed into a syscall must be aligned to 8 bytes (64
 |----------|----------------|-----------------------|
 | `RAX`    | syscall No.    | `0x01` |
 | `RDI`    | argument No. 1 | `0x01` |
-| `RSI`    | argument No. 2 | `0x1000a` |
+| `RSI`    | argument No. 2 | `0x100aaa` |
+
 
 ### Table of Syscalls
 
@@ -49,7 +51,22 @@ Please note that this list is incomplete as listed syscalls have to be implement
 |  `0x41`|  `0x01`| pointer to the audio file | Play the audio file. |
 |  `0x4f`|  `0x00`|  `0x00`| Stop the player. |
 
+
+### Syscall Return Codes
+
+| Code (uint64) | Meaning |
+|---------------|---------|
+| `0x00` | `Okay` |
+| `0xfb` | `NotImplemented` |
+| `0xfc` | `InvalidInput` |
+| `0xfd` | `FilesystemError` |
+| `0xfe` | `FileNotFound` |
+| `0xff` | `InvalidSyscall` |
+
+
 ### Type Definitions
+
+#### SysInfo
 
 ```rust 
 pub struct SysInfo {
@@ -58,4 +75,27 @@ pub struct SysInfo {
     pub system_version: [u8; 8],
     pub system_uptime: u32,
 }
+```
+
+#### Entry 
+
+```rust
+#[repr(C, packed)]
+#[derive(Default,Copy,Clone)]
+pub struct Entry {
+    pub name: [u8; 8],
+    pub ext: [u8; 3],
+    pub attr: u8,
+    pub reserved: u8,
+    pub create_time_tenths: u8,
+    pub create_time: u16,
+    pub create_date: u16,
+    pub last_access_date: u16,
+    pub high_cluster: u16,
+    pub write_time: u16,
+    pub write_date: u16,
+    pub start_cluster: u16,
+    pub file_size: u32,
+}
+```
 

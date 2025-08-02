@@ -5,7 +5,7 @@ extern syscall_handler
 
 section .text
 int7f_isr:
-    ; Test the invocation: print '!'
+    ; Test the invocation: print '!' with blue fg
     ;mov byte [0xb8000], '!'
     ;mov byte [0xb8001], 0x1F
 

@@ -49,13 +49,13 @@ pub struct Floppy;
 
 impl BlockDevice for Floppy {
     fn read_sector(&self, lba: u64, buffer: &mut [u8; 512]) {
-        debugln!("Floppy read_sector()");
+        //debugln!("Floppy read_sector()");
 
         self.read_sector(lba, buffer);
     }
 
     fn write_sector(&self, lba: u64, buffer: &[u8; 512]) {
-        debugln!("Floppy write_sector()");
+        //debugln!("Floppy write_sector()");
 
         let (cylinder, head, sector) = self.lba_to_chs(lba);
         self.write_sector(cylinder, head, sector, buffer);
@@ -138,8 +138,8 @@ impl Floppy {
             //let addr = &dma as *const _ as usize;
             let addr = dma.as_ptr() as u32;
 
-            debugn!(&dma as *const _ as usize);
-            debugln!("");
+            //debugn!(&dma as *const _ as usize);
+            //debugln!("");
 
             let page = ((addr >> 16) & 0xFF) as u8;
             let offset = (addr & 0xFFFF) as u16;
@@ -270,10 +270,10 @@ impl Floppy {
 
             self.wait_for_irq();    // Wait for IRQ 6
             
-            for i in 0..10 {
+            /*for i in 0..10 {
                 debugn!(dma[i]);
             }
-            debugln!("");
+            debugln!("");*/
 
             // Copy from DMA buffer to output
             core::ptr::copy_nonoverlapping(dma.as_ptr(), buffer.as_mut_ptr(), 512);
@@ -349,7 +349,7 @@ impl Floppy {
     fn write_sector(&self, cylinder: u8, head: u8, sector: u8, data: &[u8; 512]) {
         unsafe {
             //core::arch::asm!("sti");
-            self.set_write_mode();
+            //self.set_write_mode();
 
             self.seek(1, cylinder, head);
 

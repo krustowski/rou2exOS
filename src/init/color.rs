@@ -20,8 +20,7 @@ pub fn color_demo() {
             col = 0;
         }
 
-        print!(" ", Color::Black, color);
-        print!(" ", Color::Black, color);
+        print!("  ", Color::Black, color);
         print!(" ", Color::Black, Color::Black);
 
         col += 1;

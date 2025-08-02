@@ -1,0 +1,101 @@
+use core::ptr::{copy_nonoverlapping, write_bytes};
+
+/// ELF64 types
+type Elf64Addr  = u64;
+type Elf64Off   = u64;
+type Elf64Half  = u16;
+type Elf64Word  = u32;
+type Elf64Xword = u64;
+
+/// ELF header (first 64 bytes)
+#[repr(C)]
+struct Elf64Ehdr {
+    e_ident:    [u8; 16],
+    e_type:     Elf64Half,
+    e_machine:  Elf64Half,
+    e_version:  Elf64Word,
+    e_entry:    Elf64Addr,
+    e_phoff:    Elf64Off,
+    e_shoff:    Elf64Off,
+    e_flags:    Elf64Word,
+    e_ehsize:   Elf64Half,
+    e_phentsize:Elf64Half,
+    e_phnum:    Elf64Half,
+    e_shentsize:Elf64Half,
+    e_shnum:    Elf64Half,
+    e_shstrndx: Elf64Half,
+}
+
+/// Program header
+#[repr(C)]
+struct Elf64Phdr {
+    p_type:   Elf64Word,
+    p_flags:  Elf64Word,
+    p_offset: Elf64Off,
+    p_vaddr:  Elf64Addr,
+    p_paddr:  Elf64Addr,
+    p_filesz: Elf64Xword,
+    p_memsz:  Elf64Xword,
+    p_align:  Elf64Xword,
+}
+
+const PT_LOAD: Elf64Word = 1;
+
+/// Parse and load an ELF64 image from `elf_addr` (in-memory file),
+/// then return its entry point address.
+///
+/// # Safety
+/// - Memory at `elf_addr..elf_addr+file_size` must contain the complete ELF file.
+/// - The destination virtual addresses (`p_vaddr`) must be identity-mapped and writable.
+pub unsafe fn load_elf64(elf_addr: usize, file_size: usize) -> usize {
+    let ehdr = &*(elf_addr as *const Elf64Ehdr);
+
+    // Validate ELF magic
+    let id = &ehdr.e_ident;
+    assert!(id[0] == 0x7F && id[1] == b'E' && id[2] == b'L' && id[3] == b'F');
+    assert!(id[4] == 2); // 64-bit
+
+    let phdr_base = elf_addr + ehdr.e_phoff as usize;
+    let phdrs = phdr_base as *const Elf64Phdr;
+
+    for i in 0..ehdr.e_phnum {
+        let ph = &*phdrs.add(i as usize);
+
+        if ph.p_type != PT_LOAD {
+            continue;
+        }
+
+        // Validate segment is inside file
+        assert!((ph.p_offset + ph.p_filesz) as usize <= file_size);
+
+        let src = (elf_addr + ph.p_offset as usize) as *const u8;
+        let dst = ph.p_vaddr as *mut u8;
+
+        // Copy to physical memory
+        copy_nonoverlapping(src, dst, ph.p_filesz as usize);
+
+        // Zero .bss if needed
+        if ph.p_memsz > ph.p_filesz {
+            let bss_start = dst.add(ph.p_filesz as usize);
+            let bss_len = (ph.p_memsz - ph.p_filesz) as usize;
+            write_bytes(bss_start, 0, bss_len);
+        }
+
+        rprint!("Loaded segment ");
+        rprintn!(i);
+        rprint!(" to ");
+        rprintn!(ph.p_vaddr);
+        rprint!(", filesz = ");
+        rprintn!(ph.p_filesz);
+        rprint!(", memsz = ");
+        rprintn!(ph.p_memsz);
+        rprint!("\n");
+    }
+
+    rprint!("ELF entry point: ");
+    rprintn!(ehdr.e_entry);
+    rprint!("\n");
+
+    ehdr.e_entry as usize
+}
+

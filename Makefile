@@ -90,6 +90,7 @@ build_floppy:
 	@mcopy -i fat.img ./print.bin ::PRINT.BIN
 	@mcopy -i fat.img ./print.elf ::PRINT.ELF
 	@mcopy -i fat.img ./go.elf ::GO.ELF
+	@mcopy -i fat.img ./sh.elf ::SH.ELF
 
 #
 #  RUN

@@ -249,7 +249,7 @@ pub unsafe fn parse_multiboot2_info(base_addr: usize, mut fb_tag: &FramebufferTa
             }
 
             14 => {
-                debugln!("ACPI v1 Root System Descriptor Pointer Tag");
+                debugln!("ACPI v1 Root System Descriptor Pointer tag");
 
                 let acpi_tag = &*(ptr as *const AcpiRSDPTag);
                 debug!("Signature: ");

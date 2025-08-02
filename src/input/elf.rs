@@ -54,11 +54,12 @@ pub unsafe fn load_elf64(elf_addr: usize) -> usize {
 
     for i in 0..ehdr.e_phnum {
         let ph = &*phdrs.add(i as usize);
+
         if ph.p_type == PT_LOAD {
             let src = (elf_addr + ph.p_offset as usize) as *const u8;
             let dst = ph.p_vaddr as *mut u8;
 
-            // ✅ sane debug info
+            // Sane debug info
             rprint!("Loading segment ");
             rprintn!(i);
             rprint!(" to ");
@@ -103,31 +104,13 @@ pub unsafe extern "C" fn jump_to_elf(entry: ElfEntry, stack_top: u64, arg: u64) 
     let user_stack = (stack_top - 8) as *mut u64;
     *user_stack = kernel_return as u64;
 
-    let cs: u16;
-    unsafe { core::arch::asm!("mov {0:x}, cs", out(reg) cs) };
-    
     println!("Switching to user mode:");
-    print!("Current CS: ");
-    printn!(cs);
-    print!("\n");
 
     core::arch::asm!(
         "cli",
-        "mov ax, 0x23",
-        "mov ds, ax",
-        "mov es, ax",
-        "mov fs, ax",
-        "mov gs, ax",
-
         "mov rsp, {0}",
         "mov rdi, {1}",
 
-        //"push 0x08",
-        //"push {2}",
-        //"pushfq",
-        //"push 0x10",
-        //"push rsp",
-        
         "push 0x23",    
         "push {0}",
         "pushfq",

@@ -21,7 +21,7 @@ impl<'a, D: BlockDevice> Filesystem<'a, D> {
 
         let mut found_fat = false;
 
-        debug!(sector);
+        //debug!(sector);
 
         // Search for the FAT12 label in the boot sector
         for i in 0..512 - 5 {

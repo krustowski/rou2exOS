@@ -1,6 +1,6 @@
 ;
 ; boot.asm
-; NASM syntax - stage2 bootloader to set GDT, IDT and memory paging before jumping into 64bit mode
+; NASM syntax - stage2 stub to set GDT, IDT and memory paging before jumping into 64bit mode
 ;
 
 BITS 32

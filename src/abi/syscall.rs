@@ -399,7 +399,7 @@ pub extern "C" fn syscall_handler() {
          *  Arg2: dir entries pointer (*mut Entry)
          */
         0x28 => {
-            let path = arg1;
+            let path = arg1 as u16;
             let entries = arg2 as *mut crate::fs::fat12::entry::Entry;
 
             let mut kentries: [crate::fs::fat12::entry::Entry; 32] = [crate::fs::fat12::entry::Entry::default(); 32];
@@ -409,8 +409,8 @@ pub extern "C" fn syscall_handler() {
 
             match Filesystem::new(&floppy) {
                 Ok(fs) => {
-                    fs.for_each_entry(0, |entry| {
-                        if entry.name[0] == 0x00 || entry.name[0] == 0xE5 || entry.attr & 0x08 != 0x00 {
+                    fs.for_each_entry(path, |entry| {
+                        if entry.name[0] == 0x00 || entry.name[0] == 0xE5 || entry.name[0] == 0xFF || entry.attr & 0x08 != 0 {
                             return;
                         }
 
@@ -423,6 +423,8 @@ pub extern "C" fn syscall_handler() {
                     unsafe {
                         core::ptr::copy_nonoverlapping(kentries.as_ptr(), entries, offset);
                     }
+
+                    ret = SyscallReturnCode::Okay;
                 }
                 Err(e) => {
                     rprint!(e);
@@ -431,8 +433,6 @@ pub extern "C" fn syscall_handler() {
                     ret = SyscallReturnCode::FilesystemError;
                 }
             }
-
-            ret = SyscallReturnCode::Okay;
         }
 
         /*

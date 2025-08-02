@@ -125,6 +125,7 @@ pub extern "C" fn syscall_handler() {
          */
         0x0f => {
             // TODO
+            ret = SyscallReturnCode::NotImplemented;
         }
 
         /*
@@ -243,6 +244,7 @@ pub extern "C" fn syscall_handler() {
                     rprint!("\n");
 
                     ret = SyscallReturnCode::FilesystemError;
+                    return;
                 }
             }
 
@@ -308,25 +310,16 @@ pub extern "C" fn syscall_handler() {
 
             match Filesystem::new(&floppy) {
                 Ok(fs) => {
-                    fs.for_each_entry(0, | entry | {
-                        if entry.name[0] == 0x00 || entry.name[0] == 0xE5 || entry.attr & 0x08 != 0 || entry.attr & 0x10 != 0 {
-                            return;
-                        }
-
-                        unsafe {
-                            if !entry.name.starts_with(&name) || !entry.ext.starts_with(&ext) {
-                                return
-                            }
-
-                            fs.write_file(0, &filename, &*buf_ptr);
-                        }
-                    });
+                    unsafe {
+                        fs.write_file(0, &filename, &*buf_ptr);
+                    }
                 }
                 Err(e) => {
                     rprint!(e);
                     rprint!("\n");
 
                     ret = SyscallReturnCode::FilesystemError;
+                    return;
                 }
             }
 
@@ -334,9 +327,75 @@ pub extern "C" fn syscall_handler() {
         }
 
         /*
+         *  Syscall 0x22 --- Rename a directory entry
+         *
+         *  Arg1: pointer to original filename
+         *  Arg2: pointer to new filename
+         */
+        0x22 => {
+            // TODO
+            ret = SyscallReturnCode::NotImplemented;
+        }
+
+        /*
+         *  Syscall 0x23 --- Delete a directory entry
+         *
+         *  Arg1: pointer to original filename
+         *  Arg2: 0x00
+         */
+        0x23 => {
+            // TODO
+            ret = SyscallReturnCode::NotImplemented;
+        }
+
+        /*
+         *  Syscall 0x24 --- Read the FAT table
+         *
+         *  Arg1: cluster No.
+         *  Arg2: pointer to next cluster (*mut u84)
+         */
+        0x24 => {
+            // TODO
+            ret = SyscallReturnCode::NotImplemented;
+        }
+
+        /*
+         *  Syscall 0x25 --- Write to the FAT table
+         *
+         *  Arg1: cluster No.
+         *  Arg2: pointer to value (*const u84)
+         */
+        0x25 => {
+            // TODO
+            ret = SyscallReturnCode::NotImplemented;
+        }
+
+        /*
+         *  Syscall 0x26 --- Insert entry into cluster
+         *
+         *  Arg1: cluster No.
+         *  Arg2: pointer to a new directory entry (*const Entry)
+         */
+        0x26 => {
+            // TODO
+            ret = SyscallReturnCode::NotImplemented;
+        }
+
+        /*
+         *  Syscall 0x27 --- Add new subdirectory
+         *
+         *  Arg1: cluster No.
+         *  Arg2: pointer to a new subdirectory name (*const u8)
+         */
+        0x27 => {
+            // TODO
+            ret = SyscallReturnCode::NotImplemented;
+        }
+
+        /*
          *  Syscall 0x28 --- List directory entries
          *  
-         *  Arg1: dir cluster ID
+         *  Arg1: dir cluster No.
          *  Arg2: dir entries pointer (*mut Entry)
          */
         0x28 => {
@@ -365,8 +424,15 @@ pub extern "C" fn syscall_handler() {
                         core::ptr::copy_nonoverlapping(kentries.as_ptr(), entries, offset);
                     }
                 }
-                Err(e) => {}
+                Err(e) => {
+                    rprint!(e);
+                    rprint!("\n");
+
+                    ret = SyscallReturnCode::FilesystemError;
+                }
             }
+
+            ret = SyscallReturnCode::Okay;
         }
 
         /*

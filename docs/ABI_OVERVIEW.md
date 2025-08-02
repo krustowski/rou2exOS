@@ -36,9 +36,9 @@ Please note that this list is incomplete as listed syscalls have to be implement
 |  `0x23`|  pointer to string data | --- | Delete the file specified in argument No. 1. Applicable on a file in the current directory. |
 |  `0x24`|  cluster No. | pointer to next cluster No. int64 |  Read the FAT table and find next (or first) sector of provided cluster. |
 |  `0x25`|  cluster No. | value | Write into given cluster such value provided in the argument No. 2. |
-|  `0x26`|  pointer to the Entry structure | cluster No. (directory cluster) | Insert an Entry provided via the first argument into the directory with Cluster No. specified in the argument No. 2. |
-|  `0x27`|  parent cluster No. (current directory usually) | pointer to string data | Create a new subdirectory in such parent directory specified by name in argument No. 2. |
-|  `0x28`|  parent cluster No. | pointer to array of entries | List the current directory. |
+|  `0x26`|  cluster NO. | pointer to the Entry structure | Insert an Entry provided via the first argument into the directory with Cluster No. specified in the argument No. 2. |
+|  `0x27`|  cluster No. (current directory usually) | pointer to string data | Create a new subdirectory in such parent directory specified by name in argument No. 2. |
+|  `0x28`|  cluster No. | pointer to array of entries | List the current directory. |
 |  `0x29`|  pointer to file name string | pointer to uint64 (PID) | Execute a flat binary executable (.BIN usually). |
 |  `0x2a`|  pointer to file name string | pointer to uint64 (PID) | Execute an ELF64 executable (.ELF). |
 |        |        |        | **Networking operations** |
@@ -77,7 +77,7 @@ pub struct SysInfo {
 }
 ```
 
-#### Entry 
+#### Entry (FAT12)
 
 ```rust
 #[repr(C, packed)]

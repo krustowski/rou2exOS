@@ -25,6 +25,7 @@ Please note that this list is incomplete as listed syscalls have to be implement
 |  `0x00`|  process ID | program return code | Graceful exit of a program/process/task. |
 |  `0x01`|  `0x01`|  pointer to SysInfo struct | Get the system information summary. Pointer in arg. 2 has to be casted to the SysInfo struct provided by a language library. Memory must be already allocated. |
 |        |  `0x02`|  pointer to SysInfo struct | Set the system information summary. Pointer in arg, 2 is a pointer to the SysInfo structure with new information items. |
+|  `0x02`|  `0x01`| pointer to RTC struct | Get the Real Time Clock (RTC) data. |
 |  `0x0f`|  pointer to type pointer | size in bytes to allocate | Allocate a memory block on heap. The pointer to the allocated block is returned in `RAX`, or is `0x00` if the allocation procedure fails. |
 |        |        |       | **Video output operations** |
 |  `0x10`|  pointer to string data | string length | Print provided string to terminal. |
@@ -74,6 +75,21 @@ pub struct SysInfo {
     pub system_user: [u8; 32],
     pub system_version: [u8; 8],
     pub system_uptime: u32,
+}
+```
+
+#### RTC 
+
+```rust
+#[repr(C, packed)]
+pub struct RTC {
+    pub seconds: u8,
+    pub minutes: u8,
+    pub hours: u8,
+    pub day: u8,
+    pub month: u8,
+    pub year: u8,
+    pub century: u8,
 }
 ```
 

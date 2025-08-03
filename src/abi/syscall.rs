@@ -94,6 +94,7 @@ pub extern "C" fn syscall_handler() {
                         let name = b"rou2ex";
                         let user = b"guest";
                         let version = b"v0.9.1";
+                        let path = b"/";
 
                         if let Some(nm) = (*sysinfo_ptr).system_name.get_mut(0..name.len()) {
                             nm.copy_from_slice(name);
@@ -101,6 +102,10 @@ pub extern "C" fn syscall_handler() {
 
                         if let Some(us) = (*sysinfo_ptr).system_user.get_mut(0..user.len()) {
                             us.copy_from_slice(user);
+                        }
+
+                        if let Some(ph) = (*sysinfo_ptr).system_path.get_mut(0..path.len()) {
+                            ph.copy_from_slice(path);
                         }
 
                         if let Some(vn) = (*sysinfo_ptr).system_version.get_mut(0..version.len()) {
@@ -528,6 +533,7 @@ pub extern "C" fn syscall_80h() {
 pub struct SysInfo {
     pub system_name: [u8; 32],
     pub system_user: [u8; 32],
+    pub system_path: [u8; 32],
     pub system_version: [u8; 8],
     pub system_uptime: u32,
 }

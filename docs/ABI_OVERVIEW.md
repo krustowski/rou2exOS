@@ -78,6 +78,15 @@ pub struct SysInfo {
 }
 ```
 
+```c
+typedef struct {
+    uint8_t system_name[32];
+    uint8_t system_user[32];
+    uint8_t system_version[8];
+    uint32_t  system_uptime;
+} __attribute__((packed)) SysInfo_T;
+```
+
 #### RTC 
 
 ```rust
@@ -113,5 +122,25 @@ pub struct Entry {
     pub start_cluster: u16,
     pub file_size: u32,
 }
+```
+
+```c
+#pragma pack(push, 1)
+typedef struct {
+    uint8_t name[8];
+    uint8_t ext[3];
+    uint8_t attr;
+    uint8_t reserved;
+    uint8_t tenths;
+    uint16_t create_time;
+    uint16_t create_date;
+    uint16_t last_access_time;
+    uint16_t high_cluster;
+    uint16_t write_time;
+    uint16_t write_date;
+    uint16_t start_cluster;
+    uint32_t file_size;
+} Entry_T;
+#pragma pack(pop)
 ```
 

@@ -22,53 +22,53 @@ Please note that these lists are incomplete as listed syscalls have to be implem
 
 #### System Information and Memory Management
 
-| Syscall No. | Argument 1 | Argument 2 | Purpose/Command |
+| Syscall No. | Argument 1 | Argument 2 | Purpose/Command | Implemented |
 |-------------|------------|------------|---------|
-|  `0x00`|  process ID | program return code | Graceful exit of a program/process/task. |
-|  `0x01`|  `0x01`|  pointer to SysInfo struct | Get the system information summary. Pointer in arg. 2 has to be casted to the SysInfo struct provided by a language library. Memory must be already allocated. |
-|        |  `0x02`|  pointer to SysInfo struct | Set the system information summary. Pointer in arg, 2 is a pointer to the SysInfo structure with new information items. |
-|  `0x02`|  `0x01`| pointer to RTC struct | Get the Real Time Clock (RTC) data. |
-|  `0x0f`|  pointer to type pointer | size in bytes to allocate | Allocate a memory block on heap. The pointer to the allocated block is returned in `RAX`, or is `0x00` if the allocation procedure fails. |
+|  `0x00`|  process ID | program return code | Graceful exit of a program/process/task. | ✅ |
+|  `0x01`|  `0x01`|  pointer to SysInfo struct | Get the system information summary. Pointer in arg. 2 has to be casted to the SysInfo struct provided by a language library. Memory must be already allocated. | ✅ |
+|        |  `0x02`|  pointer to SysInfo struct | Set the system information summary. Pointer in arg, 2 is a pointer to the SysInfo structure with new information items. | x |
+|  `0x02`|  `0x01`| pointer to RTC struct | Get the Real Time Clock (RTC) data. | ❌ | 
+|  `0x0f`|  pointer to type pointer | size in bytes to allocate | Allocate a memory block on heap. The pointer to the allocated block is returned in `RAX`, or is `0x00` if the allocation procedure fails. | ❌ |
 
 #### Video Output
 
-| Syscall No. | Argument 1 | Argument 2 | Purpose/Command |
+| Syscall No. | Argument 1 | Argument 2 | Purpose/Command | Implemented |
 |-------------|------------|------------|---------|
-|  `0x10`|  pointer to string data | string length | Print provided string to terminal. |
-|  `0x11`|  `0x00` | `0x00` | Clear the screen. |
+|  `0x10`|  pointer to string data | string length | Print provided string to terminal. | ✅ |
+|  `0x11`|  `0x00` | `0x00` | Clear the screen. | ✅ |
 
 #### Filesystem (FAT12)
 
-| Syscall No. | Argument 1 | Argument 2 | Purpose/Command |
+| Syscall No. | Argument 1 | Argument 2 | Purpose/Command | Implemented |
 |-------------|------------|------------|---------|
-|  `0x20`|  pointer to file name string | pointer to buffer | Read a file specified in the first argument and load its contents into the buffer in argument 2. |
-|  `0x21`|  pointer to string data | pointer to buffer | Write the buffer into a file (overwrite it) specified by the first argument. File is created in the current directory if not exists. |
-|  `0x22`|  pointer to string data | pointer to string data | Rename the file specified by its name in argument No. 1 to value specified in argument No. 2. |
-|  `0x23`|  pointer to string data | --- | Delete the file specified in argument No. 1. Applicable on a file in the current directory. |
-|  `0x24`|  cluster No. | pointer to next cluster No. int64 |  Read the FAT table and find next (or first) sector of provided cluster. |
-|  `0x25`|  cluster No. | value | Write into given cluster such value provided in the argument No. 2. |
-|  `0x26`|  cluster NO. | pointer to the Entry structure | Insert an Entry provided via the first argument into the directory with Cluster No. specified in the argument No. 2. |
-|  `0x27`|  cluster No. (current directory usually) | pointer to string data | Create a new subdirectory in such parent directory specified by name in argument No. 2. |
-|  `0x28`|  cluster No. | pointer to array of entries | List the current directory. |
-|  `0x29`|  pointer to file name string | pointer to uint64 (PID) | Execute a flat binary executable (.BIN usually). |
-|  `0x2a`|  pointer to file name string | pointer to uint64 (PID) | Execute an ELF64 executable (.ELF). |
+|  `0x20`|  pointer to file name string | pointer to buffer | Read a file specified in the first argument and load its contents into the buffer in argument 2. | ✅ |
+|  `0x21`|  pointer to string data | pointer to buffer | Write the buffer into a file (overwrite it) specified by the first argument. File is created in the current directory if not exists. | ✅ |
+|  `0x22`|  pointer to string data | pointer to string data | Rename the file specified by its name in argument No. 1 to value specified in argument No. 2. | ❌ |
+|  `0x23`|  pointer to string data | --- | Delete the file specified in argument No. 1. Applicable on a file in the current directory. | ❌ |
+|  `0x24`|  cluster No. | pointer to next cluster No. int64 |  Read the FAT table and find next (or first) sector of provided cluster. | ❌ |
+|  `0x25`|  cluster No. | value | Write into given cluster such value provided in the argument No. 2. | ❌ |
+|  `0x26`|  cluster NO. | pointer to the Entry structure | Insert an Entry provided via the first argument into the directory with Cluster No. specified in the argument No. 2. | ❌ |
+|  `0x27`|  cluster No. (current directory usually) | pointer to string data | Create a new subdirectory in such parent directory specified by name in argument No. 2. | ❌ |
+|  `0x28`|  cluster No. | pointer to array of entries | List the current directory. | ✅ |
+|  `0x29`|  pointer to file name string | pointer to uint64 (PID) | Execute a flat binary executable (.BIN usually). | ❌ |
+|  `0x2a`|  pointer to file name string | pointer to uint64 (PID) | Execute an ELF64 executable (.ELF). | ❌ |
 
 #### Port I/O and Networking
 
-| Syscall No. | Argument 1 | Argument 2 | Purpose/Command |
+| Syscall No. | Argument 1 | Argument 2 | Purpose/Command | Implemented |
 |-------------|------------|------------|---------|
-|  `0x30`|  port identificator (ID) | pointer to value (uint64) | Send a value to a port specified in arg No. 1. |
-|  `0x31`|  port identificator (ID) | pointer to value (uint64) | Receive a value from a port specified in arg No. 1. |
-|  `0x32`|  `0x01`|  pointer to array of network devices | List all network devices/interfaces available. |
-|  `0x33`|  `0x01`|  pointer to buffer | Create a new ICMP packet.  |
+|  `0x30`|  port identificator (ID) | pointer to value (uint64) | Send a value to a port specified in arg No. 1. | ✅ |
+|  `0x31`|  port identificator (ID) | pointer to value (uint64) | Receive a value from a port specified in arg No. 1. | ✅ |
+|  `0x32`|  `0x01`|  pointer to array of network devices | List all network devices/interfaces available. | ❌ |
+|  `0x33`|  `0x01`|  pointer to buffer | Create a new ICMP packet.  | ❌ |
 
 #### Audio
 
-| Syscall No. | Argument 1 | Argument 2 | Purpose/Command |
+| Syscall No. | Argument 1 | Argument 2 | Purpose/Command | Implemented |
 |-------------|------------|------------|---------|
-|  `0x40`|  frequency in Hz | length in milliseconds | Play the frequency. |
-|  `0x41`|  `0x01`| pointer to the audio file | Play the audio file. |
-|  `0x4f`|  `0x00`|  `0x00`| Stop the player. |
+|  `0x40`|  frequency in Hz | length in milliseconds | Play the frequency. | ❌ |
+|  `0x41`|  `0x01`| pointer to the audio file | Play the audio file. | ❌ |
+|  `0x4f`|  `0x00`|  `0x00`| Stop the player. | ❌ |
 
 
 ### Syscall Return Codes

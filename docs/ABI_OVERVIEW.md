@@ -23,7 +23,7 @@ Please note that these lists are incomplete as listed syscalls have to be implem
 #### System Information and Memory Management
 
 | Syscall No. | Argument 1 | Argument 2 | Purpose/Command | Implemented |
-|-------------|------------|------------|---------|
+|-------------|------------|------------|-----------------|-------------|
 |  `0x00`|  process ID | program return code | Graceful exit of a program/process/task. | ✅ |
 |  `0x01`|  `0x01`|  pointer to SysInfo struct | Get the system information summary. Pointer in arg. 2 has to be casted to the SysInfo struct provided by a language library. Memory must be already allocated. | ✅ |
 |        |  `0x02`|  pointer to SysInfo struct | Set the system information summary. Pointer in arg, 2 is a pointer to the SysInfo structure with new information items. | x |
@@ -33,14 +33,14 @@ Please note that these lists are incomplete as listed syscalls have to be implem
 #### Video Output
 
 | Syscall No. | Argument 1 | Argument 2 | Purpose/Command | Implemented |
-|-------------|------------|------------|---------|
+|-------------|------------|------------|-----------------|-------------|
 |  `0x10`|  pointer to string data | string length | Print provided string to terminal. | ✅ |
 |  `0x11`|  `0x00` | `0x00` | Clear the screen. | ✅ |
 
 #### Filesystem (FAT12)
 
 | Syscall No. | Argument 1 | Argument 2 | Purpose/Command | Implemented |
-|-------------|------------|------------|---------|
+|-------------|------------|------------|-----------------|-------------|
 |  `0x20`|  pointer to file name string | pointer to buffer | Read a file specified in the first argument and load its contents into the buffer in argument 2. | ✅ |
 |  `0x21`|  pointer to string data | pointer to buffer | Write the buffer into a file (overwrite it) specified by the first argument. File is created in the current directory if not exists. | ✅ |
 |  `0x22`|  pointer to string data | pointer to string data | Rename the file specified by its name in argument No. 1 to value specified in argument No. 2. | ❌ |
@@ -56,7 +56,7 @@ Please note that these lists are incomplete as listed syscalls have to be implem
 #### Port I/O and Networking
 
 | Syscall No. | Argument 1 | Argument 2 | Purpose/Command | Implemented |
-|-------------|------------|------------|---------|
+|-------------|------------|------------|-----------------|-------------|
 |  `0x30`|  port identificator (ID) | pointer to value (uint64) | Send a value to a port specified in arg No. 1. | ✅ |
 |  `0x31`|  port identificator (ID) | pointer to value (uint64) | Receive a value from a port specified in arg No. 1. | ✅ |
 |  `0x32`|  `0x01`|  pointer to array of network devices | List all network devices/interfaces available. | ❌ |
@@ -65,7 +65,7 @@ Please note that these lists are incomplete as listed syscalls have to be implem
 #### Audio
 
 | Syscall No. | Argument 1 | Argument 2 | Purpose/Command | Implemented |
-|-------------|------------|------------|---------|
+|-------------|------------|------------|-----------------|-------------|
 |  `0x40`|  frequency in Hz | length in milliseconds | Play the frequency. | ❌ |
 |  `0x41`|  `0x01`| pointer to the audio file | Play the audio file. | ❌ |
 |  `0x4f`|  `0x00`|  `0x00`| Stop the player. | ❌ |

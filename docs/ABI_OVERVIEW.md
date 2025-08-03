@@ -18,7 +18,9 @@ Please note that all values passed into a syscall must be aligned to 8 bytes (64
 
 ### Table of Syscalls
 
-Please note that this list is incomplete as listed syscalls have to be implemented in the kernel ABI. To be expanded.
+Please note that these lists are incomplete as listed syscalls have to be implemented in the kernel ABI. To be expanded.
+
+#### System Information and Memory Management
 
 | Syscall No. | Argument 1 | Argument 2 | Purpose/Command |
 |-------------|------------|------------|---------|
@@ -27,10 +29,18 @@ Please note that this list is incomplete as listed syscalls have to be implement
 |        |  `0x02`|  pointer to SysInfo struct | Set the system information summary. Pointer in arg, 2 is a pointer to the SysInfo structure with new information items. |
 |  `0x02`|  `0x01`| pointer to RTC struct | Get the Real Time Clock (RTC) data. |
 |  `0x0f`|  pointer to type pointer | size in bytes to allocate | Allocate a memory block on heap. The pointer to the allocated block is returned in `RAX`, or is `0x00` if the allocation procedure fails. |
-|        |        |       | **Video output operations** |
+
+#### Video Output
+
+| Syscall No. | Argument 1 | Argument 2 | Purpose/Command |
+|-------------|------------|------------|---------|
 |  `0x10`|  pointer to string data | string length | Print provided string to terminal. |
 |  `0x11`|  `0x00` | `0x00` | Clear the screen. |
-|        |        |       | **Filesystem operations** |
+
+#### Filesystem (FAT12)
+
+| Syscall No. | Argument 1 | Argument 2 | Purpose/Command |
+|-------------|------------|------------|---------|
 |  `0x20`|  pointer to file name string | pointer to buffer | Read a file specified in the first argument and load its contents into the buffer in argument 2. |
 |  `0x21`|  pointer to string data | pointer to buffer | Write the buffer into a file (overwrite it) specified by the first argument. File is created in the current directory if not exists. |
 |  `0x22`|  pointer to string data | pointer to string data | Rename the file specified by its name in argument No. 1 to value specified in argument No. 2. |
@@ -42,12 +52,20 @@ Please note that this list is incomplete as listed syscalls have to be implement
 |  `0x28`|  cluster No. | pointer to array of entries | List the current directory. |
 |  `0x29`|  pointer to file name string | pointer to uint64 (PID) | Execute a flat binary executable (.BIN usually). |
 |  `0x2a`|  pointer to file name string | pointer to uint64 (PID) | Execute an ELF64 executable (.ELF). |
-|        |        |        | **Networking operations** |
+
+#### Port I/O and Networking
+
+| Syscall No. | Argument 1 | Argument 2 | Purpose/Command |
+|-------------|------------|------------|---------|
 |  `0x30`|  port identificator (ID) | pointer to value (uint64) | Send a value to a port specified in arg No. 1. |
 |  `0x31`|  port identificator (ID) | pointer to value (uint64) | Receive a value from a port specified in arg No. 1. |
 |  `0x32`|  `0x01`|  pointer to array of network devices | List all network devices/interfaces available. |
 |  `0x33`|  `0x01`|  pointer to buffer | Create a new ICMP packet.  |
-|        |        |        | **Audio operations** |
+
+#### Audio
+
+| Syscall No. | Argument 1 | Argument 2 | Purpose/Command |
+|-------------|------------|------------|---------|
 |  `0x40`|  frequency in Hz | length in milliseconds | Play the frequency. |
 |  `0x41`|  `0x01`| pointer to the audio file | Play the audio file. |
 |  `0x4f`|  `0x00`|  `0x00`| Stop the player. |

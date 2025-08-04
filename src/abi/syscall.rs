@@ -221,22 +221,20 @@ pub extern "C" fn syscall_handler() {
                             file_read = true;
                         }
                     });
+
+                    if !file_read {
+                        ret = SyscallReturnCode::FileNotFound;
+                    } else {
+                        ret = SyscallReturnCode::Okay;
+                    }
                 }
                 Err(e) => {
                     rprint!(e);
                     rprint!("\n");
 
                     ret = SyscallReturnCode::FilesystemError;
-                    return;
                 }
             }
-
-            if !file_read {
-                ret = SyscallReturnCode::FileNotFound;
-                return;
-            }
-
-            ret = SyscallReturnCode::Okay;
         }
 
         /*
@@ -267,17 +265,17 @@ pub extern "C" fn syscall_handler() {
                     unsafe {
                         fs.write_file(0, &filename, &*buf_ptr);
                     }
+
+                    ret = SyscallReturnCode::Okay;
                 }
                 Err(e) => {
                     rprint!(e);
                     rprint!("\n");
 
                     ret = SyscallReturnCode::FilesystemError;
-                    return;
                 }
             }
 
-            ret = SyscallReturnCode::Okay;
         }
 
         /*
@@ -287,8 +285,54 @@ pub extern "C" fn syscall_handler() {
          *  Arg2: pointer to new filename
          */
         0x22 => {
-            // TODO
-            ret = SyscallReturnCode::NotImplemented;
+            if arg1 < USERLAND_START || arg1 > USERLAND_END || arg2 < USERLAND_START || arg2 > USERLAND_END {
+                ret = SyscallReturnCode::InvalidInput;
+                return;
+            }
+
+            let (name_old, ext_old) = format_filename(arg1 as *const u8);
+            let (name_new, ext_new) = format_filename(arg2 as *const u8);
+
+            let mut filename_old: [u8; 11] = [b' '; 11];
+            filename_old[0..8].copy_from_slice(&name_old);
+            filename_old[8..11].copy_from_slice(&ext_old);
+
+            let mut filename_new: [u8; 11] = [b' '; 11];
+            filename_new[0..8].copy_from_slice(&name_new);
+            filename_new[8..11].copy_from_slice(&ext_new);
+
+            let floppy = Floppy::init();
+            let mut file_found: bool = false;
+
+            match Filesystem::new(&floppy) {
+                Ok(fs) => {
+                    fs.for_each_entry(0, | entry | {
+                        if entry.name[0] == 0x00 || entry.name[0] == 0xE5 || entry.attr & 0x08 != 0 {
+                            return;
+                        }
+
+                        if !entry.name.starts_with(&name_old) || (ext_old.len() > 0 && !entry.ext.starts_with(&ext_old)) {
+                            return
+                        }
+
+                        // Read the file directly into the client's buffer
+                        fs.rename_file(0, &filename_old, &filename_new);
+                        file_found = true;
+                    });
+
+                    if !file_found {
+                        ret = SyscallReturnCode::FileNotFound;
+                    } else {
+                        ret = SyscallReturnCode::Okay;
+                    }
+                }
+                Err(e) => {
+                    rprint!(e);
+                    rprint!("\n");
+
+                    ret = SyscallReturnCode::FilesystemError;
+                }
+            }
         }
 
         /*
@@ -298,8 +342,49 @@ pub extern "C" fn syscall_handler() {
          *  Arg2: 0x00
          */
         0x23 => {
-            // TODO
-            ret = SyscallReturnCode::NotImplemented;
+            if arg1 < USERLAND_START || arg1 > USERLAND_END || arg2 != 0 {
+                ret = SyscallReturnCode::InvalidInput;
+                return;
+            }
+
+            let (name, ext) = format_filename(arg1 as *const u8);
+
+            let mut filename: [u8; 11] = [b' '; 11];
+            filename[0..8].copy_from_slice(&name);
+            filename[8..11].copy_from_slice(&ext);
+
+            let mut file_found: bool = false;
+            let floppy = Floppy::init();
+
+            match Filesystem::new(&floppy) {
+                Ok(fs) => {
+                    fs.for_each_entry(0, | entry | {
+                        if entry.name[0] == 0x00 || entry.name[0] == 0xE5 || entry.attr & 0x08 != 0 {
+                            return;
+                        }
+
+                        if !entry.name.starts_with(&name) || !entry.ext.starts_with(&ext) {
+                            return
+                        }
+
+                        // Read the file directly into the client's buffer
+                        fs.delete_file(0, &filename);
+                        file_found = true;
+                    });
+
+                    if !file_found {
+                        ret = SyscallReturnCode::FileNotFound;
+                    } else {
+                        ret = SyscallReturnCode::Okay;
+                    }
+                }
+                Err(e) => {
+                    rprint!(e);
+                    rprint!("\n");
+
+                    ret = SyscallReturnCode::FilesystemError;
+                }
+            }
         }
 
         /*

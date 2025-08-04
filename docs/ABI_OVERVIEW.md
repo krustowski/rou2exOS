@@ -14,7 +14,7 @@ The privilege levels are to be specified and defined in the Global Descriptor Ta
 | `2` | `0x7e` | privileged user space, services, privileged shell access |
 | `3` | `0x7f` | user space, user programs, common shell |
 
-* *Kernel itself handles multiple software (CPU exceptions) and hardware interrupts (e.g. IRQs). *
+**Kernel itself handles multiple software (CPU exceptions) and hardware interrupts (e.g. IRQs).*
 
 All common interrupts are callable from anywhere, but are handled only when called from the defined CPU ring, therefore are locked to such space.
 

@@ -3,6 +3,18 @@
 This overview document presents the rou2exOS (aka `r2`) kernel interface for external applications. Applications should utilize custom programming language libraries provided in [the apps repository](https://github.com/krustowski/rou2exOS-apps) and statically link them with their source code. Examples on how to use such libraries, how to compile them and link them are provided in directories named by concerned languages.
 
 
+## Privilege Levels
+
+The privilege levels are to be specified and defined in the Global Descriptor Table (GDT) in early boot sequence procedures.
+
+| CPU Ring | Target purpose |
+|----------|----------------|
+| `0` | kernel space |
+| `1` | kernel tasks, drivers, kernel services | 
+| `2` | privileged user space, services, privileged shell access |
+| `3` | user space, user programs, common shell |
+
+
 ## Syscall Specification
 
 The system call (syscall) is a procedure for requesting or modifying of kernel components, modules and drivers. Syscalls use the software interrupts (`int 0x7f`) under the hood to notify the CPU and kernel to take an action. Parameters of a syscall are passed using the CPU registers that are listed below.

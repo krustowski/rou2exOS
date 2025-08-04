@@ -44,7 +44,7 @@ Please note that these lists are incomplete as listed syscalls have to be implem
 |  `0x20`|  pointer to file name string | pointer to buffer | Read a file specified in the first argument and load its contents into the buffer in argument 2. | ✅ |
 |  `0x21`|  pointer to string data | pointer to buffer | Write the buffer into a file (overwrite it) specified by the first argument. File is created in the current directory if not exists. | ✅ |
 |  `0x22`|  pointer to string data | pointer to string data | Rename the file specified by its name in argument No. 1 to value specified in argument No. 2. | ✅ |
-|  `0x23`|  pointer to string data | --- | Delete the file specified in argument No. 1. Applicable on a file in the current directory. | ✅ |
+|  `0x23`|  pointer to string data | `0x00` | Delete the file specified in argument No. 1. Applicable on a file in the current directory. | ✅ |
 |  `0x24`|  cluster No. | pointer to next cluster No. int64 |  Read the FAT table and find next (or first) sector of provided cluster. | ❌ |
 |  `0x25`|  cluster No. | value | Write into given cluster such value provided in the argument No. 2. | ❌ |
 |  `0x26`|  cluster NO. | pointer to the Entry structure | Insert an Entry provided via the first argument into the directory with Cluster No. specified in the argument No. 2. | ❌ |

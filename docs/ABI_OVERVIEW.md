@@ -51,7 +51,7 @@ Please note that these lists are incomplete as listed syscalls have to be implem
 |  `0x27`|  cluster No. (current directory usually) | pointer to string data | Create a new subdirectory in such parent directory specified by name in argument No. 2. | ✅ |
 |  `0x28`|  cluster No. | pointer to array of entries | List the current directory. | ✅ |
 |  `0x29`|  pointer to file name string | pointer to uint64 (PID) | Execute a flat binary executable (.BIN usually). | ❌ |
-|  `0x2a`|  pointer to file name string | pointer to uint64 (PID) | Execute an ELF64 executable (.ELF). | ❌ |
+|  `0x2a`|  pointer to file name string | pointer to uint64 (PID) | Execute an ELF64 executable (.ELF). | ✅ |
 
 #### Port I/O and Networking
 

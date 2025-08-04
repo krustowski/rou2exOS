@@ -1,8 +1,6 @@
-use core::alloc::GlobalAlloc;
-
 use crate::{
-    fs::fat12::{block::Floppy, fs::Filesystem, entry::Entry}, 
-    //input::elf::kernel_return, 
+    fs::fat12::{block::{Floppy, BlockDevice}, fs::Filesystem, entry::Entry}, 
+    input::elf, 
     //task::process::schedule,
 };
 
@@ -95,7 +93,7 @@ pub extern "C" fn syscall_handler() {
                     unsafe {
                         let name = b"rou2ex";
                         let user = b"guest";
-                        let version = b"v0.9.1";
+                        let version = b"v0.9.2";
                         let path = b"/";
 
                         if let Some(nm) = (*sysinfo_ptr).system_name.get_mut(0..name.len()) {
@@ -498,6 +496,122 @@ pub extern "C" fn syscall_handler() {
                     ret = SyscallReturnCode::FilesystemError;
                 }
             }
+        }
+
+        /*
+         *  Syscall 0x29 --- Load and run flat binary executable (.BIN)
+         *
+         *  Arg1: file name
+         *  Arg2: pointer to PID (*mut u8)
+         */
+        0x29 => {
+            // TODO
+            ret = SyscallReturnCode::NotImplemented;
+        }
+
+        /*
+         *  Syscall 0x2A --- Load and run ELF executable (.ELF)
+         *
+         *  Arg1: file name
+         *  Arg2: pointer to PID (*mut u8)
+         */
+        0x2A => {
+            if arg1 < USERLAND_START || arg1 > USERLAND_END || arg2 < USERLAND_START || arg2 > USERLAND_END {
+                ret = SyscallReturnCode::InvalidInput;
+                return;
+            }
+
+            let (name, ext) = format_filename(arg1 as *const u8);
+            let mut pid = arg2 as *mut u8;
+
+            let mut file_found: bool = false;
+            let mut file_size = 0;
+            let mut cluster = 0;
+
+            let floppy = Floppy::init();
+
+            match Filesystem::new(&floppy) {
+                Ok(fs) => {
+                    fs.for_each_entry(0, | entry | {
+                        if entry.name[0] == 0x00 || entry.name[0] == 0xE5 || entry.attr & 0x08 != 0 || entry.attr & 0x10 != 0 {
+                            return;
+                        }
+
+                        if !entry.name.starts_with(&name) || !entry.ext.starts_with(&ext) || &ext != b"ELF" {
+                            return
+                        }
+
+                        file_found = true;
+                        file_size = entry.file_size;
+                        cluster = entry.start_cluster;
+
+                        //
+                        //  Load the whole ELF to a temp location
+                        //
+
+                        let load_addr: u64 = 0x650_000;
+                        let stack_top = 0x670_000;
+
+                        let mut offset = 0;
+
+                        while file_size - offset > 0 {
+                            let lba = fs.cluster_to_lba(cluster);
+                            let mut sector = [0u8; 512];
+
+                            fs.device.read_sector(lba, &mut sector);
+
+                            let dst = load_addr as *mut u8;
+
+                            rprint!("Loading ELF image to memory segment\n");
+
+                            unsafe {
+                                for i in 0..512 {
+                                    if let Some(byte) = sector.get(i) {
+                                        *dst.add(i + offset as usize) = *byte;
+                                    }
+                                }
+                            }
+
+                            cluster = fs.read_fat12_entry(cluster);
+
+                            if cluster >= 0xFF8 || cluster == 0 {
+                                break;
+                            }
+
+                            offset += 512;
+                        }
+
+                        let arg: u64 = 555;
+                        let entry_ptr = (load_addr + 0x18) as *const u8;
+
+                        unsafe {
+                            // Assume `elf_image` is a pointer to the loaded ELF file in memory
+                            let entry_addr = elf::load_elf64(load_addr as usize);
+
+                            // Cast and jump
+                            let entry_fn: extern "C" fn() -> u64 = core::mem::transmute(entry_addr as *const ());
+
+                            rprint!("Jumping to the program entry point...\n");
+                            elf::jump_to_elf(entry_fn, stack_top, arg);
+                        }
+
+                        ret = SyscallReturnCode::Okay;
+
+                    });
+                }
+                Err(e) => {
+                    rprint!(e);
+                    rprint!("\n");
+
+                    ret = SyscallReturnCode::FilesystemError;
+                }
+            }
+
+            if !file_found {
+                ret = SyscallReturnCode::FileNotFound;
+                return;
+            } 
+
         }
 
         /*

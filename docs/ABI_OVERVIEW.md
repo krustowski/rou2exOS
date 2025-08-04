@@ -7,13 +7,16 @@ This overview document presents the rou2exOS (aka `r2`) kernel interface for ext
 
 The privilege levels are to be specified and defined in the Global Descriptor Table (GDT) in early boot sequence procedures.
 
-| CPU Ring | Target purpose |
-|----------|----------------|
-| `0` | kernel space |
-| `1` | kernel tasks, drivers, kernel services | 
-| `2` | privileged user space, services, privileged shell access |
-| `3` | user space, user programs, common shell |
+| CPU Ring | Common Interrupt | Target purpose |
+|----------|------------------|----------------|
+| `0` | *      | kernel space |
+| `1` | `0x7d` | kernel tasks, drivers, kernel services | 
+| `2` | `0x7e` | privileged user space, services, privileged shell access |
+| `3` | `0x7f` | user space, user programs, common shell |
 
+* *Kernel itself handles multiple software (CPU exceptions) and hardware interrupts (e.g. IRQs). *
+
+All common interrupts are callable from anywhere, but are handled only when called from the defined CPU ring, therefore are locked to such space.
 
 ## Syscall Specification
 

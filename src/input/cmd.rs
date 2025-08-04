@@ -16,7 +16,7 @@ use crate::video;
 use crate::input::keyboard;
 use crate::tui::{widget::{Container, Window, Label}, app::TuiApp};
 
-const KERNEL_VERSION: &[u8] = b"0.9.2";
+const KERNEL_VERSION: &[u8] = b"0.9.3";
 
 struct Command {
     name: &'static [u8],

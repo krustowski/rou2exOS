@@ -1,3 +1,5 @@
+use core::alloc::GlobalAlloc;
+
 use crate::{
     fs::fat12::{block::Floppy, fs::Filesystem, entry::Entry}, 
     //input::elf::kernel_return, 
@@ -129,6 +131,11 @@ pub extern "C" fn syscall_handler() {
          *  Arg2: size in bytes to allocate
          */
         0x0f => {
+            if arg1 < USERLAND_START || arg1 > USERLAND_END {
+                ret = SyscallReturnCode::InvalidInput;
+                return;
+            }
+
             // TODO
             ret = SyscallReturnCode::NotImplemented;
         }
@@ -191,36 +198,7 @@ pub extern "C" fn syscall_handler() {
 
             let name_ptr = arg1 as *const u8;
 
-            let mut name = [b' '; 8];
-            let mut ext = [b' '; 3];
-
-            unsafe {
-                let mut i = 0;
-                let mut saw_dot = false;
-                let mut ext_i = 0;
-
-                while *name_ptr.add(i) != 0 {
-                    let c = *name_ptr.add(i);
-                    if c == b'.' {
-                        saw_dot = true;
-                        i += 1;
-                        continue;
-                    }
-
-                    if !saw_dot {
-                        if i < 8 {
-                            name[i] = c.to_ascii_uppercase();
-                        }
-                    } else {
-                        if ext_i < 3 {
-                            ext[ext_i] = c.to_ascii_uppercase();
-                            ext_i += 1;
-                        }
-                    }
-
-                    i += 1;
-                }
-            }
+            let (name, ext) = format_filename(name_ptr);
 
             let buf_ptr = arg2 as *mut [u8; 512];
             let floppy = Floppy::init();
@@ -275,36 +253,7 @@ pub extern "C" fn syscall_handler() {
 
             let name_ptr = arg1 as *const u8;
 
-            let mut name = [b' '; 8];
-            let mut ext = [b' '; 3];
-
-            unsafe {
-                let mut i = 0;
-                let mut saw_dot = false;
-                let mut ext_i = 0;
-
-                while *name_ptr.add(i) != 0 {
-                    let c = *name_ptr.add(i);
-                    if c == b'.' {
-                        saw_dot = true;
-                        i += 1;
-                        continue;
-                    }
-
-                    if !saw_dot {
-                        if i < 8 {
-                            name[i] = c.to_ascii_uppercase();
-                        }
-                    } else {
-                        if ext_i < 3 {
-                            ext[ext_i] = c.to_ascii_uppercase();
-                            ext_i += 1;
-                        }
-                    }
-
-                    i += 1;
-                }
-            }
+            let (name, ext) = format_filename(name_ptr);
 
             let mut filename: [u8; 11] = [b' '; 11];
             filename[0..8].copy_from_slice(&name);
@@ -393,8 +342,34 @@ pub extern "C" fn syscall_handler() {
          *  Arg2: pointer to a new subdirectory name (*const u8)
          */
         0x27 => {
-            // TODO
-            ret = SyscallReturnCode::NotImplemented;
+            if arg2 < USERLAND_START || arg2 > USERLAND_END {
+                ret = SyscallReturnCode::InvalidInput;
+                return;
+            }
+
+            let name_ptr = arg2 as *const u8;
+
+            let (name, ext) = format_filename(name_ptr);
+
+            let mut filename: [u8; 11] = [b' '; 11];
+            filename[0..8].copy_from_slice(&name);
+            filename[8..11].copy_from_slice(&ext);
+
+            let floppy = Floppy::init();
+
+            match Filesystem::new(&floppy) {
+                Ok(fs) => {
+                    fs.create_subdirectory(&filename, arg1 as u16);
+
+                    ret = SyscallReturnCode::Okay;
+                }
+                Err(e) => {
+                    rprint!(e);
+                    rprint!("\n");
+
+                    ret = SyscallReturnCode::FilesystemError;
+                }
+            }
         }
 
         /*
@@ -494,6 +469,45 @@ pub extern "C" fn syscall_handler() {
         );
     }
 }
+
+fn format_filename(name_ptr: *const u8) -> ([u8; 8], [u8; 3]) {
+    let mut name = [b' '; 8];
+    let mut ext = [b' '; 3];
+
+    unsafe {
+        let mut i = 0;
+        let mut saw_dot = false;
+        let mut ext_i = 0;
+
+        while *name_ptr.add(i) != 0 {
+            let c = *name_ptr.add(i);
+            if c == b'.' {
+                saw_dot = true;
+                i += 1;
+                continue;
+            }
+
+            if !saw_dot {
+                if i < 8 {
+                    name[i] = c.to_ascii_uppercase();
+                }
+            } else {
+                if ext_i < 3 {
+                    ext[ext_i] = c.to_ascii_uppercase();
+                    ext_i += 1;
+                }
+            }
+
+            i += 1;
+        }
+
+        (name, ext)
+    }
+}
+
+//
+//
+//
 
 #[no_mangle]
 pub extern "C" fn syscall_80h() {

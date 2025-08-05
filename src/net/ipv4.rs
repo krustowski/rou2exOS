@@ -7,9 +7,9 @@ pub const MAX_CONNS: usize = 10;
 
 #[repr(C, packed)]
 pub struct Ipv4Header {
-    version_ihl: u8,
+    pub version_ihl: u8,
     dscp_ecn: u8,
-    total_length: u16,
+    pub total_length: u16,
     identification: u16,
     flags_fragment_offset: u16,
     ttl: u8,

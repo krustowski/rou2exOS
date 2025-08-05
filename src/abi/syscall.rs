@@ -1,7 +1,7 @@
 use crate::{
     fs::fat12::{block::{Floppy, BlockDevice}, fs::Filesystem, entry::Entry}, 
     input::elf, 
-    net::serial,
+    net::{serial, ipv4, icmp},
     //task::process::schedule,
 };
 
@@ -43,13 +43,13 @@ pub extern "C" fn syscall_handler() {
     debugn!(arg2);
     debug!("\n");
 
-    rprint!("syscall_handler: called: ");
+    /*rprint!("syscall_handler: called: ");
     rprintn!(syscall_no);
     rprint!(", arg1: ");
     rprintn!(arg1);
     rprint!(", arg2: ");
     rprintn!(arg2);
-    rprint!("\n");
+    rprint!("\n");*/
 
     match syscall_no {
         /*
@@ -711,21 +711,126 @@ pub extern "C" fn syscall_handler() {
                 }
             }
         }
+
         /*
          *  Syscall 0x33 --- Create a packet
          *
          *  Arg1: packet type
          *  Arg2: pointer to buffer (*mut u8)
          */
-        0x33 => {}
+        0x33 => {
+            if arg2 < USERLAND_START || arg2 > USERLAND_END {
+                ret = SyscallReturnCode::InvalidInput;
+                return;
+            }
+
+            match arg1 {
+                // IPv4 packet
+                0x01 => {
+                    let packet = arg2 as *mut u8;
+                    let header = packet as *mut ipv4::Ipv4Header;
+                    let mut ipv4_buffer = [0u8; 1500];
+                    let mut ipv4_buffer_aux = [0u8; 1500];
+
+                    unsafe {
+                        core::ptr::copy_nonoverlapping(packet, ipv4_buffer.as_mut_ptr(), 1500);
+                        core::ptr::copy_nonoverlapping(packet, ipv4_buffer_aux.as_mut_ptr(), 1500);
+
+                        let header_len = ((*header).version_ihl & 0x0F) * 4;
+                        let total_len = u16::from_be((*header).total_length);
+
+                        if total_len >= 1500 {
+                            ret = SyscallReturnCode::InvalidInput;
+                            return;
+                        }
+
+                        let payload = &ipv4_buffer_aux.get(header_len as usize..total_len as usize).unwrap_or(&[]);
+
+                        let ipv4_len = ipv4::create_packet((*header).dest_ip, (*header).source_ip , (*header).protocol, payload, &mut ipv4_buffer);
+
+                        if ipv4_len == 0 {
+                            ret = SyscallReturnCode::InvalidInput;
+                            return;
+                        }
+
+                        let ipv4_slice = ipv4_buffer.get(..ipv4_len).unwrap_or(&[]);
+
+                        core::ptr::copy_nonoverlapping(ipv4_slice.as_ptr(), packet, ipv4_len);
+                    }
+
+                    ret = SyscallReturnCode::Okay;
+                }
+
+                // ICMP packet
+                0x02 => {
+                    let mut packet = arg2 as *mut u8;
+                    let mut header = packet as *mut icmp::IcmpHeader;
+                    let mut icmp_buffer = [0u8; 64];
+                    let mut icmp_buffer_aux = [0u8; 64];
+
+                    unsafe {
+                        core::ptr::copy_nonoverlapping(packet, icmp_buffer_aux.as_mut_ptr(), 1500);
+
+                        let payload = &icmp_buffer_aux.get(8..).unwrap_or(&[]);
+
+                        let icmp_len = icmp::create_packet(0, (*header).identifier, (*header).sequence_number, payload, &mut icmp_buffer);
+                        let icmp_slice = icmp_buffer.get(..icmp_len).unwrap_or(&[]);
+
+                        core::ptr::copy_nonoverlapping(icmp_slice.as_ptr(), packet, icmp_len);
+                    }
+
+                    ret = SyscallReturnCode::Okay;
+                }
+
+                _ => {}
+            }
+        }
 
         /*
          *  Syscall 0x34 --- Send a packet
          *
          *  Arg1: packet type
-         *  Arg2: pointer to buffer (*mut u8)
+         *  Arg2: pointer to buffer (*const u8)
          */
-        0x34 => {}
+        0x34 => {
+            if arg2 < USERLAND_START || arg2 > USERLAND_END {
+                ret = SyscallReturnCode::InvalidInput;
+                return;
+            }
+
+            match arg1 {
+                // IPv4 packet
+                0x01 => {
+                    let packet = arg2 as *const u8;
+
+                    let header = packet as *const ipv4::Ipv4Header;
+
+                    unsafe {
+                        /*printn!((*header).dest_ip[0]);
+                        print!(".");
+                        printn!((*header).dest_ip[1]);
+                        print!(".");
+                        printn!((*header).dest_ip[2]);
+                        print!(".");
+                        printn!((*header).dest_ip[3]);
+                        print!(" - ");*/
+
+                        let total_len = u16::from_be((*header).total_length);
+
+                        /*printn!(total_len);
+                        println!("");*/
+
+                        let slice = core::slice::from_raw_parts(packet, total_len as usize);
+
+                        ipv4::send_packet(slice);
+                    }
+
+                    ret = SyscallReturnCode::Okay;
+                }
+
+                _ => {}
+            }
+        }
 
         /*
          *  Unknown syscall

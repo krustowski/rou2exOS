@@ -43,9 +43,9 @@ Please note that these lists are incomplete as listed syscalls have to be implem
 |  `0x01`|  `0x01`|  pointer to SysInfo struct | Get the system information summary. Pointer in arg. 2 has to be casted to the SysInfo struct provided by a language library. Memory must be already allocated. | ✅ |
 |        |  `0x02`|  pointer to SysInfo struct | Set the system information summary. Pointer in arg, 2 is a pointer to the SysInfo structure with new information items. | ❌ |
 |  `0x02`|  `0x01`| pointer to RTC struct | Get the Real Time Clock (RTC) data. | ❌ | 
-|  `0x0d`|  pointer to type pointer | `0x00` | Free the allocated memory on heap. | ❌ | 
-|  `0x0e`|  pointer to type pointer | size in bytes to allocate | Reallocate the memory block on heap. | ❌ |
-|  `0x0f`|  pointer to type pointer | size in bytes to allocate | Allocate a memory block on heap. The pointer to the allocated block is returned in `RAX`, or is `0x00` if the allocation procedure fails. | ❌ |
+|  `0x0a`|  pointer to type pointer | size in bytes to allocate | Allocate a memory block on heap. The pointer to the allocated block is returned in `RAX`, or is `0x00` if the allocation procedure fails. | ❌ |
+|  `0x0b`|  pointer to type pointer | size in bytes to allocate | Reallocate the memory block on heap. | ❌ |
+|  `0x0f`|  pointer to type pointer | `0x00` | Free the allocated memory on heap. | ❌ | 
 
 #### Video + Audio Output
 
@@ -79,8 +79,8 @@ Please note that these lists are incomplete as listed syscalls have to be implem
 |-------------|------------|------------|-----------------|-------------|
 |  `0x30`|  port identificator (ID) | pointer to value (uint64) | Send a value to a port specified in arg No. 1. | ✅ |
 |  `0x31`|  port identificator (ID) | pointer to value (uint64) | Receive a value from a port specified in arg No. 1. | ✅ |
-|  `0x32`|  `0x01`|  pointer to array of network devices | List all network devices/interfaces available. | ❌ |
-|  `0x33`|  `0x01`|  pointer to buffer | Create a new ICMP packet.  | ❌ |
+|  `0x32`|  packet type|  pointer to buffer | Create a packet. | ❌ |
+|  `0x33`|  packet type|  pointer to buffer | Send a packet.  | ❌ |
 
 
 ### Syscall Return Codes

@@ -123,12 +123,12 @@ pub extern "C" fn syscall_handler() {
         }
 
         /*
-         *  Syscall 0x0f --- Allocate memory from heap
+         *  Syscall 0x0a --- Allocate memory from heap
          *
          *  Arg1: pointer to type (*mut _)
          *  Arg2: size in bytes to allocate
          */
-        0x0f => {
+        0x0a => {
             if arg1 < USERLAND_START || arg1 > USERLAND_END {
                 ret = SyscallReturnCode::InvalidInput;
                 return;
@@ -647,6 +647,22 @@ pub extern "C" fn syscall_handler() {
 
             ret = SyscallReturnCode::Okay;
         }
+
+        /*
+         *  Syscall 0x32 --- Create a packet
+         *
+         *  Arg1: packet type
+         *  Arg2: pointer to buffer (*mut u8)
+         */
+        0x32 => {}
+
+        /*
+         *  Syscall 0x33 --- Send a packet
+         *
+         *  Arg1: packet type
+         *  Arg2: pointer to buffer (*mut u8)
+         */
+        0x33 => {}
 
         /*
          *  Unknown syscall

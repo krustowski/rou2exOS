@@ -31,7 +31,7 @@ Please note that all values passed into a syscall must be aligned to 8 bytes (64
 | `RSI`    | argument No. 2 | `0x100aaa` |
 
 
-### Table of Syscalls
+### Table of Syscalls (int 0x7f)
 
 Please note that these lists are incomplete as listed syscalls have to be implemented in the kernel ABI. To be expanded.
 
@@ -43,14 +43,19 @@ Please note that these lists are incomplete as listed syscalls have to be implem
 |  `0x01`|  `0x01`|  pointer to SysInfo struct | Get the system information summary. Pointer in arg. 2 has to be casted to the SysInfo struct provided by a language library. Memory must be already allocated. | ✅ |
 |        |  `0x02`|  pointer to SysInfo struct | Set the system information summary. Pointer in arg, 2 is a pointer to the SysInfo structure with new information items. | ❌ |
 |  `0x02`|  `0x01`| pointer to RTC struct | Get the Real Time Clock (RTC) data. | ❌ | 
+|  `0x0d`|  pointer to type pointer | `0x00` | Free the allocated memory on heap. | ❌ | 
+|  `0x0e`|  pointer to type pointer | size in bytes to allocate | Reallocate the memory block on heap. | ❌ |
 |  `0x0f`|  pointer to type pointer | size in bytes to allocate | Allocate a memory block on heap. The pointer to the allocated block is returned in `RAX`, or is `0x00` if the allocation procedure fails. | ❌ |
 
-#### Video Output
+#### Video + Audio Output
 
 | Syscall No. | Argument 1 | Argument 2 | Purpose/Command | Implemented |
 |-------------|------------|------------|-----------------|-------------|
 |  `0x10`|  pointer to string data | string length | Print provided string to terminal. | ✅ |
 |  `0x11`|  `0x00` | `0x00` | Clear the screen. | ✅ |
+|  `0x1a`|  frequency in Hz | length in milliseconds | Play the frequency. | ❌ |
+|  `0x1e`|  `0x01`| pointer to the audio file | Play the audio file. | ❌ |
+|  `0x1f`|  `0x00`|  `0x00`| Stop the player. | ❌ |
 
 #### Filesystem (FAT12)
 
@@ -76,14 +81,6 @@ Please note that these lists are incomplete as listed syscalls have to be implem
 |  `0x31`|  port identificator (ID) | pointer to value (uint64) | Receive a value from a port specified in arg No. 1. | ✅ |
 |  `0x32`|  `0x01`|  pointer to array of network devices | List all network devices/interfaces available. | ❌ |
 |  `0x33`|  `0x01`|  pointer to buffer | Create a new ICMP packet.  | ❌ |
-
-#### Audio
-
-| Syscall No. | Argument 1 | Argument 2 | Purpose/Command | Implemented |
-|-------------|------------|------------|-----------------|-------------|
-|  `0x40`|  frequency in Hz | length in milliseconds | Play the frequency. | ❌ |
-|  `0x41`|  `0x01`| pointer to the audio file | Play the audio file. | ❌ |
-|  `0x4f`|  `0x00`|  `0x00`| Stop the player. | ❌ |
 
 
 ### Syscall Return Codes

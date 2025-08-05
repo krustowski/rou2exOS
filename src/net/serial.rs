@@ -1,7 +1,7 @@
 use crate::input::port;
 //use x86_64;
 
-const COM1: u16 = 0x3F8;
+pub const COM1: u16 = 0x3F8;
 
 pub fn init() {
     port::write(COM1 + 1, 0x00);    // Disable interrupts

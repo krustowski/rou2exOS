@@ -1,6 +1,7 @@
 use crate::{
     fs::fat12::{block::{Floppy, BlockDevice}, fs::Filesystem, entry::Entry}, 
     input::elf, 
+    net::serial,
     //task::process::schedule,
 };
 
@@ -638,6 +639,11 @@ pub extern "C" fn syscall_handler() {
          *  Arg2: pointer to value (u64)
          */
         0x31 => {
+            if arg2 < USERLAND_START || arg2 > USERLAND_END {
+                ret = SyscallReturnCode::InvalidInput;
+                return;
+            }
+
             let port = arg1 as *const u16;
             let value = arg2 as *mut u32;
 
@@ -649,20 +655,77 @@ pub extern "C" fn syscall_handler() {
         }
 
         /*
-         *  Syscall 0x32 --- Create a packet
+         *  Syscall 0x32 --- Serial port (UART) handling
          *
-         *  Arg1: packet type
-         *  Arg2: pointer to buffer (*mut u8)
+         *  Arg1: op code
+         *  Arg2: pointer to value (*mut u32)
          */
-        0x32 => {}
+        0x32 => {
+            match arg1 {
+                0x01 => {
+                    // Serial init
+                    if arg2 != 0x00 {
+                        ret = SyscallReturnCode::InvalidInput;
+                        return;
+                    }
 
+                    serial::init();
+
+                    ret = SyscallReturnCode::Okay;
+                }
+                
+                // Read from UART
+                0x02 => {
+                    if arg2 < USERLAND_START || arg2 > USERLAND_END {
+                        ret = SyscallReturnCode::InvalidInput;
+                        return;
+                    }
+
+                    let mut value = arg2 as *mut u32;
+
+                    unsafe {
+                        *value = serial::read() as u32;
+                    }
+
+                    ret = SyscallReturnCode::Okay;
+                }
+
+                // Write to UART
+                0x03 => {
+                    if arg2 < USERLAND_START || arg2 > USERLAND_END {
+                        ret = SyscallReturnCode::InvalidInput;
+                        return;
+                    }
+
+                    let mut value = arg2 as *const u32;
+
+                    unsafe {
+                        serial::write(*value as u8);
+                    }
+
+                    ret = SyscallReturnCode::Okay;
+                }
+
+                _ => {
+                    ret = SyscallReturnCode::InvalidInput;
+                }
+            }
+        }
         /*
-         *  Syscall 0x33 --- Send a packet
+         *  Syscall 0x33 --- Create a packet
          *
          *  Arg1: packet type
          *  Arg2: pointer to buffer (*mut u8)
          */
         0x33 => {}
+
+        /*
+         *  Syscall 0x34 --- Send a packet
+         *
+         *  Arg1: packet type
+         *  Arg2: pointer to buffer (*mut u8)
+         */
+        0x34 => {}
 
         /*
          *  Unknown syscall

@@ -79,8 +79,11 @@ Please note that these lists are incomplete as listed syscalls have to be implem
 |-------------|------------|------------|-----------------|-------------|
 |  `0x30`|  port identificator (ID) | pointer to value (uint64) | Send a value to a port specified in arg No. 1. | ✅ |
 |  `0x31`|  port identificator (ID) | pointer to value (uint64) | Receive a value from a port specified in arg No. 1. | ✅ |
-|  `0x32`|  packet type|  pointer to buffer | Create a packet. | ❌ |
-|  `0x33`|  packet type|  pointer to buffer | Send a packet.  | ❌ |
+|  `0x32`|  `0x01` |  `0x00` | Serial port (UART, COM1) initialization. | ✅ |
+|        |  `0x02` |  pointer to value | Read from the serial port (UART, COM1). | ✅ |
+|        |  `0x03` |  pointer to value | Write to the serial port (UART, COM1). | ✅ |
+|  `0x33`|  packet type |  pointer to buffer | Create a packet. | ❌ |
+|  `0x34`|  packet type |  pointer to buffer | Send a packet.  | ❌ |
 
 
 ### Syscall Return Codes

@@ -94,7 +94,7 @@ pub extern "C" fn syscall_handler() {
                     unsafe {
                         let name = b"rou2ex";
                         let user = b"guest";
-                        let version = b"v0.9.3";
+                        let version = b"v0.9.4";
                         let path = b"/";
 
                         if let Some(nm) = (*sysinfo_ptr).system_name.get_mut(0..name.len()) {

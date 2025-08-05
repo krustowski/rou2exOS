@@ -82,8 +82,9 @@ Please note that these lists are incomplete as listed syscalls have to be implem
 |  `0x32`|  `0x01` |  `0x00` | Serial port (UART, COM1) initialization. | ✅ |
 |        |  `0x02` |  pointer to value | Read from the serial port (UART, COM1). | ✅ |
 |        |  `0x03` |  pointer to value | Write to the serial port (UART, COM1). | ✅ |
-|  `0x33`|  packet type |  pointer to buffer | Create a packet. | ❌ |
-|  `0x34`|  packet type |  pointer to buffer | Send a packet.  | ❌ |
+|  `0x33`|  `0x01` |  pointer to buffer | Create an IPv4 packet. | ✅ |
+|        |  `0x02` |  pointer to buffer | Create an ICMP packet. | ✅ |
+|  `0x34`|  `0x01` |  pointer to buffer | Send an IPv4 packet.  | ✅ |
 
 
 ### Syscall Return Codes

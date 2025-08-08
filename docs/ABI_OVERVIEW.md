@@ -54,7 +54,7 @@ Please note that these lists are incomplete as listed syscalls have to be implem
 |  `0x10`|  pointer to string data | string length | Print provided string to terminal. | ✅ |
 |  `0x11`|  `0x00` | `0x00` | Clear the screen. | ✅ |
 |  `0x1a`|  frequency in Hz | length in milliseconds | Play the frequency. | ✅ |
-|  `0x1e`|  `0x01`| pointer to the audio file | Play the MIDI audio file. | ✅ |
+|  `0x1b`|  `0x01`| pointer to the audio file | Play the MIDI audio file. | ✅ |
 |  `0x1f`|  `0x00`|  `0x00`| Stop the player. | ✅ |
 
 #### Filesystem (FAT12)

@@ -243,7 +243,7 @@ extern "C" fn kern_task2() {
                     continue;
                 }
 
-                printb!( &[ch % 26 + 65] );
+                rprintb!( &[ch % 26 + 65] );
             }
         }
     }

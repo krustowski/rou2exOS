@@ -111,6 +111,15 @@ macro_rules! rprintn {
 }
 
 #[macro_export]
+macro_rules! rprintb {
+    ($data:expr) => {
+        for b in $data {
+            $crate::net::serial::write(*b);
+        }
+    };
+}
+
+#[macro_export]
 macro_rules! rprint {
     ($data:expr) => {
         //serial::init();

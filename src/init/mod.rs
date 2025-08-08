@@ -36,7 +36,7 @@ pub fn init(multiboot_ptr: u64) {
     );
 
     result::print_result(
-        "Reload IDT and ISRs", 
+        "Reload IDT, GDT and TSS", 
         idt::get_result()
     );
 

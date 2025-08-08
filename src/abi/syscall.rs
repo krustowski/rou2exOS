@@ -3,6 +3,7 @@ use crate::{
     input::elf, 
     net::{serial, ipv4, icmp},
     //task::process::schedule,
+    time::rtc,
 };
 
 const USERLAND_START: u64 = 0x600_000;
@@ -121,6 +122,34 @@ pub extern "C" fn syscall_handler() {
             }
 
             ret = SyscallReturnCode::Okay;
+        }
+
+        /*
+         *  Syscall 0x02 --- Get the RTC time
+         *
+         *  Arg1: 0x01
+         *  Arg2: pointer to RTC structu (*mut RTC)
+         */
+        0x02 => {
+            if arg2 < USERLAND_START || arg2 > USERLAND_END {
+                ret = SyscallReturnCode::InvalidInput;
+                return;
+            }
+
+            match arg1 {
+                // Get RTC
+                0x01 => {
+                    let mut rtc_data = arg2 as *mut RTC;
+
+                    unsafe {
+                        ( (*rtc_data).year, (*rtc_data).month, (*rtc_data).day, (*rtc_data).hours, (*rtc_data).minutes, (*rtc_data).seconds) = rtc::read_rtc_full();
+                    }
+
+                    ret = SyscallReturnCode::Okay;
+                }
+
+                _ => {}
+            }
         }
 
         /*
@@ -935,3 +964,12 @@ pub struct SysInfo {
     pub system_uptime: u32,
 }
 
+#[repr(C, packed)]
+pub struct RTC {
+    pub seconds: u8,
+    pub minutes: u8,
+    pub hours: u8,
+    pub day: u8,
+    pub month: u8,
+    pub year: u16,
+}

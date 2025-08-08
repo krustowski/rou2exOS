@@ -42,7 +42,7 @@ Please note that these lists are incomplete as listed syscalls have to be implem
 |  `0x00`|  process ID | program return code | Graceful exit of a program/process/task. | ✅ |
 |  `0x01`|  `0x01`|  pointer to SysInfo struct | Get the system information summary. Pointer in arg. 2 has to be casted to the SysInfo struct provided by a language library. Memory must be already allocated. | ✅ |
 |        |  `0x02`|  pointer to SysInfo struct | Set the system information summary. Pointer in arg, 2 is a pointer to the SysInfo structure with new information items. | ❌ |
-|  `0x02`|  `0x01`| pointer to RTC struct | Get the Real Time Clock (RTC) data. | ❌ | 
+|  `0x02`|  `0x01`| pointer to RTC struct | Get the Real Time Clock (RTC) data. | ✅ | 
 |  `0x0a`|  pointer to type pointer | size in bytes to allocate | Allocate a memory block on heap. The pointer to the allocated block is returned in `RAX`, or is `0x00` if the allocation procedure fails. | ❌ |
 |  `0x0b`|  pointer to type pointer | size in bytes to allocate | Reallocate the memory block on heap. | ❌ |
 |  `0x0f`|  pointer to type pointer | `0x00` | Free the allocated memory on heap. | ❌ | 
@@ -133,9 +133,19 @@ pub struct RTC {
     pub hours: u8,
     pub day: u8,
     pub month: u8,
-    pub year: u8,
-    pub century: u8,
+    pub year: u16,
 }
+```
+
+```c
+typedef struct {
+    uint8_t seconds;
+    uint8_t minutes;
+    uint8_t hours;
+    uint8_t day;
+    uint8_t month;
+    uint16_t year;
+} __attribute__((packed)) RTC_T;
 ```
 
 #### Entry (FAT12)
@@ -161,7 +171,6 @@ pub struct Entry {
 ```
 
 ```c
-#pragma pack(push, 1)
 typedef struct {
     uint8_t name[8];
     uint8_t ext[3];
@@ -176,7 +185,6 @@ typedef struct {
     uint16_t write_date;
     uint16_t start_cluster;
     uint32_t file_size;
-} Entry_T;
-#pragma pack(pop)
+} __attribute__((packed)) Entry_T;
 ```
 

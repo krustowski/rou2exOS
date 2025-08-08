@@ -213,6 +213,107 @@ pub extern "C" fn syscall_handler() {
         }
 
         /*
+         *  Syscall 0x1a --- Play a frequency
+         *
+         *  Arg2: frequency in Hz
+         *  Arg2: duration in ms
+         */
+        0x1a => {
+            if arg1 < 20 || arg1 > 20_000 {
+                ret = SyscallReturnCode::InvalidInput;
+                return;
+            }
+
+            crate::audio::beep::beep(arg1 as u32);
+            crate::audio::midi::wait_millis(arg2 as u16);
+            crate::audio::beep::stop_beep();
+        }
+
+        /*
+         *  Syscall 0x1b --- Play an audio file
+         *
+         *  Arg2: audio file type
+         *  Arg2: pointer to file name (*const u8)
+         */
+        0x1b => {
+            if arg2 < USERLAND_START || arg2 > USERLAND_END {
+                ret = SyscallReturnCode::InvalidInput;
+                return;
+            }
+
+            let name_ptr = arg1 as *const u8;
+            let (name, ext) = format_filename(name_ptr);
+
+            let mut buf: [u8; 4096] = [0u8; 4096];
+            let mut file_found = false;
+
+            match arg1 {
+                // MIDI file format 0
+                0x01 => {
+                    let floppy = Floppy::init();
+
+                    match Filesystem::new(&floppy) {
+                        Ok(fs) => {
+                            fs.for_each_entry(0, | entry | {
+                                if entry.name[0] == 0x00 || entry.name[0] == 0xE5 || entry.attr & 0x08 != 0 || entry.attr & 0x10 != 0 {
+                                    return;
+                                }
+
+                                if !entry.name.starts_with(&name) || !entry.ext.starts_with(&ext) {
+                                    return
+                                }
+
+                                // Read the file directly into the client's buffer
+                                fs.read_file(entry.start_cluster, &mut buf);
+                                file_found = true;
+                            });
+                        }
+                        Err(e) => {
+                            rprint!(e);
+                            rprint!("\n");
+
+                            ret = SyscallReturnCode::FilesystemError;
+                        }
+                    }
+
+                    if !file_found {
+                        ret = SyscallReturnCode::FileNotFound;
+                    }
+
+                    if let Some(midi) = crate::audio::midi::parse_midi_format0(&buf) {
+                        crate::audio::midi::play_midi(&midi);
+                        crate::audio::beep::stop_beep();
+
+                        ret = SyscallReturnCode::Okay;
+                    } else {
+                        ret = SyscallReturnCode::FilesystemError;
+                    }
+                }
+
+                _ => {
+                    ret = SyscallReturnCode::InvalidInput;
+                }
+            }
+        }
+
+        /*
+         *  Syscall 0x1f --- Stop the speaker
+         *
+         *  Arg2: 0x00
+         *  Arg2: 0x00
+         */
+        0x1f => {
+            if arg1 != 0x00 || arg2 != 0x00 {
+                ret = SyscallReturnCode::InvalidInput;
+                return;
+            }
+
+            crate::audio::beep::stop_beep();
+
+            ret = SyscallReturnCode::Okay;
+        }
+
+        /*
          *  Syscall 0x20 --- Read a file
          *
          *  Arg1: pointer to filename byte slice (&[u8])
@@ -702,7 +803,7 @@ pub extern "C" fn syscall_handler() {
 
                     ret = SyscallReturnCode::Okay;
                 }
-                
+
                 // Read from UART
                 0x02 => {
                     if arg2 < USERLAND_START || arg2 > USERLAND_END {
@@ -836,18 +937,18 @@ pub extern "C" fn syscall_handler() {
 
                     unsafe {
                         /*printn!((*header).dest_ip[0]);
-                        print!(".");
-                        printn!((*header).dest_ip[1]);
-                        print!(".");
-                        printn!((*header).dest_ip[2]);
-                        print!(".");
-                        printn!((*header).dest_ip[3]);
-                        print!(" - ");*/
+                          print!(".");
+                          printn!((*header).dest_ip[1]);
+                          print!(".");
+                          printn!((*header).dest_ip[2]);
+                          print!(".");
+                          printn!((*header).dest_ip[3]);
+                          print!(" - ");*/
 
                         let total_len = u16::from_be((*header).total_length);
 
                         /*printn!(total_len);
-                        println!("");*/
+                          println!("");*/
 
                         let slice = core::slice::from_raw_parts(packet, total_len as usize);
 

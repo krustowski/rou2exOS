@@ -1,60 +1,46 @@
 use core;
 
-pub fn beep(frequency: u32) {
-    let divisor = 1_193_180 / frequency; // PIT runs at 1.19318 MHz
+unsafe fn outb(port: u16, value: u8) {
+    core::arch::asm!("out dx, al", in("dx") port, in("al") value);
+}
+
+unsafe fn inb(port: u16) -> u8 {
+    let val: u8;
+    core::arch::asm!("in al, dx", in("dx") port, out("al") val);
+    val
+}
+
+pub fn beep(freq: u32) {
+    let divisor = 1_193_180 / freq;
 
     unsafe {
-        // Set PIT to mode 3 (square wave generator)
-        core::arch::asm!(
-            "out dx, al",
-            in("dx") 0x43,
-            in("al") 0b10110110u8,
-        );
+        outb(0x43, 0b10110110);
+        outb(0x42, (divisor & 0xFF) as u8);
+        outb(0x42, (divisor >> 8) as u8);
+    }
 
-        // Set frequency divisor (low byte first, then high byte)
-        core::arch::asm!(
-            "out dx, al",
-            in("dx") 0x42,
-            in("al") (divisor & 0xFF) as u8,
-        );
-        core::arch::asm!(
-            "out dx, al",
-            in("dx") 0x42,
-            in("al") (divisor >> 8) as u8,
-        );
-
-        // Enable speaker
+    unsafe {
+        // Enable speaker (bits 0 and 1 on port 0x61)
         let mut tmp: u8;
         core::arch::asm!(
             "in al, dx",
+            "or al, 3",
+            "out dx, al",
             in("dx") 0x61,
             out("al") tmp,
         );
-        if (tmp & 3) != 3 {
-            tmp |= 3;
-            core::arch::asm!(
-                "out dx, al",
-                in("dx") 0x61,
-                in("al") tmp,
-            );
-        }
     }
 }
 
 pub fn stop_beep() {
-    // Stop the beep.
     unsafe {
         let mut tmp: u8;
         core::arch::asm!(
             "in al, dx",
-            in("dx") 0x61,
-            out("al") tmp,
-        );
-        tmp &= !3;
-        core::arch::asm!(
+            "and al, 0xFC", // clear bits 0 and 1
             "out dx, al",
             in("dx") 0x61,
-            in("al") tmp,
+            out("al") tmp,
         );
     }
 }

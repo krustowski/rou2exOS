@@ -76,7 +76,15 @@ pub fn init(multiboot_ptr: u64) {
     ascii::ascii_art();
 
     // Play startup melody
-    crate::audio::midi::play_melody();
+    //crate::audio::midi::play_melody();
+    //crate::audio::fs::play_midi_file();
+    let freqs = [440, 880, 660, 550];
+    for f in freqs {
+        crate::audio::beep::stop_beep();
+        crate::audio::beep::beep(f);
+        crate::audio::midi::wait_millis(300);
+    }
+    crate::audio::beep::stop_beep();
 }
 
 struct Buffer {

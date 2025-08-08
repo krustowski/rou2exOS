@@ -1,6 +1,6 @@
 pub trait BlockDevice {
     /// Reads 1 sector (usually 512 bytes) at the given LBA into `buffer`
-    fn read_sector(&self, lba: u64, buffer: &mut [u8; 512]);
+    fn read_sector(&self, lba: u64, buffer: &mut [u8]);
 
     /// Writes 1 sector from `buffer` to `lba`
     fn write_sector(&self, lba: u64, buffer: &[u8; 512]);
@@ -28,7 +28,7 @@ impl MemDisk {
 }
 
 impl BlockDevice for MemDisk {
-    fn read_sector(&self, lba: u64, buffer: &mut [u8; 512]) {
+    fn read_sector(&self, lba: u64, buffer: &mut [u8]) {
         let offset = self.sector_offset(lba);
         let slice = &self.data[offset..offset + 512];
         buffer.copy_from_slice(slice);
@@ -48,7 +48,7 @@ impl BlockDevice for MemDisk {
 pub struct Floppy;
 
 impl BlockDevice for Floppy {
-    fn read_sector(&self, lba: u64, buffer: &mut [u8; 512]) {
+    fn read_sector(&self, lba: u64, buffer: &mut [u8]) {
         //debugln!("Floppy read_sector()");
 
         self.read_sector(lba, buffer);
@@ -251,7 +251,7 @@ impl Floppy {
         }
     }
 
-    fn read_sector(&self, lba: u64, buffer: &mut [u8; 512]) {
+    fn read_sector(&self, lba: u64, buffer: &mut [u8]) {
         let (c, h, s) = self.lba_to_chs(lba);
 
         unsafe {

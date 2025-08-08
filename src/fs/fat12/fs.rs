@@ -77,18 +77,37 @@ impl<'a, D: BlockDevice> Filesystem<'a, D> {
     }
 
     /// read_file loads the seector data into the buffer provided
-    pub fn read_file(&self, start_cluster: u16, sector_buf: &mut [u8; 512]) {
+    pub fn read_file(&self, start_cluster: u16, sector_buf: &mut [u8]) {
         let mut current_cluster = start_cluster;
 
+        if sector_buf.len() < 512 {
+            return;
+        }
+
+        let buf_count: usize = sector_buf.len() / 512;
+        let mut count = 0;
+
         loop {
-            let lba = self.cluster_to_lba(current_cluster);
-            self.device.read_sector(lba, sector_buf);
-
-            current_cluster = self.read_fat12_entry(current_cluster);
-
-            // Chain end
-            if current_cluster >= 0xFF8 {
+            if count > buf_count {
                 break;
+            }
+
+            if let Some(mut buf)= sector_buf.get_mut((count * 512)..(count + 1) * 512) {
+                rprint!("Reading to buf: ");
+                rprintn!(count);
+                rprint!("\n");
+
+                let lba = self.cluster_to_lba(current_cluster);
+                self.device.read_sector(lba, buf);
+
+                count += 1;
+
+                current_cluster = self.read_fat12_entry(current_cluster);
+
+                // Chain end
+                if current_cluster >= 0xFF8 {
+                    break;
+                }
             }
         }
     }

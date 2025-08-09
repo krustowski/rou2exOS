@@ -16,13 +16,6 @@ pub struct TcpHeader {
     pub urgent_pointer: u16,
 }
 
-#[repr(C, packed)]
-pub struct TcpPacketRequest {
-    pub header: TcpHeader,
-    pub src_ip: [u8; 4],
-    pub dst_ip: [u8; 4],
-}
-
 #[derive(PartialEq, Eq)]
 pub enum TcpState {
     Closed,

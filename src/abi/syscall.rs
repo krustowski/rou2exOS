@@ -901,7 +901,7 @@ pub extern "C" fn syscall_handler() {
                     unsafe {
                         core::ptr::copy_nonoverlapping(packet, icmp_buffer_aux.as_mut_ptr(), 1500);
 
-                        let payload = &icmp_buffer_aux.get(8..).unwrap_or(&[]);
+                        let payload = icmp_buffer_aux.get(8..).unwrap_or(&[]);
 
                         let icmp_len = icmp::create_packet(0, (*header).identifier, (*header).sequence_number, payload, &mut icmp_buffer);
                         let icmp_slice = icmp_buffer.get(..icmp_len).unwrap_or(&[]);
@@ -915,17 +915,17 @@ pub extern "C" fn syscall_handler() {
                 // TCP packet
                 0x03 => {
                     let packet = arg2 as *mut u8;
-                    let request = packet as *mut tcp::TcpPacketRequest;
-                    let mut tcp_buffer = [0u8; 1500];
-                    let mut tcp_buffer_aux = [0u8; 1500];
+                    let request = packet as *mut TcpPacketRequest;
+                    let mut tcp_buffer = [0u8; 1024];
+                    let mut tcp_buffer_aux = [0u8; 1024];
 
                     unsafe {
-                        core::ptr::copy_nonoverlapping(packet, tcp_buffer.as_mut_ptr(), 1500);
-                        core::ptr::copy_nonoverlapping(packet, tcp_buffer_aux.as_mut_ptr(), 1500);
+                        core::ptr::copy_nonoverlapping(packet, tcp_buffer.as_mut_ptr(), 1024);
+                        core::ptr::copy_nonoverlapping(packet, tcp_buffer_aux.as_mut_ptr(), 1024);
 
-                        let payload = &tcp_buffer_aux.get( (core::mem::size_of::<tcp::TcpHeader>() - 8) as usize.. ).unwrap_or(&[]);
+                        let payload = tcp_buffer_aux.get( core::mem::size_of::<TcpPacketRequest>() as usize..(*request).length as usize ).unwrap_or(&[]);
 
-                        let tcp_len = tcp::create_packet((*request).header.source_port, (*request).header.dest_port, (*request).header.seq_num, (*request).header.ack_num, (*request).header.data_offset_reserved_flags >> 8, 1024, payload, (*request).src_ip, (*request).dst_ip, &mut tcp_buffer);
+                        let tcp_len = tcp::create_packet((*request).header.source_port, (*request).header.dest_port, (*request).header.seq_num, (*request).header.ack_num, (*request).header.data_offset_reserved_flags, 1024, payload, (*request).src_ip, (*request).dst_ip, &mut tcp_buffer);
                         let tcp_slice = tcp_buffer.get(..tcp_len).unwrap_or(&[]);
 
                         core::ptr::copy_nonoverlapping(tcp_slice.as_ptr(), packet, tcp_len);
@@ -1083,3 +1083,12 @@ pub struct RTC {
     pub month: u8,
     pub year: u16,
 }
+
+#[repr(C, packed)]
+pub struct TcpPacketRequest {
+    pub header: tcp::TcpHeader,
+    pub src_ip: [u8; 4],
+    pub dst_ip: [u8; 4],
+    pub length: u16,
+}
+

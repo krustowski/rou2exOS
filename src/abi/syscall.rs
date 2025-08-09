@@ -910,7 +910,7 @@ pub extern "C" fn syscall_handler() {
                     let mut ipv4_buffer_aux = [0u8; 1500];
 
                     unsafe {
-                        core::ptr::copy_nonoverlapping(packet, ipv4_buffer.as_mut_ptr(), 1500);
+                        //core::ptr::copy_nonoverlapping(packet, ipv4_buffer.as_mut_ptr(), 1500);
                         core::ptr::copy_nonoverlapping(packet, ipv4_buffer_aux.as_mut_ptr(), 1500);
 
                         let header_len = ((*header).version_ihl & 0x0F) * 4;
@@ -932,7 +932,10 @@ pub extern "C" fn syscall_handler() {
 
                         let ipv4_slice = ipv4_buffer.get(..ipv4_len).unwrap_or(&[]);
 
-                        core::ptr::copy_nonoverlapping(ipv4_slice.as_ptr(), packet, ipv4_len);
+                        let zeros = [0u8; 512];
+
+                        core::ptr::copy(zeros.as_ptr(), packet, zeros.len());
+                        core::ptr::copy(ipv4_slice.as_ptr(), packet, ipv4_len);
                     }
 
                     ret = SyscallReturnCode::Okay;
@@ -963,18 +966,24 @@ pub extern "C" fn syscall_handler() {
                 0x03 => {
                     let packet = arg2 as *mut u8;
                     let request = packet as *mut TcpPacketRequest;
-                    let mut tcp_buffer = [0u8; 1024];
-                    let mut tcp_buffer_aux = [0u8; 1024];
+                    let mut tcp_buffer = [0u8; 1400];
+                    let mut tcp_buffer_aux = [0u8; 1400];
+
+                    //let tcp_header_len = core::mem::size_of::<tcp::TcpHeader>() as usize;
+                    let tcp_req_len = core::mem::size_of::<TcpPacketRequest>() as usize;
 
                     unsafe {
-                        core::ptr::copy_nonoverlapping(packet, tcp_buffer.as_mut_ptr(), 1024);
-                        core::ptr::copy_nonoverlapping(packet, tcp_buffer_aux.as_mut_ptr(), 1024);
+                        //core::ptr::copy_nonoverlapping(packet, tcp_buffer.as_mut_ptr(), tcp_req_len + (*request).length as usize);
+                        core::ptr::copy_nonoverlapping(packet, tcp_buffer_aux.as_mut_ptr(), tcp_req_len + (*request).length as usize);
 
-                        let payload = tcp_buffer_aux.get( core::mem::size_of::<TcpPacketRequest>() as usize..(*request).length as usize ).unwrap_or(&[]);
+                        let payload = tcp_buffer_aux.get( tcp_req_len..tcp_req_len + (*request).length as usize ).unwrap_or(&[]);
 
-                        let tcp_len = tcp::create_packet((*request).header.source_port, (*request).header.dest_port, (*request).header.seq_num, (*request).header.ack_num, (*request).header.data_offset_reserved_flags, 1024, payload, (*request).src_ip, (*request).dst_ip, &mut tcp_buffer);
-                        let tcp_slice = tcp_buffer.get(..tcp_len).unwrap_or(&[]);
+                        let tcp_len = tcp::create_packet((*request).header.source_port, (*request).header.dest_port, (*request).header.seq_num, (*request).header.ack_num, (*request).header.data_offset_reserved_flags, 1024, &payload, (*request).src_ip, (*request).dst_ip, &mut tcp_buffer);
+                        let tcp_slice = tcp_buffer.get(0..tcp_len).unwrap_or(&[]);
 
+                        let zeros = [0u8; 512];
+
+                        core::ptr::copy_nonoverlapping(zeros.as_ptr(), packet, zeros.len());
                         core::ptr::copy_nonoverlapping(tcp_slice.as_ptr(), packet, tcp_len);
                     }
 

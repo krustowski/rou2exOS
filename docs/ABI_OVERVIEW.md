@@ -28,7 +28,7 @@ Please note that all values passed into a syscall must be aligned to 8 bytes (64
 |----------|----------------|-----------------------|
 | `RAX`    | syscall No.    | `0x01` |
 | `RDI`    | argument No. 1 | `0x01` |
-| `RSI`    | argument No. 2 | `0x100aaa` |
+| `RSI`    | argument No. 2 | `0x123abc` |
 
 
 ### Table of Syscalls (int 0x7f)
@@ -43,6 +43,9 @@ Please note that these lists are incomplete as listed syscalls have to be implem
 |  `0x01`|  `0x01`|  pointer to SysInfo struct | Get the system information summary. Pointer in arg. 2 has to be casted to the SysInfo struct provided by a language library. Memory must be already allocated. | ✅ |
 |        |  `0x02`|  pointer to SysInfo struct | Set the system information summary. Pointer in arg, 2 is a pointer to the SysInfo structure with new information items. | ❌ |
 |  `0x02`|  `0x01`| pointer to RTC struct | Get the Real Time Clock (RTC) data. | ✅ | 
+|  `0x03`|  `0x01`| pointer to circular buffer | Register a buffer to receive scancodes from IRQ1 | ✅ |
+|        |  `0x02`| pointer to circular buffer | Unregister a buffer to receive scancodes from IRQ1 | ✅ |
+|        |  `0x03`| pointer to circular buffer | Read from the buffer. | ✅ |
 |  `0x0a`|  pointer to type pointer | size in bytes to allocate | Allocate a memory block on heap. The pointer to the allocated block is returned in `RAX`, or is `0x00` if the allocation procedure fails. | ❌ |
 |  `0x0b`|  pointer to type pointer | size in bytes to allocate | Reallocate the memory block on heap. | ❌ |
 |  `0x0f`|  pointer to type pointer | `0x00` | Free the allocated memory on heap. | ❌ | 
@@ -84,6 +87,7 @@ Please note that these lists are incomplete as listed syscalls have to be implem
 |        |  `0x03` |  pointer to value | Write to the serial port (UART, COM1). | ✅ |
 |  `0x33`|  `0x01` |  pointer to buffer | Create an IPv4 packet. | ✅ |
 |        |  `0x02` |  pointer to buffer | Create an ICMP packet. | ✅ |
+|        |  `0x03` |  pointer to buffer | Create a TCP packet. | ✅ |
 |  `0x34`|  `0x01` |  pointer to buffer | Send an IPv4 packet.  | ✅ |
 
 

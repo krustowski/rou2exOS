@@ -186,8 +186,18 @@ extern "x86-interrupt" fn timer_handler(stack: &mut InterruptStackFrame) {
 }
 
 extern "x86-interrupt" fn keyboard_handler(stack: &mut InterruptStackFrame) {
+    let scancode = unsafe { crate::input::port::read_u8(0x60) };
+
+    unsafe {
+        for s in crate::input::irq::RECEPTORS.iter() {
+            if s.pid != 0 {
+                s.push_irq(scancode);
+            }
+        }
+    }
+
     // Acknowledge the PIC
-    //crate::input::port::write(0x20, 0x20);
+    crate::input::port::write(0x20, 0x20);
 }
 
 extern "x86-interrupt" fn floppy_drive_handler(stack: &mut InterruptStackFrame) {

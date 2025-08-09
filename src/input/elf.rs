@@ -107,7 +107,7 @@ pub unsafe extern "C" fn jump_to_elf(entry: ElfEntry, stack_top: u64, arg: u64) 
     println!("Switching to user mode:");
 
     core::arch::asm!(
-        "cli",
+        //"cli",
         "mov rsp, {0}",
         "mov rdi, {1}",
 

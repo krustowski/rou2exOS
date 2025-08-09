@@ -1,6 +1,6 @@
 use crate::{
     fs::fat12::{block::{Floppy, BlockDevice}, fs::Filesystem, entry::Entry}, 
-    input::elf, 
+    input::{elf, irq}, 
     net::{serial, ipv4, icmp, tcp},
     //task::process::schedule,
     time::rtc,
@@ -44,13 +44,13 @@ pub extern "C" fn syscall_handler() {
     debugn!(arg2);
     debug!("\n");
 
-    /*rprint!("syscall_handler: called: ");
+    rprint!("syscall_handler: called: ");
     rprintn!(syscall_no);
     rprint!(", arg1: ");
     rprintn!(arg1);
     rprint!(", arg2: ");
     rprintn!(arg2);
-    rprint!("\n");*/
+    rprint!("\n");
 
     match syscall_no {
         /*
@@ -150,6 +150,53 @@ pub extern "C" fn syscall_handler() {
 
                 _ => {}
             }
+        }
+
+        /*
+         *  Syscall 0x03 --- Pipe subscription handling
+         *
+         *  Arg1: op type
+         *  Arg2: pointer to circular buffer (*const u8)
+         */
+        0x03 => {
+            if arg2 < USERLAND_START || arg2 > USERLAND_END {
+                ret = SyscallReturnCode::InvalidInput;
+                return;
+            }
+
+            match arg1 {
+                0x01 => {
+                    irq::pipe_subscribe(arg2);
+                }
+
+                0x02 => {
+                    irq::pipe_unsubscribe(arg2);
+                }
+
+                0x03 => {
+                    unsafe {
+                        for s in irq::RECEPTORS.iter() {
+                            if s.pid == 123 {
+                                // Try copy immediately
+                                let copied = s.copy_to_user(arg2 as *mut u8, 16);
+                                if copied > 0 {
+                                    break;
+                                }
+
+                                // No data: block current process until dispatcher wakes it
+                                //block_current_process_on_keyboard();
+                                // After wake, try copy again
+                                
+                                let copied_after = s.copy_to_user(arg2 as *mut u8, 16);
+                            }
+                        }
+                    }
+                }
+
+                _ => {}
+            }
+
+            ret = SyscallReturnCode::Okay;
         }
 
         /*

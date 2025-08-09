@@ -14,7 +14,13 @@ pub struct TcpHeader {
     pub window_size: u16,
     pub checksum: u16,
     pub urgent_pointer: u16,
-    // Options skipped
+}
+
+#[repr(C, packed)]
+pub struct TcpPacketRequest {
+    pub header: TcpHeader,
+    pub src_ip: [u8; 4],
+    pub dst_ip: [u8; 4],
 }
 
 #[derive(PartialEq, Eq)]

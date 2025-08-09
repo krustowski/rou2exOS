@@ -1,7 +1,7 @@
 use crate::{
     fs::fat12::{block::{Floppy, BlockDevice}, fs::Filesystem, entry::Entry}, 
     input::elf, 
-    net::{serial, ipv4, icmp},
+    net::{serial, ipv4, icmp, tcp},
     //task::process::schedule,
     time::rtc,
 };
@@ -912,6 +912,28 @@ pub extern "C" fn syscall_handler() {
                     ret = SyscallReturnCode::Okay;
                 }
 
+                // TCP packet
+                0x03 => {
+                    let packet = arg2 as *mut u8;
+                    let request = packet as *mut tcp::TcpPacketRequest;
+                    let mut tcp_buffer = [0u8; 1500];
+                    let mut tcp_buffer_aux = [0u8; 1500];
+
+                    unsafe {
+                        core::ptr::copy_nonoverlapping(packet, tcp_buffer.as_mut_ptr(), 1500);
+                        core::ptr::copy_nonoverlapping(packet, tcp_buffer_aux.as_mut_ptr(), 1500);
+
+                        let payload = &tcp_buffer_aux.get( (core::mem::size_of::<tcp::TcpHeader>() - 8) as usize.. ).unwrap_or(&[]);
+
+                        let tcp_len = tcp::create_packet((*request).header.source_port, (*request).header.dest_port, (*request).header.seq_num, (*request).header.ack_num, (*request).header.data_offset_reserved_flags >> 8, 1024, payload, (*request).src_ip, (*request).dst_ip, &mut tcp_buffer);
+                        let tcp_slice = tcp_buffer.get(..tcp_len).unwrap_or(&[]);
+
+                        core::ptr::copy_nonoverlapping(tcp_slice.as_ptr(), packet, tcp_len);
+                    }
+
+                    ret = SyscallReturnCode::Okay;
+                }
+
                 _ => {}
             }
         }
@@ -936,20 +958,7 @@ pub extern "C" fn syscall_handler() {
                     let header = packet as *const ipv4::Ipv4Header;
 
                     unsafe {
-                        /*printn!((*header).dest_ip[0]);
-                          print!(".");
-                          printn!((*header).dest_ip[1]);
-                          print!(".");
-                          printn!((*header).dest_ip[2]);
-                          print!(".");
-                          printn!((*header).dest_ip[3]);
-                          print!(" - ");*/
-
                         let total_len = u16::from_be((*header).total_length);
-
-                        /*printn!(total_len);
-                          println!("");*/
-
                         let slice = core::slice::from_raw_parts(packet, total_len as usize);
 
                         ipv4::send_packet(slice);

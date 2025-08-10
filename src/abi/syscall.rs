@@ -910,9 +910,6 @@ pub extern "C" fn syscall_handler() {
                     let mut ipv4_buffer_aux = [0u8; 1500];
 
                     unsafe {
-                        //core::ptr::copy_nonoverlapping(packet, ipv4_buffer.as_mut_ptr(), 1500);
-                        core::ptr::copy_nonoverlapping(packet, ipv4_buffer_aux.as_mut_ptr(), 1500);
-
                         let header_len = ((*header).version_ihl & 0x0F) * 4;
                         let total_len = u16::from_be((*header).total_length);
 
@@ -921,7 +918,9 @@ pub extern "C" fn syscall_handler() {
                             return;
                         }
 
-                        let payload = &ipv4_buffer_aux.get(header_len as usize..total_len as usize).unwrap_or(&[]);
+                        core::ptr::copy_nonoverlapping(packet, ipv4_buffer_aux.as_mut_ptr(), (header_len as u16 + total_len) as usize);
+
+                        let payload = ipv4_buffer_aux.get(header_len as usize..total_len as usize).unwrap_or(&[]);
 
                         let ipv4_len = ipv4::create_packet((*header).dest_ip, (*header).source_ip , (*header).protocol, payload, &mut ipv4_buffer);
 
@@ -978,13 +977,13 @@ pub extern "C" fn syscall_handler() {
 
                         let payload = tcp_buffer_aux.get( tcp_req_len..tcp_req_len + (*request).length as usize ).unwrap_or(&[]);
 
-                        let tcp_len = tcp::create_packet((*request).header.source_port, (*request).header.dest_port, (*request).header.seq_num, (*request).header.ack_num, (*request).header.data_offset_reserved_flags, 1024, &payload, (*request).src_ip, (*request).dst_ip, &mut tcp_buffer);
+                        let tcp_len = tcp::create_packet((*request).header.source_port, (*request).header.dest_port, (*request).header.seq_num, (*request).header.ack_num, (*request).header.data_offset_reserved_flags & 0xFF, 1024, &payload, (*request).src_ip, (*request).dst_ip, &mut tcp_buffer);
                         let tcp_slice = tcp_buffer.get(0..tcp_len).unwrap_or(&[]);
 
                         let zeros = [0u8; 512];
 
-                        core::ptr::copy_nonoverlapping(zeros.as_ptr(), packet, zeros.len());
-                        core::ptr::copy_nonoverlapping(tcp_slice.as_ptr(), packet, tcp_len);
+                        core::ptr::copy(zeros.as_ptr(), packet, zeros.len());
+                        core::ptr::copy(tcp_slice.as_ptr(), packet, tcp_len);
                     }
 
                     ret = SyscallReturnCode::Okay;
@@ -1015,6 +1014,11 @@ pub extern "C" fn syscall_handler() {
 
                     unsafe {
                         let total_len = u16::from_be((*header).total_length);
+
+                        warn!("len: ");
+                        printn!(total_len);
+                        warn!("\n");
+
                         let slice = core::slice::from_raw_parts(packet, total_len as usize);
 
                         ipv4::send_packet(slice);

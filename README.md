@@ -26,10 +26,10 @@ make init
 
 # make sure you have `xorriso`, `net-tools` and `grub2-tools` (or just grub-tools) 
 # installed (Linux)
-dnf install xorriso net-tools grub2-tools qemu qemu-common qemu-system-x86
+dnf install xorriso net-tools grub2-tools qemu qemu-common qemu-system-x86 mtools
 
 # compile the kernel and stage2 bootloader, link it into an ELF binary and bake into an ISO
-# image with GRUB stage1 bootloader
+# image with GRUB bootloader
 make build
 
 # run the QEMU emulation with ISO image
@@ -39,8 +39,8 @@ make run_iso
 # please do note that the floppy image is overwritten every time you hit this target
 make run_iso_floppy
 
-# (alternative) run the kernel exclusively only (needs the `bootloader` 
-# dependency in Cargo.toml to be added)
+# (alternative) run the kernel exclusively only (needs the `bootloader` dependency in 
+# Cargo.toml to be added)
 cargo bootimage
 make run
 ```

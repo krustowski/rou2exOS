@@ -91,6 +91,8 @@ build_floppy:
 	@mcopy -i fat.img ./print.elf ::PRINT.ELF
 	@mcopy -i fat.img ./go.elf ::GO.ELF
 	@mcopy -i fat.img ./sh.elf ::SH.ELF
+	@mcopy -i fat.img ./icmpresp.elf ::ICMPRESP.ELF
+	@mcopy -i fat.img ./garn.elf ::GARN.ELF
 
 #
 #  RUN
@@ -160,10 +162,24 @@ run_iso_debug:
 		-m 4G \
 		-cdrom r2.iso \
 		-fda fat.img \
-		-d int,cpu_reset,page \
 		-no-reboot \
 		-no-shutdown \
-		-serial stdio
+		-serial stdio \
+		-audiodev pa,id=snd0 \
+		-machine pcspk-audiodev=snd0
+
+run_iso_debug_int: 
+	@qemu-system-x86_64 \
+		-boot d \
+		-m 4G \
+		-cdrom r2.iso \
+		-fda fat.img \
+		-no-reboot \
+		-no-shutdown \
+		-serial stdio \
+		-d int,cpu_reset,page \
+		-audiodev pa,id=snd0 \
+		-machine pcspk-audiodev=snd0
 
 #
 #  HELPERS

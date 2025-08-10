@@ -26,7 +26,7 @@ make init
 
 # make sure you have `xorriso`, `net-tools` and `grub2-tools` (or just grub-tools) 
 # installed (Linux)
-dnf install xorriso net-tools grub2-tools qemu qemu-common qemu-system-x86 mtools
+dnf install xorriso net-tools grub2-tools qemu qemu-common qemu-system-x86 mtools lld
 
 # compile the kernel and stage2 bootloader, link it into an ELF binary and bake into an ISO
 # image with GRUB bootloader

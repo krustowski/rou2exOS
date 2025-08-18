@@ -54,6 +54,8 @@ pub fn print_result(fb: &super::boot::FramebufferTag) -> super::result::InitResu
 
     video::mode::init_video(fb);
 
+    unsafe { video::ega::vga_set_80x50(); }
+
     if let Some(_) = video::mode::get_video_mode() {
         return super::result::InitResult::Passed;
     }

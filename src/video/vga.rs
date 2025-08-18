@@ -6,7 +6,7 @@ use core::sync::atomic::{AtomicBool, Ordering};
 
 /// VGA text mode buffer dimensions.
 const BUFFER_WIDTH: usize = 80;
-const BUFFER_HEIGHT: usize = 25;
+const BUFFER_HEIGHT: usize = 50;
 const BUFFER_ADDRESS: usize = 0xb8000;
 
 /// Wrapped Writer instance guarded by Mutex.

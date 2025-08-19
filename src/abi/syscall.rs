@@ -1014,11 +1014,6 @@ pub extern "C" fn syscall_handler() {
 
                     unsafe {
                         let total_len = u16::from_be((*header).total_length);
-
-                        warn!("len: ");
-                        printn!(total_len);
-                        warn!("\n");
-
                         let slice = core::slice::from_raw_parts(packet, total_len as usize);
 
                         ipv4::send_packet(slice);

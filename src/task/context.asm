@@ -30,7 +30,8 @@ context_switch:
 
     ; Catch the RIP!
     call .save_rip
-.save_rip
+
+.save_rip:
     pop rax
     mov [r8 + 0x78], rax
 

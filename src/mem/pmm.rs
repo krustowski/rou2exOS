@@ -1,4 +1,4 @@
-static mut PHYSICAL_BITMAP: [[u64; 8]; 512] = [[0; 8]; 512];
+static mut PHYSICAL_BITMAP: [[u64; 8]; 1024] = [[0; 8]; 1024];
 
 static mut PHYSICAL_BASE: u64 = 0;
 
@@ -152,23 +152,17 @@ pub unsafe fn pmm_init() {
     rprint!("Building physmap\n");
     build_physmap_2m(pml4, 8 * 1024 * 1024);
 
-    //map_2m(&p4_table as *const _ as *mut u64, 0xfd00_0000, 0xfd00_0000, P | RW);
-    //map_2m(&p4_table as *const _ as *mut u64, 0xffff_8000_fd00_0000, 0xfd00_0000, P | RW);
-
-    rprint!("Mapping framebuffer\n");
-    map_framebuffer(0xfd00_0000u64, 0xffff_8000_fd00_0000);
-
     rprint!("Reloading CR3\n");
     reload_cr3();
 }
 
 /// Mark a frame by index (0..262143) as used/free
 pub unsafe fn pmm_mark(frame_idx: u32, used: bool) {
-    let row = (frame_idx / (8 * 64)) as usize;     // 0..511
-    let off = (frame_idx % (8 * 64)) as u32;       // 0..511
+    let row = (frame_idx / (8 * 64)) as usize;     
+    let off = (frame_idx % (8 * 64)) as u32;    
 
-    let col = (off / 64) as usize;                 // 0..7
-    let bit = off % 64;                            // 0..63
+    let col = (off / 64) as usize;              
+    let bit = off % 64;                            
 
     if used { 
         set_bit(&mut PHYSICAL_BITMAP[row][col], bit);
@@ -178,7 +172,7 @@ pub unsafe fn pmm_mark(frame_idx: u32, used: bool) {
 }
 
 pub unsafe fn pmm_alloc() -> Option<u64> {
-    for row in 0..512 {
+    for row in 0..1024 {
         for col in 0..8 {
             let mut w = PHYSICAL_BITMAP[row][col];
 
@@ -392,7 +386,7 @@ pub unsafe fn map_4k(p4_virt: *mut u64, virt: u64, phys: u64, pte_flags: u64) {
 //
 //
 
-unsafe fn map_framebuffer(phys: u64, virt: u64) {
+pub unsafe fn map_framebuffer(phys: u64, virt: u64) {
     let p4_virt = read_cr3_phys() as *mut u64;
 
     let p4_idx = pml4_index(virt);

@@ -151,9 +151,9 @@ pub unsafe fn parse_multiboot2_info(base_addr: usize, mut fb_tag: &FramebufferTa
                         if entry.typ == 1 {
                             debug!("Usable memory region: ");
                             debugn!(entry.base_addr as u64);
-                            debug!(" - ");
+                            debug!(": ");
                             debugn!(entry.length as u64);
-                            debugln!(" B");
+                            debugln!(" bytes");
                         }
                     }
                 }
@@ -185,49 +185,22 @@ pub unsafe fn parse_multiboot2_info(base_addr: usize, mut fb_tag: &FramebufferTa
                 use x86_64::registers::control::Cr3;
 
                 unsafe {
-                    let p4_ptr = &p4_table as *const _ as *mut u64;
+                    if fb_tag.addr == 0xb8000 {
+                        ptr += align_up(tag.size as usize, 8);
+                        continue;
+                    }
 
-                    let p4_virt = &p4_table as *const _ as usize;
-                    let p4_phys = p4_virt;
+                    rprint!("Mapping framebuffer\n");
+                    let virt_base = 0xffff_8000_0000_0000u64 + fb_tag.addr as u64;
 
-                    //
-                    
-                    let virt_base = 0xffff_8000_fd00_0000u64;
-                    let fb_ptr = virt_base as *mut u64;
+                    //crate::mem::pmm::map_framebuffer(fb_tag.addr as u64, 0xffff_8000_0000_0000 + fb_tag.addr as u64);
+                    //crate::mem::pmm::map_framebuffer(fb_tag.addr as u64, virt_base);
+                    crate::mem::pmm::map_framebuffer(0xfd00_0000, 0xffff_8000_fd00_0000);
 
-                    let test_ptr = virt_base as *mut u64;
-                    *test_ptr = 0xFFFFFFFF; 
+                    let fb_ptr = 0xffff_8000_fd00_0000 as *mut u64;
 
-                    //crate::mem::pages::identity_map(p4_table as *mut u64, 4 * 1024 * 1024);
-                    //crate::mem::pages::identity_map(p4_table as *mut u64, 0x1000);
+                    *fb_ptr = 0xFFFFFFFF; 
 
-                    /*crate::mem::pages::map_32mb(
-                        p4_ptr, 
-                        fb_tag.addr as usize, 
-                        virt_base as usize,
-                    );*/
-
-                    //x86_64::instructions::tlb::flush_all();
-                    //Cr3::write(PhysFrame::from_start_address(PhysAddr::new(p4_phys as u64)).unwrap(), Cr3Flags::empty());
-
-
-                    /*for y in 0..500  {
-                        for x in 0..500  {
-                                //let offset = y * fb_tag.pitch + x * (fb_tag.bpp as u32 / 8);
-                            let offset = y * fb_tag.pitch / 4 + x;
-                            //let color = 0x00ff00ff;
-
-                            fb_ptr.add(offset as usize).write_volatile(0xdeadbeef);
-                            fb_ptr.add(offset as usize + 1).write_volatile(0xfefab0);
-                            fb_ptr.add(offset as usize + 2).write_volatile(0xdeadbeef);
-                        }
-                    }*/
-
-                    /*for y in 0..150 {
-                        for x in 0..200 {
-                            super::font::put_pixel(x, y, 0xdeadbeef, fb_ptr, 4096, 32);
-                            }
-                            }*/
                     draw_rect(fb_ptr, 150, 150, 100, 100, 4096, 0x00ffffff);
                     draw_rect(fb_ptr, 250, 250, 100, 100, 4096, 0x00ff0000);
                     draw_rect(fb_ptr, 350, 350, 100, 100, 4096, 0x0000ff00);
@@ -269,6 +242,7 @@ pub unsafe fn parse_multiboot2_info(base_addr: usize, mut fb_tag: &FramebufferTa
         }
 
         ptr += align_up(tag.size as usize, 8);
+
         tag_count += 1;
         if tag_count > 64 {
             debugln!("Too many tags, aborting");

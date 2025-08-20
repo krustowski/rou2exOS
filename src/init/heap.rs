@@ -8,6 +8,10 @@ pub fn print_result() -> InitResult {
       return InitResult::Failed;
       }*/
 
+    unsafe { 
+        crate::mem::pmm::pmm_init();
+    }
+
     crate::mem::heap::init();
 
     unsafe {

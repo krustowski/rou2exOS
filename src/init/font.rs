@@ -1,4 +1,4 @@
-pub fn draw_char(c: u8, x: usize, y: usize, fb: *mut u32, pitch: usize, fg: u32, font: &[u8]) {
+pub fn draw_char(c: u8, x: usize, y: usize, fb: *mut u64, pitch: usize, fg: u32, font: &[u8]) {
     let char_size = font[3] as usize;
     //let glyph = &font[4 + (c as usize * char_size)..];
 
@@ -11,8 +11,8 @@ pub fn draw_char(c: u8, x: usize, y: usize, fb: *mut u32, pitch: usize, fg: u32,
                     let py = y + row;
                     let offset = py * pitch + px * 4;
                     unsafe {
-                        let pixel_ptr = fb.add(offset) as *mut u32;
-                        *pixel_ptr = fg;
+                        let pixel_ptr = fb.add(offset) as *mut u64;
+                        *pixel_ptr = fg as u64;
                     }
                 }
             }
@@ -69,7 +69,7 @@ pub fn parse_psf(psf: &[u8]) -> Option<PsfFont> {
     }
 }
 
-fn draw_char_psf(font: &PsfFont, ch: u8, x: usize, y: usize, color: u32, framebuffer: *mut u32, pitch: usize, bpp: usize) {
+fn draw_char_psf(font: &PsfFont, ch: u8, x: usize, y: usize, color: u32, framebuffer: *mut u64, pitch: usize, bpp: usize) {
     let glyph_start = ch as usize * font.bytes_per_glyph;
     //let glyph = &font.glyphs[glyph_start..glyph_start + font.bytes_per_glyph];
 
@@ -81,7 +81,7 @@ fn draw_char_psf(font: &PsfFont, ch: u8, x: usize, y: usize, color: u32, framebu
                     unsafe { 
                         let offset = (y + row) * 4096 / 4 + (x + col);
 
-                        framebuffer.add(offset as usize + 1).write_volatile(color);
+                        framebuffer.add(offset as usize + 1).write_volatile(color as u64);
                         //framebuffer.add(offset as usize + 1).write_volatile(0xfefab0);
                         //framebuffer.add(offset as usize + 2).write_volatile(0xdeadbeef);
                     }
@@ -91,7 +91,7 @@ fn draw_char_psf(font: &PsfFont, ch: u8, x: usize, y: usize, color: u32, framebu
     }
 }
 
-pub fn draw_text_psf(text: &str, font: &PsfFont, x: usize, y: usize, color: u32, framebuffer: *mut u32, pitch: usize, bpp: usize) {
+pub fn draw_text_psf(text: &str, font: &PsfFont, x: usize, y: usize, color: u32, framebuffer: *mut u64, pitch: usize, bpp: usize) {
     let mut cx = x;
 
     for ch in text.bytes() {

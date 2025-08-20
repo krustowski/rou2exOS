@@ -7,6 +7,8 @@ SECTIONS {
         KEEP(*(.multiboot2_header))
     }
 
+    __kernel_start = .;
+
     .text : {
 	*(.text.entry)
         *(.text*)
@@ -62,6 +64,8 @@ SECTIONS {
     p1_fb_table_1  = .;  . = . + 4K;
     p1_fb_table_2  = .;  . = . + 4K;
     p1_fb_table_3  = .;  . = . + 4K;
+
+    __kernel_end = .;
 
     . = 0x650000;
     .user_task : {

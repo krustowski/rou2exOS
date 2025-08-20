@@ -22,6 +22,7 @@ pub fn get_result() -> super::result::InitResult {
     debugln!("Loading TSS");
     load_tss(0x28);
 
+    debugln!("Done");
     super::result::InitResult::Passed
 }
 

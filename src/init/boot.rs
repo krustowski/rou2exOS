@@ -191,11 +191,11 @@ pub unsafe fn parse_multiboot2_info(base_addr: usize, mut fb_tag: &FramebufferTa
                     let p4_phys = p4_virt;
 
                     //
+                    
+                    let virt_base = 0xffff_8000_fd00_0000u64;
+                    let fb_ptr = virt_base as *mut u64;
 
-                    let virt_base = 0xFFFF_FF80_0000_0000u64;
-                    let fb_ptr = virt_base as *mut u32;
-
-                    let test_ptr = virt_base as *mut u32;
+                    let test_ptr = virt_base as *mut u64;
                     *test_ptr = 0xFFFFFFFF; 
 
                     //crate::mem::pages::identity_map(p4_table as *mut u64, 4 * 1024 * 1024);
@@ -283,12 +283,12 @@ fn align_up(x: usize, align: usize) -> usize {
     (x + align - 1) & !(align - 1)
 }
 
-pub unsafe fn draw_rect(ptr: *mut u32, x0: usize, y0: usize, w: usize, h: usize, pitch: usize, color: u32) {
+pub unsafe fn draw_rect(ptr: *mut u64, x0: usize, y0: usize, w: usize, h: usize, pitch: usize, color: u32) {
     for y in y0..(y0 + h) {
         for x in x0..(x0 + w) {
             let offset = y * (pitch / 4) + x;
 
-            ptr.add(offset).write_volatile(color);
+            ptr.add(offset).write_volatile(color as u64);
         }
     }
 }

@@ -224,7 +224,6 @@ pub unsafe fn enable_recursive_mapping(p4_virt: *mut u64) {
     reload_cr3();
 }
 
-
 #[inline(always)]
 fn pml4_index(va: u64) -> usize { 
     ((va >> 39) & 0x1FF) as usize
@@ -416,10 +415,10 @@ pub unsafe fn map_framebuffer(phys: u64, virt: u64) {
 
     write64(p4_virt.add(p4_idx), (l3_frame & ADDR_MASK_4K) | P | RW);
     write64(l3_virt.add(p3_idx), (l2_frame & ADDR_MASK_4K) | P | RW);
-    write64(l2_virt.add(p2_idx), (phys & ADDR_MASK_2M) | P | RW | PS);
-    write64(l2_virt.add(p2_idx + 1), ((phys + 0x200000) & ADDR_MASK_2M) | P | RW | PS);
-    write64(l2_virt.add(p2_idx + 2), ((phys + 0x400000) & ADDR_MASK_2M) | P | RW | PS);
-    write64(l2_virt.add(p2_idx + 3), ((phys + 0x600000) & ADDR_MASK_2M) | P | RW | PS);
+
+    for i in 0..4 {
+        write64(l2_virt.add(p2_idx + i), (phys + (i as u64 * 0x200000) & ADDR_MASK_2M) | P | RW | PS);
+    }
 
     invlpg(virt as usize);
 }

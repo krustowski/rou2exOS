@@ -381,6 +381,8 @@ set_up_page_tables:
 ;    cmp ecx, 0x40000
 ;    jb .map_self_2
 
+    ret
+
     ; Framebuffer init
 
     mov eax, p3_fb_table

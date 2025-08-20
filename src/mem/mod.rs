@@ -4,3 +4,4 @@ pub mod heap;
 pub mod pages;
 pub mod pmm;
 pub mod vmm;
+pub mod walk;

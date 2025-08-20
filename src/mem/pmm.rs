@@ -84,8 +84,11 @@ pub unsafe fn build_physmap_2m(p4_virt: *mut u64, mut phys_limit: u64) {
         rprintn!(virt);
         rprint!(" address\n");
 
-        //map_2m(p4_virt, virt, phys, P | RW);
+        map_2m(p4_virt, virt, phys, P | RW);
         
+        phys += TWO_MIB;
+        continue;
+
         //
         //
         //
@@ -131,6 +134,7 @@ pub unsafe fn build_physmap_2m(p4_virt: *mut u64, mut phys_limit: u64) {
 
 pub unsafe fn pmm_init() {
     let pml4 = read_cr3_phys() as *mut u64;
+    let p4_virt = &p4_table as *const _ as *mut u64;
 
     rprint!("CR3 physical addr: ");
     rprintn!(read_cr3_phys());
@@ -144,13 +148,15 @@ pub unsafe fn pmm_init() {
     set_physical_base(0xFFFF_8000_0000_0000);
 
     rprint!("Enabling recursive mapping\n");
-    enable_recursive_mapping(pml4);
+    enable_recursive_mapping(p4_virt);
 
     rprint!("Marking reserved physical memory frames as used\n");
     reserve_initial_frames();
 
     rprint!("Building physmap\n");
-    build_physmap_2m(pml4, 8 * 1024 * 1024);
+    build_physmap_2m(p4_virt, 8 * 1024 * 1024);
+
+    map_2m(pml4, 0xFFFF_8000_0000_0000, 0x000_000, P | RW);
 
     rprint!("Reloading CR3\n");
     reload_cr3();
@@ -211,7 +217,7 @@ unsafe fn reload_cr3() {
 }
 
 #[inline(always)]
-unsafe fn read_cr3_phys() -> u64 {
+pub unsafe fn read_cr3_phys() -> u64 {
     let (frame, _flags) = x86_64::registers::control::Cr3::read();
 
     frame.start_address().as_u64()

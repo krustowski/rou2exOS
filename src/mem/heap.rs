@@ -9,7 +9,7 @@ pub struct HeapNode {
 
 #[derive(PartialEq)]
 pub enum HeapNodeStatus {
-    UNKNWON = 0x00,
+    //UNKNWON = 0x00,
     FREE,
     USED,
 }
@@ -160,11 +160,11 @@ pub unsafe fn alloc(alloc_size: usize) -> u64 {
 
     // Return VAddr to allocated area
     //(cur_node as *mut HeapNode as u64) + (core::mem::size_of::<HeapNode>() as u64)
-    (cur_node as *mut HeapNode as u64)
+    cur_node as *mut HeapNode as u64
 }
 
 pub unsafe fn free(vaddr: u64) {
-    let mut cur_node = vaddr as *mut HeapNode;
+    let cur_node = vaddr as *mut HeapNode;
 
     (*cur_node).status = HeapNodeStatus::FREE;
 

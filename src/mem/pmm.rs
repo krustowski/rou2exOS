@@ -130,6 +130,8 @@ pub unsafe fn build_physmap_2m(p4_virt: *mut u64, mut phys_limit: u64) {
 }
 
 pub unsafe fn pmm_init() {
+    let pml4 = read_cr3_phys() as *mut u64;
+
     rprint!("CR3 physical addr: ");
     rprintn!(read_cr3_phys());
     rprint!("\n");
@@ -142,13 +144,13 @@ pub unsafe fn pmm_init() {
     set_physical_base(0xFFFF_8000_0000_0000);
 
     rprint!("Enabling recursive mapping\n");
-    enable_recursive_mapping(&p4_table as *const _ as *mut u64);
+    enable_recursive_mapping(pml4);
 
     rprint!("Marking reserved physical memory frames as used\n");
     reserve_initial_frames();
 
     rprint!("Building physmap\n");
-    build_physmap_2m(&p4_table as *const _ as *mut u64, 8 * 1024 * 1024);
+    build_physmap_2m(pml4, 8 * 1024 * 1024);
 
     //map_2m(&p4_table as *const _ as *mut u64, 0xfd00_0000, 0xfd00_0000, P | RW);
     //map_2m(&p4_table as *const _ as *mut u64, 0xffff_8000_fd00_0000, 0xfd00_0000, P | RW);
@@ -391,7 +393,7 @@ pub unsafe fn map_4k(p4_virt: *mut u64, virt: u64, phys: u64, pte_flags: u64) {
 //
 
 unsafe fn map_framebuffer(phys: u64, virt: u64) {
-    let p4_virt = &p4_table as *const _ as *mut u64;
+    let p4_virt = read_cr3_phys() as *mut u64;
 
     let p4_idx = pml4_index(virt);
     let p3_idx = pdpt_index(virt);
@@ -421,6 +423,9 @@ unsafe fn map_framebuffer(phys: u64, virt: u64) {
     write64(p4_virt.add(p4_idx), (l3_frame & ADDR_MASK_4K) | P | RW);
     write64(l3_virt.add(p3_idx), (l2_frame & ADDR_MASK_4K) | P | RW);
     write64(l2_virt.add(p2_idx), (phys & ADDR_MASK_2M) | P | RW | PS);
+    write64(l2_virt.add(p2_idx + 1), ((phys + 0x200000) & ADDR_MASK_2M) | P | RW | PS);
+    write64(l2_virt.add(p2_idx + 2), ((phys + 0x400000) & ADDR_MASK_2M) | P | RW | PS);
+    write64(l2_virt.add(p2_idx + 3), ((phys + 0x600000) & ADDR_MASK_2M) | P | RW | PS);
 
     invlpg(virt as usize);
 }

@@ -99,6 +99,12 @@ static COMMANDS: &[Command] = &[
         hidden: true,
     },
     Command {
+        name: b"mem",
+        description: b"prints the memory stats",
+        function: cmd_mem,
+        hidden: true,
+    },
+    Command {
         name: b"menu",
         description: b"renders a sample menu",
         function: cmd_menu,
@@ -520,6 +526,10 @@ fn cmd_http(_args: &[u8]) {
             break;
         }
     }
+}
+
+fn cmd_mem(_args: &[u8]) {
+    unsafe { crate::mem::walk::walk_memory(); }
 }
 
 /// Experimental command function to evaluate the current TUI rendering options.

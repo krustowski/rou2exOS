@@ -259,8 +259,8 @@ pub unsafe fn set_physical_base(base: u64) {
 }
 
 #[inline(always)]
-pub unsafe fn phys_to_virt(paddr: u64) -> *mut u8 {
-    (PHYSICAL_BASE + paddr) as *mut u8
+pub unsafe fn phys_to_virt(paddr: u64) -> *mut u64 {
+    (PHYSICAL_BASE + paddr) as *mut u64
 }
 
 #[inline(always)]

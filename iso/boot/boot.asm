@@ -12,53 +12,12 @@ align 4096
 ;dma:
 ;	resb 4096
 
-pml4_table:    
-	resq 512
-pdpt_table:    
-	resq 512
-pd_table:      
-	resq 512      
-pt_table:      
-	resq 512      
-
 p4_table:           
 	resb 4096
 p3_table:           
 	resb 4096
 p2_table:           
 	resb 4096
-p1_page_tables:     
-	resb 4096
-p1_page_tables_2:   
-	resb 4096
-
-p1_userspace_0:
-	resb 4096
-p1_userspace_1:
-	resb 4096
-
-p3_fb_table:
-    	resq 512
-p2_fb_table:
-    	resq 512
-
-p1_fb_table:
-    	resb 4096
-p1_fb_table_0:
-    	resb 4096
-p1_fb_table_1:
-    	resb 4096
-p1_fb_table_2:      
-	resb 4096
-p1_fb_table_3:      
-	resb 4096
-
-p1_low_table:
-    resq 512
-p1_extra_table:
-    resb 4096
-p1_table_page_tables:
-    resb 4096
 
 align 16
 ist1_stack:
@@ -99,11 +58,6 @@ global dma
 global p4_table
 global p3_table
 global p2_table
-
-global p3_fb_table
-global p2_fb_table
-global p1_fb_table
-global p1_fb_table_2
 
 global gdt_start
 global gdt_end
@@ -226,27 +180,10 @@ idt_start:
 idt_end:
 
 ;
-;
-;
-
-section .data 
-
-FB_P1_TABLES:
-    dq p1_fb_table_0
-    dq p1_fb_table_1
-    dq p1_fb_table_2
-    dq p1_fb_table_3
-
-;
 ;  Page Tables Zeroing & Mapping
 ;
 
 section .text
-
-%define FB_PHYS     0xFD000000
-%define FB_VIRT     0xFFFFFF8000000000
-%define PAGE_COUNT  4096  
-%define PAGE_FLAGS  0b11
 
 zero_table:
     mov ecx, 512          
@@ -266,34 +203,7 @@ set_up_page_tables:
     lea edi, [p3_table]
     call zero_table
 
-    lea edi, [p3_fb_table]
-    call zero_table
-
     lea edi, [p2_table]
-    call zero_table
-
-    lea edi, [p2_fb_table]
-    call zero_table
-
-    lea edi, [p1_fb_table_0]
-    call zero_table
-
-    lea edi, [p1_fb_table_1]
-    call zero_table
-
-    lea edi, [p1_fb_table_2]
-    call zero_table
-
-    lea edi, [p1_fb_table_3]
-    call zero_table
-
-    lea edi, [p1_page_tables]
-    call zero_table
-
-    lea edi, [p1_userspace_0]
-    call zero_table
-
-    lea edi, [p1_userspace_1]
     call zero_table
 
     ; Map P4[0] → P3
@@ -319,8 +229,10 @@ set_up_page_tables:
     mov dword [p2_table + ecx * 8 + 4], 0
 
     inc ecx
-    cmp ecx, 512
+    cmp ecx, 1
     jne .map_1gib
+
+    ret
 
     ; Allow CPL=3 access at 0x600_000--0x800_000
 
@@ -334,125 +246,6 @@ set_up_page_tables:
     mov [p2_table + 4 * 8], eax
     mov dword [p2_table + 4 * 8 + 4], 0 
 
-    ; Identity-map 
-
-;    mov eax, p1_page_tables
-;    or eax, PAGE_FLAGS
-;    mov [p2_table + 1 * 8], eax  
-;    mov dword [p2_table + 1 * 8 + 4], 0
-
-;    mov eax, p1_page_tables_2
-;    or eax, PAGE_FLAGS
-;    mov [p2_table + 2 * 8], eax  
-;    mov dword [p2_table + 2 * 8 + 4], 0
-
-;    xor ecx, 0
-;.map_self:
-;    mov eax, 0x131000        
-;    add eax, ecx
-;    or eax, PAGE_FLAGS
-;    mov edi, p1_page_tables
-;    mov ebx, ecx
-;    shr ebx, 12
-;    shl ebx, 3
-;    add edi, ebx
-
-;    mov [edi], eax
-;    mov dword [edi + 4], 0
-
-;    add ecx, 0x1000
-;    cmp ecx, 0x80000
-;    jb .map_self
-
-;.map_self_2:
-;    mov eax, 0x13e000        
-;    add eax, ecx
-;    or eax, PAGE_FLAGS
-;    mov edi, p1_page_tables_2
-;    mov ebx, ecx
-;    shr ebx, 12
-;    shl ebx, 3
-;    add edi, ebx
-
-;    mov [edi], eax
-;    mov dword [edi + 4], 0
-
-;    add ecx, 0x1000
-;    cmp ecx, 0x40000
-;    jb .map_self_2
-
-    ret
-
-    ; Framebuffer init
-
-    mov eax, p3_fb_table
-    or eax, PAGE_FLAGS
-    mov [p4_table + 511 * 8], eax
-    mov dword [p4_table + 511 * 8 + 4], 0
-
-    mov eax, p2_fb_table
-    or eax, PAGE_FLAGS
-    mov [p3_fb_table + 0 * 8], eax
-    mov dword [p3_fb_table + 0 * 8 + 4], 0
-
-    mov eax, p1_fb_table_0
-    or eax, PAGE_FLAGS
-    mov [p2_fb_table + 0 * 8], eax
-    mov dword [p2_fb_table + 0 * 8 + 4], 0
-
-    mov eax, p1_fb_table_1
-    or eax, PAGE_FLAGS
-    mov [p2_fb_table + 1 * 8], eax
-    mov dword [p2_fb_table + 1 * 8 + 4], 0
-
-    mov eax, p1_fb_table_2
-    or eax, PAGE_FLAGS
-    mov [p2_fb_table + 2 * 8], eax
-    mov dword [p2_fb_table + 2 * 8 + 4], 0
-
-    mov eax, p1_fb_table_3
-    or eax, PAGE_FLAGS
-    mov [p2_fb_table + 3 * 8], eax
-    mov dword [p2_fb_table + 3 * 8 + 4], 0
-
-    ; Framebuffer P1 pages
-
-    xor ecx, ecx            
-    xor esi, esi            
-.map_fb_dynamic:
-    mov eax, FB_PHYS
-    add eax, ecx            
-    or eax, PAGE_FLAGS
-
-    mov ebx, esi
-    shl ebx, 3              
-    mov edi, [FB_P1_TABLES + ebx] 
-
-    mov ebx, ecx
-    shr ebx, 12             
-    and ebx, 511            
-    shl ebx, 3              
-
-    add edi, ebx
-    mov [edi], eax
-    mov dword [edi + 4], 0
-
-    add ecx, 0x1000         
-    cmp ecx, PAGE_COUNT * 0x1000
-    jae .done_fb_map
-
-    ; Switch to next p1 table every 512 pages
-    mov ebx, ecx
-    shr ebx, 12
-    and ebx, 511
-    cmp ebx, 0
-    jne .map_fb_dynamic
-    inc esi
-    cmp esi, (PAGE_COUNT + 511) / 512
-    jae .done_fb_map
-    jmp .map_fb_dynamic
-
-.done_fb_map:
     ret
 
 enable_paging:

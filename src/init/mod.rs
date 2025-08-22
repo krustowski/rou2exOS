@@ -10,6 +10,7 @@ pub mod heap;
 pub mod pit;
 pub mod result;
 pub mod video;
+pub mod multiboot_helpers;
 
 use spin::Mutex;
 

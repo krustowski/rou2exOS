@@ -74,7 +74,7 @@ pub struct AcpiRSDPTag {
 
 #[repr(C, packed)]
 pub struct AcpiSDTHeader {
-    pub signature: [u8; 4],
+    pub signature: [u8; 4], //array
     pub length: u32,
     pub revision: u8, 
     pub checksum: u8,
@@ -85,6 +85,23 @@ pub struct AcpiSDTHeader {
     pub creatpr_revision: u32,
 }
 
+#[repr(C, packed)] //directive?? status kinda idfk
+pub struct UsableMemory {
+	pub base: u64,
+	pub length: u64,
+	pub memtype: u32,
+	pub reserved: u32,
+
+}
+
+
+
+
+static mut U_MEM: [UsableMemory: 200] = [default::default()u64; 200]; //change this accordingly!!! placeholder for now
+
+//&&&&&&& reference variable borrower cannot change 
+//usize like size_t from C
+//main parser
 pub unsafe fn parse_multiboot2_info(base_addr: usize, mut fb_tag: &FramebufferTag) -> usize {
     // Ensure alignment (Multiboot2 requires 8-byte aligned structure)
     let addr = align_up(base_addr, 8);
@@ -111,6 +128,7 @@ pub unsafe fn parse_multiboot2_info(base_addr: usize, mut fb_tag: &FramebufferTa
             }
 
             1 => {
+
                 debug!("Boot command line tag: ");
 
                 let str_ptr = ptr + 8;
@@ -121,7 +139,7 @@ pub unsafe fn parse_multiboot2_info(base_addr: usize, mut fb_tag: &FramebufferTa
                 debugln!(cmdline);
             }
 
-            3 => {
+            3 => { 
                 debug!("Module tag found: ");
 
                 //let start = *((ptr + 8) as *const u32);
@@ -136,9 +154,9 @@ pub unsafe fn parse_multiboot2_info(base_addr: usize, mut fb_tag: &FramebufferTa
 
             6 => {
                 debugln!("Memory map tag");
-
+				//ptr casted to const memorytag pointer casted again to a pointer and marked as borrowed???
                 let mmap_tag = &*(ptr as *const MemoryMapTag);
-                let entries_start = (addr + core::mem::size_of::<MemoryMapTag>()) as *const u8;
+                let entries_start = (addr + core::mem::size_of::<MemoryMapTag>()) as *const u8; //jump to actual memory entries array
                 let entry_size = mmap_tag.entry_size as usize;
 
                 if entry_size > 0 {
@@ -149,10 +167,19 @@ pub unsafe fn parse_multiboot2_info(base_addr: usize, mut fb_tag: &FramebufferTa
                         let entry = &*entry_ptr;
 
                         if entry.typ == 1 {
+							
                             debug!("Usable memory region: ");
                             debugn!(entry.base_addr as u64);
+							U_MEM[i].addr = entry.base_addr;
+							U_MEM[i].length = entry.length;
+							U_MEM[i].memtype = entry.typ;
+							U_MEM[i].reserved = entry.reserved;
+							
+
                             debug!(": ");
+
                             debugn!(entry.length as u64);
+
                             debugln!(" bytes");
                         }
                     }

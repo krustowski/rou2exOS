@@ -1,3 +1,76 @@
+pub const MULTIBOOT_HEADER: u32 = 1;
+
+pub const MULTIBOOT_SEARCH: u32 = 32768;
+
+pub const MULTIBOOT2_HEADER_MAGIC: u32 = 0xe85250d6;
+pub const MULTIBOOT2_BOOTLOADER_MAGIC: u32 = 0x36d76289;
+
+pub const MULTIBOOT_MOD_ALIGN: u32 = 0x00001000;
+pub const MULTIBOOT_INFO_ALIGN: u32 = 0x00000008;
+pub const MULTIBOOT_TAG_ALIGN: u32 = 8;
+pub const MULTIBOOT_HEADER_ALIGN: u8 = 8;
+
+pub enum MULTIBOOT_TAG_TYPE {
+    MULTIBOOT_TAG_TYPE_END              = 0,
+    MULTIBOOT_TAG_TYPE_CMDLINE          = 1,
+    MULTIBOOT_TAG_TYPE_BOOT_LOADER_NAME = 2,
+    MULTIBOOT_TAG_TYPE_MODULE           = 3,
+    MULTIBOOT_TAG_TYPE_BASIC_MEMINFO    = 4,
+    MULTIBOOT_TAG_TYPE_BOOTDEV          = 5,
+    MULTIBOOT_TAG_TYPE_MMAP             = 6,
+    MULTIBOOT_TAG_TYPE_VBE              = 7,
+    MULTIBOOT_TAG_TYPE_FRAMEBUFFER      = 8,
+    MULTIBOOT_TAG_TYPE_ELF_SECTIONS     = 9,
+    MULTIBOOT_TAG_TYPE_APM              = 10,
+    MULTIBOOT_TAG_TYPE_EFI32            = 11,
+    MULTIBOOT_TAG_TYPE_EFI64            = 12,
+    MULTIBOOT_TAG_TYPE_SMBIOS           = 13,
+    MULTIBOOT_TAG_TYPE_ACPI_OLD         = 14,
+    MULTIBOOT_TAG_TYPE_ACPI_NEW         = 15,
+    MULTIBOOT_TAG_TYPE_NETWORK          = 16,
+    MULTIBOOT_TAG_TYPE_EFI_MMAP         = 17,
+    MULTIBOOT_TAG_TYPE_EFI_BS           = 18,
+    MULTIBOOT_TAG_TYPE_EFI32_IH         = 19,
+    MULTIBOOT_TAG_TYPE_EFI64_IH         = 20,
+    MULTIBOOT_TAG_TYPE_LOAD_BASE_ADDR   = 21,
+}
+
+pub enum MULTIBOOT_HEADER_TAG {
+    MULTIBOOT_HEADER_TAG_END  = 0,
+    MULTIBOOT_HEADER_TAG_INFORMATION_REQUEST = 1,
+    MULTIBOOT_HEADER_TAG_ADDRESS = 2,
+    MULTIBOOT_HEADER_TAG_ENTRY_ADDRESS = 3,
+    MULTIBOOT_HEADER_TAG_CONSOLE_FLAGS = 4,
+    MULTIBOOT_HEADER_TAG_FRAMEBUFFER = 5,
+    MULTIBOOT_HEADER_TAG_MODULE_ALIGN = 6,
+    MULTIBOOT_HEADER_TAG_EFI_BS       = 7,
+    MULTIBOOT_HEADER_TAG_ENTRY_ADDRESS_EFI32 = 8,
+    MULTIBOOT_HEADER_TAG_ENTRY_ADDRESS_EFI64 = 9,
+    MULTIBOOT_HEADER_TAG_RELOCATABLE = 10,
+}
+
+pub enum MULTIBOOT_MEMORY {
+    MULTIBOOT_MEMORY_AVAILABLE              = 1,
+    MULTIBOOT_MEMORY_RESERVED               = 2,
+    MULTIBOOT_MEMORY_ACPI_RECLAIMABLE       = 3,
+    MULTIBOOT_MEMORY_NVS                    = 4,
+    MULTIBOOT_MEMORY_BADRAM                 = 5,
+}
+
+pub const MULTIBOOT_ARCHITECTURE_I386: u8 = 0;
+pub const MULTIBOOT_ARCHITECTURE_MIPS32: u8 =  4;
+pub const MULTIBOOT_HEADER_TAG_OPTIONAL: u8 = 1;
+
+pub enum MULTIBOOT_LOAD_PREFERENCE {
+    MULTIBOOT_LOAD_PREFERENCE_NONE = 0,
+    MULTIBOOT_LOAD_PREFERENCE_LOW  = 1,
+    MULTIBOOT_LOAD_PREFERENCE_HIGH = 2,
+}
+
+const MULTIBOOT_CONSOLE_FLAGS_CONSOLE_REQUIRED: u8 = 1;
+const MULTIBOOT_CONSOLE_FLAGS_EGA_TEXT_SUPPORTED: u8 = 2;
+
+
 use crate::{debug::dump_debug_log_to_file, init::{config::{p1_fb_table, p1_fb_table_2, p2_fb_table, p3_fb_table, p4_table}, font::{draw_text_psf, parse_psf}}, mem, vga::{
     buffer::Color, write::{newline, number, string}
 } };
@@ -24,7 +97,7 @@ pub fn print_info(multiboot_ptr: u64, mut fb_tag: &FramebufferTag) -> InitResult
 #[repr(C)]
 #[derive(Debug)]
 pub struct TagHeader {
-    pub typ: u32,
+    pub typ: MULTIBOOT_TAG_TYPE,
     pub size: u32,
 }
 
@@ -87,17 +160,16 @@ pub struct AcpiSDTHeader {
 
 #[repr(C, packed)] //directive?? status kinda idfk
 pub struct UsableMemory {
-	pub base: u64,
-	pub length: u64,
-	pub memtype: u32,
-	pub reserved: u32,
+	start: u64,
+	end: u64,
+	count: u8,
 
 }
 
 
 
 
-static mut U_MEM: [UsableMemory: 200] = [default::default()u64; 200]; //change this accordingly!!! placeholder for now
+static mut U_MEM: UsableMemory = UsableMemory{start: 0, end: 0, count: 0}; //change this accordingly!!! placeholder for now
 
 //&&&&&&& reference variable borrower cannot change 
 //usize like size_t from C
@@ -114,20 +186,22 @@ pub unsafe fn parse_multiboot2_info(base_addr: usize, mut fb_tag: &FramebufferTa
 
     let mut tag_count = 0;
 
+	
+
     while ptr < end {
         let tag = &*(ptr as *const TagHeader);
         if tag.size < 8 || tag.size > 4096 {
             debugln!("Invalid tag size: abort");
             break;
         }
-
+		
         match tag.typ {
-            0 => {
+            MULTIBOOT_TAG_TYPE::MULTIBOOT_TAG_TYPE_END => {
                 debugln!("End tag found");
                 break;
             }
 
-            1 => {
+            MULTIBOOT_TAG_TYPE::MULTIBOOT_TAG_TYPE_CMDLINE => {
 
                 debug!("Boot command line tag: ");
 
@@ -139,7 +213,7 @@ pub unsafe fn parse_multiboot2_info(base_addr: usize, mut fb_tag: &FramebufferTa
                 debugln!(cmdline);
             }
 
-            3 => { 
+            MULTIBOOT_TAG_TYPE::MULTIBOOT_TAG_TYPE_MODULE => { 
                 debug!("Module tag found: ");
 
                 //let start = *((ptr + 8) as *const u32);
@@ -152,41 +226,13 @@ pub unsafe fn parse_multiboot2_info(base_addr: usize, mut fb_tag: &FramebufferTa
                 debugln!(cmdline);
             }
 
-            6 => {
-                debugln!("Memory map tag");
-				//ptr casted to const memorytag pointer casted again to a pointer and marked as borrowed???
+            MULTIBOOT_TAG_TYPE::MULTIBOOT_TAG_TYPE_MMAP => {
+				//ptr as *const foo ; immutable raw pointer
                 let mmap_tag = &*(ptr as *const MemoryMapTag);
-                let entries_start = (addr + core::mem::size_of::<MemoryMapTag>()) as *const u8; //jump to actual memory entries array
-                let entry_size = mmap_tag.entry_size as usize;
-
-                if entry_size > 0 {
-                    let entries_count = (mmap_tag.size as usize - core::mem::size_of::<MemoryMapTag>()) / entry_size;
-
-                    for i in 0..entries_count {
-                        let entry_ptr = entries_start.add(i * entry_size) as *const MemoryMapEntry;
-                        let entry = &*entry_ptr;
-
-                        if entry.typ == 1 {
-							
-                            debug!("Usable memory region: ");
-                            debugn!(entry.base_addr as u64);
-							U_MEM[i].addr = entry.base_addr;
-							U_MEM[i].length = entry.length;
-							U_MEM[i].memtype = entry.typ;
-							U_MEM[i].reserved = entry.reserved;
-							
-
-                            debug!(": ");
-
-                            debugn!(entry.length as u64);
-
-                            debugln!(" bytes");
-                        }
-                    }
-                }
+				memory_map_tag(mmap_tag); 
             }
 
-            8 => {
+            MULTIBOOT_TAG_TYPE::MULTIBOOT_TAG_TYPE_FRAMEBUFFER => {
                 debugln!("Framebuffer tag: ");
 
                 fb_tag = &*(ptr as *const FramebufferTag);
@@ -248,7 +294,7 @@ pub unsafe fn parse_multiboot2_info(base_addr: usize, mut fb_tag: &FramebufferTa
 
             }
 
-            14 => {
+            MULTIBOOT_TAG_TYPE::MULTIBOOT_TAG_TYPE_ACPI_OLD => {
                 debugln!("ACPI v1 Root System Descriptor Pointer tag");
 
                 let acpi_tag = &*(ptr as *const AcpiRSDPTag);
@@ -279,6 +325,24 @@ pub unsafe fn parse_multiboot2_info(base_addr: usize, mut fb_tag: &FramebufferTa
 
     tag_count
 }
+
+pub unsafe fn memory_map_tag(mmap_tag: &MemoryMapTag) {
+	debugln!("Memory map tag");
+	let entries_start = (mmap_tag + core::mem::size_of::<MemoryMapTag>()) as *const u8; //wont compile look into this
+    let entry_size = mmap_tag.entry_size as usize;
+	let end 
+
+
+
+}
+
+
+
+
+pub unsafe fn boot_line_tag() {
+
+}
+
 
 fn align_up(x: usize, align: usize) -> usize {
     (x + align - 1) & !(align - 1)

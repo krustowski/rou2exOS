@@ -103,7 +103,7 @@ pub struct TagHeader {
 
 #[repr(C)]
 #[derive(Debug)]
-struct MemoryMapTag {
+pub struct MemoryMapTag {
     typ: u32,       
     size: u32,          
     entry_size: u32,
@@ -228,7 +228,7 @@ pub unsafe fn parse_multiboot2_info(base_addr: usize, mut fb_tag: &FramebufferTa
 
             MULTIBOOT_TAG_TYPE::MULTIBOOT_TAG_TYPE_MMAP => {
 				//ptr as *const foo ; immutable raw pointer
-                let mmap_tag = &*(ptr as *const MemoryMapTag);
+                let mmap_tag = &*(ptr as *mut MemoryMapTag);
 				memory_map_tag(mmap_tag); 
             }
 
@@ -326,11 +326,19 @@ pub unsafe fn parse_multiboot2_info(base_addr: usize, mut fb_tag: &FramebufferTa
     tag_count
 }
 
-pub unsafe fn memory_map_tag(mmap_tag: &MemoryMapTag) {
+pub unsafe fn memory_map_tag(mut mmap_tag: &MemoryMapTag) {
+
 	debugln!("Memory map tag");
-	let entries_start = (mmap_tag + core::mem::size_of::<MemoryMapTag>()) as *const u8; //wont compile look into this
-    let entry_size = mmap_tag.entry_size as usize;
-	let end 
+	let tag_size = mmap_tag.size as usize;
+	let entry_size = mmap_tag.entry_size as usize;
+	let mut entries_start = &mut mmap_tag as *mut _ as *mut u8;
+	let mut entries_end = entries_start.add(tag_size);
+	let entry: MemoryMapEntry = MemoryMapEntry {base_addr: 0, length: 0, typ: 0, reserved: 0};
+
+	while entries_start <= entries_end {
+		
+	}
+
 
 
 

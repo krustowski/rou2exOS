@@ -10,13 +10,15 @@ The goal of this project is to make the rou2exOS kernel to follow the microkerne
 + [ABI specification document](/docs/ABI_OVERVIEW.md)
 + [Syscall client implementation examples](https://github.com/krustowski/rou2exOS-apps) (aka `rou2exOS` Apps)
 
-![rou2exOS startup](/.github/img/r2-kernel-boot.png)
-
 To run the OS, you can use the attached ISO image from any [Release](https://github.com/krustowski/rou2exOS/releases), and run it in QEMU emulator. The system was also tested on the x86_64 baremetal (booted from the USB flash disk). To enable the filesystem functionalities, attach a IMG file to QEMU as well (in virtual floppy drive A).
 
 ```
 qemu-system-x86_64 -boot d -cdrom r2.iso -fda fat.img
 ```
+
+## Preview
+
+![rou2exOS startup](/.github/img/r2-kernel-boot.png)
 
 ## How to build and run from source
 

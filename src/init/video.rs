@@ -49,7 +49,7 @@ pub fn map_framebuffer(
     }
 }
 
-pub fn print_result(fb: &super::boot::FramebufferTag) -> super::result::InitResult {
+pub fn print_result(fb: &super::multiboot_parser::FramebufferTag) -> super::result::InitResult {
     use crate::video;
 
     video::mode::init_video(fb);

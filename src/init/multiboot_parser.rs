@@ -10,6 +10,7 @@ pub const MULTIBOOT_INFO_ALIGN: u32 = 0x00000008;
 pub const MULTIBOOT_TAG_ALIGN: u32 = 8;
 pub const MULTIBOOT_HEADER_ALIGN: u8 = 8;
 
+#[derive(Copy,Clone)]
 pub enum MULTIBOOT_TAG_TYPE {
     MULTIBOOT_TAG_TYPE_END              = 0,
     MULTIBOOT_TAG_TYPE_CMDLINE          = 1,
@@ -95,7 +96,6 @@ pub fn print_info(multiboot_ptr: u64, mut fb_tag: &FramebufferTag) -> InitResult
 }
 
 #[repr(C)]
-#[derive(Debug)]
 pub struct TagHeader {
     pub typ: MULTIBOOT_TAG_TYPE,
     pub size: u32,

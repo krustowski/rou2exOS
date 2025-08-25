@@ -12,7 +12,7 @@ pub enum VideoMode {
 
 static mut VIDEO_MODE: Option<VideoMode> = Some(VideoMode::TextMode);
 
-pub fn init_video(fb: &crate::init::boot::FramebufferTag) {
+pub fn init_video(fb: &crate::init::multiboot_parser::FramebufferTag) {
     unsafe {
     VIDEO_MODE = Some(VideoMode::Framebuffer {
         address: fb.addr as *mut u8,

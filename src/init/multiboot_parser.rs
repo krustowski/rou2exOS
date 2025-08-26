@@ -329,15 +329,17 @@ pub unsafe fn parse_multiboot2_info(base_addr: usize, mut fb_tag: &FramebufferTa
 pub unsafe fn memory_map_tag(mut mmap_tag: &MemoryMapTag) {
 
 	debugln!("Memory map tag");
-	let tag_size = mmap_tag.size as usize;
+	let tag_size = mmap_tag.size as u8;
 	let entry_size = mmap_tag.entry_size as usize;
-	let mut entries_start = &mut mmap_tag as *mut _ as *mut u8;
-	let mut entries_end = entries_start.add(tag_size);
+	let mut entries_start = *(&mut mmap_tag as *mut _ as *mut u8); //wrong size here
+
 	let entry: MemoryMapEntry = MemoryMapEntry {base_addr: 0, length: 0, typ: 0, reserved: 0};
 
-	while entries_start <= entries_end {
-		
-	}
+
+	debugln!("Tag size");
+	debugn!(tag_size);
+	debugln!("\nEntry size");
+	debugn!(entry_size);
 
 
 

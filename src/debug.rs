@@ -1,7 +1,6 @@
 use core::fmt::{self, Write};
 use spin::Mutex;
-use crate::{clear_screen, error, printb, println};
-use crate::vga::{write::string, buffer::Color, screen};
+use crate::{clear_screen, error, printb};
 
 const DEBUG_LOG_SIZE: usize = 8192;
 

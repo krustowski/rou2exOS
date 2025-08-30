@@ -1,5 +1,4 @@
 use core::fmt::{self, Write};
-use core::ptr::Unique;
 use crate::input::port;
 use spin::{mutex::Mutex};
 use core::sync::atomic::{AtomicBool, Ordering};
@@ -28,6 +27,7 @@ pub fn init_writer() {
 /// Returns a wrapped Writer instance guarded by Mutex in Option. Beware that this invocation locks
 /// the Writer instance and all print macros therefore can fail silently.
 pub fn get_writer() -> Option<spin::MutexGuard<'static, Writer>> {
+    #[expect(static_mut_refs)]
     if WRITER_INIT.load(Ordering::Relaxed) {
         unsafe { WRITER.as_ref().map(|m| m.lock()) }
     } else {
@@ -97,13 +97,13 @@ pub struct Writer {
     col_pos: usize,
     row_pos: usize,
     color_code: ColorCode,
-    buffer: Unique<Buffer>,
+    buffer: *mut Buffer,
 }
 
 impl Write for Writer {
     /// Writes an input string to VGA text mode screen.
     fn write_str(&mut self, s: &str) -> fmt::Result {
-        let _ = self.write_str_raw(s);
+        self.write_str_raw(s);
         Ok(())
     }
 }
@@ -115,7 +115,7 @@ impl Writer {
             col_pos: 0,
             row_pos: 0,
             color_code: ColorCode::new(Color::White, Color::Black),
-            buffer: unsafe { Unique::new_unchecked(BUFFER_ADDRESS as *mut _) },
+            buffer: BUFFER_ADDRESS as *mut _,
         }
     }
 
@@ -224,7 +224,7 @@ impl Writer {
 
     /// Returns a mutable reference to the video buffer.
     fn buffer_mut(&mut self) -> &mut Buffer {
-        unsafe { self.buffer.as_mut() }
+        unsafe { &mut *self.buffer }
     }
 
     /// Does the CRLF type of magic with the positional coordinates of a Writer instance.

@@ -1,11 +1,8 @@
 use crate::fs::fat12::{block::Floppy, fs::Filesystem};
 use crate::init::config::PATH_CLUSTER;
-use crate::net::serial::ready;
 use crate::input::cmd;
 use crate::input::port;
-use crate::init::config::{HOST, PATH, USER, get_path};
-use crate::vga::screen::clear;
-use crate::vga::write::newline;
+use crate::init::config::{HOST, USER, get_path};
 use crate::video::{self, vga};
 
 /// The macimum size of an input to the shell console.
@@ -182,7 +179,7 @@ fn handle_tab_completion(input_buffer: &mut [u8; INPUT_BUFFER_SIZE], input_len: 
     let (cmd, prefix) = split_cmd(&input_cpy);
 
     // Just render the help command output
-    if prefix.len() == 0 {
+    if prefix.is_empty() {
         cmd::handle(b"help");
         return;
     }
@@ -278,13 +275,8 @@ fn handle_tab_completion(input_buffer: &mut [u8; INPUT_BUFFER_SIZE], input_len: 
                             // Adjust the input buffer used length
                             *input_len += cmd.len() + 1 + clean_name_len;
 
-                            if *input_len > 128 {
-                                return;
-                            }
-
                             // Debug: record full input buffer
                             //debugln!(&input_buffer[..*input_len]);
-                            return;
                         }
                     }
                 });
@@ -412,7 +404,7 @@ pub fn split_cmd(input: &[u8]) -> (&[u8], &[u8]) {
         }
         (cmd, rest)
     } else {
-        (&trimmed[..], &[])
+        (trimmed, &[])
     }
 }
 

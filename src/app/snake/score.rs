@@ -1,7 +1,7 @@
 use crate::{
     app::snake::menu::{draw_menu, draw_window}, fs::fat12::{
         block::Floppy, 
-        fs::Filesystem}, init::config::PATH_CLUSTER, input::keyboard::keyboard_read_scancode, slice_end_index_len_fail, vga::{buffer::VGA_BUFFER, write::{byte, newline, number, string}}
+        fs::Filesystem}, init::config::PATH_CLUSTER, input::keyboard::keyboard_read_scancode
 };
 
 const HIGH_SCORE_FILE: &[u8; 11] = b"SKSCORE DAT";
@@ -12,18 +12,19 @@ type Error = &'static str;
 pub fn render_scores_window(scores: &[u32; SCORE_LEN]) {
     let mut menu: [&str; SCORE_LEN] = [""; SCORE_LEN];
 
-    static mut buf0: [u8; 32] = [0u8; 32];
-    static mut buf1: [u8; 32] = [0u8; 32];
-    static mut buf2: [u8; 32] = [0u8; 32];
-    static mut buf3: [u8; 32] = [0u8; 32];
-    static mut buf4: [u8; 32] = [0u8; 32];
+    static mut BUF0: [u8; 32] = [0u8; 32];
+    static mut BUF1: [u8; 32] = [0u8; 32];
+    static mut BUF2: [u8; 32] = [0u8; 32];
+    static mut BUF3: [u8; 32] = [0u8; 32];
+    static mut BUF4: [u8; 32] = [0u8; 32];
     
+    #[expect(static_mut_refs)]
     unsafe {
-        menu[0] = sprintf_score(b"1. ", &mut buf0, scores[0]);
-        menu[1] = sprintf_score(b"2. ", &mut buf1, scores[1]);
-        menu[2] = sprintf_score(b"3. ", &mut buf2, scores[2]);
-        menu[3] = sprintf_score(b"4. ", &mut buf3, scores[3]);
-        menu[4] = sprintf_score(b"5. ", &mut buf4, scores[4]);
+        menu[0] = sprintf_score(b"1. ", &mut BUF0, scores[0]);
+        menu[1] = sprintf_score(b"2. ", &mut BUF1, scores[1]);
+        menu[2] = sprintf_score(b"3. ", &mut BUF2, scores[2]);
+        menu[3] = sprintf_score(b"4. ", &mut BUF3, scores[3]);
+        menu[4] = sprintf_score(b"5. ", &mut BUF4, scores[4]);
     }
 
     draw_window(25, 5, 30, 15, Some("High Scores"));
@@ -52,15 +53,12 @@ pub fn save_high_scores_fat12(scores: &[u32; SCORE_LEN]) -> Result<(), Error> {
         buf[i * 4..i * 4 + 4].copy_from_slice(&score.to_le_bytes());
     }
 
-    match Filesystem::new(&floppy) {
-        Ok(fs) => {
-            //let cluster: u16 = 0;
+    if let Ok(fs) = Filesystem::new(&floppy) {
+        //let cluster: u16 = 0;
 
-            unsafe {
-                fs.write_file(PATH_CLUSTER, HIGH_SCORE_FILE, &buf);
-            }
+        unsafe {
+            fs.write_file(PATH_CLUSTER, HIGH_SCORE_FILE, &buf);
         }
-        Err(e) => {}
     }
 
     Ok(())
@@ -72,23 +70,19 @@ pub fn update_high_scores(score: u32) {
 
         let mut scores_new = [0u32; 6];
 
-        for i in 0..scores.len() {
-            scores_new[i] = scores[i];
-        }
+        scores_new[..5].copy_from_slice(&scores);
 
         scores_new[SCORE_LEN] = score;
 
         scores_new.sort_unstable_by(|a, b| b.cmp(a));
 
-        for i in 0..scores.len() {
-            scores[i] = scores_new[i];
-        }
+        scores.copy_from_slice(&scores_new[..5]);
 
-        save_high_scores_fat12(&scores);
+        save_high_scores_fat12(&scores).expect("couldn't save highscores");
     } else {
         let mut scores = [0u32; SCORE_LEN];
         scores[0] = score;
-        save_high_scores_fat12(&scores);
+        save_high_scores_fat12(&scores).expect("couldn't save highscores");
     }
 }
 
@@ -120,9 +114,8 @@ pub fn load_high_scores_fat12() -> Option<[u32; SCORE_LEN]> {
         }
         Err(_) => return None
     }
-
-    let scores = parse_scores_from_sector(&sector_buf);
-    scores
+    
+    parse_scores_from_sector(&sector_buf)
 }
 
 pub fn parse_scores_from_sector(sector_buf: &[u8; 512]) -> Option<[u32; 5]> {

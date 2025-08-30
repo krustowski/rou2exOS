@@ -238,13 +238,13 @@ impl Floppy {
             // Read floppy IRQ status
             self.send_byte(0x08); // Sense interrupt
 
-            // let st0 = self.read_byte(); // bit 7 = 1 means error
-            // let st1 = self.read_byte();
-            // let st2 = self.read_byte();
-            // let cylinder = self.read_byte();
-            // let head = self.read_byte();
-            // let sector = self.read_byte();
-            // let bytesize = self.read_byte(); // Sector size as N where size = 128 << N
+            let _st0 = self.read_byte(); // bit 7 = 1 means error
+            let _st1 = self.read_byte();
+            let _st2 = self.read_byte();
+            let _cylinder = self.read_byte();
+            let _head = self.read_byte();
+            let _sector = self.read_byte();
+            let _bytesize = self.read_byte(); // Sector size as N where size = 128 << N
 
             // TODO: Dump controller status, check for errors
         }

@@ -21,7 +21,7 @@ static mut FRAMEBUFFER: Option<boot::FramebufferTag> = None;
 pub fn init(multiboot_ptr: u64) {
     debugln!("Kernel init start");
 
-    let mut framebuffer_tag: boot::FramebufferTag = boot::FramebufferTag{
+    let framebuffer_tag: boot::FramebufferTag = boot::FramebufferTag{
         ..Default::default()
     };
 
@@ -47,7 +47,7 @@ pub fn init(multiboot_ptr: u64) {
 
     result::print_result(
         "Read Multiboot2 tags", 
-        boot::print_info(multiboot_ptr, &mut framebuffer_tag),
+        boot::print_info(multiboot_ptr, &framebuffer_tag),
     );
 
     let video_result = video::print_result(&framebuffer_tag);

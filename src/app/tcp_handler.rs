@@ -1,6 +1,5 @@
 use crate::net::ipv4;
 use crate::net::tcp;
-use crate::vga;
 
 pub fn handle() {
     fn callback(conns: &mut [Option<tcp::TcpConnection>; ipv4::MAX_CONNS], packet: &[u8]) -> u8 {

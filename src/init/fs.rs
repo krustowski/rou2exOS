@@ -1,8 +1,4 @@
 use crate::fs::fat12::{block::Floppy, fs::Filesystem};
-use crate::vga::{
-    write::{string, newline},
-    buffer::Color,
-};
 use super::{
     config::{PATH_CLUSTER, set_path},
     result,
@@ -11,18 +7,16 @@ use super::{
 pub fn check_floppy() -> result::InitResult {
     let floppy = Floppy::init();
 
-    let res: result::InitResult;
-
-    match Filesystem::new(&floppy) {
+    let res = match Filesystem::new(&floppy) {
         Ok(_) => {
-            res = result::InitResult::Passed
+            result::InitResult::Passed
         }
         Err(e) => {
             debug!("Filesystem init (floppy) fail: ");
             debugln!(e);
-            res = result::InitResult::Skipped
+            result::InitResult::Skipped
         }
-    }
+    };
 
     set_path(b"/");
 

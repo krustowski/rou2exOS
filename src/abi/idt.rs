@@ -1,4 +1,4 @@
-use x86_64::{registers::control::Cr2, structures::{gdt::DescriptorFlags, idt::{PageFaultErrorCode}}};
+use x86_64::registers::control::Cr2;
 
 use crate::input::keyboard::keyboard_loop;
 
@@ -98,7 +98,7 @@ extern "C" fn page_fault_handler(stack_frame: u64, error_code: u64) {
         Ok(addr) => {
             printn!(addr.as_u64());
         }
-        Err(e) => {
+        Err(_) => {
             warn!("Cannot read CR2");
         }
     }
@@ -115,15 +115,13 @@ extern "C" fn page_fault_handler(stack_frame: u64, error_code: u64) {
 #[no_mangle]
 #[link_section = ".text"]
 extern "C" fn general_protection_fault_handler(error_code: u64) {
-    unsafe {
-        error!("EXCEPTION: GENERAL PROTECTION FAULT");
+    error!("EXCEPTION: GENERAL PROTECTION FAULT");
 
-        warn!("\nError code: ");
-        printn!(error_code);
-        print!("\n\n");
+    warn!("\nError code: ");
+    printn!(error_code);
+    print!("\n\n");
 
-        keyboard_loop();
-    }
+    keyboard_loop();
 }
 
 #[no_mangle]
@@ -169,8 +167,8 @@ extern "C" fn double_fault_handler(stack_frame: InterruptStackFrame, error_code:
 pub fn load_idt() {
     unsafe {
         let idt_ptr = IdtPointer {
-            limit: (core::mem::size_of_val(&IDT) - 1) as u16,
-            base: &IDT as *const _ as u64,
+            limit: (core::mem::size_of::<[IdtEntry64; 256]>() - 1) as u16,
+            base: &raw const IDT as u64,
         };
 
         core::arch::asm!("lidt [{}]", in(reg) &idt_ptr, options(nostack, preserves_flags));
@@ -178,17 +176,18 @@ pub fn load_idt() {
 }
 
 #[no_mangle]
-extern "x86-interrupt" fn timer_handler(stack: &mut InterruptStackFrame) {
+extern "x86-interrupt" fn timer_handler(_stack: &mut InterruptStackFrame) {
     // Acknowledge the PIC
     crate::input::port::write(0x20, 0x20);
 
-    crate::task::task::schedule();  // Switch tasks
+    crate::task::schedule();  // Switch tasks
 }
 
-extern "x86-interrupt" fn keyboard_handler(stack: &mut InterruptStackFrame) {
-    let scancode = unsafe { crate::input::port::read_u8(0x60) };
+extern "x86-interrupt" fn keyboard_handler(_stack: &mut InterruptStackFrame) {
+    let scancode = crate::input::port::read_u8(0x60);
 
     unsafe {
+        #[expect(static_mut_refs)] // this is bad but i cant figure out how to fix
         for s in crate::input::irq::RECEPTORS.iter() {
             if s.pid != 0 {
                 s.push_irq(scancode);
@@ -200,11 +199,12 @@ extern "x86-interrupt" fn keyboard_handler(stack: &mut InterruptStackFrame) {
     crate::input::port::write(0x20, 0x20);
 }
 
-extern "x86-interrupt" fn floppy_drive_handler(stack: &mut InterruptStackFrame) {
+extern "x86-interrupt" fn floppy_drive_handler(_stack: &mut InterruptStackFrame) {
     // Acknowledge the PIC
     //crate::input::port::write(0x20, 0x20);
 }
 
+#[expect(clippy::fn_to_numeric_cast)]
 /// https://phrack.org/issues/59/4
 pub fn install_isrs() {
     let entry_06 = IdtEntry64::new(

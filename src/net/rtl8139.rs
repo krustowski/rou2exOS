@@ -26,12 +26,13 @@ pub fn receive_frame(buf: &mut [u8]) -> Option<usize> {
         let offset = RX_OFFSET & 0x1FFF;
         //let rx_buf = &RX_BUFFER[offset..];
 
+        #[expect(static_mut_refs)]
         if let Some(rx_buf) = RX_BUFFER.get(offset..) {
             if rx_buf.len() < 4 {
                 return None;
             }
 
-            let rx_status = u16::from_le_bytes([rx_buf[0], rx_buf[1]]);
+            let _rx_status = u16::from_le_bytes([rx_buf[0], rx_buf[1]]);
             let len = u16::from_le_bytes([rx_buf[2], rx_buf[3]]) as usize;
 
             if len == 0 || len > buf.len() {
@@ -85,28 +86,26 @@ pub fn send_frame(data: &[u8]) -> Result<(), &'static str> {
 
 
 pub fn rtl8139_init() {
-    unsafe {
-        // Enable bus mastering
-        pci::enable_bus_mastering(PCI_VENDOR_ID_REALTEK, PCI_DEVICE_ID_RTL8139);
+    // Enable bus mastering
+    pci::enable_bus_mastering(PCI_VENDOR_ID_REALTEK, PCI_DEVICE_ID_RTL8139);
 
-        let io_base = RTL8139_IO_BASE;
+    let io_base = RTL8139_IO_BASE;
 
-        // Reset
-        port::write_u8(io_base + 0x37, 0x10);
-        while port::read_u8(io_base + 0x37) & 0x10 != 0 {}
+    // Reset
+    port::write_u8(io_base + 0x37, 0x10);
+    while port::read_u8(io_base + 0x37) & 0x10 != 0 {}
 
-        // Set receive buffer address
-        let rx_buf_addr = &RX_BUFFER as *const _ as u32;
-        port::write_u32(io_base + 0x30, rx_buf_addr);
+    // Set receive buffer address
+    let rx_buf_addr = &raw const RX_BUFFER as u32;
+    port::write_u32(io_base + 0x30, rx_buf_addr);
 
-        // Enable RX and TX
-        port::write_u8(io_base + 0x37, 0x0C);
+    // Enable RX and TX
+    port::write_u8(io_base + 0x37, 0x0C);
 
-        // Set receive config
-        port::write_u32(io_base + 0x44, 0xf | (1 << 7)); // Accept broadcast | multicast | runt
+    // Set receive config
+    port::write_u32(io_base + 0x44, 0xf | (1 << 7)); // Accept broadcast | multicast | runt
 
-        // Enable RX OK interrupts
-        port::write_u16(io_base + 0x3C, 0x0005);
-    }
+    // Enable RX OK interrupts
+    port::write_u16(io_base + 0x3C, 0x0005);
 }
 

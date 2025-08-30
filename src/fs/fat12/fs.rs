@@ -1,4 +1,3 @@
-use crate::{debug::dump_debug_log_to_file, vga::{buffer::Color, write::{byte, newline, number, string}}};
 use super::{block::BlockDevice, entry::{BootSector, Entry}};
 
 /// Fs is the filesystem abstraction for FAT12 devices.
@@ -53,7 +52,7 @@ impl<'a, D: BlockDevice> Filesystem<'a, D> {
         let fat_start = boot_sector.reserved_sectors as u64;
 
         // Count of sectors used for root directory
-        let root_dir_sectors = ((boot_sector.root_entry_count as u32 * 32) + 511) / 512;
+        let root_dir_sectors = (boot_sector.root_entry_count as u32 * 32).div_ceil(512);
 
         // LBA address of the root directory
         let root_dir_start = fat_start + (boot_sector.fat_count as u64 * boot_sector.fat_size_16 as u64);
@@ -92,7 +91,7 @@ impl<'a, D: BlockDevice> Filesystem<'a, D> {
                 break;
             }
 
-            if let Some(mut buf)= sector_buf.get_mut((count * 512)..(count + 1) * 512) {
+            if let Some(buf)= sector_buf.get_mut((count * 512)..(count + 1) * 512) {
                 rprint!("Reading to buf: ");
                 rprintn!(count);
                 rprint!("\n");
@@ -132,17 +131,16 @@ impl<'a, D: BlockDevice> Filesystem<'a, D> {
             fat_sector[offset_in_sector + 1]
         };
 
-        let entry: u16;
 
-        if cluster & 1 == 0 {
+        
+
+        (if cluster & 1 == 0 {
             // Even cluster
-            entry = ((next_byte as u16 & 0x0F) << 8) | (fat_sector[offset_in_sector] as u16);
+            ((next_byte as u16 & 0x0F) << 8) | (fat_sector[offset_in_sector] as u16)
         } else {
             // Odd cluster
-            entry = ((next_byte as u16) << 4) | ((fat_sector[offset_in_sector] as u16 & 0xF0) >> 4);
-        }
-
-        entry & 0x0FFF
+            ((next_byte as u16) << 4) | ((fat_sector[offset_in_sector] as u16 & 0xF0) >> 4)
+        } & 0x0FFF)
     }
 
     /// write_fat12_entry writes into the FAT table according to the provided cluster number
@@ -155,9 +153,9 @@ impl<'a, D: BlockDevice> Filesystem<'a, D> {
 
         if cluster & 1 == 0 {
             buf[fat_offset % 512] = (value & 0xFF) as u8;
-            buf[(fat_offset + 1) % 512] = ((buf[(fat_offset + 1) % 512] & 0xF0) | ((value >> 8) as u8 & 0x0F));
+            buf[(fat_offset + 1) % 512] = (buf[(fat_offset + 1) % 512] & 0xF0) | ((value >> 8) as u8 & 0x0F);
         } else {
-            buf[fat_offset % 512] = ((buf[fat_offset % 512] & 0x0F) | ((value << 4) as u8 & 0xF0));
+            buf[fat_offset % 512] = (buf[fat_offset % 512] & 0x0F) | ((value << 4) as u8 & 0xF0);
             buf[(fat_offset + 1) % 512] = ((value >> 4) & 0xFF) as u8;
         }
 
@@ -182,7 +180,7 @@ impl<'a, D: BlockDevice> Filesystem<'a, D> {
         }
 
         // Write new file
-        let mut clusters_needed = (data.len() + 511) / 512;
+        let mut clusters_needed = data.len().div_ceil(512);
         let first_cluster = self.allocate_cluster();
 
         if first_cluster == 0 {
@@ -474,7 +472,7 @@ impl<'a, D: BlockDevice> Filesystem<'a, D> {
             // Root directory
             let root_dir_sector = self.root_dir_start_lba;
             let root_dir_entries = self.boot_sector.root_entry_count as usize;
-            let total_sectors = (root_dir_entries * entry_size + 511) / 512;
+            let total_sectors = (root_dir_entries * entry_size).div_ceil(512);
 
             for i in 0..total_sectors {
                 self.device.read_sector(root_dir_sector + i as u64, &mut sector_buf);
@@ -553,7 +551,7 @@ impl<'a, D: BlockDevice> Filesystem<'a, D> {
         if dir_cluster == 0 {
             let root_dir_sector = self.root_dir_start_lba;
             let root_dir_entries = self.boot_sector.root_entry_count as usize;
-            let total_sectors = (root_dir_entries * entry_size + 511) / 512;
+            let total_sectors = (root_dir_entries * entry_size).div_ceil(512);
 
             for i in 0..total_sectors {
                 self.device.read_sector(root_dir_sector + i as u64, &mut sector_buf);
@@ -628,12 +626,7 @@ impl<'a, D: BlockDevice> Filesystem<'a, D> {
             return false;
         }
 
-        for i in 0..8 {
-            if entry.name[i] != entry_name[i] {
-                return false;
-            }
-        }
-        true
+        entry.name.iter().zip(entry_name.iter()).all(|(a, b)| *a == *b)
     }
 
     /// Iterates over the given directory entries and provides a closure
@@ -647,7 +640,7 @@ impl<'a, D: BlockDevice> Filesystem<'a, D> {
         // Root directory
         if dir_cluster == 0 {
             let total_entries = self.boot_sector.root_entry_count as usize;
-            let total_sectors = (total_entries * entry_size + 511) / 512;
+            let total_sectors = (total_entries * entry_size).div_ceil(512);
 
             // Loop over all sectors of the root directory
             for sector_index in 0..total_sectors {
@@ -673,7 +666,7 @@ impl<'a, D: BlockDevice> Filesystem<'a, D> {
             let sector_start = self.cluster_to_lba(current_cluster);
 
             for i in 0..self.boot_sector.sectors_per_cluster {
-                self.device.read_sector(sector_start as u64 + i as u64, &mut buf);
+                self.device.read_sector(sector_start + i as u64, &mut buf);
 
                 let entries_ptr = buf.as_ptr() as *const Entry;
 
@@ -703,9 +696,10 @@ impl<'a, D: BlockDevice> Filesystem<'a, D> {
         }
 
         // Prepare the Entry to be inserted into the current directory
+        // Safety: we index and it is big enough
         let entry = Entry {
-            name: name[..8].try_into().unwrap(),
-            ext: name[8..].try_into().unwrap(),
+            name: unsafe { name[..8].try_into().unwrap_unchecked() },
+            ext: unsafe { name[8..11].try_into().unwrap_unchecked() },
             attr: 0x10,
             start_cluster: cluster,
             file_size: 0,

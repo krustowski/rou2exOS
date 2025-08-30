@@ -1,4 +1,3 @@
-use crate::net::arp::{ArpPacket};
 use crate::input::port;
 
 use super::rtl8139;
@@ -78,7 +77,7 @@ impl<'a> EthernetFrame<'a> {
     }
 }
 
-pub fn receive_frame(buf: &mut [u8]) -> Option<usize> {
+pub fn receive_frame(_buf: &mut [u8]) -> Option<usize> {
     // Hardware-specific receive logic (e.g., RTL8139, E1000)
     // Fill `buf[..len]` with received frame
     // Return Some(len) if a frame is received
@@ -105,7 +104,7 @@ fn send_arp_reply(payload: &[u8]) {
         [0xDE, 0xAD, 0xBE, 0xEF, 0x00, 0x01],
         [0x12, 0x34, 0x56, 0x78, 0x9A, 0xBC],
         0x0806,
-        &payload,
+        payload,
     );
 
     rtl8139::send_frame(&frame).unwrap();
@@ -129,26 +128,26 @@ pub fn receive_loop(callback: fn(packet: &[u8]) -> u8) -> u8 {
 
                 if let Some(slice) = frame_buf.get(..frame_len) {
                     return callback(slice);
-                    if let Some(frame) = EthernetFrame::parse(slice) {
+                    // if let Some(frame) = EthernetFrame::parse(slice) {
 
-                        match frame.ethertype {
-                            //0x0800 => {
-                            EtherType::Ipv4 => {
-                                // IPv4 packet → pass to callback
-                                return callback(frame.payload);
-                            }
-                            //0x0806 => {
-                            EtherType::Arp => {
-                                // ARP → handle separately
-                                if let Some(arp) = ArpPacket::parse(frame.payload) {
-                                    // handle_arp(arp);
-                                }
-                            }
-                            _ => {
-                                return callback(frame.payload);
-                            }
-                        }
-                        }
+                    //     match frame.ethertype {
+                    //         //0x0800 => {
+                    //         EtherType::Ipv4 => {
+                    //             // IPv4 packet → pass to callback
+                    //             return callback(frame.payload);
+                    //         }
+                    //         //0x0806 => {
+                    //         EtherType::Arp => {
+                    //             // ARP → handle separately
+                    //             if let Some(arp) = ArpPacket::parse(frame.payload) {
+                    //                 // handle_arp(arp);
+                    //             }
+                    //         }
+                    //         _ => {
+                    //             return callback(frame.payload);
+                    //         }
+                    //     }
+                    //     }
                         }
                     }
                 }

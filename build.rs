@@ -18,7 +18,5 @@ macro_rules! nasm {
 
 fn main() {
     nasm!("iso/boot/boot.asm", "iso/boot/boot.o");
-    nasm!("src/abi/int_7f.asm", "src/abi/int_7f.o");
-    nasm!("src/abi/int_80.asm", "src/abi/int_80.o");
     nasm!("src/task/context.asm", "src/task/context.o");
 }

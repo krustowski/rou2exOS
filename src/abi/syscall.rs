@@ -1,3 +1,5 @@
+use x86_64::structures::idt::InterruptStackFrame;
+
 use crate::{
     fs::fat12::{block::{Floppy, BlockDevice}, fs::Filesystem}, 
     input::{elf, irq}, 
@@ -31,10 +33,10 @@ macro_rules! syscall_ret {
     }
 }
 
+// TODO: make this return values properly?
 /// This function is the syscall ABI dispatching routine. It is called exclusively from the ISR 
 /// for interrupt 0x7f. 
-#[no_mangle]
-pub extern "C" fn syscall_handler() {
+pub extern "x86-interrupt" fn syscall_handler(_stack: InterruptStackFrame) {
     let (syscall_no, arg1, arg2): (u64, u64, u64);
     let mut ret: SyscallReturnCode = SyscallReturnCode::Okay;
 
@@ -1077,12 +1079,7 @@ fn format_filename(name_ptr: *const u8) -> ([u8; 8], [u8; 3]) {
     }
 }
 
-//
-//
-//
-
-#[no_mangle]
-pub extern "C" fn syscall_80h() {
+pub extern "x86-interrupt" fn syscall_80h(_stack: InterruptStackFrame) {
     //schedule();
 
     // unsafe {

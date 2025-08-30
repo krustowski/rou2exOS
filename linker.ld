@@ -26,7 +26,6 @@ SECTIONS {
     .bss : {
         *(.bss*)
         *(COMMON)
-	/*KEEP(*(.multiboot_ptr))*/
     }
 
     .gdt : {
@@ -43,10 +42,10 @@ SECTIONS {
     . = . + 64K; 
     stack_top = .;
 
-    /* Heap */
+    /* Kernel Heap */
     . = ALIGN(16);
     __heap_start = .;
-    . = . + 64K; 
+    . = . + 128K; 
     __heap_end = .;
 
     . = ALIGN(4K);

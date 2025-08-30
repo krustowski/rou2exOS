@@ -85,6 +85,7 @@ pub struct AcpiSDTHeader {
     pub creatpr_revision: u32,
 }
 
+#[derive(Copy,Clone)]
 #[repr(C, packed)] //directive?? status kinda idfk
 pub struct UsableMemory {
 	pub base: u64,
@@ -94,10 +95,12 @@ pub struct UsableMemory {
 
 }
 
-
-
-
-static mut U_MEM: [UsableMemory: 200] = [default::default()u64; 200]; //change this accordingly!!! placeholder for now
+static mut U_MEM: [UsableMemory; 200] = [UsableMemory{
+    base: 0,
+    length: 0,
+    memtype: 0,
+    reserved: 0,
+}; 200]; 
 
 //&&&&&&& reference variable borrower cannot change 
 //usize like size_t from C
@@ -170,11 +173,11 @@ pub unsafe fn parse_multiboot2_info(base_addr: usize, mut fb_tag: &FramebufferTa
 							
                             debug!("Usable memory region: ");
                             debugn!(entry.base_addr as u64);
-							U_MEM[i].addr = entry.base_addr;
-							U_MEM[i].length = entry.length;
-							U_MEM[i].memtype = entry.typ;
-							U_MEM[i].reserved = entry.reserved;
-							
+
+                            U_MEM[i].base = entry.base_addr;
+                            U_MEM[i].length = entry.length;
+                            U_MEM[i].memtype = entry.typ;
+                            U_MEM[i].reserved = entry.reserved;
 
                             debug!(": ");
 

@@ -529,7 +529,26 @@ fn cmd_http(_args: &[u8]) {
 }
 
 fn cmd_mem(_args: &[u8]) {
-    unsafe { crate::mem::walk::walk_memory(); }
+    unsafe { 
+        crate::mem::walk::walk_memory();
+
+        let mut used_bits_block = 0;
+
+        for i in 0..512 {
+            for j in 0..8 {
+                for k in 0..64 {
+                    if crate::mem::pmm::PHYSICAL_BITMAP[i][j] & (1u64 << k) != 0 {
+                        used_bits_block += 1;
+                    }
+                }
+
+                rprintn!(used_bits_block);
+                rprint!(", ");
+
+                used_bits_block = 0;
+            }
+        }
+    }
 }
 
 /// Experimental command function to evaluate the current TUI rendering options.
@@ -852,7 +871,14 @@ fn cmd_run(args: &[u8]) {
                     return;
                 }
 
+                let user_addr: u64 = 0x600_000;
                 let load_addr: u64 = 0x690_000;
+
+                use crate::mem::pmm::{read_cr3_phys, p4_table, map_2m, P, RW, US};
+                let p4_virt = &p4_table as *const _ as *mut u64;
+                let pml4 = read_cr3_phys() as *mut u64;
+
+                //map_2m(pml4, user_addr, user_addr, P | RW | US);
 
                 while size - offset > 0 {
                     let lba = fs.cluster_to_lba(cluster);
@@ -901,15 +927,15 @@ fn cmd_run(args: &[u8]) {
                 rprint!("\n");
 
                 /*let entry_addr = u64::from_le_bytes([
-                    *entry_ptr.add(0),
-                    *entry_ptr.add(1),
-                    *entry_ptr.add(2),
-                    *entry_ptr.add(3),
-                    *entry_ptr.add(4),
-                    *entry_ptr.add(5),
-                    *entry_ptr.add(6),
-                    *entry_ptr.add(7),
-                ]);*/
+                 *entry_ptr.add(0),
+                 *entry_ptr.add(1),
+                 *entry_ptr.add(2),
+                 *entry_ptr.add(3),
+                 *entry_ptr.add(4),
+                 *entry_ptr.add(5),
+                 *entry_ptr.add(6),
+                 *entry_ptr.add(7),
+                 ]);*/
 
                 // assume `elf_image` is a pointer to the loaded ELF file in memory
                 let entry_addr = super::elf::load_elf64(load_addr as usize);

@@ -218,7 +218,7 @@ set_up_page_tables:
     mov [p3_table + 0 * 8], eax
     mov dword [p3_table + 0 * 8 + 4], 0
 
-    ; Identity map 1 GB using huge pages
+    ; Identity map 1 GiB (512 runs) using huge pages
 
     xor ecx, ecx
 .map_1gib:
@@ -231,8 +231,6 @@ set_up_page_tables:
     inc ecx
     cmp ecx, 1
     jne .map_1gib
-
-    ret
 
     ; Allow CPL=3 access at 0x600_000--0x800_000
 

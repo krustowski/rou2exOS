@@ -1,4 +1,4 @@
-static mut PHYSICAL_BITMAP: [[u64; 8]; 1024] = [[0; 8]; 1024];
+pub static mut PHYSICAL_BITMAP: [[u64; 8]; 1024] = [[0; 8]; 1024];
 
 static mut PHYSICAL_BASE: u64 = 0;
 
@@ -16,6 +16,8 @@ static mut PHYSICAL_BASE: u64 = 0;
 
 extern "C" {
     pub static mut p4_table: *mut u64;
+    static __kernel_start: u8;
+    static __kernel_end: u8;
 }
 
 pub enum PhysicalPageStatus {
@@ -24,9 +26,9 @@ pub enum PhysicalPageStatus {
     BAD,
 }
 
-const P:   u64 = 1 << 0;
-const RW:  u64 = 1 << 1;
-const US:  u64 = 1 << 2;
+pub const P:   u64 = 1 << 0;
+pub const RW:  u64 = 1 << 1;
+pub const US:  u64 = 1 << 2;
 const PWT: u64 = 1 << 3;
 const PCD: u64 = 1 << 4;
 const PS:  u64 = 1 << 7;
@@ -54,17 +56,20 @@ fn clear_bit(word: &mut u64, bit: u32) {
 //
 //
 
-extern "C" {
-    static __kernel_start: u8;
-    static __kernel_end: u8;
-}
-
 pub unsafe fn reserve_initial_frames() {
-    // Reserved frame
-    pmm_mark(0, true);
+    // Reserve the first MiB og memory (BIOS stuff etc) 
+    // 256 * 4096 B = 1 MiB
+    for i in 0..256 {
+        pmm_mark(i, true);
+    }
 
     let kstart = (&__kernel_start as *const _ as u64) >> 12;
     let kend   = (&__kernel_end   as *const _ as u64) >> 12;
+
+    rprint!("Marking lower kernel memory as reserved: ");
+    rprintn!((kend - kstart) * 4096);
+    rprint!(" bytes\n");
+
     for f in kstart..=kend {
         pmm_mark(f as u32, true);
     }
@@ -154,9 +159,10 @@ pub unsafe fn pmm_init() {
     reserve_initial_frames();
 
     rprint!("Building physmap\n");
-    build_physmap_2m(p4_virt, 8 * 1024 * 1024);
+    build_physmap_2m(p4_virt, 4 * 1024 * 1024);
 
     map_2m(pml4, 0xFFFF_8000_0000_0000, 0x000_000, P | RW);
+    map_2m(pml4, 0x600_000u64, 0x600_000u64, 0b11100111);
 
     rprint!("Reloading CR3\n");
     reload_cr3();
@@ -189,6 +195,7 @@ pub unsafe fn pmm_alloc() -> Option<u64> {
                         PHYSICAL_BITMAP[row][col] = w;
 
                         let frame_idx = (row as u32) * (8 * 64) + (col as u32) * 64 + bit;
+                        pmm_mark(frame_idx, true);
 
                         return Some((frame_idx as u64) << 12);
                     }
@@ -335,8 +342,7 @@ fn is_aligned_2m(x: u64) -> bool { (x & 0x1F_FFFF) == 0 } // 2 MiB
 
 pub unsafe fn map_2m(p4_virt: *mut u64, virt: u64, phys: u64, pde_flags: u64) {
     // L3 (PDPT)
-    rprint!("L3 ensure_table()\n");
-    let l3 = ensure_table(p4_virt, pml4_index(virt), P | RW);
+    let l3 = ensure_table(p4_virt, pml4_index(virt), pde_flags);
 
     // Clear 1GiB if present
     let l3e_ptr = l3.add(pdpt_index(virt));
@@ -348,15 +354,21 @@ pub unsafe fn map_2m(p4_virt: *mut u64, virt: u64, phys: u64, pde_flags: u64) {
     }
 
     // L2 (PD)
-    rprint!("L2 ensure_table()\n");
-    let l2 = ensure_table(l3, pdpt_index(virt), P | RW);
+    let l2 = ensure_table(l3, pdpt_index(virt), pde_flags);
 
     // Write 2MiB PDE (PS=1)
     let l2e_ptr = l2.add(pd_index(virt));
     let entry = (phys & ADDR_MASK_2M) | pde_flags | PS;
     write64(l2e_ptr, entry);
 
+    rprint!("Mapped ");
+    rprintn!(phys);
+    rprint!(" to ");
+    rprintn!(virt);
+    rprint!(" with 2MiB huge page\n");
+
     invlpg(virt as usize);
+    //reload_cr3();
 }
 
 pub unsafe fn map_4k(p4_virt: *mut u64, virt: u64, phys: u64, pte_flags: u64) {

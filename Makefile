@@ -11,70 +11,29 @@ init:
 #  BUILD
 #
 
-build: compile_kernel nasm link build_iso 
+build: compile_kernel build_iso 
 
 #@cargo rustc --release --target x86_64-r2.json -- -C relocation-model=static --emit=obj
 compile_kernel:
-	@cargo rustc \
+	@cargo build \
 		--features kernel_text \
 		--target-dir target/kernel_text \
 		--release \
 		-Z build-std=core,compiler_builtins \
-		--target x86_64-r2.json \
-		-- --emit=obj
-	@cargo rustc \
+		--target x86_64-r2.json
+	@cp target/kernel_text/x86_64-r2/release/kernel iso/boot/kernel_text.elf
+	@cargo build \
 		--features kernel_graphics \
 		--target-dir target/kernel_graphics \
 		--release \
 		-Z build-std=core,compiler_builtins \
-		--target x86_64-r2.json \
-		-- --emit=obj
-nasm:
-	@nasm \
-		-f elf64 \
-		-o iso/boot/boot.o \
-		iso/boot/boot.asm
-	@nasm \
-		-f elf64 \
-		-o src/abi/int_7f.o \
-		src/abi/int_7f.asm
-	@nasm \
-		-f elf64 \
-		-o src/abi/int_80.o \
-		src/abi/int_80.asm
-	@nasm \
-		-f elf64 \
-		-o src/task/context.o \
-		src/task/context.asm
-
-link:
-	@ld.lld \
-		--verbose \
-		-T linker.ld \
-		-n \
-		--gc-sections \
-		-o iso/boot/kernel_text.elf \
-		iso/boot/boot.o \
-		src/abi/int_7f.o \
-		src/abi/int_80.o \
-		src/task/context.o \
-		$(shell ls -t target/kernel_text/x86_64-r2/release/deps/kernel-*o | head -1)
-	@ld.lld \
-		--verbose \
-		-T linker.ld \
-		-n \
-		--gc-sections \
-		-o iso/boot/kernel_graphics.elf \
-		iso/boot/boot.o \
-		src/abi/int_7f.o \
-		src/abi/int_80.o \
-		src/task/context.o \
-		$(shell ls -t target/kernel_graphics/x86_64-r2/release/deps/kernel-*o | head -1)
+		--target x86_64-r2.json
+	@cp target/kernel_graphics/x86_64-r2/release/kernel iso/boot/kernel_graphics.elf
 
 build_iso:
-	@grub2-mkrescue \
+	@grub-mkrescue \
 		-o r2.iso iso/ \
-		--modules="multiboot2 vbe video video_bochs video_cirrus gfxterm all_video"
+		--modules="multiboot2 video video_bochs video_cirrus gfxterm all_video"
 
 build_floppy:
 	@dd \

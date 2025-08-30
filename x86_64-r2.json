@@ -7,7 +7,6 @@
 	"arch": "x86_64",
 	"os": "none",
 	"executables": true,
-	"linker-flavor": "ld.lld",
 	"panic-strategy": "abort",
 	"disable-redzone": true,
 	"features": "-mmx,-sse,+soft-float",

@@ -88,7 +88,7 @@ section .text
 align 4
 
 extern kernel_main
-global _start
+global start
 
 global multiboot_magic
 global multiboot_ptr
@@ -115,7 +115,7 @@ global debug_flag
 debug_flag:
     db 0    ; 1 = enabled
 
-_start:
+start:
     mov [multiboot_magic], eax
     mov [multiboot_ptr], ebx
 

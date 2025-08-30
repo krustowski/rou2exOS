@@ -21,14 +21,14 @@ compile_kernel:
 		--release \
 		-Z build-std=core,compiler_builtins \
 		--target x86_64-r2.json
-	@cp target/kernel_text/x86_64-r2/release/kernel iso/boot/kernel_text.elf
+	@cp target/kernel_text/x86_64-r2/release/kernel.elf iso/boot/kernel_text.elf
 	@cargo build \
 		--features kernel_graphics \
 		--target-dir target/kernel_graphics \
 		--release \
 		-Z build-std=core,compiler_builtins \
 		--target x86_64-r2.json
-	@cp target/kernel_graphics/x86_64-r2/release/kernel iso/boot/kernel_graphics.elf
+	@cp target/kernel_graphics/x86_64-r2/release/kernel.elf iso/boot/kernel_graphics.elf
 
 build_iso:
 	@grub-mkrescue \

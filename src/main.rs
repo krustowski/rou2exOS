@@ -34,9 +34,9 @@ mod tui;
 mod vga;
 
 /// Kernel entrypoint
-#[unsafe(no_mangle)]
+#[unsafe(no_mangle)]//attribute
 pub extern "C" fn kernel_main(multiboot2_magic: u32, multiboot_ptr: u32) { 
-    debugln!("Kernel loaded");
+    //debugln!("Kernel loaded");
 
     // VGA buffer position (LEGACY)
     clear_screen!();
@@ -45,12 +45,15 @@ pub extern "C" fn kernel_main(multiboot2_magic: u32, multiboot_ptr: u32) {
     video::vga::init_writer();
 
     // Run init checks
-    init::init(multiboot_ptr as u64);
+    init::init(multiboot_ptr as *mut usize, multiboot2_magic as u32);
+
+	//commented out for now
 
     // Run the shell loop
     debugln!("Starting shell...");
     println!("Starting shell...\n");
     input::keyboard::keyboard_loop();
+	
 }
 
 //

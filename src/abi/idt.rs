@@ -1,59 +1,9 @@
-use x86_64::registers::control::Cr2;
+use x86_64::{registers::control::Cr2, structures::idt::{InterruptDescriptorTable, InterruptStackFrame, PageFaultErrorCode}};
 
-use crate::input::keyboard::keyboard_loop;
+use crate::{abi::syscall::{syscall_80h, syscall_handler}, input::keyboard::keyboard_loop};
 
-#[repr(C, packed)]
-#[derive(Copy, Clone)]
-pub struct IdtEntry64 {
-    offset_low: u16,
-    selector: u16,
-    ist: u8,
-    type_attr: u8,
-    offset_mid: u16,
-    offset_high: u32,
-    zero: u32,
-}
-
-impl IdtEntry64 {
-    pub fn new(handler: u64, selector: u16, ist: u8, type_attr: u8) -> Self {
-        Self {
-            offset_low: handler as u16,
-            selector,
-            ist,
-            type_attr,
-            offset_mid: (handler >> 16) as u16,
-            offset_high: (handler >> 32) as u32,
-            zero: 0,
-        }
-    }
-}
-
-#[repr(C)]
-pub struct InterruptStackFrame {
-    pub rip: u64,
-    pub cs: u64,
-    pub rflags: u64,
-    pub rsp: u64,
-    pub ss: u64,
-}
-
-#[repr(C, packed)]
-pub struct IdtPointer {
-    limit: u16,
-    base: u64,
-}
-
-#[link_section = ".bss.idt"]
-#[no_mangle]
-static mut IDT: [IdtEntry64; 256] = [IdtEntry64 {
-    offset_low: 0,
-    selector: 0,
-    ist: 0,
-    type_attr: 0,
-    offset_mid: 0,
-    offset_high: 0,
-    zero: 0,
-}; 256];
+#[link_section = ".data.idt"]
+static mut IDT: InterruptDescriptorTable = InterruptDescriptorTable::new();
 
 //
 //
@@ -78,19 +28,9 @@ idt
 }
 });*/
 
-//
-//
-//
-
-extern "C" {
-    fn int7f_isr();
-    fn syscall_80h();
-}
-
-
 #[no_mangle]
 #[link_section = ".text"]
-extern "C" fn page_fault_handler(stack_frame: u64, error_code: u64) {
+extern "x86-interrupt" fn page_fault_handler(stack_frame: InterruptStackFrame, error_code: PageFaultErrorCode) {
     error!("EXCEPTION: PAGE FAULT");
     warn!("\nAccessed Address: ");
 
@@ -104,17 +44,15 @@ extern "C" fn page_fault_handler(stack_frame: u64, error_code: u64) {
     }
 
     warn!("\nError Code: ");
-    printn!(error_code);
+    printn!(error_code.bits());
     warn!("\nStack frame: ");
-    printn!(stack_frame);
+    printn!(stack_frame.stack_pointer.as_u64());
     print!("\n\n");
 
     keyboard_loop();
 }
 
-#[no_mangle]
-#[link_section = ".text"]
-extern "C" fn general_protection_fault_handler(error_code: u64) {
+extern "x86-interrupt" fn general_protection_fault_handler(_frame: InterruptStackFrame, error_code: u64) {
     error!("EXCEPTION: GENERAL PROTECTION FAULT");
 
     warn!("\nError code: ");
@@ -124,35 +62,27 @@ extern "C" fn general_protection_fault_handler(error_code: u64) {
     keyboard_loop();
 }
 
-#[no_mangle]
-#[link_section = ".text"]
-extern "C" fn invalid_opcode_handler(stack_frame: *mut InterruptStackFrame) {
-    unsafe {
-        error!("EXCEPTION: INVALID OPCODE");
+extern "x86-interrupt" fn invalid_opcode_handler(stack_frame: InterruptStackFrame) {
+    error!("EXCEPTION: INVALID OPCODE");
 
-        let frame = &mut *stack_frame;
+    warn!("\nRIP: ");
+    printn!(stack_frame.instruction_pointer.as_u64());
+    warn!("\nStack frame: ");
+    printn!(stack_frame.stack_pointer.as_u64());
+    print!("\n\n");
 
-        warn!("\nRIP: ");
-        printn!(frame.rip);
-        warn!("\nStack frame: ");
-        printn!(frame.rsp);
-        print!("\n\n");
-
-        // Try to skip the invalid opcode 
-        //frame.rip += 3;
-        keyboard_loop();
-    }
+    // Try to skip the invalid opcode 
+    //frame.rip += 3;
+    keyboard_loop();
 }
 
-#[no_mangle]
-#[link_section = ".text"]
-extern "C" fn double_fault_handler(stack_frame: InterruptStackFrame, error_code: u64) -> ! {
+extern "x86-interrupt" fn double_fault_handler(stack_frame: InterruptStackFrame, error_code: u64) -> ! {
     error!("EXCEPTION: DOUBLE FAULT");
 
     warn!("\nError Code: ");
     printn!(error_code);
     warn!("\nStack frame: ");
-    printn!(stack_frame.rsp);
+    printn!(stack_frame.stack_pointer.as_u64());
     print!("\n\nRecovering the shell...", crate::video::vga::Color::White);
     print!("\n\n");
 
@@ -160,30 +90,20 @@ extern "C" fn double_fault_handler(stack_frame: InterruptStackFrame, error_code:
     keyboard_loop();
 }
 
-//
-//
-//
-
 pub fn load_idt() {
-    unsafe {
-        let idt_ptr = IdtPointer {
-            limit: (core::mem::size_of::<[IdtEntry64; 256]>() - 1) as u16,
-            base: &raw const IDT as u64,
-        };
-
-        core::arch::asm!("lidt [{}]", in(reg) &idt_ptr, options(nostack, preserves_flags));
-    }
+    #[expect(static_mut_refs)]
+    unsafe { IDT.load() };
 }
 
 #[no_mangle]
-extern "x86-interrupt" fn timer_handler(_stack: &mut InterruptStackFrame) {
+extern "x86-interrupt" fn timer_handler(_stack: InterruptStackFrame) {
     // Acknowledge the PIC
     crate::input::port::write(0x20, 0x20);
 
     crate::task::schedule();  // Switch tasks
 }
 
-extern "x86-interrupt" fn keyboard_handler(_stack: &mut InterruptStackFrame) {
+extern "x86-interrupt" fn keyboard_handler(_stack: InterruptStackFrame) {
     let scancode = crate::input::port::read_u8(0x60);
 
     unsafe {
@@ -199,87 +119,22 @@ extern "x86-interrupt" fn keyboard_handler(_stack: &mut InterruptStackFrame) {
     crate::input::port::write(0x20, 0x20);
 }
 
-extern "x86-interrupt" fn floppy_drive_handler(_stack: &mut InterruptStackFrame) {
+extern "x86-interrupt" fn floppy_drive_handler(_stack: InterruptStackFrame) {
     // Acknowledge the PIC
     //crate::input::port::write(0x20, 0x20);
 }
 
-#[expect(clippy::fn_to_numeric_cast)]
+#[expect(static_mut_refs)]
 /// https://phrack.org/issues/59/4
 pub fn install_isrs() {
-    let entry_06 = IdtEntry64::new(
-        invalid_opcode_handler as u64,
-        0x08,             
-        0,                
-        0b1110_1110,      // present, DPL=3, 64-bit interrupt gate
-    );
+    unsafe { IDT.invalid_opcode.set_handler_fn(invalid_opcode_handler) };
+    unsafe { IDT.double_fault.set_handler_fn(double_fault_handler) };
+    unsafe { IDT.general_protection_fault.set_handler_fn(general_protection_fault_handler) };
+    unsafe { IDT.page_fault.set_handler_fn(page_fault_handler) };
 
-    let entry_08 = IdtEntry64::new(
-        double_fault_handler as u64,
-        0x08,             
-        0,                
-        0b1110_1110,      // present, DPL=3, 64-bit interrupt gate
-    );
-
-    let entry_0d = IdtEntry64::new(
-        general_protection_fault_handler as u64,
-        0x08,             
-        0,                
-        0b1110_1110,      // present, DPL=3, 64-bit interrupt gate
-    );
-
-    let entry_0e = IdtEntry64::new(
-        page_fault_handler as u64,
-        0x08,             
-        0,                
-        0b1110_1110,      // present, DPL=3, 64-bit interrupt gate
-    );
-
-    let entry_irq0 = IdtEntry64::new(
-        timer_handler as u64,
-        0x08,             
-        0,                
-        0b1110_1110,      // present, DPL=3, 64-bit interrupt gate
-    );
-
-    let entry_irq1 = IdtEntry64::new(
-        keyboard_handler as u64,
-        0x08,             
-        0,                
-        0b1110_1110,      // present, DPL=3, 64-bit interrupt gate
-    );
-
-    let entry_irq6 = IdtEntry64::new(
-        floppy_drive_handler as u64,
-        0x08,             
-        0,                
-        0b1110_1110,      // present, DPL=3, 64-bit interrupt gate
-    );
-
-    let entry_7f = IdtEntry64::new(
-        int7f_isr as u64,
-        0x08,
-        0,                
-        0b1110_1110,      // present, DPL=3, 64-bit interrupt gate
-    );
-
-    let entry_80 = IdtEntry64::new(
-        syscall_80h as u64,
-        0x08,             
-        0,                
-        0b1110_1110,      // present, DPL=3, 64-bit interrupt gate
-    );
-
-    unsafe {
-        IDT[0x06] = entry_06;
-        IDT[0x08] = entry_08;
-        IDT[0x0d] = entry_0d;
-        IDT[0x0e] = entry_0e;
-        IDT[0x20] = entry_irq0;
-        IDT[0x21] = entry_irq1;
-        IDT[0x26] = entry_irq6;
-        IDT[0x7f] = entry_7f;
-        IDT[0x80] = entry_80;
-    }
+    unsafe { IDT[0x20].set_handler_fn(timer_handler) };
+    unsafe { IDT[0x21].set_handler_fn(keyboard_handler) };
+    unsafe { IDT[0x26].set_handler_fn(floppy_drive_handler) };
+    unsafe { IDT[0x7f].set_handler_fn(syscall_handler).set_privilege_level(x86_64::PrivilegeLevel::Ring3) };
+    unsafe { IDT[0x80].set_handler_fn(syscall_80h) };
 }
-

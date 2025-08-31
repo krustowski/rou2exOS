@@ -49,9 +49,38 @@ pub struct Floppy;
 
 impl BlockDevice for Floppy {
     fn read_sector(&self, lba: u64, buffer: &mut [u8]) {
-        //debugln!("Floppy read_sector()");
+        let (c, h, s) = self.lba_to_chs(lba);
 
-        self.read_sector(lba, buffer);
+        #[expect(static_mut_refs)]
+        unsafe {
+            Self::init();
+            self.set_read_mode();
+
+            self.send_byte(0x46);          // Read data
+            self.send_byte(h << 2);  // drive 0, head
+            self.send_byte(c);             // Cylinder
+            self.send_byte(h);             // Head
+            self.send_byte(s);             // Sector (1-based)
+            self.send_byte(2);             // 512 = 2^2
+            self.send_byte(18);            // Last sector
+            self.send_byte(0x1B);          // GAP3
+            self.send_byte(0xFF);          // DTL (don't care for 512B)
+
+            self.wait_for_irq();    // Wait for IRQ 6
+            
+            /*for i in 0..10 {
+                debugn!(dma[i]);
+            }
+            debugln!("");*/
+
+            // Copy from DMA buffer to output
+
+            core::ptr::copy_nonoverlapping(DMA.as_ptr(), buffer.as_mut_ptr(), 512);
+
+            for byte in DMA.iter_mut() {
+                *byte = 0;
+            }
+        }
     }
 
     fn write_sector(&self, lba: u64, buffer: &[u8; 512]) {
@@ -247,40 +276,6 @@ impl Floppy {
             let _bytesize = self.read_byte(); // Sector size as N where size = 128 << N
 
             // TODO: Dump controller status, check for errors
-        }
-    }
-
-    fn read_sector(&self, lba: u64, buffer: &mut [u8]) {
-        let (c, h, s) = self.lba_to_chs(lba);
-
-        unsafe {
-            Self::init();
-            self.set_read_mode();
-
-            self.send_byte(0x46);          // Read data
-            self.send_byte(h << 2);  // drive 0, head
-            self.send_byte(c);             // Cylinder
-            self.send_byte(h);             // Head
-            self.send_byte(s);             // Sector (1-based)
-            self.send_byte(2);             // 512 = 2^2
-            self.send_byte(18);            // Last sector
-            self.send_byte(0x1B);          // GAP3
-            self.send_byte(0xFF);          // DTL (don't care for 512B)
-
-            self.wait_for_irq();    // Wait for IRQ 6
-            
-            /*for i in 0..10 {
-                debugn!(dma[i]);
-            }
-            debugln!("");*/
-
-            // Copy from DMA buffer to output
-            core::ptr::copy_nonoverlapping(&raw const DMA, buffer.as_mut_ptr().cast(), 512);
-
-            #[expect(static_mut_refs)]
-            for byte in DMA.iter_mut() {
-                *byte = 0;
-            }
         }
     }
 

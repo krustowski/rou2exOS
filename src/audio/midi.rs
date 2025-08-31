@@ -35,9 +35,7 @@ pub static MIDI_FREQ_TABLE: [u16; 128] = [
 ];
 
 pub fn midi_note_to_freq(note: u8) -> u16 {
-    unsafe {
-        return MIDI_FREQ_TABLE[note as usize];
-    }
+    MIDI_FREQ_TABLE[note as usize]
 }
 
 pub static TEST_MELODY: &[(u8, u16)] = &[
@@ -81,7 +79,7 @@ fn read_varlen(data: &[u8]) -> (u32, usize) {
     (result, i)
 }
 
-pub fn parse_midi_format0(data: &[u8]) -> Option<MidiFile> {
+pub fn parse_midi_format0(data: &'_ [u8]) -> Option<MidiFile<'_>> {
     if &data[0..4] != b"MThd" { return None; }
 
     let header_len = u32::from_be_bytes([data[4], data[5], data[6], data[7]]);
@@ -101,7 +99,6 @@ pub fn parse_midi_format0(data: &[u8]) -> Option<MidiFile> {
     pos += 8;
 
     let track_end = pos + track_len;
-    let mut time = 0u32;
     let mut last_status = 0u8;
     let mut output = [MidiEvent { note: 0, duration: 0 }; 256];
     let mut out_idx = 0;
@@ -112,9 +109,8 @@ pub fn parse_midi_format0(data: &[u8]) -> Option<MidiFile> {
         }
 
         // Delta time
-        let (delta, delta_len) = read_varlen(&data[pos..]);
+        let (_delta, delta_len) = read_varlen(&data[pos..]);
         pos += delta_len;
-        time += delta;
 
         // Event type
         let mut status = data[pos];
@@ -142,7 +138,7 @@ pub fn parse_midi_format0(data: &[u8]) -> Option<MidiFile> {
             pos += 2;
         } else if status == 0xFF {
             // Meta event
-            let meta_type = data[pos];
+            // let meta_type = data[pos];
             let (len, len_len) = read_varlen(&data[pos + 1..]);
             pos += 1 + len_len + len as usize;
         } else {
@@ -178,7 +174,7 @@ pub fn play_midi(midi: &MidiFile) {
 
 pub fn play_midi_file() {
     if let Some(data) = read_file() {
-        if let Some(midi) = parse_midi_format0(data) {
+        if let Some(midi) = parse_midi_format0(&data) {
             play_midi(&midi);
         } else {
             println!("Invalid MIDI file");
@@ -188,26 +184,19 @@ pub fn play_midi_file() {
     }
 }
 
-static mut BUF: [u8; 4096] = [0u8; 4096];
-
-fn read_file() -> Option<&'static [u8]> {
+fn read_file() -> Option<[u8; 4096]> {
     let floppy = fat12::block::Floppy::init();
 
-    match fat12::fs::Filesystem::new(&floppy) {
-        Ok(fs) => {
-            fs.for_each_entry(0, | entry | {
-                if entry.ext.starts_with(b"MID") {
-                    unsafe {
-                        fs.read_file(entry.start_cluster, &mut BUF);
-                    }
-                }
-            });
-        }
-        Err(_) => {}
+    let mut buf = [0; 4096];
+
+    if let Ok(fs) = fat12::fs::Filesystem::new(&floppy) {
+        fs.for_each_entry(0, | entry | {
+            if entry.ext.starts_with(b"MID") {
+                fs.read_file(entry.start_cluster, &mut buf);
+            }
+        });
     }
 
-    unsafe {
-        Some(&BUF)
-    }
+    Some(buf)
 }
 

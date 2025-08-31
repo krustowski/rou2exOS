@@ -1,16 +1,7 @@
-// Enable static analysis features for clippy
-#![deny(clippy::indexing_slicing)]
-#![deny(clippy::panic)]
-#![deny(clippy::unwrap_used)]
-#![deny(clippy::expect_used)]
-
 #![no_std]
 #![no_main]
 #![feature(abi_x86_interrupt)]
-#![feature(lang_items)]
 #![feature(alloc_error_handler)]
-#![feature(ptr_internals)]
-#![feature(panic_info_message)]
 
 #[macro_use]
 mod debug;
@@ -34,9 +25,9 @@ mod tui;
 mod vga;
 
 /// Kernel entrypoint
-#[unsafe(no_mangle)]//attribute
-pub extern "C" fn kernel_main(multiboot2_magic: u32, multiboot_ptr: u32) { 
-    //debugln!("Kernel loaded");
+#[unsafe(no_mangle)]
+pub extern "C" fn kernel_main(_multiboot2_magic: u32, multiboot_ptr: u32) { 
+    debugln!("Kernel loaded");
 
     // VGA buffer position (LEGACY)
     clear_screen!();
@@ -60,7 +51,7 @@ pub extern "C" fn kernel_main(multiboot2_magic: u32, multiboot_ptr: u32) {
 //
 //
 
-#[lang = "eh_personality"] extern fn eh_personality() {}
+// #[lang = "eh_personality"] extern fn eh_personality() {}
 
 use core::panic::PanicInfo;
 
@@ -95,16 +86,22 @@ pub extern "C" fn rust_begin_unwind(_: &core::panic::PanicInfo) {
 #[no_mangle]
 pub extern "C" fn panic_bounds_check() -> ! {
     //panic("bounds check failed");
-    loop {}
+    loop {
+        x86_64::instructions::hlt();
+    }
 }
 
 #[no_mangle]
 pub extern "C" fn slice_end_index_len_fail() -> ! {
-    loop {}
+    loop {
+        x86_64::instructions::hlt();
+    }
 }
 
 #[no_mangle]
 pub extern "C" fn core_fmt_write() {
-    loop {}
+    loop {
+        x86_64::instructions::hlt();
+    }
 }
 

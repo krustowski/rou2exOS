@@ -17,9 +17,9 @@ pub struct Label {
 }
 
 impl Widget for Label {
-    fn render(&mut self, screen: &Screen, offset_x: usize, offset_y: usize) {
-        let x = offset_x + self.x;
-        let y = offset_y + self.y;
+    fn render(&mut self, _screen: &Screen, offset_x: usize, offset_y: usize) {
+        let _x = offset_x + self.x;
+        let _y = offset_y + self.y;
         for (i, byte) in self.text.bytes().enumerate() {
             Screen::write_char(offset_x + i, offset_y, byte, self.attr);
         }
@@ -126,7 +126,7 @@ pub struct OffsetWidget<'a> {
 }
 
 impl<'a> Widget for OffsetWidget<'a> {
-    fn render(&mut self, screen: &Screen, offset_x: usize, offset_y: usize) {
+    fn render(&mut self, screen: &Screen, _offset_x: usize, _offset_y: usize) {
         self.widget.render(screen, self.dx, self.dy);
         // TODO: Offset math amd render
     }

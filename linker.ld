@@ -1,4 +1,4 @@
-ENTRY(_start)
+ENTRY(start)
 
 SECTIONS {
     . = 0x100000; /* 1 MB offset */

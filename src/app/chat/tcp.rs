@@ -11,7 +11,7 @@ use crate::{
     },
     vga::{
         buffer::Color, 
-        screen::{clear, scroll_at}, 
+        screen::scroll_at, 
         write::{
             byte,
             newline,
@@ -86,13 +86,15 @@ pub fn receive_loop_tcp(
                 0x1C => {
                     // Send message
                     unsafe {
-                        for i in 0..RESPONSE_LENGTH {
+                        for _ in 0..RESPONSE_LENGTH {
                             VGA_INDEX_WRITE -= 2;
+                            #[expect(static_mut_refs)]
                             byte(&mut VGA_INDEX_WRITE, b' ', Color::Black);
                             VGA_INDEX_WRITE -= 2;
                         }
 
-                        move_cursor_index(&mut END_LINE);
+                        let mut end_line = END_LINE;
+                        move_cursor_index(&mut end_line);
                         return HandleState::SendResponse;
                     }
                 }
@@ -103,8 +105,10 @@ pub fn receive_loop_tcp(
                             RESPONSE_LENGTH -= 1;
 
                             VGA_INDEX_WRITE -= 2;
+                            #[expect(static_mut_refs)]
                             byte(&mut VGA_INDEX_WRITE, b' ', Color::Black);
                             VGA_INDEX_WRITE -= 2;
+                            #[expect(static_mut_refs)]
                             move_cursor_index(&mut VGA_INDEX_WRITE);
                         }
                     }
@@ -112,15 +116,14 @@ pub fn receive_loop_tcp(
                 _ => {
                     if let Some(ascii) = keyboard::scancode_to_ascii(key) {
                         unsafe {
-                            if RESPONSE_LENGTH < 256 {
-                                if let Some(w) = RESPONSE_BUFFER.get_mut(RESPONSE_LENGTH) {
-                                    *w = ascii;
-                                    RESPONSE_LENGTH += 1;
+                            #[expect(static_mut_refs)]
+                            if let Some(w) = RESPONSE_BUFFER.get_mut(RESPONSE_LENGTH) {
+                                *w = ascii;
+                                RESPONSE_LENGTH += 1;
 
-                                    byte(&mut VGA_INDEX_WRITE, ascii, Color::Yellow);
-                                    move_cursor_index(&mut VGA_INDEX_WRITE);
-                                    //scroll(&mut VGA_INDEX);
-                                }
+                                byte(&mut VGA_INDEX_WRITE, ascii, Color::Yellow);
+                                move_cursor_index(&mut VGA_INDEX_WRITE);
+                                //scroll(&mut VGA_INDEX);
                             }
                         }
                     }
@@ -232,6 +235,7 @@ pub fn handle_conns(ips: &[[u8; 4]; 4]) {
 
         send_response(&mut new_conn, tcp::SYN, &[]);
         
+        #[expect(static_mut_refs)]
         unsafe {
             string(&mut VGA_INDEX, b"[NEW] Dialing....", Color::Cyan);
             newline(&mut VGA_INDEX);
@@ -244,7 +248,8 @@ pub fn handle_conns(ips: &[[u8; 4]; 4]) {
         VGA_INDEX = 0;
     }
 
-    move_cursor_index(&mut END_LINE);
+    let mut end_line = END_LINE;
+    move_cursor_index(&mut end_line);
 
     loop {
         let ret = receive_loop_tcp(&mut conns, callback);
@@ -257,6 +262,7 @@ pub fn handle_conns(ips: &[[u8; 4]; 4]) {
                 HandleState::GotACK => {
                     //string(vga_index, b"Received ACK", Color::White);
                 }
+                #[expect(static_mut_refs)]
                 HandleState::GotFIN => {
                     //string(vga_index, b"Received FIN", Color::White);
                     string(&mut VGA_INDEX, b"[FIN] Client disconnected.", Color::White);
@@ -309,6 +315,7 @@ pub fn handle_conns(ips: &[[u8; 4]; 4]) {
                     });
 
                     if let Some(conn) = found_conn {
+                        #[expect(static_mut_refs)]
                         if let Some(response) = RESPONSE_BUFFER.get_mut(..RESPONSE_LENGTH + 1) {
                             if let Some(b) = response.get_mut(response.len() - 1) {
                                 *b = b'\n';
@@ -322,7 +329,7 @@ pub fn handle_conns(ips: &[[u8; 4]; 4]) {
                             }
 
                             string(&mut VGA_INDEX, b"[you]: ", Color::Yellow);
-                            string(&mut VGA_INDEX, &response, Color::White);
+                            string(&mut VGA_INDEX, response, Color::White);
                             newline(&mut VGA_INDEX);
                             scroll_at(&mut VGA_INDEX, &mut 24);
                         }
@@ -338,12 +345,10 @@ pub fn handle_conns(ips: &[[u8; 4]; 4]) {
     clear_screen!()
 }
 
-fn for_each_conn<'a, F, R>(conns: &'a mut [Option<TcpConnection>], mut f: F) -> Option<R> where F: FnMut(&'a mut TcpConnection) -> Option<R> {
-    for conn in conns.iter_mut() {
-        if let Some(ref mut c) = conn {
-            if let Some(result) = f(c) {
-                return Some(result);
-            }
+fn for_each_conn<'a, R>(conns: &'a mut [Option<TcpConnection>], mut f: impl FnMut(&'a mut TcpConnection) -> Option<R>) -> Option<R> {
+    for conn in conns.iter_mut().flatten() {
+        if let Some(result) = f(conn) {
+            return Some(result);
         }
     }
     None
@@ -361,6 +366,7 @@ fn handle_tcp_packet(conn: &mut tcp::TcpConnection, tcp_header: &tcp::TcpHeader,
         conn.seq_num = 1;
         conn.ack_num = u32::from_be(tcp_header.seq_num).wrapping_add(1);
 
+        #[expect(static_mut_refs)]
         unsafe {
             if conn.src_port == 12345 {
                 string(&mut VGA_INDEX, b"[NEW] New connection.", Color::Cyan);
@@ -402,12 +408,13 @@ fn handle_tcp_packet(conn: &mut tcp::TcpConnection, tcp_header: &tcp::TcpHeader,
             unsafe {
                 let mut crt = 0;
 
-                if let Some(end) = payload.get(payload.len() - 1) {
+                if let Some(end) = payload.last() {
                     if *end == b'\n' {
                         crt = 1;
                     }
                 }
 
+                #[expect(static_mut_refs)]
                 if let Some(msg) = payload.get(..payload.len() - 1 - crt) {
                     string(&mut VGA_INDEX, b"[peer]: ", Color::Green);
                     string(&mut VGA_INDEX, msg, Color::White);

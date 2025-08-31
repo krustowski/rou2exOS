@@ -21,26 +21,24 @@ pub fn beep(freq: u32) {
 
     unsafe {
         // Enable speaker (bits 0 and 1 on port 0x61)
-        let mut tmp: u8;
         core::arch::asm!(
             "in al, dx",
             "or al, 3",
             "out dx, al",
             in("dx") 0x61,
-            out("al") tmp,
+            out("al") _,
         );
     }
 }
 
 pub fn stop_beep() {
     unsafe {
-        let mut tmp: u8;
         core::arch::asm!(
             "in al, dx",
             "and al, 0xFC", // clear bits 0 and 1
             "out dx, al",
             in("dx") 0x61,
-            out("al") tmp,
+            out("al") _,
         );
     }
 }

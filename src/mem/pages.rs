@@ -1,9 +1,10 @@
 // Pre-allocated memory space for page tables (e.g., 64 KiB)
-static mut PAGE_TABLE_MEMORY: [u8; 128 * 1024] = [0; 128 * 1024];
+const PAGE_TABLE_MEMORY_SIZE: usize = 128 * 1024;
+static mut PAGE_TABLE_MEMORY: [u8; PAGE_TABLE_MEMORY_SIZE] = [0; 128 * 1024];
 static mut NEXT_FREE_PAGE: usize = 0x1000;
 
 unsafe fn alloc_page() -> *mut u8 {
-    if NEXT_FREE_PAGE + 0x1000 > PAGE_TABLE_MEMORY.len() {
+    if NEXT_FREE_PAGE + 0x1000 > PAGE_TABLE_MEMORY_SIZE {
         panic!("Out of preallocated page table memory!");
     }
     let addr = &mut PAGE_TABLE_MEMORY[NEXT_FREE_PAGE] as *mut u8;
@@ -15,8 +16,8 @@ unsafe fn alloc_page() -> *mut u8 {
 pub unsafe fn map_32mb(p4: *mut u64, phys_start: usize, virt_start: usize) {
     let p4_index = (virt_start >> 39) & 0x1FF;
     let p3_index = (virt_start >> 30) & 0x1FF;
-    let p2_index = (virt_start >> 21) & 0x1FF;
-    let p1_index = (virt_start >> 12) & 0x1FF;
+    // let p2_index = (virt_start >> 21) & 0x1FF;
+    // let p1_index = (virt_start >> 12) & 0x1FF;
 
     let p3 = get_or_alloc_table(p4.add(p4_index).as_mut().unwrap());
     //let p3 = alloc_page();
@@ -39,17 +40,13 @@ pub unsafe fn map_32mb(p4: *mut u64, phys_start: usize, virt_start: usize) {
 
 pub unsafe fn identity_map(p4: *mut u64, size: usize) {
     let page_count = size / 0x1000;
-    let p1_tables = (page_count + 511) / 512;
+    let p1_tables = page_count.div_ceil(512);
 
-    let p4_index = (0x0000_0000_0000_0000u64 >> 39) & 0x1FF;
-    let p3_index = (0x0000_0000_0000_0000u64 >> 30) & 0x1FF;
-    let p2_index = (0x0000_0000_0000_0000u64 >> 21) & 0x1FF;
+    let p3 = get_or_alloc_table(p4);
+    p4.write(p3 as u64 | 0x3);
 
-    let p3 = get_or_alloc_table(p4.add(p4_index as usize));
-    p4.add(p4_index as usize).write(p3 as u64 | 0x3);
-
-    let p2 = get_or_alloc_table(p3.add(p3_index as usize));
-    p3.add(p3_index as usize).write(p2 as u64 | 0x3);
+    let p2 = get_or_alloc_table(p3);
+    p3.write(p2 as u64 | 0x3);
 
     for i in 0..p1_tables {
         let p1 = alloc_page();
@@ -58,7 +55,7 @@ pub unsafe fn identity_map(p4: *mut u64, size: usize) {
         debug!("] = ");
         debugn!(p1);
         debugln!("");
-        p2.add(p2_index as usize + i).write(p1 as u64 | 0x3);
+        p2.add(i).write(p1 as u64 | 0x3);
         for j in 0..512 {
             let page_idx = i * 512 + j;
             if page_idx >= page_count {
@@ -75,9 +72,9 @@ unsafe fn get_or_alloc_table(entry: *mut u64) -> *mut u64 {
     if val & 1 == 0 {
         let new_page = alloc_page() as u64 | 0x3;
         entry.write(new_page);
-        return (new_page & 0x000f_ffff_ffff_f000) as *mut u64;
+        (new_page & 0x000f_ffff_ffff_f000) as *mut u64
     } else {
-        return (val & 0x000f_ffff_ffff_f000) as *mut u64;
+        (val & 0x000f_ffff_ffff_f000) as *mut u64
     }
 }
 

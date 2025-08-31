@@ -29,7 +29,7 @@ pub fn scroll_at(vga_index: &mut isize, height: &mut isize) {
 
     unsafe {
         let row_size = buffer::WIDTH * 2;                // Bytes per row
-        let screen_size = row_size * buffer::HEIGHT;
+        let _screen_size = row_size * buffer::HEIGHT;
 
         // Copy all rows up one line: from row 1 to row 0
         ptr::copy(
@@ -47,7 +47,7 @@ pub fn scroll_at(vga_index: &mut isize, height: &mut isize) {
         }
     }
 
-    *vga_index = (*height as isize - 1) * buffer::WIDTH as isize * 2;
+    *vga_index = (*height - 1) * buffer::WIDTH as isize * 2;
 }
 
 pub fn scroll(vga_index: &mut isize) {
@@ -57,7 +57,7 @@ pub fn scroll(vga_index: &mut isize) {
 
     unsafe {
         let row_size = buffer::WIDTH * 2; // Bytes per row
-        let screen_size = row_size * buffer::HEIGHT;
+        let _screen_size = row_size * buffer::HEIGHT;
 
         // Copy all rows up one line: from row 1 to row 0
         ptr::copy(

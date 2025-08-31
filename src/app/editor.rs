@@ -1,7 +1,6 @@
 use crate::fs::fat12::{fs::Filesystem, block::Floppy};
 use crate::init::config::PATH_CLUSTER;
 use crate::input::keyboard::{self, keyboard_read_scancode};
-use crate::vga::{buffer::Color, screen::clear, write::{string, newline}};
 use crate::video::vga::Writer;
 
 pub const MAX_LINES: usize = 100;
@@ -169,7 +168,7 @@ impl Editor {
                                 let mut prev = [0u8; 80];
                                 prev.copy_from_slice(line);
 
-                                if i >= MAX_LINE_LEN || i < 1 {
+                                if !(1..MAX_LINE_LEN).contains(&i) {
                                     return;
                                 }
 
@@ -198,7 +197,6 @@ pub fn edit_file(file_name: &[u8; 12]) {
         Err(e) => {
             error!(e);
             error!();
-            return;
         }
         Ok(fs) => {
             let mut file_buf = [0u8; 512];
@@ -214,16 +212,12 @@ pub fn edit_file(file_name: &[u8; 12]) {
 
             unsafe {
                 fs.for_each_entry(PATH_CLUSTER, |entry| {
-                    if entry.name[0] != 0x00 && entry.name[0] != 0xE5 && entry.attr & 0x10 == 0 {
-
-                        if entry.name.starts_with(name) {
-                            cluster = entry.start_cluster;
-                            return;
-                        }
+                    if entry.name[0] != 0x00 && entry.name[0] != 0xE5 && entry.attr & 0x10 == 0 && entry.name.starts_with(name) {
+                        cluster = entry.start_cluster;
                     }
                 });
 
-                if cluster <= 0 {
+                if cluster == 0 {
                     return;
                 }
                 fs.read_file(cluster, &mut file_buf);
@@ -405,7 +399,7 @@ pub fn split_filename(input: &[u8]) -> (&[u8], &[u8]) {
         }
         (cmd, rest)
     } else {
-        (&trimmed[..], &[])
+        (trimmed, &[])
     }
 }
 

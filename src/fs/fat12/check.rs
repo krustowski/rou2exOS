@@ -1,5 +1,4 @@
-use crate::fs::fat12::{entry::Entry, fs::Filesystem, table::FatTable, block::Floppy}; 
-use crate::vga::{write::{newline, number, string}, buffer::Color};
+use crate::fs::fat12::{fs::Filesystem, table::FatTable, block::Floppy}; 
 
 pub struct CheckReport {
     pub errors: usize,
@@ -22,17 +21,7 @@ pub fn run_check() -> CheckReport {
     scan_directory(0, &fat, &mut used_clusters, &mut report, 0);
 
     // Check the FAT for unreferenced or multiply referenced clusters
-    for cluster in 2..fat.total_clusters() {
-        let fat_entry = fat.get(cluster as u16);
-        if fat_entry.is_some() && !used_clusters[cluster as usize] {
-            report.orphan_clusters += 1;
-            continue;
-
-            // Debug: print orphan clusters
-            //print!(" -> Orphan cluster: ");
-            //printn!(cluster);
-        }
-    }
+    report.orphan_clusters += used_clusters.iter().zip((0..).map(|cluster| fat.get(cluster))).skip(2).filter_map(|x| if !x.0 { x.1 } else {None}).count();
 
     /*print!("Done. Error count: ");
     printn!(report.errors as u64);
@@ -45,7 +34,7 @@ pub fn run_check() -> CheckReport {
     println!();
     println!();*/
 
-    return report;
+    report
 }
 
 fn scan_directory(
@@ -65,63 +54,60 @@ fn scan_directory(
 
     let floppy = Floppy::init();
 
-    match Filesystem::new(&floppy) {
-        Ok(fs) => {
-            fs.for_each_entry(start_cluster, |entry| {
-                if entry.name[0] == 0x00 || entry.name[0] == 0xE5 {
-                    //string(vga_index, b" -> Invalid entry: ", Color::Red);
-                    //number(vga_index, entry.start_cluster as u64);
-                    //newline(vga_index);
-                    report.invalid_entries += 1;
-                    return;
-                }
+    if let Ok(fs) = Filesystem::new(&floppy) {
+        fs.for_each_entry(start_cluster, |entry| {
+            if entry.name[0] == 0x00 || entry.name[0] == 0xE5 {
+                //string(vga_index, b" -> Invalid entry: ", Color::Red);
+                //number(vga_index, entry.start_cluster as u64);
+                //newline(vga_index);
+                report.invalid_entries += 1;
+                return;
+            }
 
-                if entry.attr & 0x08 != 0 {
-                    // Volume label
-                    return;
-                }
+            if entry.attr & 0x08 != 0 {
+                // Volume label
+                return;
+            }
 
-                if entry.attr & 0x10 != 0 && entry.file_size != 0 {
-                    error!(" -> Directory has non-zero value: ");
-                    printn!(entry.start_cluster as u64);
-                    println!();
+            if entry.attr & 0x10 != 0 && entry.file_size != 0 {
+                error!(" -> Directory has non-zero value: ");
+                printn!(entry.start_cluster as u64);
+                println!();
 
-                    report.errors += 1;
-                }
+                report.errors += 1;
+            }
 
-                if entry.start_cluster < 2 {
-                    warn!(" -> Warning: entry with cluster < 2: ");
-                    printn!(entry.start_cluster as u64);
-                    println!();
-                    return;
-                }
+            if entry.start_cluster < 2 {
+                warn!(" -> Warning: entry with cluster < 2: ");
+                printn!(entry.start_cluster as u64);
+                println!();
+                return;
+            }
 
-                if entry.start_cluster == start_cluster {
-                    warn!(" -> Skipping self-recursive directory");
-                    println!();
-                    return;
-                }
+            if entry.start_cluster == start_cluster {
+                warn!(" -> Skipping self-recursive directory");
+                println!();
+                return;
+            }
 
-                let is_dotdot = entry.name.starts_with(b"..");
-                if is_dotdot {
-                    return;
-                }
+            let is_dotdot = entry.name.starts_with(b"..");
+            if is_dotdot {
+                return;
+            }
 
-                if entry.attr & 0x10 != 0 {
-                    scan_directory(entry.start_cluster, fat, used, report, depth + 1);
-                } else {
-                    validate_chain(entry.start_cluster, fat, used, report);
-                }
-            });
-        }
-        Err(e) => {}
+            if entry.attr & 0x10 != 0 {
+                scan_directory(entry.start_cluster, fat, used, report, depth + 1);
+            } else {
+                validate_chain(entry.start_cluster, fat, used, report);
+            }
+        });
     }
 }
 
 fn is_valid_name(name: &[u8; 11]) -> bool {
     name.iter().all(|&c| {
-        (b'A'..=b'Z').contains(&c) ||
-        (b'0'..=b'9').contains(&c) ||
+        c.is_ascii_uppercase() ||
+        c.is_ascii_digit() ||
         c == b' ' || b"!#$%&'()-@^_`{}~".contains(&c)
     })
 }

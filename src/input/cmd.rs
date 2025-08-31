@@ -2,13 +2,10 @@ use crate::acpi;
 use crate::app;
 use crate::audio;
 use crate::fs::fat12::block::BlockDevice;
-use crate::fs::fat12::entry;
 use crate::init::config;
 use crate::debug;
 use crate::fs::fat12::{block::Floppy, fs::Filesystem, check::run_check};
-use crate::init::config::get_path;
 use crate::init::config::PATH_CLUSTER;
-use crate::init::result;
 use crate::input::keyboard::keyboard_loop;
 use crate::net;
 use crate::time;
@@ -342,7 +339,7 @@ fn cmd_beep(_args: &[u8]) {
 /// Changes the current directory to one matching an input from keyboard.
 fn cmd_cd(args: &[u8]) {
     // 12 = name + extension + dot
-    if args.len() == 0 || args.len() > 12 {
+    if args.is_empty() || args.len() > 12 {
         unsafe {
             config::PATH_CLUSTER = 0;
             config::set_path(b"/");
@@ -353,7 +350,7 @@ fn cmd_cd(args: &[u8]) {
     // This split_cmd invocation trims the b'\0' tail from the input args.
     let (filename_input, _) = keyboard::split_cmd(args);
 
-    if filename_input.len() == 0 || filename_input.len() > 12 {
+    if filename_input.is_empty() || filename_input.len() > 12 {
         warn!("Usage: cd <dirname>\n");
         return;
     }
@@ -373,14 +370,14 @@ fn cmd_cd(args: &[u8]) {
 
             unsafe {
                 fs.for_each_entry(config::PATH_CLUSTER, |entry| {
-                    if entry.name.starts_with(&filename_input) {
+                    if entry.name.starts_with(filename_input) {
                         cluster = entry.start_cluster;
                     }
                 });
 
                 if cluster > 0 {
-                    config::PATH_CLUSTER = cluster as u16;
-                    config::set_path(&filename_input);
+                    config::PATH_CLUSTER = cluster;
+                    config::set_path(filename_input);
                 } else {
                     error!("No such directory\n");
                 }
@@ -452,7 +449,7 @@ fn cmd_echo(args: &[u8]) {
 fn cmd_ed(args: &[u8]) {
     let (filename_input, _) = keyboard::split_cmd(args);
 
-    if filename_input.len() == 0 || filename_input.len() > 12 {
+    if filename_input.is_empty() || filename_input.len() > 12 {
         warn!("Usage: ed <filename>\n");
         return;
     }
@@ -567,7 +564,7 @@ fn cmd_menu(_args: &[u8]) {
 
 /// Creates new subdirectory in the current directory.
 fn cmd_mkdir(args: &[u8]) {
-    if args.len() == 0 || args.len() > 11 {
+    if args.is_empty() || args.len() > 11 {
         warn!("Usage: mkdir <dirname>\n");
         return;
     }
@@ -596,7 +593,7 @@ fn cmd_mkdir(args: &[u8]) {
 
 /// Renames given <old_name> to <new_name> in the current directory.
 fn cmd_mv(args: &[u8]) {
-    if args.len() == 0 {
+    if args.is_empty() {
         warn!("Usage: mv <old> <new>");
         return;
     }
@@ -610,7 +607,7 @@ fn cmd_mv(args: &[u8]) {
             let mut old_filename: [u8; 11] = [b' '; 11];
             let mut new_filename: [u8; 11] = [b' '; 11];
 
-            if new.len() == 0 || old.len() == 0 || old.len() > 11 || new.len() > 11 {
+            if new.is_empty() || old.is_empty() || old.len() > 11 || new.len() > 11 {
                 warn!("Usage: mv <old> <new>");
                 return;
             }
@@ -671,7 +668,7 @@ fn cmd_ping(args: &[u8]) {
 /// This command function takes the argument, then tries to find a matching filename in the current
 /// directory, and finally it dumps its content to screen.
 fn cmd_read(args: &[u8]) {
-    if args.len() == 0 || args.len() > 11 {
+    if args.is_empty() || args.len() > 11 {
         warn!("Usage: read <filename>\n");
         return;
     }
@@ -687,22 +684,20 @@ fn cmd_read(args: &[u8]) {
 
             to_uppercase_ascii(&mut filename);
 
-            unsafe {
-                // TODO: tix this
-                //let cluster = fs.list_dir(config::PATH_CLUSTER, &filename);
-                let cluster = 0;
+            // TODO: tix this
+            //let cluster = fs.list_dir(config::PATH_CLUSTER, &filename);
+            let cluster = 0;
 
-                if cluster > 0 {
-                    let mut buf = [0u8; 512];
+            if cluster > 0 {
+                let mut buf = [0u8; 512];
 
-                    fs.read_file(cluster as u16, &mut buf);
+                fs.read_file(cluster as u16, &mut buf);
 
-                    print!("Dumping file raw contents:\n", video::vga::Color::DarkYellow);
-                    printb!(&buf);
-                    println!();
-                } else {
-                    error!("No such file found");
-                }
+                print!("Dumping file raw contents:\n", video::vga::Color::DarkYellow);
+                printb!(&buf);
+                println!();
+            } else {
+                error!("No such file found");
             }
         }
         Err(e) => {
@@ -775,7 +770,7 @@ fn cmd_response(_args: &[u8]) {
 
 /// Removes a file in the current directory according to the input.
 fn cmd_rm(args: &[u8]) {
-    if args.len() == 0 || args.len() > 11 {
+    if args.is_empty() || args.len() > 11 {
         warn!("Usage: rm <filename>\n");
         return;
     }
@@ -805,7 +800,7 @@ fn cmd_rm(args: &[u8]) {
 }
 
 fn cmd_run(args: &[u8]) {
-    if args.len() == 0 || args.len() > 12 {
+    if args.is_empty() || args.len() > 12 {
         warn!("usage: run <binary name>");
         return;
     }
@@ -813,7 +808,7 @@ fn cmd_run(args: &[u8]) {
     // This split_cmd invocation trims the b'\0' tail from the input args.
     let (filename_input, _) = keyboard::split_cmd(args);
 
-    if filename_input.len() == 0 || filename_input.len() > 12 {
+    if filename_input.is_empty() || filename_input.len() > 12 {
         warn!("Usage: run <binary name>\n");
         return;
     }
@@ -835,10 +830,9 @@ fn cmd_run(args: &[u8]) {
                 let mut size = 0;
 
                 fs.for_each_entry(config::PATH_CLUSTER, |entry| {
-                    if entry.name.starts_with(&filename_input) && entry.ext.starts_with(b"ELF") {
+                    if entry.name.starts_with(filename_input) && entry.ext.starts_with(b"ELF") {
                         cluster = entry.start_cluster;
                         size = entry.file_size;
-                        return;
                     }
                 });
 
@@ -895,7 +889,7 @@ fn cmd_run(args: &[u8]) {
 
                 rprint!("First 16 bytes (load_addr + 0x18): ");
                 for i in 0..16 {
-                    rprintn!(*(entry_ptr as *const u8).add(i));
+                    rprintn!(*entry_ptr.add(i));
                     rprint!(" ");
                 }
                 rprint!("\n");
@@ -953,7 +947,7 @@ unsafe extern "C" fn user_program_return() -> ! {
     );
 }
 
-extern "C" fn handle_program_return(retval: u64) {
+extern "C" fn handle_program_return(retval: u64) -> ! {
     rprint!("Program returned: ");
     rprintn!(retval);
     rprint!("\n");
@@ -961,13 +955,14 @@ extern "C" fn handle_program_return(retval: u64) {
     keyboard_loop();
 }
 
+// TODO: why are we chopping off 32 bits off of all the regs
 unsafe fn run_program(entry: extern "C" fn(u32) -> u32, arg: u32) -> u32 {
     let mut ret: u32;
 
     // Get stack top
-    let user_stack_top = USER_STACK.as_ptr().add(USER_STACK_SIZE);
+    let user_stack_top = (&raw const USER_STACK).add(USER_STACK_SIZE);
 
-    let return_addr = user_program_return() as usize;
+    let return_addr = user_program_return as usize;
 
     core::arch::asm!(
         "mov {old_rsp}, rsp",
@@ -1013,11 +1008,11 @@ fn cmd_snake(_args: &[u8]) {
 }
 
 fn cmd_task(_args: &[u8]) {
-    crate::task::task::run_scheduler();
+    crate::task::run_scheduler();
 }
 
 fn cmd_tasks(_args: &[u8]) {
-    crate::task::task::status();
+    crate::task::status();
 }
 
 /// Experimental command function to demonstrate the implementation state of the TCP/IP stack.
@@ -1113,7 +1108,7 @@ fn cmd_write(args: &[u8]) {
         Ok(fs) => {
             let (filename, content) = split_cmd(args);
 
-            if filename.len() == 0 || content.len() == 0 {
+            if filename.is_empty() || content.is_empty() {
                 warn!("Usage <filename> <content>\n");
                 return;
             }

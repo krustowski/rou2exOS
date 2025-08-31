@@ -12,7 +12,7 @@ pub fn map_framebuffer(
     p2_fb_tables: &mut [&mut [u64; 512]],  
     p1_fb_tables: &mut [&mut [u64; 512]],
 ) {
-    let page_count = (fb_size + PAGE_SIZE - 1) / PAGE_SIZE;
+    let page_count = fb_size.div_ceil(PAGE_SIZE);
 
     for i in 0..page_count {
         let virt = fb_virt_base + i * PAGE_SIZE;
@@ -54,7 +54,7 @@ pub fn print_result(fb: &super::multiboot_parser::FramebufferTag) -> super::resu
 
     video::mode::init_video(fb);
 
-    if let Some(_) = video::mode::get_video_mode() {
+    if video::mode::get_video_mode().is_some() {
         return super::result::InitResult::Passed;
     }
 

@@ -19,6 +19,29 @@ p3_table:
 p2_table:           
 	resb 4096
 
+p3_fb_table:
+    	resq 512
+p2_fb_table:
+    	resq 512
+
+p1_fb_table:
+    	resb 4096
+p1_fb_table_0:
+    	resb 4096
+p1_fb_table_1:
+    	resb 4096
+p1_fb_table_2:      
+	resb 4096
+p1_fb_table_3:      
+	resb 4096
+
+p1_low_table:
+    resq 512
+p1_extra_table:
+    resb 4096
+p1_table_page_tables:
+    resb 4096
+
 align 16
 ist1_stack:
     resb 4096
@@ -47,7 +70,7 @@ section .text
 align 4
 
 extern kernel_main
-global _start
+global start
 
 global multiboot_magic
 global multiboot_ptr
@@ -69,7 +92,7 @@ global debug_flag
 debug_flag:
     db 0    ; 1 = enabled
 
-_start:
+start:
     mov [multiboot_magic], eax
     mov [multiboot_ptr], ebx
 
@@ -206,11 +229,31 @@ set_up_page_tables:
     lea edi, [p2_table]
     call zero_table
 
+    lea edi, [p2_fb_table]
+    call zero_table
+
+    lea edi, [p1_fb_table_0]
+    call zero_table
+
+    lea edi, [p1_fb_table_1]
+    call zero_table
+
+    lea edi, [p1_fb_table_2]
+    call zero_table
+
+    lea edi, [p1_fb_table_3]
+    call zero_table
+
     ; Map P4[0] → P3
     mov eax, p3_table
     or eax, 0b111
     mov [p4_table + 0 * 8], eax
     mov dword [p4_table + 0 * 8 + 4], 0
+
+    mov eax, p3_fb_table
+    or eax, 0b111
+    mov [p4_table + 1 * 8], eax
+    mov dword [p4_table + 1 * 8 + 4], 0
 
     ; Map P3[0] → P2
     mov eax, p2_table
@@ -218,17 +261,35 @@ set_up_page_tables:
     mov [p3_table + 0 * 8], eax
     mov dword [p3_table + 0 * 8 + 4], 0
 
+    mov eax, p2_fb_table
+    or eax, 0b111
+    mov [p3_fb_table + 0 * 8], eax
+    mov dword [p3_fb_table + 0 * 8 + 4], 0
+
+    ;mov eax, p1_fb_table_0
+    ;or eax, 0b11100111
+    ;mov [p2_fb_table + 0 * 8], eax
+    ;mov dword [p2_fb_table + 465 * 8 + 4], 0 
+
+    ;mov eax, 0x68747000
+    ;or eax, 0b11100111
+    ;mov [p1_fb_table_0 + 186 * 8], eax
+    ;mov dword [p1_fb_table_0 + 186 * 8 + 4], 0 
+
+
     ; Identity map 1 GB using huge pages
 
     xor ecx, ecx
 .map_1gib:
-    mov eax, 0x200000
+    mov eax, 0x40000000
+    ;mov eax, 0x200000
     mul ecx
     or eax, 0b10000011        
-    mov [p2_table + ecx * 8], eax
-    mov dword [p2_table + ecx * 8 + 4], 0
+    mov [p3_table + ecx * 8], eax
+    mov dword [p3_table + ecx * 8 + 4], 0
 
     inc ecx
+    cmp ecx, 4
     cmp ecx, 1
     jne .map_1gib
 
@@ -245,6 +306,8 @@ set_up_page_tables:
     or eax, 0b11100111
     mov [p2_table + 4 * 8], eax
     mov dword [p2_table + 4 * 8 + 4], 0 
+
+    ret
 
     ret
 

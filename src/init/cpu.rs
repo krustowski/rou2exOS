@@ -1,8 +1,4 @@
 use core::arch::asm;
-use crate::vga::{
-    write::{string, newline},
-    buffer::Color,
-};
 use super::result;
 
 pub fn check_mode() -> crate::init::result::InitResult {
@@ -11,7 +7,7 @@ pub fn check_mode() -> crate::init::result::InitResult {
     enable_sse();
     enable_syscalls();
 
-    if mode.as_bytes().len() > 5 && mode.as_bytes()[0..4] == *b"Long" {
+    if mode.len() > 5 && mode.as_bytes()[0..4] == *b"Long" {
         return result::InitResult::Passed;
     }
 
@@ -103,7 +99,7 @@ unsafe fn rdmsr(msr: u32) -> u64 {
 
 // Your syscall handler (just returns for now)
 #[unsafe(naked)]
-unsafe extern "C" fn syscall_handler() -> () {
+unsafe extern "C" fn syscall_handler() {
     core::arch::naked_asm!(
         "swapgs",           // swap GS base to kernel GS base
         "push rcx",         // save RCX (return RIP)
@@ -118,6 +114,7 @@ unsafe extern "C" fn syscall_handler() -> () {
 fn enable_syscalls() {
     unsafe {
         // Set IA32_LSTAR to syscall_handler address
+        #[expect(clippy::fn_to_numeric_cast)]
         wrmsr(IA32_LSTAR, syscall_handler as u64);
 
         // Enable syscall/sysret in EFER (bit 0 = SCE)

@@ -1,5 +1,5 @@
 use crate::{
-    fs::fat12::{block::{Floppy, BlockDevice}, fs::Filesystem, entry::Entry}, 
+    fs::fat12::{block::{Floppy, BlockDevice}, fs::Filesystem}, 
     input::{elf, irq}, 
     net::{serial, ipv4, icmp, tcp},
     //task::process::schedule,
@@ -16,6 +16,19 @@ enum SyscallReturnCode {
     FilesystemError = 0xfd,
     FileNotFound = 0xfe,
     InvalidSyscall = 0xff,
+}
+
+macro_rules! syscall_ret {
+    ($ret:expr) => {
+        #[allow(unused_unsafe)]
+        unsafe {
+            core::arch::asm!(
+                "mov rax, {:r}",
+                in(reg) ($ret as u64)
+            );
+            return;
+        }
+    }
 }
 
 /// This function is the syscall ABI dispatching routine. It is called exclusively from the ISR 
@@ -83,12 +96,12 @@ pub extern "C" fn syscall_handler() {
          *
          */
         0x01 => {
-            if arg2 < USERLAND_START || arg2 > USERLAND_END {
+            if !(USERLAND_START..=USERLAND_END).contains(&arg2) {
                 ret = SyscallReturnCode::InvalidInput;
-                return;
+                syscall_ret!(ret);
             }
 
-            let mut sysinfo_ptr = arg2 as *mut SysInfo;
+            let sysinfo_ptr = arg2 as *mut SysInfo;
 
             match arg1 {
                 0x01 => {
@@ -131,24 +144,19 @@ pub extern "C" fn syscall_handler() {
          *  Arg2: pointer to RTC structu (*mut RTC)
          */
         0x02 => {
-            if arg2 < USERLAND_START || arg2 > USERLAND_END {
+            if !(USERLAND_START..=USERLAND_END).contains(&arg2) {
                 ret = SyscallReturnCode::InvalidInput;
-                return;
+                syscall_ret!(ret);
             }
 
-            match arg1 {
-                // Get RTC
-                0x01 => {
-                    let mut rtc_data = arg2 as *mut RTC;
+            if arg1 == 0x01 {
+                let rtc_data = arg2 as *mut RTC;
 
-                    unsafe {
-                        ( (*rtc_data).year, (*rtc_data).month, (*rtc_data).day, (*rtc_data).hours, (*rtc_data).minutes, (*rtc_data).seconds) = rtc::read_rtc_full();
-                    }
-
-                    ret = SyscallReturnCode::Okay;
+                unsafe {
+                    ( (*rtc_data).year, (*rtc_data).month, (*rtc_data).day, (*rtc_data).hours, (*rtc_data).minutes, (*rtc_data).seconds) = rtc::read_rtc_full();
                 }
 
-                _ => {}
+                ret = SyscallReturnCode::Okay;
             }
         }
 
@@ -159,9 +167,9 @@ pub extern "C" fn syscall_handler() {
          *  Arg2: pointer to circular buffer (*const u8)
          */
         0x03 => {
-            if arg2 < USERLAND_START || arg2 > USERLAND_END {
+            if !(USERLAND_START..=USERLAND_END).contains(&arg2) {
                 ret = SyscallReturnCode::InvalidInput;
-                return;
+                syscall_ret!(ret);
             }
 
             match arg1 {
@@ -175,6 +183,7 @@ pub extern "C" fn syscall_handler() {
 
                 0x03 => {
                     unsafe {
+                        #[expect(static_mut_refs)] // this is bad but i cant figure out how to fix
                         for s in irq::RECEPTORS.iter() {
                             if s.pid == 123 {
                                 // Try copy immediately
@@ -187,7 +196,7 @@ pub extern "C" fn syscall_handler() {
                                 //block_current_process_on_keyboard();
                                 // After wake, try copy again
                                 
-                                let copied_after = s.copy_to_user(arg2 as *mut u8, 16);
+                                s.copy_to_user(arg2 as *mut u8, 16);
                             }
                         }
                     }
@@ -206,9 +215,9 @@ pub extern "C" fn syscall_handler() {
          *  Arg2: size in bytes to allocate
          */
         0x0a => {
-            if arg1 < USERLAND_START || arg1 > USERLAND_END {
+            if !(USERLAND_START..=USERLAND_END).contains(&arg1) {
                 ret = SyscallReturnCode::InvalidInput;
-                return;
+                syscall_ret!(ret);
             }
 
             // TODO
@@ -222,9 +231,9 @@ pub extern "C" fn syscall_handler() {
          *  Arg2: length in bytes to print
          */
         0x10 => {
-            if arg1 < USERLAND_START || arg1 > USERLAND_END {
+            if !(USERLAND_START..=USERLAND_END).contains(&arg1) {
                 ret = SyscallReturnCode::InvalidInput;
-                return;
+                syscall_ret!(ret);
             }
 
             let ptr = arg1 as *const u8;
@@ -251,7 +260,7 @@ pub extern "C" fn syscall_handler() {
         0x11 => {
             if arg1 != 0x00 || arg2 != 0x00 {
                 ret = SyscallReturnCode::InvalidInput;
-                return;
+                syscall_ret!(ret);
             }
 
             clear_screen!();
@@ -266,9 +275,9 @@ pub extern "C" fn syscall_handler() {
          *  Arg2: duration in ms
          */
         0x1a => {
-            if arg1 < 20 || arg1 > 20_000 {
+            if !(20..=20_000).contains(&arg1) {
                 ret = SyscallReturnCode::InvalidInput;
-                return;
+                syscall_ret!(ret);
             }
 
             crate::audio::beep::beep(arg1 as u32);
@@ -283,9 +292,9 @@ pub extern "C" fn syscall_handler() {
          *  Arg2: pointer to file name (*const u8)
          */
         0x1b => {
-            if arg2 < USERLAND_START || arg2 > USERLAND_END {
+            if !(USERLAND_START..=USERLAND_END).contains(&arg2) {
                 ret = SyscallReturnCode::InvalidInput;
-                return;
+                syscall_ret!(ret);
             }
 
             let name_ptr = arg1 as *const u8;
@@ -318,13 +327,12 @@ pub extern "C" fn syscall_handler() {
                         Err(e) => {
                             rprint!(e);
                             rprint!("\n");
-
-                            ret = SyscallReturnCode::FilesystemError;
                         }
                     }
 
                     if !file_found {
                         ret = SyscallReturnCode::FileNotFound;
+                        syscall_ret!(ret)
                     }
 
                     if let Some(midi) = crate::audio::midi::parse_midi_format0(&buf) {
@@ -352,7 +360,7 @@ pub extern "C" fn syscall_handler() {
         0x1f => {
             if arg1 != 0x00 || arg2 != 0x00 {
                 ret = SyscallReturnCode::InvalidInput;
-                return;
+                syscall_ret!(ret);
             }
 
             crate::audio::beep::stop_beep();
@@ -367,9 +375,9 @@ pub extern "C" fn syscall_handler() {
          *  Arg2: pointer to buffer (*mut [u8; 512])
          */
         0x20 => {
-            if arg1 < USERLAND_START || arg1 > USERLAND_END || arg2 < USERLAND_START || arg2 > USERLAND_END {
+            if !(USERLAND_START..=USERLAND_END).contains(&arg1) || !(USERLAND_START..=USERLAND_END).contains(&arg2) {
                 ret = SyscallReturnCode::InvalidInput;
-                return;
+                syscall_ret!(ret);
             }
 
             let name_ptr = arg1 as *const u8;
@@ -420,9 +428,9 @@ pub extern "C" fn syscall_handler() {
          *  Arg2: pointer to byte buffer (*mut [u8; 512])
          */
         0x21 => {
-            if arg1 < USERLAND_START || arg1 > USERLAND_END || arg2 < USERLAND_START || arg2 > USERLAND_END {
+            if !(USERLAND_START..=USERLAND_END).contains(&arg1) || !(USERLAND_START..=USERLAND_END).contains(&arg2) {
                 ret = SyscallReturnCode::InvalidInput;
-                return;
+                syscall_ret!(ret);
             }
 
             let name_ptr = arg1 as *const u8;
@@ -461,9 +469,9 @@ pub extern "C" fn syscall_handler() {
          *  Arg2: pointer to new filename
          */
         0x22 => {
-            if arg1 < USERLAND_START || arg1 > USERLAND_END || arg2 < USERLAND_START || arg2 > USERLAND_END {
+            if !(USERLAND_START..=USERLAND_END).contains(&arg1) || !(USERLAND_START..=USERLAND_END).contains(&arg2) {
                 ret = SyscallReturnCode::InvalidInput;
-                return;
+                syscall_ret!(ret);
             }
 
             let (name_old, ext_old) = format_filename(arg1 as *const u8);
@@ -487,7 +495,7 @@ pub extern "C" fn syscall_handler() {
                             return;
                         }
 
-                        if !entry.name.starts_with(&name_old) || (ext_old.len() > 0 && !entry.ext.starts_with(&ext_old)) {
+                        if !entry.name.starts_with(&name_old) || (!ext_old.is_empty() && !entry.ext.starts_with(&ext_old)) {
                             return
                         }
 
@@ -518,9 +526,9 @@ pub extern "C" fn syscall_handler() {
          *  Arg2: 0x00
          */
         0x23 => {
-            if arg1 < USERLAND_START || arg1 > USERLAND_END || arg2 != 0 {
+            if !(USERLAND_START..=USERLAND_END).contains(&arg1) || arg2 != 0 {
                 ret = SyscallReturnCode::InvalidInput;
-                return;
+                syscall_ret!(ret);
             }
 
             let (name, ext) = format_filename(arg1 as *const u8);
@@ -603,9 +611,9 @@ pub extern "C" fn syscall_handler() {
          *  Arg2: pointer to a new subdirectory name (*const u8)
          */
         0x27 => {
-            if arg2 < USERLAND_START || arg2 > USERLAND_END {
+            if !(USERLAND_START..=USERLAND_END).contains(&arg2) {
                 ret = SyscallReturnCode::InvalidInput;
-                return;
+                syscall_ret!(ret);
             }
 
             let name_ptr = arg2 as *const u8;
@@ -655,8 +663,8 @@ pub extern "C" fn syscall_handler() {
                             return;
                         }
 
-                        if offset < kentries.len() {
-                            kentries[offset] = *entry;
+                        if let Some(entry_mut) = kentries.get_mut(offset) {
+                            *entry_mut = *entry;
                             offset += 1;
                         }
                     });
@@ -694,13 +702,12 @@ pub extern "C" fn syscall_handler() {
          *  Arg2: pointer to PID (*mut u8)
          */
         0x2A => {
-            if arg1 < USERLAND_START || arg1 > USERLAND_END || arg2 < USERLAND_START || arg2 > USERLAND_END {
+            if !(USERLAND_START..=USERLAND_END).contains(&arg1) || !(USERLAND_START..=USERLAND_END).contains(&arg2) {
                 ret = SyscallReturnCode::InvalidInput;
-                return;
+                syscall_ret!(ret);
             }
 
             let (name, ext) = format_filename(arg1 as *const u8);
-            let mut pid = arg2 as *mut u8;
 
             let mut file_found: bool = false;
             let mut file_size = 0;
@@ -760,7 +767,7 @@ pub extern "C" fn syscall_handler() {
                         }
 
                         let arg: u64 = 555;
-                        let entry_ptr = (load_addr + 0x18) as *const u8;
+                        // let entry_ptr = (load_addr + 0x18) as *const u8;
 
                         unsafe {
                             // Assume `elf_image` is a pointer to the loaded ELF file in memory
@@ -787,7 +794,7 @@ pub extern "C" fn syscall_handler() {
 
             if !file_found {
                 ret = SyscallReturnCode::FileNotFound;
-                return;
+                syscall_ret!(ret);
             } 
 
         }
@@ -816,9 +823,9 @@ pub extern "C" fn syscall_handler() {
          *  Arg2: pointer to value (u64)
          */
         0x31 => {
-            if arg2 < USERLAND_START || arg2 > USERLAND_END {
+            if !(USERLAND_START..=USERLAND_END).contains(&arg2) {
                 ret = SyscallReturnCode::InvalidInput;
-                return;
+                syscall_ret!(ret);
             }
 
             let port = arg1 as *const u16;
@@ -843,7 +850,7 @@ pub extern "C" fn syscall_handler() {
                     // Serial init
                     if arg2 != 0x00 {
                         ret = SyscallReturnCode::InvalidInput;
-                        return;
+                        syscall_ret!(ret)
                     }
 
                     serial::init();
@@ -853,12 +860,12 @@ pub extern "C" fn syscall_handler() {
 
                 // Read from UART
                 0x02 => {
-                    if arg2 < USERLAND_START || arg2 > USERLAND_END {
+                    if !(USERLAND_START..=USERLAND_END).contains(&arg2) {
                         ret = SyscallReturnCode::InvalidInput;
-                        return;
+                        syscall_ret!(ret)
                     }
 
-                    let mut value = arg2 as *mut u32;
+                    let value = arg2 as *mut u32;
 
                     unsafe {
                         *value = serial::read() as u32;
@@ -869,12 +876,12 @@ pub extern "C" fn syscall_handler() {
 
                 // Write to UART
                 0x03 => {
-                    if arg2 < USERLAND_START || arg2 > USERLAND_END {
+                    if !(USERLAND_START..=USERLAND_END).contains(&arg2) {
                         ret = SyscallReturnCode::InvalidInput;
-                        return;
+                        syscall_ret!(ret)
                     }
 
-                    let mut value = arg2 as *const u32;
+                    let value = arg2 as *const u32;
 
                     unsafe {
                         serial::write(*value as u8);
@@ -896,9 +903,9 @@ pub extern "C" fn syscall_handler() {
          *  Arg2: pointer to buffer (*mut u8)
          */
         0x33 => {
-            if arg2 < USERLAND_START || arg2 > USERLAND_END {
+            if !(USERLAND_START..=USERLAND_END).contains(&arg2) {
                 ret = SyscallReturnCode::InvalidInput;
-                return;
+                syscall_ret!(ret);
             }
 
             match arg1 {
@@ -915,7 +922,7 @@ pub extern "C" fn syscall_handler() {
 
                         if total_len >= 1500 {
                             ret = SyscallReturnCode::InvalidInput;
-                            return;
+                            syscall_ret!(ret)
                         }
 
                         core::ptr::copy_nonoverlapping(packet, ipv4_buffer_aux.as_mut_ptr(), (header_len as u16 + total_len) as usize);
@@ -926,7 +933,7 @@ pub extern "C" fn syscall_handler() {
 
                         if ipv4_len == 0 {
                             ret = SyscallReturnCode::InvalidInput;
-                            return;
+                            syscall_ret!(ret)
                         }
 
                         let ipv4_slice = ipv4_buffer.get(..ipv4_len).unwrap_or(&[]);
@@ -942,8 +949,8 @@ pub extern "C" fn syscall_handler() {
 
                 // ICMP packet
                 0x02 => {
-                    let mut packet = arg2 as *mut u8;
-                    let mut header = packet as *mut icmp::IcmpHeader;
+                    let packet = arg2 as *mut u8;
+                    let header = packet as *mut icmp::IcmpHeader;
                     let mut icmp_buffer = [0u8; 64];
                     let mut icmp_buffer_aux = [0u8; 64];
 
@@ -969,7 +976,7 @@ pub extern "C" fn syscall_handler() {
                     let mut tcp_buffer_aux = [0u8; 1400];
 
                     //let tcp_header_len = core::mem::size_of::<tcp::TcpHeader>() as usize;
-                    let tcp_req_len = core::mem::size_of::<TcpPacketRequest>() as usize;
+                    let tcp_req_len = core::mem::size_of::<TcpPacketRequest>();
 
                     unsafe {
                         //core::ptr::copy_nonoverlapping(packet, tcp_buffer.as_mut_ptr(), tcp_req_len + (*request).length as usize);
@@ -977,7 +984,7 @@ pub extern "C" fn syscall_handler() {
 
                         let payload = tcp_buffer_aux.get( tcp_req_len..tcp_req_len + (*request).length as usize ).unwrap_or(&[]);
 
-                        let tcp_len = tcp::create_packet((*request).header.source_port, (*request).header.dest_port, (*request).header.seq_num, (*request).header.ack_num, (*request).header.data_offset_reserved_flags & 0xFF, 1024, &payload, (*request).src_ip, (*request).dst_ip, &mut tcp_buffer);
+                        let tcp_len = tcp::create_packet((*request).header.source_port, (*request).header.dest_port, (*request).header.seq_num, (*request).header.ack_num, (*request).header.data_offset_reserved_flags & 0xFF, 1024, payload, (*request).src_ip, (*request).dst_ip, &mut tcp_buffer);
                         let tcp_slice = tcp_buffer.get(0..tcp_len).unwrap_or(&[]);
 
                         let zeros = [0u8; 512];
@@ -1000,29 +1007,24 @@ pub extern "C" fn syscall_handler() {
          *  Arg2: pointer to buffer (*const u8)
          */
         0x34 => {
-            if arg2 < USERLAND_START || arg2 > USERLAND_END {
+            if !(USERLAND_START..=USERLAND_END).contains(&arg2) {
                 ret = SyscallReturnCode::InvalidInput;
-                return;
+                syscall_ret!(ret);
             }
 
-            match arg1 {
-                // IPv4 packet
-                0x01 => {
-                    let packet = arg2 as *const u8;
+            if arg1 == 0x01 {
+                let packet = arg2 as *const u8;
 
-                    let header = packet as *const ipv4::Ipv4Header;
+                let header = packet as *const ipv4::Ipv4Header;
 
-                    unsafe {
-                        let total_len = u16::from_be((*header).total_length);
-                        let slice = core::slice::from_raw_parts(packet, total_len as usize);
+                unsafe {
+                    let total_len = u16::from_be((*header).total_length);
+                    let slice = core::slice::from_raw_parts(packet, total_len as usize);
 
-                        ipv4::send_packet(slice);
-                    }
-
-                    ret = SyscallReturnCode::Okay;
+                    ipv4::send_packet(slice);
                 }
 
-                _ => {}
+                ret = SyscallReturnCode::Okay;
             }
         }
 
@@ -1039,12 +1041,7 @@ pub extern "C" fn syscall_handler() {
     }
 
     // Write the response code
-    unsafe {
-        core::arch::asm!(
-            "mov rax, {0:r}",
-            in(reg) (ret as u64),
-        );
-    }
+    syscall_ret!(ret)
 }
 
 fn format_filename(name_ptr: *const u8) -> ([u8; 8], [u8; 3]) {
@@ -1065,14 +1062,12 @@ fn format_filename(name_ptr: *const u8) -> ([u8; 8], [u8; 3]) {
             }
 
             if !saw_dot {
-                if i < 8 {
-                    name[i] = c.to_ascii_uppercase();
+                if let Some(ch) = name.get_mut(i) {
+                    *ch = c.to_ascii_uppercase();
                 }
-            } else {
-                if ext_i < 3 {
-                    ext[ext_i] = c.to_ascii_uppercase();
-                    ext_i += 1;
-                }
+            } else if let Some(ch) = ext.get_mut(ext_i) {
+                *ch = c.to_ascii_uppercase();
+                ext_i += 1;
             }
 
             i += 1;
@@ -1088,35 +1083,32 @@ fn format_filename(name_ptr: *const u8) -> ([u8; 8], [u8; 3]) {
 
 #[no_mangle]
 pub extern "C" fn syscall_80h() {
-    let code: u64;
-
     //schedule();
-    return;
 
-    unsafe {
-        core::arch::asm!(
-            "mov {0}, rax",
-            //"mov {1}, rdi",
-            //"mov {2}, rsi",
-            out(reg) code,
-            //out(reg) arg1,
-            //out(reg) arg2,
-        );
-    }
+    // unsafe {
+    //     core::arch::asm!(
+    //         "mov {0}, rax",
+    //         //"mov {1}, rdi",
+    //         //"mov {2}, rsi",
+    //         out(reg) code,
+    //         //out(reg) arg1,
+    //         //out(reg) arg2,
+    //     );
+    // }
 
-    match code {
-        0x01 => {
-            // EXIT USER MODE
-            unsafe {
-                core::arch::asm!("iretq");
-            }
-        }
-        _ => {
-            unsafe {
-                core::arch::asm!("mov rax, 0xff");
-            }
-        }
-    }
+    // match code {
+    //     0x01 => {
+    //         // EXIT USER MODE
+    //         unsafe {
+    //             core::arch::asm!("iretq");
+    //         }
+    //     }
+    //     _ => {
+    //         unsafe {
+    //             core::arch::asm!("mov rax, 0xff");
+    //         }
+    //     }
+    // }
 }
 
 #[repr(C, packed)]
@@ -1129,6 +1121,7 @@ pub struct SysInfo {
     pub system_uptime: u32,
 }
 
+#[expect(clippy::upper_case_acronyms)]
 #[repr(C, packed)]
 pub struct RTC {
     pub seconds: u8,

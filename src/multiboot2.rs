@@ -1,6 +1,6 @@
 #[repr(C, packed)]
 #[cfg(feature = "kernel_text")]
-struct Multiboot2HeaderText {
+pub struct Multiboot2HeaderText {
     magic: u32,
     architecture: u32,
     header_length: u32,
@@ -40,7 +40,7 @@ pub static MULTIBOOT2_HEADER_TEXT: Multiboot2HeaderText = {
 
 #[repr(C, packed)]
 #[cfg(feature = "kernel_graphics")]
-struct Multiboot2HeaderGraphics {
+pub struct Multiboot2HeaderGraphics {
     magic: u32,
     architecture: u32,
     header_length: u32,

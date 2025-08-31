@@ -10,21 +10,18 @@ pub fn load_level_from_file<const N: usize>(filename: &[u8; 7]) -> ([Point; N], 
 
     let floppy = Floppy::init();
 
-    match Filesystem::new(&floppy) {
-        Ok(fs) => {
-            unsafe {
-                fs.for_each_entry(PATH_CLUSTER, |entry| {
-                    if entry.name[0] == 0x00 || entry.name[0] == 0xE5 || entry.attr & 0x10 != 0 {
-                        return;
-                    }
+    if let Ok(fs) = Filesystem::new(&floppy) {
+        unsafe {
+            fs.for_each_entry(PATH_CLUSTER, |entry| {
+                if entry.name[0] == 0x00 || entry.name[0] == 0xE5 || entry.attr & 0x10 != 0 {
+                    return;
+                }
 
-                    if entry.name.starts_with(filename) && entry.ext.starts_with(b"TXT") {
-                        fs.read_file(entry.start_cluster, &mut buf);
-                    }
-                });
-            }
+                if entry.name.starts_with(filename) && entry.ext.starts_with(b"TXT") {
+                    fs.read_file(entry.start_cluster, &mut buf);
+                }
+            });
         }
-        Err(e) => {}
     }
 
     let mut i = 0;

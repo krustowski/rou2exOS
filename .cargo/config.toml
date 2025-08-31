@@ -11,8 +11,8 @@ rustflags = [
   "-C", "link-arg=-Tlinker.ld"
 ]
 
-[target.'cfg(target_os = "none")']
-runner = "bootimage runner"
-rustflags = [
-  "-C", "link-arg=-Tlinker.ld"
-]
+# [target.'cfg(target_os = "none")']
+# runner = "bootimage runner"
+# rustflags = [
+#   "-C", "link-arg=-Tlinker.ld"
+# ]

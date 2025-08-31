@@ -94,7 +94,7 @@ pub unsafe fn inb(port: u16) -> u8 {
 }*/
 
 #[unsafe(link_section = ".dma")]
-pub static mut dma: [u8; 512] = [0; 512];
+pub static mut DMA: [u8; 512] = [0; 512];
 
 //#[unsafe(link_section = ".dma")]
 //#[unsafe(no_mangle)]
@@ -135,14 +135,13 @@ impl Floppy {
 
             let count = 512;
 
-            //let addr = &dma as *const _ as usize;
-            let addr = dma.as_ptr() as u32;
+            let addr = &raw const DMA as u32;
 
             //debugn!(&dma as *const _ as usize);
             //debugln!("");
 
             let page = ((addr >> 16) & 0xFF) as u8;
-            let offset = (addr & 0xFFFF) as u16;
+            let offset = addr as u16;
 
             // Mask channel 2+0
             outb(0x0A, 0x06);
@@ -239,13 +238,13 @@ impl Floppy {
             // Read floppy IRQ status
             self.send_byte(0x08); // Sense interrupt
 
-            let st0 = self.read_byte(); // bit 7 = 1 means error
-            let st1 = self.read_byte();
-            let st2 = self.read_byte();
-            let cylinder = self.read_byte();
-            let head = self.read_byte();
-            let sector = self.read_byte();
-            let bytesize = self.read_byte(); // Sector size as N where size = 128 << N
+            let _st0 = self.read_byte(); // bit 7 = 1 means error
+            let _st1 = self.read_byte();
+            let _st2 = self.read_byte();
+            let _cylinder = self.read_byte();
+            let _head = self.read_byte();
+            let _sector = self.read_byte();
+            let _bytesize = self.read_byte(); // Sector size as N where size = 128 << N
 
             // TODO: Dump controller status, check for errors
         }
@@ -259,7 +258,7 @@ impl Floppy {
             self.set_read_mode();
 
             self.send_byte(0x46);          // Read data
-            self.send_byte((h << 2) | 0);  // drive 0, head
+            self.send_byte(h << 2);  // drive 0, head
             self.send_byte(c);             // Cylinder
             self.send_byte(h);             // Head
             self.send_byte(s);             // Sector (1-based)
@@ -276,9 +275,10 @@ impl Floppy {
             debugln!("");*/
 
             // Copy from DMA buffer to output
-            core::ptr::copy_nonoverlapping(dma.as_ptr(), buffer.as_mut_ptr(), 512);
+            core::ptr::copy_nonoverlapping(&raw const DMA, buffer.as_mut_ptr().cast(), 512);
 
-            for byte in dma.iter_mut() {
+            #[expect(static_mut_refs)]
+            for byte in DMA.iter_mut() {
                 *byte = 0;
             }
         }
@@ -334,16 +334,14 @@ impl Floppy {
         self.wait_ready();
 
         // Send SEEK command
-        unsafe {
-            self.send_byte(FDC_CMD_SEEK);
-            self.send_byte((head << 2) | (drive & 0x03)); // Head & drive combined
-            self.send_byte(cylinder);
+        self.send_byte(FDC_CMD_SEEK);
+        self.send_byte((head << 2) | (drive & 0x03)); // Head & drive combined
+        self.send_byte(cylinder);
 
-            // Wait for IRQ6
-            self.wait_for_irq();
+        // Wait for IRQ6
+        self.wait_for_irq();
 
-            // TODO: Verify the seek result (sense the interrupt)
-        }
+        // TODO: Verify the seek result (sense the interrupt)
     }
 
     fn write_sector(&self, cylinder: u8, head: u8, sector: u8, data: &[u8; 512]) {
@@ -360,7 +358,7 @@ impl Floppy {
 
             // Send command packet to FDC
             self.send_byte(CMD_WRITE_SECTOR);
-            self.send_byte((head << 2) | 0);   // Drive 0, head
+            self.send_byte(head << 2);         // Drive 0, head
             self.send_byte(cylinder);          // Cylinder number
             self.send_byte(head);              // Head
             self.send_byte(sector);            // Sector number (starts at 1)

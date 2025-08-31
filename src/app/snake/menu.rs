@@ -1,14 +1,14 @@
-use crate::{input::keyboard::{move_cursor, move_cursor_index}, vga::{self, buffer::VGA_BUFFER, screen::clear, write::{byte_raw, string}}};
+use crate::{input::keyboard::move_cursor, vga::buffer::VGA_BUFFER};
 use crate::input::keyboard::{keyboard_read_scancode};
-use crate::app::snake::{engine::run, score::{load_high_scores_fat12, save_high_scores_fat12, render_scores_window}};
+use crate::app::snake::{engine::run, score::{load_high_scores_fat12, render_scores_window}};
 
 const WIDTH: isize = 80;
-const HEIGHT: isize = 25;
+// const HEIGHT: isize = 25;
 
 const KEY_UP: u8 = 0x48;
 const KEY_DOWN: u8 = 0x50;
-const KEY_LEFT: u8 = 0x4B;
-const KEY_RIGHT: u8 = 0x4D;
+// const KEY_LEFT: u8 = 0x4B;
+// const KEY_RIGHT: u8 = 0x4D;
 
 const KEY_ESC: u8 = 0x01;
 const KEY_ENTER: u8 = 0x1C;
@@ -128,7 +128,7 @@ pub fn draw_window(x: usize, y: usize, width: usize, height: usize, title: Optio
             j += 1;
         }
 
-        write_char(start + j + 0, y, b' ', 0x0E);
+        write_char(start + j,     y, b' ', 0x0E);
         write_char(start + j + 1, y, b']', 0x0E);
     }
 }

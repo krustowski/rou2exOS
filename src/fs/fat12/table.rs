@@ -37,7 +37,7 @@ impl FatTable {
         }
         Self { data }
             }
-            Err(e) => {
+            Err(_) => {
                 Self { data: [0u8; FAT_SECTORS * BYTES_PER_SECTOR] }
             }
         }
@@ -108,7 +108,7 @@ impl FatTable {
     }
 
     pub fn next_cluster(&self, cluster: u16) -> Option<u16> {
-        if cluster < 2 || cluster >= 0xFF8 {
+        if !(2..0xFF8).contains(&cluster) {
             return None;
         }
 

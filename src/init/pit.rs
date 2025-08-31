@@ -8,12 +8,10 @@ pub fn init_pit(frequency_hz: u32) {
     //let divisor = 1_193_180 / frequency_hz;
     let divisor = 1_193_000_000 / frequency_hz;
 
-    unsafe {
-        // PIT control port
-        write(0x43, 0x36);
-        write(0x40, (divisor & 0xFF) as u8);        // low byte
-        write(0x40, ((divisor >> 8) & 0xFF) as u8); // high byte
-    }
+    // PIT control port
+    write(0x43, 0x36);
+    write(0x40, (divisor & 0xFF) as u8);        // low byte
+    write(0x40, ((divisor >> 8) & 0xFF) as u8); // high byte
 
     // Enable interrupts
     unsafe {

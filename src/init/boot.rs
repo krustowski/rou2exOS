@@ -1,9 +1,7 @@
-use crate::{debug::dump_debug_log_to_file, init::{config::{p1_fb_table, p1_fb_table_2, p2_fb_table, p3_fb_table, p4_table}, font::{draw_text_psf, parse_psf}}, mem, vga::{
-    buffer::Color, write::{newline, number, string}
-} };
+use crate::init::font::{draw_text_psf, parse_psf};
 use super::{result::InitResult};
 
-pub fn print_info(multiboot_ptr: u64, mut fb_tag: &FramebufferTag) -> InitResult {
+pub fn print_info(multiboot_ptr: u64, fb_tag: &FramebufferTag) -> InitResult {
     unsafe {
         debug!("Multiboot2 pointer: ");
         debugn!(multiboot_ptr);
@@ -192,7 +190,7 @@ pub unsafe fn parse_multiboot2_info(base_addr: usize, mut fb_tag: &FramebufferTa
             8 => {
                 debugln!("Framebuffer tag: ");
 
-                fb_tag = &*(ptr as *const FramebufferTag);
+                let fb_tag = &*(ptr as *const FramebufferTag);
 
                 debug!("Framebuffer address: ");
                 debugn!(fb_tag.addr as u64);
@@ -210,22 +208,11 @@ pub unsafe fn parse_multiboot2_info(base_addr: usize, mut fb_tag: &FramebufferTa
                 debugn!(fb_tag.pitch);
                 debugln!("");
 
-
-                use core::ptr;
-                use x86_64::registers::control::Cr3;
-
                 unsafe {
-                    if fb_tag.addr == 0xb8000 {
-                        ptr += align_up(tag.size as usize, 8);
-                        continue;
-                    }
+                    // let p4_ptr = &raw mut p4_table as *mut u64;
 
-                    rprint!("Mapping framebuffer\n");
-                    let virt_base = 0xffff_8000_0000_0000u64 + fb_tag.addr as u64;
-
-                    //crate::mem::pmm::map_framebuffer(fb_tag.addr as u64, 0xffff_8000_0000_0000 + fb_tag.addr as u64);
-                    //crate::mem::pmm::map_framebuffer(fb_tag.addr as u64, virt_base);
-                    crate::mem::pmm::map_framebuffer(0xfd00_0000, 0xffff_8000_fd00_0000);
+                    // let p4_virt = &raw const p4_table as usize;
+                    // let p4_phys = p4_virt;
 
                     let fb_ptr = 0xffff_8000_fd00_0000 as *mut u64;
 
@@ -261,7 +248,7 @@ pub unsafe fn parse_multiboot2_info(base_addr: usize, mut fb_tag: &FramebufferTa
                 debug!(acpi_tag.oemid);
                 debugln!("");
 
-                let acpi_sdt = &*(acpi_tag.rsdt_addr as *const AcpiSDTHeader);
+                // let acpi_sdt = &*(acpi_tag.rsdt_addr as *const AcpiSDTHeader);
             }
 
             _ => {

@@ -1,27 +1,27 @@
 #[repr(C)]
 pub struct Registers {
-    r15: u64,
-    r14: u64,
-    r13: u64,
-    r12: u64,
-    r11: u64,
-    r10: u64,
-    r9: u64,
-    r8: u64,
-    rdi: u64,
-    rsi: u64,
-    rbp: u64,
-    rdx: u64,
-    rcx: u64,
-    rbx: u64,
-    rax: u64,
+    pub(super) r15: u64,
+    pub(super) r14: u64,
+    pub(super) r13: u64,
+    pub(super) r12: u64,
+    pub(super) r11: u64,
+    pub(super) r10: u64,
+    pub(super) r9: u64,
+    pub(super) r8: u64,
+    pub(super) rdi: u64,
+    pub(super) rsi: u64,
+    pub(super) rbp: u64,
+    pub(super) rdx: u64,
+    pub(super) rcx: u64,
+    pub(super) rbx: u64,
+    pub(super) rax: u64,
 
     // iretq stack frame
-    rip: u64,
-    cs: u64,
-    rflags: u64,
-    rsp: u64,
-    ss: u64,
+    pub(super) rip: u64,
+    pub(super) cs: u64,
+    pub(super) rflags: u64,
+    pub(super) rsp: u64,
+    pub(super) ss: u64,
 }
 
 pub struct Process {
@@ -36,6 +36,7 @@ static mut CURRENT_PID: usize = 0;
 
 pub fn schedule() {
     unsafe {
+        #[expect(static_mut_refs)]
         let next_pid = (CURRENT_PID + 1) % PROCESSES.len();
 
         if let Some(next_proc) = &mut PROCESSES[next_pid] {
@@ -50,7 +51,7 @@ extern "C" {
 }
 
 fn create_process(entry_point: u64, process_stack_top: u64) -> Process {
-    let mut p = Process {
+    Process {
         regs: Registers {
             r15: 0, r14: 0, r13: 0, r12: 0,
             r11: 0, r10: 0, r9: 0, r8: 0,
@@ -63,7 +64,6 @@ fn create_process(entry_point: u64, process_stack_top: u64) -> Process {
             ss: 0x23,          // user stack segment selector
         },
         kernel_stack: [0; 4096],
-    };
-    p
+    }
 }
 

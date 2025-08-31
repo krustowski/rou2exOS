@@ -26,7 +26,7 @@ pub fn init_video(fb: &crate::init::boot::FramebufferTag) {
 
 pub fn get_video_mode() -> Option<VideoMode> {
     unsafe {
-        return VIDEO_MODE;
+        VIDEO_MODE
     }
 }
 

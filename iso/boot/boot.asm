@@ -19,6 +19,9 @@ p3_table:
 p2_table:           
 	resb 4096
 
+p3_fb_table:           
+	resb 4096
+
 align 16
 ist1_stack:
     resb 4096
@@ -47,7 +50,7 @@ section .text
 align 4
 
 extern kernel_main
-global _start
+global start
 
 global multiboot_magic
 global multiboot_ptr
@@ -69,7 +72,7 @@ global debug_flag
 debug_flag:
     db 0    ; 1 = enabled
 
-_start:
+start:
     mov [multiboot_magic], eax
     mov [multiboot_ptr], ebx
 
@@ -212,6 +215,11 @@ set_up_page_tables:
     mov [p4_table + 0 * 8], eax
     mov dword [p4_table + 0 * 8 + 4], 0
 
+    mov eax, p3_fb_table
+    or eax, 0b111
+    mov [p4_table + 1 * 8], eax
+    mov dword [p4_table + 1 * 8 + 4], 0
+
     ; Map P3[0] → P2
     mov eax, p2_table
     or eax, 0b111
@@ -222,14 +230,15 @@ set_up_page_tables:
 
     xor ecx, ecx
 .map_1gib:
-    mov eax, 0x200000
+    mov eax, 0x40000000
+    ;mov eax, 0x200000
     mul ecx
     or eax, 0b10000011        
-    mov [p2_table + ecx * 8], eax
-    mov dword [p2_table + ecx * 8 + 4], 0
+    mov [p3_table + ecx * 8], eax
+    mov dword [p3_table + ecx * 8 + 4], 0
 
     inc ecx
-    cmp ecx, 1
+    cmp ecx, 4
     jne .map_1gib
 
     ; Allow CPL=3 access at 0x600_000--0x800_000

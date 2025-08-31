@@ -11,13 +11,12 @@ pub struct Pipe {
 
 impl Pipe {
     pub fn new(id: u64) -> Self {
-        let pipe = Pipe{
+        Pipe{
             buffer: [0u8; MAX_BUFFER_SIZE],
             id,
             read_pos: 0,
             write_pos: 0,
-        };
-        pipe
+        }
     }
 
     pub fn read(&mut self) -> u8 {

@@ -1,5 +1,3 @@
-use x86_64::registers::debug;
-
 use crate::abi::idt::{install_isrs, load_idt};
 
 pub fn get_result() -> super::result::InitResult {
@@ -13,8 +11,8 @@ pub fn get_result() -> super::result::InitResult {
     init_tss();
 
     debugln!("Resetting TSS");
-    let base_addr = unsafe { &tss64 as *const Tss64 as u64 };
-    setup_tss_descriptor(base_addr as u64, 0x67);
+    let base_addr = &raw const tss64 as u64;
+    setup_tss_descriptor(base_addr, 0x67);
 
     debugln!("Reloading GDT");
     reload_gdt();
@@ -43,8 +41,8 @@ fn reload_gdt() {
     unsafe {
         // Prepare GDTR
         let gdtr = DescriptorTablePointer {
-            limit: (&gdt_end as *const _ as usize - &gdt_start as *const _ as usize - 1) as u16,
-            base: &gdt_start as *const _ as u64,
+            limit: (&raw const gdt_end as usize - &raw const gdt_start as usize - 1) as u16,
+            base: &raw const gdt_start as u64,
         };
 
         // Load new GDT
@@ -68,6 +66,7 @@ fn load_tss(tss_selector: u16) {
 
 fn setup_tss_descriptor(base: u64, limit: u32) {
     let desc = make_tss_descriptor(base, limit);
+    #[expect(static_mut_refs)]
     unsafe {
         gdt_tss_descriptor.copy_from_slice(&desc);
     }
@@ -133,7 +132,7 @@ struct Tss64 {
 fn init_tss() {
     unsafe {
         // Zero out the whole TSS first (probably redundant if in .bss)
-        core::ptr::write_bytes(&mut tss64 as *mut _ as *mut u8, 0, core::mem::size_of::<Tss64>());
+        core::ptr::write_bytes(&raw mut tss64 as *mut u8, 0, core::mem::size_of::<Tss64>());
 
         // Set kernel stack (top) pointer for ring 0 (rsp0)
         tss64.rsp0 = 0x190000;

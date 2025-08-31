@@ -76,6 +76,7 @@ const TEMP_PID: usize = 123;
 
 pub fn pipe_subscribe(addr: u64) -> isize {
     unsafe {
+        #[expect(static_mut_refs)]
         for s in RECEPTORS.iter_mut() {
             if s.pid == 0 {
                 s.pid = TEMP_PID;
@@ -90,8 +91,9 @@ pub fn pipe_subscribe(addr: u64) -> isize {
     -1 // busy
 }
 
-pub fn pipe_unsubscribe(addr: u64) -> isize {
+pub fn pipe_unsubscribe(_addr: u64) -> isize {
     unsafe {
+        #[expect(static_mut_refs)]
         for s in RECEPTORS.iter_mut() {
             if s.pid == TEMP_PID {
                 s.pid = 0;

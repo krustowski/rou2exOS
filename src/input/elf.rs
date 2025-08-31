@@ -1,4 +1,4 @@
-use core::{ptr::{copy_nonoverlapping, write_bytes}, u64};
+use core::ptr::{copy_nonoverlapping, write_bytes};
 
 use crate::input::keyboard::keyboard_loop;
 
@@ -88,17 +88,18 @@ pub type ElfEntry = extern "C" fn() -> u64;
 
 #[no_mangle]
 #[link_section = ".data"]
-pub static mut saved_kernel_rsp: u64 = 0;
+pub static mut SAVED_KERNEL_RSP: u64 = 0;
 
+#[expect(clippy::fn_to_numeric_cast)]
 #[no_mangle]
-pub unsafe extern "C" fn jump_to_elf(entry: ElfEntry, stack_top: u64, arg: u64) -> () {
+pub unsafe extern "C" fn jump_to_elf(entry: ElfEntry, stack_top: u64, arg: u64) {
     extern "C" {
         fn kernel_return();
     }
 
     let kernel_rsp: u64;
     core::arch::asm!("mov {}, rsp", out(reg) kernel_rsp);
-    saved_kernel_rsp = kernel_rsp;
+    SAVED_KERNEL_RSP = kernel_rsp;
 
     // Trampoline
     let user_stack = (stack_top - 8) as *mut u64;
@@ -144,8 +145,8 @@ pub unsafe extern "C" fn kernel_return(result: u64) -> ! {
 
 #[no_mangle]
 pub unsafe extern "C" fn call_elf(entry: ElfEntry, stack_top: u64, arg: u64) -> u64 {
-    let kernel_stack: u64;
-    let kernel_stack_pointer: u64;
+    let _kernel_stack: u64;
+    let _kernel_stack_pointer: u64;
     let result: u64;
 
     core::arch::asm!(
@@ -156,8 +157,8 @@ pub unsafe extern "C" fn call_elf(entry: ElfEntry, stack_top: u64, arg: u64) -> 
         "call {entry}",
         "mov rbp, {kernel_stack_pointer}",
         "mov rsp, {kernel_stack}",
-        kernel_stack = lateout(reg) kernel_stack,
-        kernel_stack_pointer = lateout(reg) kernel_stack_pointer,
+        kernel_stack = lateout(reg) _kernel_stack,
+        kernel_stack_pointer = lateout(reg) _kernel_stack_pointer,
         stack = in(reg) stack_top,
         entry = in(reg) entry,
         in("rdi") arg,

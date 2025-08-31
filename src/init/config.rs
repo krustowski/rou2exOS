@@ -17,7 +17,7 @@ pub fn set_path(new_path: &[u8]) {
 
 pub fn get_path() -> &'static [u8] {
     unsafe {
-        core::slice::from_raw_parts(PATH_BUF.as_ptr(), PATH_LEN)
+        core::slice::from_raw_parts((&raw const PATH_BUF).cast(), PATH_LEN)
     }
 }
 

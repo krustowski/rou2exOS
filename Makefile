@@ -46,6 +46,14 @@ build_floppy:
 		fat.img
 	@echo "Hello from floppy!" > /tmp/hello.txt
 	@mcopy -i fat.img /tmp/hello.txt ::HELLO.TXT 
+	@mcopy -i fat.img ./hello.elf ::HELLO.ELF 
+	@mcopy -i fat.img ./print.bin ::PRINT.BIN
+	@mcopy -i fat.img ./print.elf ::PRINT.ELF
+	@mcopy -i fat.img ./go.elf ::GO.ELF
+	@mcopy -i fat.img ./sh.elf ::SH.ELF
+	@mcopy -i fat.img ./icmpresp.elf ::ICMPRESP.ELF
+	@mcopy -i fat.img ./garn.elf ::GARN.ELF
+
 
 #
 #  RUN
@@ -111,6 +119,8 @@ run_iso_floppy_drive:
 
 run_iso_debug: 
 	@qemu-system-x86_64 \
+		-s \
+		-S \
 		-boot d \
 		-m 4G \
 		-cdrom r2.iso \

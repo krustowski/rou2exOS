@@ -6,8 +6,8 @@
 BITS 32
 
 section .bss
-align 4096
 
+align 4096
 ;global dma
 ;dma:
 ;	resb 4096
@@ -229,16 +229,27 @@ set_up_page_tables:
     ; Identity map 1 GiB (512 runs) using huge pages
 
     xor ecx, ecx
+.map_2mib:
+    mov eax, 0x200000
+    mul ecx
+    or eax, 0b10000011        
+    mov [p2_table + ecx * 8], eax
+    mov dword [p2_table + ecx * 8 + 4], 0
+
+    inc ecx
+    cmp ecx, 512
+    jne .map_2mib
+
+    mov ecx, 1
 .map_1gib:
     mov eax, 0x40000000
-    ;mov eax, 0x200000
     mul ecx
     or eax, 0b10000011        
     mov [p3_table + ecx * 8], eax
     mov dword [p3_table + ecx * 8 + 4], 0
 
     inc ecx
-    cmp ecx, 4
+    cmp ecx, 3
     jne .map_1gib
 
     ; Allow CPL=3 access at 0x600_000--0x800_000

@@ -1,4 +1,4 @@
-use x86_64::{instructions::tables::lidt, registers::control::Cr2, structures::{idt::{InterruptDescriptorTable, InterruptStackFrame, PageFaultErrorCode}, DescriptorTablePointer}};
+use x86_64::{registers::control::Cr2, structures::idt::{InterruptDescriptorTable, InterruptStackFrame, PageFaultErrorCode}};
 
 use crate::{abi::syscall::{syscall_80h, syscall_handler}, input::keyboard::keyboard_loop};
 
@@ -127,14 +127,14 @@ extern "x86-interrupt" fn floppy_drive_handler(_stack: InterruptStackFrame) {
 #[expect(static_mut_refs)]
 /// https://phrack.org/issues/59/4
 pub fn install_isrs() {
-    unsafe { IDT.invalid_opcode.set_handler_fn(invalid_opcode_handler).set_privilege_level(x86_64::PrivilegeLevel::Ring3) };
-    unsafe { IDT.double_fault.set_handler_fn(double_fault_handler).set_privilege_level(x86_64::PrivilegeLevel::Ring3) };
-    unsafe { IDT.general_protection_fault.set_handler_fn(general_protection_fault_handler).set_privilege_level(x86_64::PrivilegeLevel::Ring3) };
-    unsafe { IDT.page_fault.set_handler_fn(page_fault_handler).set_privilege_level(x86_64::PrivilegeLevel::Ring3) };
+    unsafe { IDT.invalid_opcode.set_handler_fn(invalid_opcode_handler) };
+    unsafe { IDT.double_fault.set_handler_fn(double_fault_handler) };
+    unsafe { IDT.general_protection_fault.set_handler_fn(general_protection_fault_handler) };
+    unsafe { IDT.page_fault.set_handler_fn(page_fault_handler) };
 
-    unsafe { IDT[0x20].set_handler_fn(timer_handler).set_privilege_level(x86_64::PrivilegeLevel::Ring3) };
-    unsafe { IDT[0x21].set_handler_fn(keyboard_handler).set_privilege_level(x86_64::PrivilegeLevel::Ring3) };
-    unsafe { IDT[0x26].set_handler_fn(floppy_drive_handler).set_privilege_level(x86_64::PrivilegeLevel::Ring3) };
+    unsafe { IDT[0x20].set_handler_fn(timer_handler) };
+    unsafe { IDT[0x21].set_handler_fn(keyboard_handler) };
+    unsafe { IDT[0x26].set_handler_fn(floppy_drive_handler) };
     unsafe { IDT[0x7f].set_handler_fn(syscall_handler).set_privilege_level(x86_64::PrivilegeLevel::Ring3) };
-    unsafe { IDT[0x80].set_handler_fn(syscall_80h).set_privilege_level(x86_64::PrivilegeLevel::Ring3) };
+    unsafe { IDT[0x80].set_handler_fn(syscall_80h) };
 }

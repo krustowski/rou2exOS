@@ -15,15 +15,15 @@ use spin::Mutex;
 const BUFFER_SIZE: usize = 1024;
 
 static INIT_BUFFER: Mutex<Buffer> = Mutex::new(Buffer::new());
-static mut FRAMEBUFFER: Option<boot::FramebufferTag> = None;
+//static mut FRAMEBUFFER: Option<boot::FramebufferTag> = None;
 
 pub fn init(multiboot_ptr: u64) {
     debugln!("Kernel init start");
 
-    let framebuffer_tag: boot::FramebufferTag = boot::FramebufferTag{
+    /*let framebuffer_tag: boot::FramebufferTag = boot::FramebufferTag{
         ..Default::default()
     };
-
+	*/
     result::print_result(
         "Load kernel", 
         result::InitResult::Passed,
@@ -44,17 +44,17 @@ pub fn init(multiboot_ptr: u64) {
         heap::print_result(),
     );
 
-    result::print_result(
+    /*result::print_result(
         "Read Multiboot2 tags", 
         boot::print_info(multiboot_ptr, &framebuffer_tag),
-    );
+    ); */
 
-    let video_result = video::print_result(&framebuffer_tag);
+    //let video_result = video::print_result(&framebuffer_tag);
 
-    result::print_result(
+    /*result::print_result(
         "Initialize video", 
         video_result,
-    );
+    ); */
 
     result::print_result(
         "Start PIC timer", 
@@ -67,10 +67,10 @@ pub fn init(multiboot_ptr: u64) {
     );
 
     // TODO: Fallback to floppy to dump debug logs + init buffer
-    if video_result == result::InitResult::Passed {
+    /*if video_result == result::InitResult::Passed {
         INIT_BUFFER.lock().flush();
     }
-
+	*/
     color::color_demo();
     ascii::ascii_art();
 

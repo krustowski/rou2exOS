@@ -36,7 +36,7 @@ pub extern "C" fn kernel_main(_multiboot2_magic: u32, multiboot_ptr: u32) {
     video::vga::init_writer();
 
     // Run init checks
-    init::init(multiboot_ptr as *mut usize, multiboot2_magic as u32);
+    //init::init(multiboot_ptr as *mut usize, multiboot2_magic as u32);
 
 	//commented out for now
 

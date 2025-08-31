@@ -5,7 +5,7 @@ use spin::Mutex;
 const BUFFER_SIZE: usize = 1024;
 
 static INIT_BUFFER: Mutex<Buffer> = Mutex::new(Buffer::new());
-static mut FRAMEBUFFER: Option<multiboot2::m2_tags::FramebufferTag> = None;
+static mut FRAMEBUFFER: Option<multiboot2::tags::FramebufferTag> = None;
 
 pub fn init(m2_ptr: *mut usize, m2_magic: u32) {
 	unsafe {

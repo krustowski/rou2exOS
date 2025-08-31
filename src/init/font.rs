@@ -1,4 +1,4 @@
-gipub fn draw_char(c: u8, x: usize, y: usize, fb: *mut u64, pitch: usize, fg: u32, font: &[u8]) {
+pub fn draw_char(c: u8, x: usize, y: usize, fb: *mut u64, pitch: usize, fg: u32, font: &[u8]) {
     let char_size = font[3] as usize;
     //let glyph = &font[4 + (c as usize * char_size)..];
 
@@ -11,7 +11,7 @@ gipub fn draw_char(c: u8, x: usize, y: usize, fb: *mut u64, pitch: usize, fg: u3
                     let offset = py * pitch + px * 4;
                     unsafe {
                         let pixel_ptr = fb.add(offset);
-                        *pixel_ptr = fg;
+                        //*pixel_ptr = fg;
                         let pixel_ptr = fb.add(offset) as *mut u64;
                         *pixel_ptr = fg as u64;
                     }

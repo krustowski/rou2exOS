@@ -24,21 +24,16 @@ mod time;
 mod tui;
 mod vga;
 
+
 /// Kernel entrypoint
 #[unsafe(no_mangle)]
-pub extern "C" fn kernel_main(_multiboot2_magic: u32, multiboot_ptr: u32) { 
+pub extern "C" fn kernel_main(multiboot2_magic: u32, multiboot_ptr: u32) { 
     debugln!("Kernel loaded");
 
-    // VGA buffer position (LEGACY)
-    clear_screen!();
+    // make it so this init function initializes everything so noo init messes
+    init::check::init(multiboot_ptr as *mut usize, multiboot2_magic as u32);
+	//this is so stupid OMG
 
-    // TODO: REmove: Instantiate new VGA Writer
-    video::vga::init_writer();
-
-    // Run init checks
-    //init::init(multiboot_ptr as *mut usize, multiboot2_magic as u32);
-
-	//commented out for now
 
     // Run the shell loop
     debugln!("Starting shell...");

@@ -74,7 +74,7 @@ pub unsafe fn io_wait() {
     write(0x80, 0);
 }
 
-pub fn get_result() -> super::result::InitResult {
+pub fn get_result() -> super::result::InitResult { //why??? why do this why not just ret value or something??
     debugln!("Remapping PIC");
     unsafe { remap_pic(); }
 

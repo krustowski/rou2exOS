@@ -1,0 +1,22 @@
+temp stash of comments or code 
+
+    // TODO: Fallback to floppy to dump debug logs + init buffer
+    /*if video_result == result::InitResult::Passed {
+        INIT_BUFFER.lock().flush();
+    } */
+	/* 
+    color::color_demo();
+    ascii::ascii_art();
+	*/
+	/*commented out cuz EAR PAINN
+    // Play startup melody
+    crate::audio::midi::play_melody();
+    crate::audio::fs::play_midi_file();
+    let freqs = [440, 880, 660, 550];
+    for f in freqs {
+        crate::audio::beep::stop_beep();
+        crate::audio::beep::beep(f);
+        crate::audio::midi::wait_millis(300);
+    }
+    crate::audio::beep::stop_beep();
+	*/

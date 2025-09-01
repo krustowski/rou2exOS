@@ -49,7 +49,7 @@ macro_rules! printb {
     };
 }
 
-/// Special macro to print u64 numbers as a slice of u8 bytes.
+/// Special macro to print u64 numbers as a slice of u8 bytes. why?
 #[macro_export]
 macro_rules! printn {
     ($arg:expr) => {
@@ -109,5 +109,86 @@ macro_rules! print {
             writer.write_str_raw($arg);
         }
     });
+}
+
+
+#[derive(PartialEq, Copy, Clone)]
+pub enum InitResult {
+    Unknown,
+    Passed,
+    Failed,
+    Skipped,
+}
+
+impl InitResult {
+    pub fn format(&self) -> (&[u8; 6], Color) {
+        match self {
+            InitResult::Unknown => 
+                (b"UNKNWN", Color::Cyan),
+            InitResult::Passed => 
+                (b"  OK  ", Color::Green),
+            InitResult::Failed => 
+                (b" FAIL ", Color::Red),
+            InitResult::Skipped => 
+                (b" SKIP ", Color::Yellow),
+        }
+    }
+}
+
+const MAX_MSG_LEN: usize = 60;
+
+pub fn print_result(message: &'static str, result: InitResult) {
+    let mut buf = Buffer::new();
+    
+    buf.append(message.as_bytes());
+
+    for _ in 0..MAX_MSG_LEN - message.len() {
+        buf.append(b".");
+    }
+
+    buf.append(b" [");
+    buf.append(result.format().0);
+    buf.append(b"]\n");
+
+    if let Some(slice) = buf.buf.get(..buf.pos) {
+        //
+        INIT_BUFFER.lock().append(slice);
+    }
+}
+
+struct Buffer {
+    buf: [u8; 1024],
+    pos: usize,
+}
+
+impl Buffer {
+    /// Creates and returns a new instance of Buffer. why multiple instances??
+    const fn new() -> Self {
+        Self {
+            buf: [0u8; BUFFER_SIZE],
+            pos: 0,
+        }
+    }
+
+    /// Adds given byte slice to the buffer at offset of self.pos.
+    fn append(&mut self, s: &[u8]) {
+        // Take the input length, or the offset
+        let len = s.len().min(self.buf.len() - self.pos);
+
+        if let Some(buf) = self.buf.get_mut(self.pos..self.pos + len) {
+            if let Some(slice) = s.get(..len) {
+                // Copy the slice into buffer at offset of self.pos
+                buf.copy_from_slice(slice);
+                self.pos += len;
+            }
+        }
+    }
+
+    /// Puts the contents of buf into the printb! macro.
+    fn flush(&self) {
+        if let Some(buf) = self.buf.get(..self.pos) {
+            printb!(buf);
+        }
+    }
 }
 

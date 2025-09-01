@@ -1,3 +1,5 @@
+use core::arch::naked_asm;
+
 use x86_64::structures::idt::InterruptStackFrame;
 
 use crate::{
@@ -11,8 +13,9 @@ use crate::{
 const USERLAND_START: u64 = 0x600_000;
 const USERLAND_END: u64 = 0x800_000;
 
+#[repr(u64)]
 enum SyscallReturnCode {
-    Okay = 0x00,
+    Ok = 0x00,
     NotImplemented = 0xfb,
     InvalidInput = 0xfc,
     FilesystemError = 0xfd,
@@ -20,37 +23,19 @@ enum SyscallReturnCode {
     InvalidSyscall = 0xff,
 }
 
-macro_rules! syscall_ret {
-    ($ret:expr) => {
-        #[allow(unused_unsafe)]
-        unsafe {
-            core::arch::asm!(
-                "mov rax, {:r}",
-                in(reg) ($ret as u64)
-            );
-            return;
-        }
-    }
-}
-
-// TODO: make this return values properly?
 /// This function is the syscall ABI dispatching routine. It is called exclusively from the ISR 
 /// for interrupt 0x7f. 
-pub extern "x86-interrupt" fn syscall_handler(_stack: InterruptStackFrame) {
-    let (syscall_no, arg1, arg2): (u64, u64, u64);
-    let mut ret: SyscallReturnCode = SyscallReturnCode::Okay;
+#[unsafe(naked)]
+pub extern "x86-interrupt" fn syscall_handler(_: InterruptStackFrame) {
+    naked_asm!(
+        "mov rcx, rax",
+        "call {syscall}",
+        "iret",
+        syscall = sym syscall_inner,
+    )
+}
 
-    unsafe {
-        core::arch::asm!(
-            "mov {0}, rax",
-            "mov {1}, rdi",
-            "mov {2}, rsi",
-            out(reg) syscall_no,
-            out(reg) arg1,
-            out(reg) arg2,
-        );
-    }
-
+extern "C" fn syscall_inner(arg1: u64, arg2: u64, syscall_no: u64) -> SyscallReturnCode {
     debug!("syscall_handler: called: ");
     debugn!(syscall_no);
     debug!(", arg1: ");
@@ -99,8 +84,7 @@ pub extern "x86-interrupt" fn syscall_handler(_stack: InterruptStackFrame) {
          */
         0x01 => {
             if !(USERLAND_START..=USERLAND_END).contains(&arg2) {
-                ret = SyscallReturnCode::InvalidInput;
-                syscall_ret!(ret);
+                return SyscallReturnCode::InvalidInput;
             }
 
             let sysinfo_ptr = arg2 as *mut SysInfo;
@@ -135,8 +119,6 @@ pub extern "x86-interrupt" fn syscall_handler(_stack: InterruptStackFrame) {
                 }
                 _ => {}
             }
-
-            ret = SyscallReturnCode::Okay;
         }
 
         /*
@@ -147,8 +129,7 @@ pub extern "x86-interrupt" fn syscall_handler(_stack: InterruptStackFrame) {
          */
         0x02 => {
             if !(USERLAND_START..=USERLAND_END).contains(&arg2) {
-                ret = SyscallReturnCode::InvalidInput;
-                syscall_ret!(ret);
+                return SyscallReturnCode::InvalidInput;
             }
 
             if arg1 == 0x01 {
@@ -157,8 +138,6 @@ pub extern "x86-interrupt" fn syscall_handler(_stack: InterruptStackFrame) {
                 unsafe {
                     ( (*rtc_data).year, (*rtc_data).month, (*rtc_data).day, (*rtc_data).hours, (*rtc_data).minutes, (*rtc_data).seconds) = rtc::read_rtc_full();
                 }
-
-                ret = SyscallReturnCode::Okay;
             }
         }
 
@@ -170,8 +149,7 @@ pub extern "x86-interrupt" fn syscall_handler(_stack: InterruptStackFrame) {
          */
         0x03 => {
             if !(USERLAND_START..=USERLAND_END).contains(&arg2) {
-                ret = SyscallReturnCode::InvalidInput;
-                syscall_ret!(ret);
+                return SyscallReturnCode::InvalidInput;
             }
 
             match arg1 {
@@ -206,8 +184,6 @@ pub extern "x86-interrupt" fn syscall_handler(_stack: InterruptStackFrame) {
 
                 _ => {}
             }
-
-            ret = SyscallReturnCode::Okay;
         }
 
         /*
@@ -218,12 +194,11 @@ pub extern "x86-interrupt" fn syscall_handler(_stack: InterruptStackFrame) {
          */
         0x0a => {
             if !(USERLAND_START..=USERLAND_END).contains(&arg1) {
-                ret = SyscallReturnCode::InvalidInput;
-                syscall_ret!(ret);
+                return SyscallReturnCode::InvalidInput;
             }
 
             // TODO
-            ret = SyscallReturnCode::NotImplemented;
+            return SyscallReturnCode::NotImplemented;
         }
 
         /*
@@ -234,8 +209,7 @@ pub extern "x86-interrupt" fn syscall_handler(_stack: InterruptStackFrame) {
          */
         0x10 => {
             if !(USERLAND_START..=USERLAND_END).contains(&arg1) {
-                ret = SyscallReturnCode::InvalidInput;
-                syscall_ret!(ret);
+                return SyscallReturnCode::InvalidInput;
             }
 
             let ptr = arg1 as *const u8;
@@ -249,8 +223,6 @@ pub extern "x86-interrupt" fn syscall_handler(_stack: InterruptStackFrame) {
 
                 printb!(&[b]);
             }
-
-            ret = SyscallReturnCode::Okay;
         }
 
         /*
@@ -261,13 +233,10 @@ pub extern "x86-interrupt" fn syscall_handler(_stack: InterruptStackFrame) {
          */
         0x11 => {
             if arg1 != 0x00 || arg2 != 0x00 {
-                ret = SyscallReturnCode::InvalidInput;
-                syscall_ret!(ret);
+                return SyscallReturnCode::InvalidInput;
             }
 
             clear_screen!();
-
-            ret = SyscallReturnCode::Okay;
         }
 
         /*
@@ -278,8 +247,7 @@ pub extern "x86-interrupt" fn syscall_handler(_stack: InterruptStackFrame) {
          */
         0x1a => {
             if !(20..=20_000).contains(&arg1) {
-                ret = SyscallReturnCode::InvalidInput;
-                syscall_ret!(ret);
+                return SyscallReturnCode::InvalidInput;
             }
 
             crate::audio::beep::beep(arg1 as u32);
@@ -295,8 +263,7 @@ pub extern "x86-interrupt" fn syscall_handler(_stack: InterruptStackFrame) {
          */
         0x1b => {
             if !(USERLAND_START..=USERLAND_END).contains(&arg2) {
-                ret = SyscallReturnCode::InvalidInput;
-                syscall_ret!(ret);
+                return SyscallReturnCode::InvalidInput;
             }
 
             let name_ptr = arg1 as *const u8;
@@ -333,22 +300,19 @@ pub extern "x86-interrupt" fn syscall_handler(_stack: InterruptStackFrame) {
                     }
 
                     if !file_found {
-                        ret = SyscallReturnCode::FileNotFound;
-                        syscall_ret!(ret)
+                        return SyscallReturnCode::FileNotFound;
                     }
 
                     if let Some(midi) = crate::audio::midi::parse_midi_format0(&buf) {
                         crate::audio::midi::play_midi(&midi);
                         crate::audio::beep::stop_beep();
-
-                        ret = SyscallReturnCode::Okay;
                     } else {
-                        ret = SyscallReturnCode::FilesystemError;
+                        return SyscallReturnCode::FilesystemError;
                     }
                 }
 
                 _ => {
-                    ret = SyscallReturnCode::InvalidInput;
+                    return SyscallReturnCode::InvalidInput;
                 }
             }
         }
@@ -361,13 +325,10 @@ pub extern "x86-interrupt" fn syscall_handler(_stack: InterruptStackFrame) {
          */
         0x1f => {
             if arg1 != 0x00 || arg2 != 0x00 {
-                ret = SyscallReturnCode::InvalidInput;
-                syscall_ret!(ret);
+                return SyscallReturnCode::InvalidInput;
             }
 
             crate::audio::beep::stop_beep();
-
-            ret = SyscallReturnCode::Okay;
         }
 
         /*
@@ -378,8 +339,7 @@ pub extern "x86-interrupt" fn syscall_handler(_stack: InterruptStackFrame) {
          */
         0x20 => {
             if !(USERLAND_START..=USERLAND_END).contains(&arg1) || !(USERLAND_START..=USERLAND_END).contains(&arg2) {
-                ret = SyscallReturnCode::InvalidInput;
-                syscall_ret!(ret);
+                return SyscallReturnCode::InvalidInput;
             }
 
             let name_ptr = arg1 as *const u8;
@@ -409,16 +369,16 @@ pub extern "x86-interrupt" fn syscall_handler(_stack: InterruptStackFrame) {
                     });
 
                     if !file_read {
-                        ret = SyscallReturnCode::FileNotFound;
+                        return SyscallReturnCode::FileNotFound;
                     } else {
-                        ret = SyscallReturnCode::Okay;
+                        return SyscallReturnCode::Ok;
                     }
                 }
                 Err(e) => {
                     rprint!(e);
                     rprint!("\n");
 
-                    ret = SyscallReturnCode::FilesystemError;
+                    return SyscallReturnCode::FilesystemError;
                 }
             }
         }
@@ -431,8 +391,7 @@ pub extern "x86-interrupt" fn syscall_handler(_stack: InterruptStackFrame) {
          */
         0x21 => {
             if !(USERLAND_START..=USERLAND_END).contains(&arg1) || !(USERLAND_START..=USERLAND_END).contains(&arg2) {
-                ret = SyscallReturnCode::InvalidInput;
-                syscall_ret!(ret);
+                return SyscallReturnCode::InvalidInput;
             }
 
             let name_ptr = arg1 as *const u8;
@@ -451,14 +410,12 @@ pub extern "x86-interrupt" fn syscall_handler(_stack: InterruptStackFrame) {
                     unsafe {
                         fs.write_file(0, &filename, &*buf_ptr);
                     }
-
-                    ret = SyscallReturnCode::Okay;
                 }
                 Err(e) => {
                     rprint!(e);
                     rprint!("\n");
 
-                    ret = SyscallReturnCode::FilesystemError;
+                    return SyscallReturnCode::FilesystemError;
                 }
             }
 
@@ -472,8 +429,7 @@ pub extern "x86-interrupt" fn syscall_handler(_stack: InterruptStackFrame) {
          */
         0x22 => {
             if !(USERLAND_START..=USERLAND_END).contains(&arg1) || !(USERLAND_START..=USERLAND_END).contains(&arg2) {
-                ret = SyscallReturnCode::InvalidInput;
-                syscall_ret!(ret);
+                return SyscallReturnCode::InvalidInput;
             }
 
             let (name_old, ext_old) = format_filename(arg1 as *const u8);
@@ -507,16 +463,14 @@ pub extern "x86-interrupt" fn syscall_handler(_stack: InterruptStackFrame) {
                     });
 
                     if !file_found {
-                        ret = SyscallReturnCode::FileNotFound;
-                    } else {
-                        ret = SyscallReturnCode::Okay;
+                        return SyscallReturnCode::FileNotFound;
                     }
                 }
                 Err(e) => {
                     rprint!(e);
                     rprint!("\n");
 
-                    ret = SyscallReturnCode::FilesystemError;
+                    return SyscallReturnCode::FilesystemError;
                 }
             }
         }
@@ -529,8 +483,7 @@ pub extern "x86-interrupt" fn syscall_handler(_stack: InterruptStackFrame) {
          */
         0x23 => {
             if !(USERLAND_START..=USERLAND_END).contains(&arg1) || arg2 != 0 {
-                ret = SyscallReturnCode::InvalidInput;
-                syscall_ret!(ret);
+                return SyscallReturnCode::InvalidInput;
             }
 
             let (name, ext) = format_filename(arg1 as *const u8);
@@ -559,16 +512,14 @@ pub extern "x86-interrupt" fn syscall_handler(_stack: InterruptStackFrame) {
                     });
 
                     if !file_found {
-                        ret = SyscallReturnCode::FileNotFound;
-                    } else {
-                        ret = SyscallReturnCode::Okay;
+                        return SyscallReturnCode::FileNotFound;
                     }
                 }
                 Err(e) => {
                     rprint!(e);
                     rprint!("\n");
 
-                    ret = SyscallReturnCode::FilesystemError;
+                    return SyscallReturnCode::FilesystemError;
                 }
             }
         }
@@ -581,7 +532,7 @@ pub extern "x86-interrupt" fn syscall_handler(_stack: InterruptStackFrame) {
          */
         0x24 => {
             // TODO
-            ret = SyscallReturnCode::NotImplemented;
+            return SyscallReturnCode::NotImplemented;
         }
 
         /*
@@ -592,7 +543,7 @@ pub extern "x86-interrupt" fn syscall_handler(_stack: InterruptStackFrame) {
          */
         0x25 => {
             // TODO
-            ret = SyscallReturnCode::NotImplemented;
+            return SyscallReturnCode::NotImplemented;
         }
 
         /*
@@ -603,7 +554,7 @@ pub extern "x86-interrupt" fn syscall_handler(_stack: InterruptStackFrame) {
          */
         0x26 => {
             // TODO
-            ret = SyscallReturnCode::NotImplemented;
+            return SyscallReturnCode::NotImplemented;
         }
 
         /*
@@ -614,8 +565,7 @@ pub extern "x86-interrupt" fn syscall_handler(_stack: InterruptStackFrame) {
          */
         0x27 => {
             if !(USERLAND_START..=USERLAND_END).contains(&arg2) {
-                ret = SyscallReturnCode::InvalidInput;
-                syscall_ret!(ret);
+                return SyscallReturnCode::InvalidInput;
             }
 
             let name_ptr = arg2 as *const u8;
@@ -631,14 +581,12 @@ pub extern "x86-interrupt" fn syscall_handler(_stack: InterruptStackFrame) {
             match Filesystem::new(&floppy) {
                 Ok(fs) => {
                     fs.create_subdirectory(&filename, arg1 as u16);
-
-                    ret = SyscallReturnCode::Okay;
                 }
                 Err(e) => {
                     rprint!(e);
                     rprint!("\n");
 
-                    ret = SyscallReturnCode::FilesystemError;
+                    return SyscallReturnCode::FilesystemError;
                 }
             }
         }
@@ -674,14 +622,12 @@ pub extern "x86-interrupt" fn syscall_handler(_stack: InterruptStackFrame) {
                     unsafe {
                         core::ptr::copy_nonoverlapping(kentries.as_ptr(), entries, offset);
                     }
-
-                    ret = SyscallReturnCode::Okay;
                 }
                 Err(e) => {
                     rprint!(e);
                     rprint!("\n");
 
-                    ret = SyscallReturnCode::FilesystemError;
+                    return SyscallReturnCode::FilesystemError;
                 }
             }
         }
@@ -694,7 +640,7 @@ pub extern "x86-interrupt" fn syscall_handler(_stack: InterruptStackFrame) {
          */
         0x29 => {
             // TODO
-            ret = SyscallReturnCode::NotImplemented;
+            return SyscallReturnCode::NotImplemented;
         }
 
         /*
@@ -705,8 +651,7 @@ pub extern "x86-interrupt" fn syscall_handler(_stack: InterruptStackFrame) {
          */
         0x2A => {
             if !(USERLAND_START..=USERLAND_END).contains(&arg1) || !(USERLAND_START..=USERLAND_END).contains(&arg2) {
-                ret = SyscallReturnCode::InvalidInput;
-                syscall_ret!(ret);
+                return SyscallReturnCode::InvalidInput;
             }
 
             let (name, ext) = format_filename(arg1 as *const u8);
@@ -781,22 +726,18 @@ pub extern "x86-interrupt" fn syscall_handler(_stack: InterruptStackFrame) {
                             rprint!("Jumping to the program entry point...\n");
                             elf::jump_to_elf(entry_fn, stack_top, arg);
                         }
-
-                        ret = SyscallReturnCode::Okay;
-
                     });
                 }
                 Err(e) => {
                     rprint!(e);
                     rprint!("\n");
-
-                    ret = SyscallReturnCode::FilesystemError;
+                    
+                    return SyscallReturnCode::FilesystemError;
                 }
             }
 
             if !file_found {
-                ret = SyscallReturnCode::FileNotFound;
-                syscall_ret!(ret);
+                return SyscallReturnCode::FileNotFound;
             } 
 
         }
@@ -814,8 +755,6 @@ pub extern "x86-interrupt" fn syscall_handler(_stack: InterruptStackFrame) {
             unsafe {
                 crate::input::port::write_u32(*port, *value);
             }
-
-            ret = SyscallReturnCode::Okay;
         }
 
         /*
@@ -826,8 +765,7 @@ pub extern "x86-interrupt" fn syscall_handler(_stack: InterruptStackFrame) {
          */
         0x31 => {
             if !(USERLAND_START..=USERLAND_END).contains(&arg2) {
-                ret = SyscallReturnCode::InvalidInput;
-                syscall_ret!(ret);
+                return SyscallReturnCode::InvalidInput;
             }
 
             let port = arg1 as *const u16;
@@ -836,8 +774,6 @@ pub extern "x86-interrupt" fn syscall_handler(_stack: InterruptStackFrame) {
             unsafe {
                 *value = crate::input::port::read_u32(*port);
             }
-
-            ret = SyscallReturnCode::Okay;
         }
 
         /*
@@ -851,20 +787,16 @@ pub extern "x86-interrupt" fn syscall_handler(_stack: InterruptStackFrame) {
                 0x01 => {
                     // Serial init
                     if arg2 != 0x00 {
-                        ret = SyscallReturnCode::InvalidInput;
-                        syscall_ret!(ret)
+                        return SyscallReturnCode::InvalidInput;
                     }
 
                     serial::init();
-
-                    ret = SyscallReturnCode::Okay;
                 }
 
                 // Read from UART
                 0x02 => {
                     if !(USERLAND_START..=USERLAND_END).contains(&arg2) {
-                        ret = SyscallReturnCode::InvalidInput;
-                        syscall_ret!(ret)
+                        return SyscallReturnCode::InvalidInput;
                     }
 
                     let value = arg2 as *mut u32;
@@ -872,15 +804,12 @@ pub extern "x86-interrupt" fn syscall_handler(_stack: InterruptStackFrame) {
                     unsafe {
                         *value = serial::read() as u32;
                     }
-
-                    ret = SyscallReturnCode::Okay;
                 }
 
                 // Write to UART
                 0x03 => {
                     if !(USERLAND_START..=USERLAND_END).contains(&arg2) {
-                        ret = SyscallReturnCode::InvalidInput;
-                        syscall_ret!(ret)
+                        return SyscallReturnCode::InvalidInput;
                     }
 
                     let value = arg2 as *const u32;
@@ -888,12 +817,10 @@ pub extern "x86-interrupt" fn syscall_handler(_stack: InterruptStackFrame) {
                     unsafe {
                         serial::write(*value as u8);
                     }
-
-                    ret = SyscallReturnCode::Okay;
                 }
 
                 _ => {
-                    ret = SyscallReturnCode::InvalidInput;
+                    return SyscallReturnCode::InvalidInput;
                 }
             }
         }
@@ -906,8 +833,7 @@ pub extern "x86-interrupt" fn syscall_handler(_stack: InterruptStackFrame) {
          */
         0x33 => {
             if !(USERLAND_START..=USERLAND_END).contains(&arg2) {
-                ret = SyscallReturnCode::InvalidInput;
-                syscall_ret!(ret);
+                return SyscallReturnCode::InvalidInput;
             }
 
             match arg1 {
@@ -923,8 +849,7 @@ pub extern "x86-interrupt" fn syscall_handler(_stack: InterruptStackFrame) {
                         let total_len = u16::from_be((*header).total_length);
 
                         if total_len >= 1500 {
-                            ret = SyscallReturnCode::InvalidInput;
-                            syscall_ret!(ret)
+                            return SyscallReturnCode::InvalidInput;
                         }
 
                         core::ptr::copy_nonoverlapping(packet, ipv4_buffer_aux.as_mut_ptr(), (header_len as u16 + total_len) as usize);
@@ -934,8 +859,7 @@ pub extern "x86-interrupt" fn syscall_handler(_stack: InterruptStackFrame) {
                         let ipv4_len = ipv4::create_packet((*header).dest_ip, (*header).source_ip , (*header).protocol, payload, &mut ipv4_buffer);
 
                         if ipv4_len == 0 {
-                            ret = SyscallReturnCode::InvalidInput;
-                            syscall_ret!(ret)
+                            return SyscallReturnCode::InvalidInput;
                         }
 
                         let ipv4_slice = ipv4_buffer.get(..ipv4_len).unwrap_or(&[]);
@@ -945,8 +869,6 @@ pub extern "x86-interrupt" fn syscall_handler(_stack: InterruptStackFrame) {
                         core::ptr::copy(zeros.as_ptr(), packet, zeros.len());
                         core::ptr::copy(ipv4_slice.as_ptr(), packet, ipv4_len);
                     }
-
-                    ret = SyscallReturnCode::Okay;
                 }
 
                 // ICMP packet
@@ -966,8 +888,6 @@ pub extern "x86-interrupt" fn syscall_handler(_stack: InterruptStackFrame) {
 
                         core::ptr::copy_nonoverlapping(icmp_slice.as_ptr(), packet, icmp_len);
                     }
-
-                    ret = SyscallReturnCode::Okay;
                 }
 
                 // TCP packet
@@ -994,8 +914,6 @@ pub extern "x86-interrupt" fn syscall_handler(_stack: InterruptStackFrame) {
                         core::ptr::copy(zeros.as_ptr(), packet, zeros.len());
                         core::ptr::copy(tcp_slice.as_ptr(), packet, tcp_len);
                     }
-
-                    ret = SyscallReturnCode::Okay;
                 }
 
                 _ => {}
@@ -1010,8 +928,7 @@ pub extern "x86-interrupt" fn syscall_handler(_stack: InterruptStackFrame) {
          */
         0x34 => {
             if !(USERLAND_START..=USERLAND_END).contains(&arg2) {
-                ret = SyscallReturnCode::InvalidInput;
-                syscall_ret!(ret);
+                return SyscallReturnCode::InvalidInput;
             }
 
             if arg1 == 0x01 {
@@ -1025,8 +942,6 @@ pub extern "x86-interrupt" fn syscall_handler(_stack: InterruptStackFrame) {
 
                     ipv4::send_packet(slice);
                 }
-
-                ret = SyscallReturnCode::Okay;
             }
         }
 
@@ -1038,12 +953,11 @@ pub extern "x86-interrupt" fn syscall_handler(_stack: InterruptStackFrame) {
             rprintn!(syscall_no);
             rprint!("\n");
 
-            ret = SyscallReturnCode::InvalidSyscall;
+            return SyscallReturnCode::InvalidSyscall;
         }
     }
 
-    // Write the response code
-    syscall_ret!(ret)
+    SyscallReturnCode::Ok
 }
 
 fn format_filename(name_ptr: *const u8) -> ([u8; 8], [u8; 3]) {

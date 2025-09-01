@@ -29,6 +29,7 @@ enum SyscallReturnCode {
 pub extern "x86-interrupt" fn syscall_handler(_: InterruptStackFrame) {
     naked_asm!(
         "mov rcx, rax",
+        "cld",
         "call {syscall}",
         "iret",
         syscall = sym syscall_inner,

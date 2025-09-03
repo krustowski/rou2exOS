@@ -1,5 +1,5 @@
-use super::{m2_header,tags};
-pub mod init;
+
+
 
 /*use crate::{debug::dump_debug_log_to_file, init::{config::{p1_fb_table, p1_fb_table_2, p2_fb_table, p3_fb_table, p4_table}, font::{draw_text_psf, parse_psf}}, mem, vga::{
     buffer::Color, write::{newline, number, string}
@@ -43,17 +43,17 @@ use super::{result::InitResult}; */
 
 //static mut U_MEM: UsableMemory = UsableMemory{start: 0, end: 0, count: 0}; //change this accordingly!!! placeholder for now
 
-
+/* 
 pub unsafe fn parse_multiboot2_info(m2_ptr: *mut usize, m2_magic: u32) {
 	//check magic, needs to match 
-	if m2_magic != m2_header::MULTIBOOT2_BOOTLOADER_MAGIC {
+	if m2_magic != super::header::MULTIBOOT2_BOOTLOADER_MAGIC {
 		return; //return 1 here???
 	};
 	//alignment to 8
 	let mut m2_tag = &*((m2_ptr as *mut u8).add(8) as *mut tags::TagHeader);
 
 
-    while m2_tag.typ != m2_header::M2TagType::End {
+    /*while m2_tag.typ != m2_header::M2TagType::End {
 
         match m2_tag.typ {
 
@@ -91,7 +91,7 @@ pub unsafe fn parse_multiboot2_info(m2_ptr: *mut usize, m2_magic: u32) {
 
 
 }
-
+*/
 pub unsafe fn memory_map_tag(mut mmap_tag: &tags::MemoryMapTag) {
 
 	let tag_size = mmap_tag.size as usize;
@@ -106,9 +106,9 @@ pub unsafe fn memory_map_tag(mut mmap_tag: &tags::MemoryMapTag) {
 
 
 }
-
+*/
 //stashed code for now!!!
-
+/* 
 
 pub unsafe fn acpi_old_tag() {
 	/* 
@@ -214,15 +214,15 @@ pub unsafe fn framebuffer_tag() {
                 //dump_debug_log_to_file();
 	*/
 }
+*/
 
-
-
+/* 
 fn align_up(x: usize, align: usize) -> usize {
     (x + align - 1) & !(align - 1)
-}
+} */
 
 
-pub unsafe fn draw_rect(ptr: *mut u64, x0: usize, y0: usize, w: usize, h: usize, pitch: usize, color: u32) {
+/*pub unsafe fn draw_rect(ptr: *mut u64, x0: usize, y0: usize, w: usize, h: usize, pitch: usize, color: u32) {
     for y in y0..(y0 + h) {
         for x in x0..(x0 + w) {
             let offset = y * (pitch / 4) + x;
@@ -232,4 +232,4 @@ pub unsafe fn draw_rect(ptr: *mut u64, x0: usize, y0: usize, w: usize, h: usize,
     }
 }
 
-
+*/

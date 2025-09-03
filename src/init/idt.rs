@@ -1,6 +1,6 @@
 use crate::abi::idt::{install_isrs, load_idt};
 
-pub fn get_result() -> super::result::InitResult {
+/*pub fn get_result() -> super::result::InitResult {
     debugln!("Installing Exception handlers and ISRs");
     install_isrs();
 
@@ -22,7 +22,7 @@ pub fn get_result() -> super::result::InitResult {
 
     debugln!("Done");
     super::result::InitResult::Passed
-}
+} */
 
 extern "C" {
     static mut tss64: Tss64;

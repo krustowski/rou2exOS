@@ -7,6 +7,5 @@ pub mod fs;
 pub mod idt;
 pub mod heap;
 pub mod pit;
-pub mod video;
 mod multiboot2;
 pub mod check;

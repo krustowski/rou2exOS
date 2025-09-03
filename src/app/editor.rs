@@ -1,4 +1,4 @@
-use crate::fs::fat12::{fs::Filesystem, block::Floppy};
+/*use crate::fs::fat12::{fs::Filesystem, block::Floppy};
 use crate::init::config::PATH_CLUSTER;
 use crate::input::keyboard::{self, keyboard_read_scancode};
 use crate::video::vga::Writer;
@@ -403,3 +403,4 @@ pub fn split_filename(input: &[u8]) -> (&[u8], &[u8]) {
     }
 }
 
+*/

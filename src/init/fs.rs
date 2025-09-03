@@ -1,5 +1,5 @@
 use crate::fs::fat12::{block::Floppy, fs::Filesystem};
-use super::{
+/*use super::{
     config::{PATH_CLUSTER, set_path},
     result,
 };
@@ -25,7 +25,7 @@ pub fn check_floppy() -> result::InitResult {
     }
 
     res
-} 
+}  */
 
 /*pub fn print_info(vga_index: &mut isize) {
     let floppy = Floppy;

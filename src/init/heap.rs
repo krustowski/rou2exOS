@@ -1,9 +1,9 @@
 use crate::mem::bump::{ALLOCATOR};
 use core::ptr;
 
-use super::result::InitResult;
+//use super::result::InitResult;
 
-pub fn print_result() -> InitResult {
+/*pub fn print_result() -> InitResult {
     /*if !init_heap_allocator() {
       return InitResult::Failed;
       }*/
@@ -63,7 +63,7 @@ pub fn print_result() -> InitResult {
     }
 
     InitResult::Passed
-}
+} */
 
 fn init_heap_allocator() -> bool {
     debugln!("Heap allocator init start");

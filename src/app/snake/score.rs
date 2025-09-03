@@ -1,4 +1,4 @@
-use crate::{
+/*use crate::{
     app::snake::menu::{draw_menu, draw_window}, fs::fat12::{
         block::Floppy, 
         fs::Filesystem}, init::config::PATH_CLUSTER, input::keyboard::keyboard_read_scancode
@@ -202,3 +202,4 @@ pub fn sprintf_score<'a>(prefix: &'static [u8], buf: &'a mut [u8], score: u32) -
     unsafe { core::str::from_utf8_unchecked(&buf[..i]) }
 }
 
+*/

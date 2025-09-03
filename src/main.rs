@@ -24,7 +24,6 @@ mod time;
 mod tui;
 mod vga;
 
-
 /// Kernel entrypoint
 #[unsafe(no_mangle)]
 pub extern "C" fn kernel_main(multiboot2_magic: u32, multiboot_ptr: u32) { 

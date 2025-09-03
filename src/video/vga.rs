@@ -4,12 +4,12 @@ use spin::{mutex::Mutex};
 use core::sync::atomic::{AtomicBool, Ordering};
 
 /// VGA text mode buffer dimensions.
-const BUFFER_WIDTH: usize = 80;
-const BUFFER_HEIGHT: usize = 25;
-const BUFFER_ADDRESS: usize = 0xb8000;
+pub const BUFFER_WIDTH: usize = 80;
+pub const BUFFER_HEIGHT: usize = 25;
+pub const BUFFER_ADDRESS: usize = 0xb8000;
 
 /// Wrapped Writer instance guarded by Mutex.
-pub static mut WRITER: Option<Mutex<Writer>> = None;
+pub static mut WRITER: Option<Mutex<Writer>> = None; //get rid of this static mut
 
 /// Helper static boolean to ensure that the global Writer instance is created just once.
 static WRITER_INIT: AtomicBool = AtomicBool::new(false);
@@ -257,4 +257,5 @@ impl Writer {
         }
     }
 }
+
 

@@ -1,5 +1,5 @@
 use core::arch::asm;
-use super::result;
+/*use super::result;
 
 pub fn check_mode() -> crate::init::result::InitResult {
     let mode = check_cpu_mode();
@@ -12,7 +12,7 @@ pub fn check_mode() -> crate::init::result::InitResult {
     }
 
     result::InitResult::Failed
-}
+} */
 
 fn enable_sse() {
     unsafe {

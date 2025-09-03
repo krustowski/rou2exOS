@@ -1,8 +1,8 @@
-
+//pub mod header;
 #[repr(C)]
 #[derive(Copy,Clone)]
 pub struct TagHeader {
-    pub typ: header::M2TagType,
+    //pub typ: header::M2TagType,
     pub size: u32,
 }
 

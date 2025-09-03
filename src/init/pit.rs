@@ -74,7 +74,7 @@ pub unsafe fn io_wait() {
     write(0x80, 0);
 }
 
-pub fn get_result() -> super::result::InitResult { //why??? why do this why not just ret value or something??
+/*pub fn get_result() -> super::result::InitResult { //why??? why do this why not just ret value or something??
     debugln!("Remapping PIC");
     unsafe { remap_pic(); }
 
@@ -82,4 +82,4 @@ pub fn get_result() -> super::result::InitResult { //why??? why do this why not 
     init_pit(1); // 100Hz -> 10ms per tick???
 
     super::result::InitResult::Passed
-}
+}*/

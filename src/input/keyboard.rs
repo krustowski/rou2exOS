@@ -3,7 +3,8 @@ use crate::init::config::PATH_CLUSTER;
 use crate::input::cmd;
 use crate::input::port;
 use crate::init::config::{HOST, USER, get_path};
-use crate::video::{self, vga};
+use crate::video::{self, vga, sysprint};
+use crate::video::macros::{print, system};
 
 /// The macimum size of an input to the shell console.
 const INPUT_BUFFER_SIZE: usize = 128;

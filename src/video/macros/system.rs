@@ -1,4 +1,4 @@
-use crate::video::{vga};
+use crate::video::{vga, sysprint, bufmg};
 //system warning macros etc
 #[macro_export]
 macro_rules! error {
@@ -24,47 +24,28 @@ macro_rules! warn {
 }
 
 
-const MAX_MSG_LEN: usize = 60;
-
-pub fn print_result(message: &'static str, result: vga::Result) {
-    let mut buf = vga::SysBuffer::new(); //new buffer instance, make the init initialize this instead?
-    
-    buf.append(message.as_bytes()); //append as bytes
-
-    for _ in 0..MAX_MSG_LEN - message.len() {
-        buf.append(b"."); //write, not going past max
-    }
-
-    buf.append(b" [");
-    buf.append(result.format().0);
-    buf.append(b"]\n");
-
-	//in range ...
-    if let Some(slice) = buf.buf.get(..buf.pos) {
-        //
-        INIT_BUFFER.lock().append(slice); //buffer lock?
-    }
-}
 
 
-
+//result printing macro
 //arg1 is the message, arg2 is the status for it
 #[macro_export]
 macro_rules! result {
 	() => {
 		$crate::print!("\n");
-	};
-	($str:expr, $res: expr) => {
-		let mut buf = vga::SysBuffer;
-		let mut len = str.len();
-		buf.append(str);
-		for _ in 0 MAX_MSG_LEN - len {
-			buf.append(b".");
+	}; 
+	//could be problematic?
+	($arg:expr) => {
+		//key created
+		if let Some(mut instance) = $crate::video::sysprint::SysBuffer.try_lock() {
+			instance.append($arg.as_bytes());
+			instance.flush();
+			//make this arg to a temporary value
+
 		}
-		buf.append(b" [");
 
 
-		$crate::print!(str);
+
+
 	};
 	
 }

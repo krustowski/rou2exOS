@@ -31,7 +31,7 @@ compile_kernel:
 	@cp target/kernel_graphics/x86_64-r2/release/kernel.elf iso/boot/kernel_graphics.elf
 
 build_iso:
-	@grub-mkrescue \
+	@grub2-mkrescue \
 		-o r2.iso iso/ \
 		--modules="multiboot2 video video_bochs video_cirrus gfxterm all_video"
 

@@ -1,7 +1,7 @@
 //
 //  PRINT MACROS
 //
-
+//generic print macros
 /// Macro to render all rows with the currently set ColorCode.
 #[macro_export]
 macro_rules! clear_screen {

@@ -35,8 +35,6 @@ pub extern "C" fn kernel_main(multiboot2_magic: u32, multiboot_ptr: u32) {
 
 
     // Run the shell loop
-    debugln!("Starting shell...");
-    println!("Starting shell...\n");
     input::keyboard::keyboard_loop();
 	
 }

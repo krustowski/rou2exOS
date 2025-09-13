@@ -30,21 +30,12 @@ macro_rules! warn {
 //arg1 is the message, arg2 is the status for it
 #[macro_export]
 macro_rules! result {
-	() => {
-		$crate::print!("\n");
-	}; 
-	//could be problematic?
-	($arg:expr) => {
+	($msg:expr, $res: expr) => {
 		//key created
 		if let Some(mut instance) = $crate::video::sysprint::SysBuffer.try_lock() {
-			instance.append($arg.as_bytes());
-			instance.flush();
-			//make this arg to a temporary value
+			instance.format($msg, $res);
 
 		}
-
-
-
 
 	};
 	

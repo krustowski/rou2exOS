@@ -1,33 +1,12 @@
 //system prints such as warnings etc
-use crate::video::{vga, bufmg};
+use crate::video::{vga, vga::Color as Color};
 use spin::Mutex;
 
-pub static SysBuffer: Mutex<bufmg::Buffer> = Mutex::new(bufmg::Buffer::new());
+pub static SysBuffer: Mutex<Buffer> = Mutex::new(Buffer::new());
 
 const MAX_MSG_LEN: usize = 60;
 
-/*pub fn format_result(message: &'static str, result: sysprint::Result) {
-    let mut buf = bufmg::Buffer::new(); //new buffer instance, make the init initialize this instead?
-    
-    buf.append(message.as_bytes()); //append as bytes
-
-    for _ in 0..MAX_MSG_LEN - message.len() {
-        buf.append(b"."); //write, not going past max
-    }
-
-    buf.append(b" [");
-    buf.append(result.format().0);
-    buf.append(b"]\n");
-
-	//in range ...
-    if let Some(slice) = buf.buf.get(..buf.pos) {
-        //
-        INIT_BUFFER.lock().append(slice); //buffer lock?
-    }
-}*/
-
-
-#[derive(PartialEq, Copy, Clone)] //make this global?? could be reused for a bunch of things 
+#[derive(PartialEq, Copy, Clone)]
 pub enum Result {
     Unknown,
     Passed,
@@ -35,19 +14,103 @@ pub enum Result {
     Skipped,
 }
 
-//match
+//here for future proofing, if needed to call from another caller outside of sys buffer
 impl Result {
-    pub fn format(&self) -> (&[u8; 6], vga::Color) {
+    pub fn format(&self) -> (&[u8; 6], Color) {
         match self {
             Result::Unknown => 
-                (b"UNKNWN", vga::Color::Cyan),
+                (b"UNKNWN", Color::Cyan),
             Result::Passed => 
-                (b"  OK  ", vga::Color::Green),
+                (b"  OK  ", Color::Green),
             Result::Failed => 
-                (b" FAIL ", vga::Color::Red),
+                (b" FAIL ", Color::Red),
             Result::Skipped => 
-                (b" SKIP ", vga::Color::Yellow),
+                (b" SKIP ", Color::Yellow),
         }
     }
 }
-//make the sys print call this
+
+const BUFFER_SIZE: usize = 160;
+
+
+pub struct Buffer {
+    pub buf: [u8; 160],
+    pub pos: usize,
+}
+
+
+
+
+impl Buffer {
+    //get buffer instance
+    pub const fn new() -> Self {
+        Self {
+            buf: [0u8; BUFFER_SIZE], 
+            pos: 0,
+        }
+
+    }
+
+
+
+
+	pub fn format(&mut self, msg: &'static str, res: Result) {
+		if msg.len() <= MAX_MSG_LEN {
+
+			self.append(msg.as_bytes());
+
+			while self.pos <= vga::BUFFER_WIDTH - 9 {
+				self.append(b".");
+		
+			}
+			self.append(b"[       ]"); //make this aligned with a for loop or while
+			self.pos -= 7;
+			self.flush(None);
+			self.append(res.format().0);
+
+			self.flush(Some(res.format().1));
+
+
+	}
+	}
+
+    pub fn append(&mut self, s: &[u8]) {
+
+
+        let len = s.len().min(BUFFER_SIZE - self.pos);
+
+		self.buf[self.pos..self.pos + len].copy_from_slice(&s);
+
+		self.pos += len;
+
+		
+	}
+
+
+    /// Puts the contents of buf into the printb! macro.
+    pub fn flush(&mut self, c: Option<Color>) {
+		match c {
+			Some(Color::Cyan) => {
+			if let Some(buf) = self.buf.get(..self.pos) {
+				printb!(buf, Cyan);
+				self.pos = 0;
+
+			}
+			}
+
+			None => {
+			if let Some(buf) = self.buf.get(..self.pos) {
+            	printb!(buf);
+				self.pos = 0;
+        	}
+
+			}
+
+			_ => ()
+		}
+
+    }
+
+}
+
+

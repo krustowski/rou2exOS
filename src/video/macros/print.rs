@@ -17,16 +17,35 @@ macro_rules! clear_screen {
 /// This macro takes in a reference to byte slice (&[u8]) and prints all its contents to display.
 #[macro_export]
 macro_rules! printb {
-    ($arg:expr $(,$col: ident)?) => {
+    ($arg:expr) => {
         if let Some(mut writer) = $crate::video::vga::get_writer() { 
-            //writer.set_color($crate::vga::writer::Color::White, $crate::vga::writer::Color::Black);
-			$(writer.set_color($crate::video::vga::Color::$col, $crate::video::vga::Color::Black);)?
             for b in $arg {
                 writer.write_byte(*b);
             }
+
         }
+		
     };
 }
+//Same as the macro above, except takes in color then resets
+#[macro_export]
+macro_rules! printb_color {
+
+	($arg:expr, $col: ident) => {
+		if let Some(mut writer) = $crate::video::vga::get_writer() {
+			writer.set_color($crate::video::vga::Color::$col, $crate::video::vga::Color::Black);
+			for b in $arg {
+				writer.write_byte(*b);
+			}
+			writer.set_color($crate::video::vga::Color::White, $crate::video::vga::Color::Black); //resets color
+		}
+
+	}
+
+
+}
+
+
 
 /// Special macro to print u64 numbers as a slice of u8 bytes. why?
 #[macro_export]

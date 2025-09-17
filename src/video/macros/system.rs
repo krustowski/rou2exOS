@@ -32,10 +32,10 @@ macro_rules! warn {
 macro_rules! result {
 	($msg:expr, $res: expr) => {
 		//key created
-		if let Some(mut instance) = $crate::video::sysprint::SysBuffer.try_lock() {
+		if let Some(mut instance) = $crate::video::sysprint::SYSBUFFER.try_lock() {
 			instance.format($msg, $res);
 
-		}
+		};
 
 	};
 	

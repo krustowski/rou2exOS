@@ -4,14 +4,14 @@ use crate::video::{vga, sysprint::Result as res};
 
 
 
-//static tempbuff = vga::SysBuffer::new();
 
 pub fn init(m2_ptr: *mut usize, m2_magic: u32) {
-	debugln!("Kernel init start");
 	vga::init_writer();
 	clear_screen!();
 	result!("First", res::Unknown);
-
+	result!("Second", res::Passed);
+	result!("Third", res::Failed);
+	result!("Fourth", res::Skipped);
 
 
 

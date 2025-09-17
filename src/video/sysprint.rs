@@ -1,8 +1,8 @@
-//system prints such as warnings etc
+//System prints such as warnings etc
 use crate::video::{vga, vga::Color as Color};
 use spin::Mutex;
 
-pub static SysBuffer: Mutex<Buffer> = Mutex::new(Buffer::new());
+pub static SYSBUFFER: Mutex<Buffer> = Mutex::new(Buffer::new());
 
 const MAX_MSG_LEN: usize = 60;
 
@@ -14,7 +14,7 @@ pub enum Result {
     Skipped,
 }
 
-//here for future proofing, if needed to call from another caller outside of sys buffer
+//Here for future proofing, if needed to call from another caller outside of sysbuffer
 impl Result {
     pub fn format(&self) -> (&[u8; 6], Color) {
         match self {
@@ -53,22 +53,24 @@ impl Buffer {
 
 
 
-
+//TODO: add safety check so self.pos doesnt go out of bounds
 	pub fn format(&mut self, msg: &'static str, res: Result) {
 		if msg.len() <= MAX_MSG_LEN {
-
 			self.append(msg.as_bytes());
-
+			//9 is size of the brackets
 			while self.pos <= vga::BUFFER_WIDTH - 9 {
 				self.append(b".");
 		
 			}
-			self.append(b"[       ]"); //make this aligned with a for loop or while
-			self.pos -= 7;
+			self.append(b"["); 
 			self.flush(None);
+			
 			self.append(res.format().0);
 
 			self.flush(Some(res.format().1));
+
+			self.append(b"]");
+			self.flush(None); 
 
 
 	}
@@ -87,23 +89,40 @@ impl Buffer {
 	}
 
 
-    /// Puts the contents of buf into the printb! macro.
+    /// Puts the contents of buf into the printb! or printb_color! macro.
     pub fn flush(&mut self, c: Option<Color>) {
 		match c {
 			Some(Color::Cyan) => {
 			if let Some(buf) = self.buf.get(..self.pos) {
-				printb!(buf, Cyan);
+				printb_color!(buf, Cyan);
+				self.pos = 0;
+			}
+			}
+			Some(Color::Green) => {
+			if let Some(buf) = self.buf.get(..self.pos) {
+				printb_color!(buf, Green);
 				self.pos = 0;
 
 			}
 			}
+			Some(Color::Red) => {
+			if let Some(buf) = self.buf.get(..self.pos) {
+				printb_color!(buf, Red);
+				self.pos = 0;
 
+			}
+			}
+ 			Some(Color::Yellow) => {
+			if let Some(buf) = self.buf.get(..self.pos) {
+				printb_color!(buf, Yellow);
+				self.pos = 0;
+			}
+			}
 			None => {
 			if let Some(buf) = self.buf.get(..self.pos) {
             	printb!(buf);
 				self.pos = 0;
         	}
-
 			}
 
 			_ => ()

@@ -57,11 +57,13 @@ impl Buffer {
 	pub fn format(&mut self, msg: &'static str, res: Result) {
 		if msg.len() <= MAX_MSG_LEN {
 			self.append(msg.as_bytes());
-			//9 is size of the brackets
+			//9 is size of the brackets could be added as a more readable constant
 			while self.pos <= vga::BUFFER_WIDTH - 9 {
 				self.append(b".");
 		
 			}
+			//Color characters must be appended and flushed immediately. For now theres no function
+			//to keep track of color, may be added in the future.
 			self.append(b"["); 
 			self.flush(None);
 			

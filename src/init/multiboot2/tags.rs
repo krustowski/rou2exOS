@@ -1,8 +1,9 @@
-//pub mod header;
+use crate::init::multiboot2::{header};
+
 #[repr(C)]
 #[derive(Copy,Clone)]
-pub struct TagHeader {
-    //pub typ: header::M2TagType,
+pub struct BasicTag {
+    pub typ: header::M2TagType,
     pub size: u32,
 }
 
@@ -18,7 +19,7 @@ pub struct MemoryMapTag {
 
 
 #[repr(C, packed)]
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct MemoryMapEntry {
     pub base_addr: u64,
     pub length: u64,
@@ -53,7 +54,7 @@ pub struct AcpiRSDPTag {
 
 #[repr(C, packed)]
 pub struct AcpiSDTHeader {
-    pub signature: [u8; 4], //array
+    pub signature: [u8; 4], 
     pub length: u32,
     pub revision: u8, 
     pub checksum: u8,
@@ -71,4 +72,3 @@ pub struct UsableMemory {
 	count: u8,
 
 }
-

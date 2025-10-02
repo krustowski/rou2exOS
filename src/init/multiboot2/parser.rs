@@ -1,12 +1,11 @@
 
-
-
 /*use crate::{debug::dump_debug_log_to_file, init::{config::{p1_fb_table, p1_fb_table_2, p2_fb_table, p3_fb_table, p4_table}, font::{draw_text_psf, parse_psf}}, mem, vga::{
     buffer::Color, write::{newline, number, string}
-} };
-use super::{result::InitResult}; */
-
-/*pub fn print_info(multiboot_ptr: u64, mut fb_tag: &FramebufferTag) -> InitResult {
+} };*/
+use crate::init::multiboot2::{header,tags, header::M2TagType as TagType, tags::BasicTag as BasicTag, tags::MemoryMapTag as MMapTag};
+use crate::{debug};
+/*
+pub fn print_info(multiboot_ptr: u64, mut fb_tag: &FramebufferTag) -> InitResult {
     unsafe {
         debug!("Multiboot2 pointer: ");
         debugn!(multiboot_ptr);
@@ -23,10 +22,10 @@ use super::{result::InitResult}; */
 
     InitResult::Failed
 }
-*/
 
 
-/*     let addr = align_up(base_addr, 8);
+
+     let addr = align_up(base_addr, 8);
 
     // First 4 bytes: total size of the multiboot info
     let total_size = *(addr as *const u32) as usize;
@@ -36,77 +35,111 @@ use super::{result::InitResult}; */
 
     let mut tag_count = 0;
 
-*/
 
+*/
 
 
 
 //static mut U_MEM: UsableMemory = UsableMemory{start: 0, end: 0, count: 0}; //change this accordingly!!! placeholder for now
 
-/* 
+ 
 pub unsafe fn parse_multiboot2_info(m2_ptr: *mut usize, m2_magic: u32) {
-	//check magic, needs to match 
-	if m2_magic != super::header::MULTIBOOT2_BOOTLOADER_MAGIC {
-		return; //return 1 here???
+
+	if m2_magic != header::MULTIBOOT2_BOOTLOADER_MAGIC {
+		return; //return sysfail here
 	};
 	//alignment to 8
-	let mut m2_tag = &*((m2_ptr as *mut u8).add(8) as *mut tags::TagHeader);
+	//is the & not needed here?
+	let mut m2_tag = m2_ptr.add(8) as *mut BasicTag;
 
+    while (*m2_tag).typ != TagType::End {
 
-    /*while m2_tag.typ != m2_header::M2TagType::End {
+        match (*m2_tag).typ {
 
-        match m2_tag.typ {
-
-            m2_header::M2TagType::CmdLine => {
-				break;
-            }
-
-            m2_header::M2TagType::Module => { 
-                break;
-            }
-
-            m2_header::M2TagType::Mmap => {
-                let mmap_tag = &*(m2_tag as *const _ as *const tags::MemoryMapTag);
-				memory_map_tag(mmap_tag); 
-            }
-
-            m2_header::M2TagType::Framebuffer => {
-				break;
+            TagType::CmdLine => {
+				debugn!((*m2_tag).typ);
+				debug!("Cmd");
 
             }
 
-            m2_header::M2TagType::AcpiOLD => {
-				break;
+            TagType::Module => { 
+				debugn!((*m2_tag).typ);
+				debugln!("Module");
+
+            }
+
+            TagType::Mmap => {
+				debugn!((*m2_tag).typ);
+				let mmap_tag = m2_tag as *mut MMapTag;
+				memory_map_tag(mmap_tag);
+				debugln!("MMap");
+
+            }
+
+            TagType::Framebuffer => {
+				debugn!((*m2_tag).typ);
+				debugln!("Frame");
+
+            }
+
+            TagType::AcpiOLD => {
+				debugn!((*m2_tag).typ);
+				debugln!("acpi");
+
             }
 
             _ => {
-				break;
+				debugn!((*m2_tag).typ);
+				debugln!("Empty");
+
             }
+		
         }
+	//Could be cleaned up
+	//m2_tag = (((m2_tag as usize) + ((*m2_tag).size as usize) + 7) & !(7)) as *mut BasicTag;
+	m2_tag = (((m2_tag as *mut u8).add((*m2_tag).size as usize + 7)) as usize & !(7)) as *mut BasicTag;
 
-        m2_tag = &*((align_up(m2_tag.size as usize, 8) as *mut tags::TagHeader));
+	}
 
 
-    }
+ }
+
+
+
+
+pub unsafe fn memory_map_tag(mmap_tag: *mut MMapTag) {
+	debugln!("Tag start");
+	debugn!(mmap_tag as usize);
+	debugln!("Entry initial");
+	let mut entries = &mut (*mmap_tag).entries as *mut tags::MemoryMapEntry;
+	debugn!(entries);
+	let end = (mmap_tag as *mut u8).add((*mmap_tag).size as usize) as *mut tags::MemoryMapEntry;
+	debugln!("End");
+	debugn!(end);
+	let mut i = 0;
+	while entries < end {
+
+		entries = ((entries as *mut u8).add((*mmap_tag).entry_size as usize)) as *mut tags::MemoryMapEntry;
+		i+=1;
+	}
+	debugln!("Ran");
+	debugn!(i);
+
+
+
+	debugln!("Tag size");
+	debugn!((*mmap_tag).size as usize);
+
+	debugln!("Tag entry sizes");
+	debugn!((*mmap_tag).entry_size as u8);
+
+	debugln!("Last entry");
+	debugn!(entries);
+
 
 
 }
-*/
-pub unsafe fn memory_map_tag(mut mmap_tag: &tags::MemoryMapTag) {
 
-	let tag_size = mmap_tag.size as usize;
-	let entry_size = mmap_tag.entry_size as usize; //incrementation
-
-	let mut entries_start = mmap_tag as *const _ as *mut u8;
-	let mut tag_end = entries_start.add(tag_size);
- 
-
-
-
-
-
-}
-*/
 //stashed code for now!!!
 /* 
 

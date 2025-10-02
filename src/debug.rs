@@ -1,6 +1,6 @@
 use core::fmt::{self, Write};
 use spin::Mutex;
-use crate::{clear_screen, error, printb};
+use crate::{clear_screen, error, printb, println};
 
 const DEBUG_LOG_SIZE: usize = 8192;
 
@@ -74,7 +74,7 @@ macro_rules! debugn {
             let mut buf = [0u8; 20];
             let s = $crate::debug::u64_to_dec_str($n as u64, &mut buf);
             log.append(s);
-        }
+        } 
     }};
 }
 

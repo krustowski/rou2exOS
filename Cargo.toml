@@ -1,3 +1,5 @@
+cargo-features = ["panic-immediate-abort"]
+
 [package]
 name = "kernel"
 description = ""
@@ -9,17 +11,26 @@ authors = ["krusty <krusty@vxn.dev>"]
 x86_64 = { version = "0.15.2", default-features = false, features = ["instructions", "abi_x86_interrupt"] }
 spin = "0.10.0"
 
+
 [features]
 kernel_text = []
 kernel_graphics = []
 
+
 [profile.dev]
 panic = "abort"
+debug = true
+opt-level = 0
+lto = false
+
 
 [profile.release]
 lto = false
 panic = "abort"
-debug = true
+debug = 2
+
+
+
 
 [[bin]]
 name = "kernel"

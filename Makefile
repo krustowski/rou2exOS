@@ -30,6 +30,8 @@ compile_kernel:
 		--target x86_64-r2.json
 	@cp target/kernel_graphics/x86_64-r2/release/kernel.elf iso/boot/kernel_graphics.elf
 
+#TODO: Please add an option to compile a debug kernel with debugging symbols and no optimizations
+
 build_iso:
 	@grub-mkrescue \
 		-o r2.iso iso/ \

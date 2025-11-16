@@ -1,3 +1,4 @@
+use crate::video::sysprint::{Result};
 const PAGE_SIZE: u64 = 4096;
 const PAGE_PRESENT: u64 = 1 << 0;
 const PAGE_WRITE: u64 = 1 << 1;
@@ -49,14 +50,14 @@ pub fn map_framebuffer(
     }
 }
 
-pub fn print_result(fb: &super::boot::FramebufferTag) -> super::result::InitResult {
+pub fn print_result(fb: &super::boot::FramebufferTag) -> Result {
     use crate::video;
 
     video::mode::init_video(fb);
 
     if video::mode::get_video_mode().is_some() {
-        return super::result::InitResult::Passed;
+        return Result::Passed;
     }
 
-    super::result::InitResult::Failed
+    Result::Failed
 }

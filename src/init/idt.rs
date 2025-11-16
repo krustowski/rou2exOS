@@ -1,27 +1,24 @@
 use crate::abi::idt::{install_isrs, load_idt};
+use crate::video::sysprint::{Result};
 
-pub fn get_result() -> super::result::InitResult {
-    debugln!("Installing Exception handlers and ISRs");
+
+pub fn idt_isrs_init() -> Result {
+
     install_isrs();
 
-    debugln!("Reloading IDT");
     load_idt();
 
-    debugln!("Initializing TSS");
     init_tss();
 
-    debugln!("Resetting TSS");
     let base_addr = &raw const tss64 as u64;
     setup_tss_descriptor(base_addr, 0x67);
 
-    debugln!("Reloading GDT");
     reload_gdt();
     
-    debugln!("Loading TSS");
     load_tss(0x28);
 
-    super::result::InitResult::Passed
-}
+    Result::Passed
+} 
 
 extern "C" {
     static mut tss64: Tss64;

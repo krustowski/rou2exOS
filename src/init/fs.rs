@@ -1,20 +1,18 @@
 use crate::fs::fat12::{block::Floppy, fs::Filesystem};
-use super::{
-    config::{PATH_CLUSTER, set_path},
-    result,
-};
+use crate::video::sysprint::{Result};
+use crate::init::config::{PATH_CLUSTER, set_path};
 
-pub fn check_floppy() -> result::InitResult {
+pub fn floppy_check_init() -> Result {
     let floppy = Floppy::init();
 
     let res = match Filesystem::new(&floppy) {
         Ok(_) => {
-            result::InitResult::Passed
+            Result::Passed
         }
         Err(e) => {
             debug!("Filesystem init (floppy) fail: ");
             debugln!(e);
-            result::InitResult::Skipped
+            Result::Skipped
         }
     };
 
@@ -25,7 +23,7 @@ pub fn check_floppy() -> result::InitResult {
     }
 
     res
-} 
+}  
 
 /*pub fn print_info(vga_index: &mut isize) {
     let floppy = Floppy;

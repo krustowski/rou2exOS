@@ -1,23 +1,4 @@
 use crate::init::font::{draw_text_psf, parse_psf};
-use super::{result::InitResult};
-
-pub fn print_info(multiboot_ptr: u64, fb_tag: &FramebufferTag) -> InitResult {
-    unsafe {
-        debug!("Multiboot2 pointer: ");
-        debugn!(multiboot_ptr);
-        debugln!("");
-
-        if parse_multiboot2_info((multiboot_ptr as u32) as usize, fb_tag) > 0 {
-            return InitResult::Passed;
-        }
-    }
-
-    debug!("Multiboot2 pointer: ");
-    debugn!(multiboot_ptr);
-    debugln!("");
-
-    InitResult::Failed
-}
 
 #[repr(C)]
 #[derive(Debug)]

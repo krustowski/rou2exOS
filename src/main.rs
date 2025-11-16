@@ -29,14 +29,8 @@ mod vga;
 pub extern "C" fn kernel_main(_multiboot2_magic: u32, multiboot_ptr: u32) { 
     debugln!("Kernel loaded");
 
-    // VGA buffer position (LEGACY)
-    clear_screen!();
-
-    // TODO: REmove: Instantiate new VGA Writer
-    video::vga::init_writer();
-
-    // Run init checks
-    init::init(multiboot_ptr as u64);
+    // Run init checks and initialize system
+    init::check::init(multiboot_ptr as u64);
 
     // Run the shell loop
     debugln!("Starting shell...");

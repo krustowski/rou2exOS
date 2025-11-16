@@ -1,17 +1,17 @@
 use core::arch::asm;
-use super::result;
+use crate::video::sysprint::{Result};
 
-pub fn check_mode() -> crate::init::result::InitResult {
+pub fn check() -> Result {
     let mode = check_cpu_mode();
 
     enable_sse();
     enable_syscalls();
 
     if mode.len() > 5 && mode.as_bytes()[0..4] == *b"Long" {
-        return result::InitResult::Passed;
+        return Result::Passed;
     }
 
-    result::InitResult::Failed
+    Result::Failed
 }
 
 fn enable_sse() {

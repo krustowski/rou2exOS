@@ -23,10 +23,10 @@ pub fn draw_char(c: u8, x: usize, y: usize, fb: *mut u32, pitch: usize, fg: u32,
 //
 //
 
-pub fn print_result() -> super::result::InitResult {
+/*pub fn print_result() -> super::result::InitResult {
     super::result::InitResult::Unknown
 }
-
+*/
 //
 //
 //

@@ -1,8 +1,9 @@
 //
 //  PRINT MACROS
 //
-
+//generic print macros
 /// Macro to render all rows with the currently set ColorCode.
+use crate::video::{vga};
 #[macro_export]
 macro_rules! clear_screen {
     () => {
@@ -12,44 +13,41 @@ macro_rules! clear_screen {
     };
 }
 
-/// Prints the error string to screen in red.
-#[macro_export]
-macro_rules! error {
-    () => {
-        $crate::print!("\n");
-    };
-    ($arg:expr $(,)?) => {
-        // Set yellow chars on black
-        $crate::print!($arg, $crate::video::vga::Color::Red, $crate::video::vga::Color::Black);
-    };
-}
-
-/// Prints the warning string to screen in yellow.
-#[macro_export]
-macro_rules! warn {
-    () => {
-        $crate::print!("\n");
-    };
-    ($arg:expr $(,)?) => {
-        // Set yellow chars on black
-        $crate::print!($arg, $crate::video::vga::Color::Yellow, $crate::video::vga::Color::Black);
-    };
-}
 
 /// This macro takes in a reference to byte slice (&[u8]) and prints all its contents to display.
 #[macro_export]
 macro_rules! printb {
     ($arg:expr) => {
         if let Some(mut writer) = $crate::video::vga::get_writer() { 
-            //writer.set_color($crate::vga::writer::Color::White, $crate::vga::writer::Color::Black);
             for b in $arg {
                 writer.write_byte(*b);
             }
+
         }
+		
     };
 }
+//Same as the macro above, except takes in color then resets
+#[macro_export]
+macro_rules! printb_color {
 
-/// Special macro to print u64 numbers as a slice of u8 bytes.
+	($arg:expr, $col: ident) => {
+		if let Some(mut writer) = $crate::video::vga::get_writer() {
+			writer.set_color($crate::video::vga::Color::$col, $crate::video::vga::Color::Black);
+			for b in $arg {
+				writer.write_byte(*b);
+			}
+			writer.set_color($crate::video::vga::Color::White, $crate::video::vga::Color::Black); //resets color
+		}
+
+	}
+
+
+}
+
+
+
+/// Special macro to print u64 numbers as a slice of u8 bytes. why?
 #[macro_export]
 macro_rules! printn {
     ($arg:expr) => {
@@ -110,4 +108,5 @@ macro_rules! print {
         }
     });
 }
+
 

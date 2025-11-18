@@ -28,10 +28,10 @@ enum SyscallReturnCode {
 #[unsafe(naked)]
 pub extern "x86-interrupt" fn syscall_handler(_: InterruptStackFrame) {
     naked_asm!(
-        "mov rcx, rax",
+        "mov rcx, rdx",
         "cld",
         "call {syscall}",
-        "iret",
+        "iretq",
         syscall = sym syscall_inner,
     )
 }

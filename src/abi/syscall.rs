@@ -97,7 +97,7 @@ extern "C" fn syscall_inner(arg1: u64, arg2: u64, syscall_no: u64) -> SyscallRet
                 0x01 => unsafe {
                     let name = b"rou2ex";
                     let user = b"guest";
-                    let version = b"v0.9.6";
+                    let version = b"v0.10.0";
                     let path = b"/";
 
                     if let Some(nm) = (*sysinfo_ptr).system_name.get_mut(0..name.len()) {

@@ -3,9 +3,12 @@ use core::arch::naked_asm;
 use x86_64::structures::idt::InterruptStackFrame;
 
 use crate::{
-    fs::fat12::{block::{Floppy, BlockDevice}, fs::Filesystem}, 
-    input::{elf, irq}, 
-    net::{serial, ipv4, icmp, tcp},
+    fs::fat12::{
+        block::{BlockDevice, Floppy},
+        fs::Filesystem,
+    },
+    input::{elf, irq},
+    net::{icmp, ipv4, serial, tcp},
     //task::process::schedule,
     time::rtc,
 };
@@ -23,8 +26,8 @@ enum SyscallReturnCode {
     InvalidSyscall = 0xff,
 }
 
-/// This function is the syscall ABI dispatching routine. It is called exclusively from the ISR 
-/// for interrupt 0x7f. 
+/// This function is the syscall ABI dispatching routine. It is called exclusively from the ISR
+/// for interrupt 0x7f.
 #[unsafe(naked)]
 pub extern "x86-interrupt" fn syscall_handler(_: InterruptStackFrame) {
     naked_asm!(
@@ -91,30 +94,28 @@ extern "C" fn syscall_inner(arg1: u64, arg2: u64, syscall_no: u64) -> SyscallRet
             let sysinfo_ptr = arg2 as *mut SysInfo;
 
             match arg1 {
-                0x01 => {
-                    unsafe {
-                        let name = b"rou2ex";
-                        let user = b"guest";
-                        let version = b"v0.9.6";
-                        let path = b"/";
+                0x01 => unsafe {
+                    let name = b"rou2ex";
+                    let user = b"guest";
+                    let version = b"v0.9.6";
+                    let path = b"/";
 
-                        if let Some(nm) = (*sysinfo_ptr).system_name.get_mut(0..name.len()) {
-                            nm.copy_from_slice(name);
-                        }
-
-                        if let Some(us) = (*sysinfo_ptr).system_user.get_mut(0..user.len()) {
-                            us.copy_from_slice(user);
-                        }
-
-                        if let Some(ph) = (*sysinfo_ptr).system_path.get_mut(0..path.len()) {
-                            ph.copy_from_slice(path);
-                        }
-
-                        if let Some(vn) = (*sysinfo_ptr).system_version.get_mut(0..version.len()) {
-                            vn.copy_from_slice(version);
-                        }
+                    if let Some(nm) = (*sysinfo_ptr).system_name.get_mut(0..name.len()) {
+                        nm.copy_from_slice(name);
                     }
-                }
+
+                    if let Some(us) = (*sysinfo_ptr).system_user.get_mut(0..user.len()) {
+                        us.copy_from_slice(user);
+                    }
+
+                    if let Some(ph) = (*sysinfo_ptr).system_path.get_mut(0..path.len()) {
+                        ph.copy_from_slice(path);
+                    }
+
+                    if let Some(vn) = (*sysinfo_ptr).system_version.get_mut(0..version.len()) {
+                        vn.copy_from_slice(version);
+                    }
+                },
                 0x02 => {
                     // TODO
                 }
@@ -137,7 +138,14 @@ extern "C" fn syscall_inner(arg1: u64, arg2: u64, syscall_no: u64) -> SyscallRet
                 let rtc_data = arg2 as *mut RTC;
 
                 unsafe {
-                    ( (*rtc_data).year, (*rtc_data).month, (*rtc_data).day, (*rtc_data).hours, (*rtc_data).minutes, (*rtc_data).seconds) = rtc::read_rtc_full();
+                    (
+                        (*rtc_data).year,
+                        (*rtc_data).month,
+                        (*rtc_data).day,
+                        (*rtc_data).hours,
+                        (*rtc_data).minutes,
+                        (*rtc_data).seconds,
+                    ) = rtc::read_rtc_full();
                 }
             }
         }
@@ -176,7 +184,7 @@ extern "C" fn syscall_inner(arg1: u64, arg2: u64, syscall_no: u64) -> SyscallRet
                                 // No data: block current process until dispatcher wakes it
                                 //block_current_process_on_keyboard();
                                 // After wake, try copy again
-                                
+
                                 s.copy_to_user(arg2 as *mut u8, 16);
                             }
                         }
@@ -280,13 +288,17 @@ extern "C" fn syscall_inner(arg1: u64, arg2: u64, syscall_no: u64) -> SyscallRet
 
                     match Filesystem::new(&floppy) {
                         Ok(fs) => {
-                            fs.for_each_entry(0, | entry | {
-                                if entry.name[0] == 0x00 || entry.name[0] == 0xE5 || entry.attr & 0x08 != 0 || entry.attr & 0x10 != 0 {
+                            fs.for_each_entry(0, |entry| {
+                                if entry.name[0] == 0x00
+                                    || entry.name[0] == 0xE5
+                                    || entry.attr & 0x08 != 0
+                                    || entry.attr & 0x10 != 0
+                                {
                                     return;
                                 }
 
                                 if !entry.name.starts_with(&name) || !entry.ext.starts_with(&ext) {
-                                    return
+                                    return;
                                 }
 
                                 // Read the file directly into the client's buffer
@@ -339,7 +351,9 @@ extern "C" fn syscall_inner(arg1: u64, arg2: u64, syscall_no: u64) -> SyscallRet
          *  Arg2: pointer to buffer (*mut [u8; 512])
          */
         0x20 => {
-            if !(USERLAND_START..=USERLAND_END).contains(&arg1) || !(USERLAND_START..=USERLAND_END).contains(&arg2) {
+            if !(USERLAND_START..=USERLAND_END).contains(&arg1)
+                || !(USERLAND_START..=USERLAND_END).contains(&arg2)
+            {
                 return SyscallReturnCode::InvalidInput;
             }
 
@@ -347,26 +361,53 @@ extern "C" fn syscall_inner(arg1: u64, arg2: u64, syscall_no: u64) -> SyscallRet
 
             let (name, ext) = format_filename(name_ptr);
 
-            let buf_ptr = arg2 as *mut [u8; 512];
+            let buf_ptr = arg2 as *mut u8;
             let floppy = Floppy::init();
             let mut file_read: bool = false;
 
             match Filesystem::new(&floppy) {
                 Ok(fs) => {
-                    fs.for_each_entry(0, | entry | {
-                        if entry.name[0] == 0x00 || entry.name[0] == 0xE5 || entry.attr & 0x08 != 0 || entry.attr & 0x10 != 0 {
+                    fs.for_each_entry(0, |entry| {
+                        if entry.name[0] == 0x00
+                            || entry.name[0] == 0xE5
+                            || entry.attr & 0x08 != 0
+                            || entry.attr & 0x10 != 0
+                        {
                             return;
                         }
 
-                        unsafe {
-                            if !entry.name.starts_with(&name) || !entry.ext.starts_with(&ext) {
-                                return
+                        if !entry.name.starts_with(&name) || !entry.ext.starts_with(&ext) {
+                            return;
+                        }
+
+                        let mut cluster = entry.start_cluster;
+                        let mut offset = 0;
+
+                        while entry.file_size - offset > 0 {
+                            let lba = fs.cluster_to_lba(cluster);
+                            let mut sector = [0u8; 512];
+
+                            fs.device.read_sector(lba, &mut sector);
+
+                            let dst = buf_ptr;
+
+                            unsafe {
+                                core::ptr::copy_nonoverlapping(
+                                    sector.as_ptr(),
+                                    dst.add(offset as usize),
+                                    512,
+                                );
                             }
 
-                            // Read the file directly into the client's buffer
-                            fs.read_file(entry.start_cluster, &mut *buf_ptr);
-                            file_read = true;
+                            cluster = fs.read_fat12_entry(cluster);
+
+                            if cluster >= 0xFF8 || cluster == 0 {
+                                break;
+                            }
+
+                            offset += 512;
                         }
+                        file_read = true;
                     });
 
                     if !file_read {
@@ -375,6 +416,7 @@ extern "C" fn syscall_inner(arg1: u64, arg2: u64, syscall_no: u64) -> SyscallRet
                         return SyscallReturnCode::Ok;
                     }
                 }
+
                 Err(e) => {
                     rprint!(e);
                     rprint!("\n");
@@ -391,7 +433,9 @@ extern "C" fn syscall_inner(arg1: u64, arg2: u64, syscall_no: u64) -> SyscallRet
          *  Arg2: pointer to byte buffer (*mut [u8; 512])
          */
         0x21 => {
-            if !(USERLAND_START..=USERLAND_END).contains(&arg1) || !(USERLAND_START..=USERLAND_END).contains(&arg2) {
+            if !(USERLAND_START..=USERLAND_END).contains(&arg1)
+                || !(USERLAND_START..=USERLAND_END).contains(&arg2)
+            {
                 return SyscallReturnCode::InvalidInput;
             }
 
@@ -407,11 +451,9 @@ extern "C" fn syscall_inner(arg1: u64, arg2: u64, syscall_no: u64) -> SyscallRet
             let floppy = Floppy::init();
 
             match Filesystem::new(&floppy) {
-                Ok(fs) => {
-                    unsafe {
-                        fs.write_file(0, &filename, &*buf_ptr);
-                    }
-                }
+                Ok(fs) => unsafe {
+                    fs.write_file(0, &filename, &*buf_ptr);
+                },
                 Err(e) => {
                     rprint!(e);
                     rprint!("\n");
@@ -419,7 +461,6 @@ extern "C" fn syscall_inner(arg1: u64, arg2: u64, syscall_no: u64) -> SyscallRet
                     return SyscallReturnCode::FilesystemError;
                 }
             }
-
         }
 
         /*
@@ -429,7 +470,9 @@ extern "C" fn syscall_inner(arg1: u64, arg2: u64, syscall_no: u64) -> SyscallRet
          *  Arg2: pointer to new filename
          */
         0x22 => {
-            if !(USERLAND_START..=USERLAND_END).contains(&arg1) || !(USERLAND_START..=USERLAND_END).contains(&arg2) {
+            if !(USERLAND_START..=USERLAND_END).contains(&arg1)
+                || !(USERLAND_START..=USERLAND_END).contains(&arg2)
+            {
                 return SyscallReturnCode::InvalidInput;
             }
 
@@ -449,13 +492,16 @@ extern "C" fn syscall_inner(arg1: u64, arg2: u64, syscall_no: u64) -> SyscallRet
 
             match Filesystem::new(&floppy) {
                 Ok(fs) => {
-                    fs.for_each_entry(0, | entry | {
-                        if entry.name[0] == 0x00 || entry.name[0] == 0xE5 || entry.attr & 0x08 != 0 {
+                    fs.for_each_entry(0, |entry| {
+                        if entry.name[0] == 0x00 || entry.name[0] == 0xE5 || entry.attr & 0x08 != 0
+                        {
                             return;
                         }
 
-                        if !entry.name.starts_with(&name_old) || (!ext_old.is_empty() && !entry.ext.starts_with(&ext_old)) {
-                            return
+                        if !entry.name.starts_with(&name_old)
+                            || (!ext_old.is_empty() && !entry.ext.starts_with(&ext_old))
+                        {
+                            return;
                         }
 
                         // Read the file directly into the client's buffer
@@ -498,13 +544,14 @@ extern "C" fn syscall_inner(arg1: u64, arg2: u64, syscall_no: u64) -> SyscallRet
 
             match Filesystem::new(&floppy) {
                 Ok(fs) => {
-                    fs.for_each_entry(0, | entry | {
-                        if entry.name[0] == 0x00 || entry.name[0] == 0xE5 || entry.attr & 0x08 != 0 {
+                    fs.for_each_entry(0, |entry| {
+                        if entry.name[0] == 0x00 || entry.name[0] == 0xE5 || entry.attr & 0x08 != 0
+                        {
                             return;
                         }
 
                         if !entry.name.starts_with(&name) || !entry.ext.starts_with(&ext) {
-                            return
+                            return;
                         }
 
                         // Read the file directly into the client's buffer
@@ -594,7 +641,7 @@ extern "C" fn syscall_inner(arg1: u64, arg2: u64, syscall_no: u64) -> SyscallRet
 
         /*
          *  Syscall 0x28 --- List directory entries
-         *  
+         *
          *  Arg1: dir cluster No.
          *  Arg2: dir entries pointer (*mut Entry)
          */
@@ -602,7 +649,8 @@ extern "C" fn syscall_inner(arg1: u64, arg2: u64, syscall_no: u64) -> SyscallRet
             let path = arg1 as u16;
             let entries = arg2 as *mut crate::fs::fat12::entry::Entry;
 
-            let mut kentries: [crate::fs::fat12::entry::Entry; 32] = [crate::fs::fat12::entry::Entry::default(); 32];
+            let mut kentries: [crate::fs::fat12::entry::Entry; 32] =
+                [crate::fs::fat12::entry::Entry::default(); 32];
             let mut offset = 0;
 
             let floppy = Floppy::init();
@@ -610,7 +658,11 @@ extern "C" fn syscall_inner(arg1: u64, arg2: u64, syscall_no: u64) -> SyscallRet
             match Filesystem::new(&floppy) {
                 Ok(fs) => {
                     fs.for_each_entry(path, |entry| {
-                        if entry.name[0] == 0x00 || entry.name[0] == 0xE5 || entry.name[0] == 0xFF || entry.attr & 0x08 != 0 {
+                        if entry.name[0] == 0x00
+                            || entry.name[0] == 0xE5
+                            || entry.name[0] == 0xFF
+                            || entry.attr & 0x08 != 0
+                        {
                             return;
                         }
 
@@ -651,7 +703,9 @@ extern "C" fn syscall_inner(arg1: u64, arg2: u64, syscall_no: u64) -> SyscallRet
          *  Arg2: pointer to PID (*mut u8)
          */
         0x2A => {
-            if !(USERLAND_START..=USERLAND_END).contains(&arg1) || !(USERLAND_START..=USERLAND_END).contains(&arg2) {
+            if !(USERLAND_START..=USERLAND_END).contains(&arg1)
+                || !(USERLAND_START..=USERLAND_END).contains(&arg2)
+            {
                 return SyscallReturnCode::InvalidInput;
             }
 
@@ -665,13 +719,20 @@ extern "C" fn syscall_inner(arg1: u64, arg2: u64, syscall_no: u64) -> SyscallRet
 
             match Filesystem::new(&floppy) {
                 Ok(fs) => {
-                    fs.for_each_entry(0, | entry | {
-                        if entry.name[0] == 0x00 || entry.name[0] == 0xE5 || entry.attr & 0x08 != 0 || entry.attr & 0x10 != 0 {
+                    fs.for_each_entry(0, |entry| {
+                        if entry.name[0] == 0x00
+                            || entry.name[0] == 0xE5
+                            || entry.attr & 0x08 != 0
+                            || entry.attr & 0x10 != 0
+                        {
                             return;
                         }
 
-                        if !entry.name.starts_with(&name) || !entry.ext.starts_with(&ext) || &ext != b"ELF" {
-                            return
+                        if !entry.name.starts_with(&name)
+                            || !entry.ext.starts_with(&ext)
+                            || &ext != b"ELF"
+                        {
+                            return;
                         }
 
                         file_found = true;
@@ -722,7 +783,8 @@ extern "C" fn syscall_inner(arg1: u64, arg2: u64, syscall_no: u64) -> SyscallRet
                             let entry_addr = elf::load_elf64(load_addr as usize);
 
                             // Cast and jump
-                            let entry_fn: extern "C" fn() -> u64 = core::mem::transmute(entry_addr as *const ());
+                            let entry_fn: extern "C" fn() -> u64 =
+                                core::mem::transmute(entry_addr as *const ());
 
                             rprint!("Jumping to the program entry point...\n");
                             elf::jump_to_elf(entry_fn, stack_top, arg);
@@ -732,15 +794,14 @@ extern "C" fn syscall_inner(arg1: u64, arg2: u64, syscall_no: u64) -> SyscallRet
                 Err(e) => {
                     rprint!(e);
                     rprint!("\n");
-                    
+
                     return SyscallReturnCode::FilesystemError;
                 }
             }
 
             if !file_found {
                 return SyscallReturnCode::FileNotFound;
-            } 
-
+            }
         }
 
         /*
@@ -853,11 +914,23 @@ extern "C" fn syscall_inner(arg1: u64, arg2: u64, syscall_no: u64) -> SyscallRet
                             return SyscallReturnCode::InvalidInput;
                         }
 
-                        core::ptr::copy_nonoverlapping(packet, ipv4_buffer_aux.as_mut_ptr(), (header_len as u16 + total_len) as usize);
+                        core::ptr::copy_nonoverlapping(
+                            packet,
+                            ipv4_buffer_aux.as_mut_ptr(),
+                            (header_len as u16 + total_len) as usize,
+                        );
 
-                        let payload = ipv4_buffer_aux.get(header_len as usize..total_len as usize).unwrap_or(&[]);
+                        let payload = ipv4_buffer_aux
+                            .get(header_len as usize..total_len as usize)
+                            .unwrap_or(&[]);
 
-                        let ipv4_len = ipv4::create_packet((*header).dest_ip, (*header).source_ip , (*header).protocol, payload, &mut ipv4_buffer);
+                        let ipv4_len = ipv4::create_packet(
+                            (*header).dest_ip,
+                            (*header).source_ip,
+                            (*header).protocol,
+                            payload,
+                            &mut ipv4_buffer,
+                        );
 
                         if ipv4_len == 0 {
                             return SyscallReturnCode::InvalidInput;
@@ -884,7 +957,13 @@ extern "C" fn syscall_inner(arg1: u64, arg2: u64, syscall_no: u64) -> SyscallRet
 
                         let payload = icmp_buffer_aux.get(8..).unwrap_or(&[]);
 
-                        let icmp_len = icmp::create_packet(0, (*header).identifier, (*header).sequence_number, payload, &mut icmp_buffer);
+                        let icmp_len = icmp::create_packet(
+                            0,
+                            (*header).identifier,
+                            (*header).sequence_number,
+                            payload,
+                            &mut icmp_buffer,
+                        );
                         let icmp_slice = icmp_buffer.get(..icmp_len).unwrap_or(&[]);
 
                         core::ptr::copy_nonoverlapping(icmp_slice.as_ptr(), packet, icmp_len);
@@ -903,11 +982,28 @@ extern "C" fn syscall_inner(arg1: u64, arg2: u64, syscall_no: u64) -> SyscallRet
 
                     unsafe {
                         //core::ptr::copy_nonoverlapping(packet, tcp_buffer.as_mut_ptr(), tcp_req_len + (*request).length as usize);
-                        core::ptr::copy_nonoverlapping(packet, tcp_buffer_aux.as_mut_ptr(), tcp_req_len + (*request).length as usize);
+                        core::ptr::copy_nonoverlapping(
+                            packet,
+                            tcp_buffer_aux.as_mut_ptr(),
+                            tcp_req_len + (*request).length as usize,
+                        );
 
-                        let payload = tcp_buffer_aux.get( tcp_req_len..tcp_req_len + (*request).length as usize ).unwrap_or(&[]);
+                        let payload = tcp_buffer_aux
+                            .get(tcp_req_len..tcp_req_len + (*request).length as usize)
+                            .unwrap_or(&[]);
 
-                        let tcp_len = tcp::create_packet((*request).header.source_port, (*request).header.dest_port, (*request).header.seq_num, (*request).header.ack_num, (*request).header.data_offset_reserved_flags & 0xFF, 1024, payload, (*request).src_ip, (*request).dst_ip, &mut tcp_buffer);
+                        let tcp_len = tcp::create_packet(
+                            (*request).header.source_port,
+                            (*request).header.dest_port,
+                            (*request).header.seq_num,
+                            (*request).header.ack_num,
+                            (*request).header.data_offset_reserved_flags & 0xFF,
+                            1024,
+                            payload,
+                            (*request).src_ip,
+                            (*request).dst_ip,
+                            &mut tcp_buffer,
+                        );
                         let tcp_slice = tcp_buffer.get(0..tcp_len).unwrap_or(&[]);
 
                         let zeros = [0u8; 512];
@@ -1051,4 +1147,3 @@ pub struct TcpPacketRequest {
     pub dst_ip: [u8; 4],
     pub length: u16,
 }
-

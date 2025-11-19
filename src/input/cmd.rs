@@ -1,17 +1,20 @@
 use crate::acpi;
 use crate::app;
 use crate::audio;
-use crate::fs::fat12::block::BlockDevice;
-use crate::init::config;
 use crate::debug;
-use crate::fs::fat12::{block::Floppy, fs::Filesystem, check::run_check};
+use crate::fs::fat12::block::BlockDevice;
+use crate::fs::fat12::{block::Floppy, check::run_check, fs::Filesystem};
+use crate::init::config;
 use crate::init::config::PATH_CLUSTER;
+use crate::input::keyboard;
 use crate::input::keyboard::keyboard_loop;
 use crate::net;
 use crate::time;
+use crate::tui::{
+    app::TuiApp,
+    widget::{Container, Label, Window},
+};
 use crate::video;
-use crate::input::keyboard;
-use crate::tui::{widget::{Container, Window, Label}, app::TuiApp};
 
 const KERNEL_VERSION: &[u8] = b"0.9.6";
 
@@ -196,7 +199,7 @@ static COMMANDS: &[Command] = &[
         description: b"writes arguments to a sample file on floppy",
         function: cmd_write,
         hidden: false,
-    }
+    },
 ];
 
 /// Handle takes in an input from keyboard and tries to match it to a defined Command to execute it
@@ -384,7 +387,7 @@ fn cmd_cd(args: &[u8]) {
     }
 }
 
-/// Clears the screen and starts the TCP server accepting connections on TCP/12345. 
+/// Clears the screen and starts the TCP server accepting connections on TCP/12345.
 fn cmd_chat(args: &[u8]) {
     clear_screen!();
 
@@ -394,7 +397,7 @@ fn cmd_chat(args: &[u8]) {
     if count > 0 {
         app::chat::tcp::handle_conns(&ips);
     } else {
-        // Use dummy IP addresses to 
+        // Use dummy IP addresses to
         app::chat::tcp::handle_conns(&[[0u8; 4]; 4]);
     }
 }
@@ -415,17 +418,15 @@ fn cmd_dir(_args: &[u8]) {
     let floppy = Floppy;
 
     match Filesystem::new(&floppy) {
-        Ok(fs) => {
-            unsafe {
-                fs.for_each_entry(PATH_CLUSTER, | entry | {
-                    if entry.name[0] == 0x00 || entry.name[0] == 0xE5 || entry.name[0] == 0xFF {
-                        return;
-                    }
+        Ok(fs) => unsafe {
+            fs.for_each_entry(PATH_CLUSTER, |entry| {
+                if entry.name[0] == 0x00 || entry.name[0] == 0xE5 || entry.name[0] == 0xFF {
+                    return;
+                }
 
-                    fs.print_name(entry);
-                });
-            }
-        }
+                fs.print_name(entry);
+            });
+        },
         Err(e) => {
             error!(e);
             error!();
@@ -525,9 +526,24 @@ fn cmd_menu(_args: &[u8]) {
     //app::menu::menu_loop(vga_index);
 
     // Set the labels
-    let mut label1 = Label { x: 0, y: 0, text: "Play", attr: 0x0F };
-    let mut label2 = Label { x: 0, y: 2, text: "Scores", attr: 0x0F };
-    let mut label3 = Label { x: 0, y: 4, text: "Quit", attr: 0x0F };
+    let mut label1 = Label {
+        x: 0,
+        y: 0,
+        text: "Play",
+        attr: 0x0F,
+    };
+    let mut label2 = Label {
+        x: 0,
+        y: 2,
+        text: "Scores",
+        attr: 0x0F,
+    };
+    let mut label3 = Label {
+        x: 0,
+        y: 4,
+        text: "Quit",
+        attr: 0x0F,
+    };
 
     // Create a container to hold all labels
     let mut menu = Container {
@@ -683,7 +699,10 @@ fn cmd_read(args: &[u8]) {
 
                 fs.read_file(cluster as u16, &mut buf);
 
-                print!("Dumping file raw contents:\n", video::vga::Color::DarkYellow);
+                print!(
+                    "Dumping file raw contents:\n",
+                    video::vga::Color::DarkYellow
+                );
                 printb!(&buf);
                 println!();
             } else {
@@ -719,11 +738,23 @@ fn cmd_response(_args: &[u8]) {
                 let mut ipv4_buf = [0u8; 1500];
 
                 // Create an ICMP Echo response packet...
-                let icmp_len = net::icmp::create_packet(0, icmp_header.identifier, icmp_header.sequence_number, icmp_payload, &mut icmp_buf);
+                let icmp_len = net::icmp::create_packet(
+                    0,
+                    icmp_header.identifier,
+                    icmp_header.sequence_number,
+                    icmp_payload,
+                    &mut icmp_buf,
+                );
                 let icmp_slice = icmp_buf.get(..icmp_len).unwrap_or(&[]);
 
                 // ...and prefix it with IPv4 header.
-                let ipv4_len = net::ipv4::create_packet(ipv4_header.dest_ip, ipv4_header.source_ip, ipv4_header.protocol, icmp_slice, &mut ipv4_buf);
+                let ipv4_len = net::ipv4::create_packet(
+                    ipv4_header.dest_ip,
+                    ipv4_header.source_ip,
+                    ipv4_header.protocol,
+                    icmp_slice,
+                    &mut ipv4_buf,
+                );
                 let ipv4_slice = ipv4_buf.get(..ipv4_len).unwrap_or(&[]);
 
                 net::ipv4::send_packet(ipv4_slice);
@@ -751,7 +782,7 @@ fn cmd_response(_args: &[u8]) {
                 break;
             }
             _ => {
-                // Hide this as it would spam the screen 
+                // Hide this as it would spam the screen
                 //println!("Unknown IPv4 protocol number (not ICMP)");
             }
         }
@@ -902,10 +933,11 @@ fn cmd_run(args: &[u8]) {
                 rprintn!(entry_addr);
                 rprint!("\n");
 
-                let stack_top = 0x700000;
+                let stack_top = 0x7fffff;
 
                 // cast and jump
-                let entry_fn: extern "C" fn() -> u64 = core::mem::transmute(entry_addr as *const ());
+                let entry_fn: extern "C" fn() -> u64 =
+                    core::mem::transmute(entry_addr as *const ());
 
                 rprint!("Jumping to the program entry point...\n");
                 //prg_fn();
@@ -930,7 +962,7 @@ static mut USER_STACK: [u8; USER_STACK_SIZE] = [0; USER_STACK_SIZE];
 
 unsafe extern "C" fn user_program_return() -> ! {
     core::arch::asm!(
-        "mov rdi, rax",     
+        "mov rdi, rax",
         "jmp {handler}",
         handler = sym handle_program_return,
         options(noreturn)
@@ -976,7 +1008,10 @@ unsafe fn run_program(entry: extern "C" fn(u32) -> u32, arg: u32) -> u32 {
 /// Experimental command function to demonstrate the current state of the shutdown process
 /// implemented.
 fn cmd_shutdown(_args: &[u8]) {
-    print!("\n\n --- Shutting down the system", video::vga::Color::DarkCyan);
+    print!(
+        "\n\n --- Shutting down the system",
+        video::vga::Color::DarkCyan
+    );
 
     // Burn some CPU time
     for _ in 0..3 {
@@ -1021,14 +1056,14 @@ fn cmd_time(_args: &[u8]) {
     print!(":");
 
     // Minutes
-    if m < 10 { 
+    if m < 10 {
         print!("0");
     }
     printn!(m as u64);
     print!(":");
 
     // Seconds
-    if s < 10 { 
+    if s < 10 {
         print!("0");
     }
     printn!(s as u64);
@@ -1127,4 +1162,3 @@ fn cmd_write(args: &[u8]) {
         }
     }
 }
-

@@ -3,7 +3,7 @@
 //
 //generic print macros
 /// Macro to render all rows with the currently set ColorCode.
-use crate::video::{vga};
+use crate::video::vga;
 #[macro_export]
 macro_rules! clear_screen {
     () => {
@@ -13,39 +13,60 @@ macro_rules! clear_screen {
     };
 }
 
-
 /// This macro takes in a reference to byte slice (&[u8]) and prints all its contents to display.
 #[macro_export]
 macro_rules! printb {
     ($arg:expr) => {
-        if let Some(mut writer) = $crate::video::vga::get_writer() { 
+        if let Some(mut writer) = $crate::video::vga::get_writer() {
             for b in $arg {
                 writer.write_byte(*b);
             }
-
         }
-		
     };
 }
 //Same as the macro above, except takes in color then resets
 #[macro_export]
 macro_rules! printb_color {
-
-	($arg:expr, $col: ident) => {
-		if let Some(mut writer) = $crate::video::vga::get_writer() {
-			writer.set_color($crate::video::vga::Color::$col, $crate::video::vga::Color::Black);
-			for b in $arg {
-				writer.write_byte(*b);
-			}
-			writer.set_color($crate::video::vga::Color::White, $crate::video::vga::Color::Black); //resets color
-		}
-
-	}
-
-
+    ($arg:expr, $col: ident) => {
+        if let Some(mut writer) = $crate::video::vga::get_writer() {
+            writer.set_color(
+                $crate::video::vga::Color::$col,
+                $crate::video::vga::Color::Black,
+            );
+            for b in $arg {
+                writer.write_byte(*b);
+            }
+            writer.set_color(
+                $crate::video::vga::Color::White,
+                $crate::video::vga::Color::Black,
+            ); //resets color
+        }
+    };
 }
 
+#[macro_export]
+macro_rules! printx {
+    ($arg:expr) => {
+        let mut buf = [0u8; 20];
+        let mut len = buf.len();
 
+        let mut num = $arg;
+
+        let hex_runes: [char; 16] = [
+            '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f',
+        ];
+
+        while num > 0 {
+            len -= 1;
+            if let Some(x) = buf.get_mut(len) {
+                *x = hex_runes[(num % 16) as usize] as u8;
+            }
+            num /= 16;
+        }
+
+        printb!(buf.get(len..).unwrap_or(&[]));
+    };
+}
 
 /// Special macro to print u64 numbers as a slice of u8 bytes. why?
 #[macro_export]
@@ -57,7 +78,6 @@ macro_rules! printn {
 
         if $arg == 0 {
             print!("0");
-            //return 
         }
 
         let mut num = $arg;
@@ -77,11 +97,13 @@ macro_rules! printn {
 /// Meta macro to include the newline implicitly at the end of provided string.
 #[macro_export]
 macro_rules! println {
-    () => ($crate::print!("\n"));
-    ($arg:expr) => ({
+    () => {
+        $crate::print!("\n")
+    };
+    ($arg:expr) => {{
         $crate::print!($arg);
         $crate::print!("\n");
-    });
+    }};
 }
 
 /// The main string printing macro. Takes in 1-3 arguments. The first one is always the string to
@@ -90,23 +112,21 @@ macro_rules! println {
 #[macro_export]
 macro_rules! print {
     ($arg:expr) => {
-        if let Some(mut writer) = $crate::video::vga::get_writer() { 
+        if let Some(mut writer) = $crate::video::vga::get_writer() {
             //writer.set_color($crate::vga::writer::Color::White, $crate::vga::writer::Color::Black);
             writer.write_str_raw($arg);
         }
     };
     ($arg:expr, $fg:expr) => {
-        if let Some(mut writer) = $crate::video::vga::get_writer() { 
+        if let Some(mut writer) = $crate::video::vga::get_writer() {
             writer.set_color_num($fg as u8, $crate::video::vga::Color::Black as u8);
             writer.write_str_raw($arg);
         }
     };
     ($arg:expr, $fg:expr, $bg:expr) => ({
-        if let Some(mut writer) = $crate::video::vga::get_writer() { 
+        if let Some(mut writer) = $crate::video::vga::get_writer() {
             writer.set_color_num($fg as u8, $bg as u8);
             writer.write_str_raw($arg);
         }
     });
 }
-
-

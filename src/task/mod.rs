@@ -19,7 +19,7 @@ static STACKS: [u64; 4] = [0x790000, 0x780000, 0x770000, 0x760000];
 
 #[unsafe(no_mangle)]
 extern "C" fn new_stack() -> u64 {
-//extern "C" fn new_stack() -> &'static mut [u8] {
+    //extern "C" fn new_stack() -> &'static mut [u8] {
     //static mut STACKS: [[u8; 4096]; MAX_TASKS] = [[0; 4096]; MAX_TASKS];
     static mut NEXT: usize = 0;
 
@@ -42,20 +42,20 @@ fn add_task(entry: extern "C" fn()) {
     let rsp = stack + 0x90000 - 8; // top of stack
 
     let regs = process::Registers {
-        r15: 0, 
-        r14: 0, 
-        r13: 0, 
+        r15: 0,
+        r14: 0,
+        r13: 0,
         r12: 0,
-        r11: 0, 
-        r10: 0, 
-        r9: 0, 
+        r11: 0,
+        r10: 0,
+        r9: 0,
         r8: 0,
-        rdi: 0, 
-        rsi: 0, 
-        rbp: 0, 
+        rdi: 0,
+        rsi: 0,
+        rbp: 0,
         rdx: 0,
-        rcx: 0, 
-        rbx: 0, 
+        rcx: 0,
+        rbx: 0,
         rax: 0,
         rip: entry as u64,
         cs: 0x08,
@@ -68,7 +68,11 @@ fn add_task(entry: extern "C" fn()) {
         #[expect(static_mut_refs)]
         for slot in TASKS.iter_mut() {
             if slot.is_none() {
-                *slot = Some(Task { regs, stack, is_done: false });
+                *slot = Some(Task {
+                    regs,
+                    stack,
+                    is_done: false,
+                });
                 break;
             }
         }
@@ -122,61 +126,61 @@ pub extern "C" fn schedule() {
         let mut next = CURRENT_TASK;
 
         //for _ in 0..MAX_TASKS {
-            next = (next + 1) % 2;
+        next = (next + 1) % 2;
 
-            // Check if next task exists and is not done
-            if let Some(next_task) = &TASKS[next] {
-                if !next_task.is_done {
-                    // Check that old task exists as well
-                    if let Some(old_task) = old_task_opt.as_mut() {
-                        rprint!("[SCHEDULE] Switching from task ");
-                        rprintn!(CURRENT_TASK);
-                        rprint!(" to task ");
-                        rprintn!(next);
-                        rprint!("\n");
+        // Check if next task exists and is not done
+        if let Some(next_task) = &TASKS[next] {
+            if !next_task.is_done {
+                // Check that old task exists as well
+                if let Some(old_task) = old_task_opt.as_mut() {
+                    rprint!("[SCHEDULE] Switching from task ");
+                    rprintn!(CURRENT_TASK);
+                    rprint!(" to task ");
+                    rprintn!(next);
+                    rprint!("\n");
 
-                        rprint!("Task ");
-                        rprintn!(CURRENT_TASK);
-                        rprint!(" registers:\nRIP: ");
-                        rprintn!(old_task.regs.rip);
-                        rprint!("\nRSP: ");
-                        rprintn!(old_task.regs.rsp);
-                        rprint!("\nSS: ");
-                        rprintn!(old_task.regs.ss);
-                        rprint!("\n\n");
+                    rprint!("Task ");
+                    rprintn!(CURRENT_TASK);
+                    rprint!(" registers:\nRIP: ");
+                    rprintn!(old_task.regs.rip);
+                    rprint!("\nRSP: ");
+                    rprintn!(old_task.regs.rsp);
+                    rprint!("\nSS: ");
+                    rprintn!(old_task.regs.ss);
+                    rprint!("\n\n");
 
-                        rprint!("Task ");
-                        rprintn!(next);
-                        rprint!(" registers:\nRIP: ");
-                        rprintn!(next_task.regs.rip);
-                        rprint!("\nRSP: ");
-                        rprintn!(next_task.regs.rsp);
-                        rprint!("\nSS: ");
-                        rprintn!(next_task.regs.ss);
-                        rprint!("\n\n");
+                    rprint!("Task ");
+                    rprintn!(next);
+                    rprint!(" registers:\nRIP: ");
+                    rprintn!(next_task.regs.rip);
+                    rprint!("\nRSP: ");
+                    rprintn!(next_task.regs.rsp);
+                    rprint!("\nSS: ");
+                    rprintn!(next_task.regs.ss);
+                    rprint!("\n\n");
 
-                        // Update current task index
-                        CURRENT_TASK = next;
+                    // Update current task index
+                    CURRENT_TASK = next;
 
-                        // Perform the context switch with valid pointers
-                        context_switch(
-                            &mut old_task.regs as *mut process::Registers,
-                            &next_task.regs as *const process::Registers,
-                        );
+                    // Perform the context switch with valid pointers
+                    context_switch(
+                        &mut old_task.regs as *mut process::Registers,
+                        &next_task.regs as *const process::Registers,
+                    );
 
-                        //break;
-                    } else {
-                        //println!("[SCHEDULE] Current task ");
-                        //printn!(CURRENT_TASK); 
-                        //println!(" is None")
-                    }
+                    //break;
+                } else {
+                    //println!("[SCHEDULE] Current task ");
+                    //printn!(CURRENT_TASK);
+                    //println!(" is None")
                 }
-            } else {
-                //print!("[SCHEDULE] Task slot ");
-                //printn!(next);
-                //println!(" is None")
-                //}
-    }
+            }
+        } else {
+            //print!("[SCHEDULE] Task slot ");
+            //printn!(next);
+            //println!(" is None")
+            //}
+        }
     }
 }
 
@@ -193,10 +197,10 @@ extern "C" fn kern_task1() {
         unsafe {
             #[expect(static_mut_refs)]
             if let Some(pipe) = PIPE.as_mut() {
-                ch += 1;
                 pipe.write(ch);
+                ch += 1;
 
-                if ch.is_multiple_of(26) {
+                if ch.is_multiple_of(27) {
                     ch = 0;
                 }
 
@@ -222,7 +226,7 @@ extern "C" fn kern_task2() {
                     continue;
                 }
 
-                rprintb!( &[ch % 26 + 65] );
+                rprintb!(&[ch % 27 + 64]);
             }
         }
     }
@@ -232,7 +236,7 @@ extern "C" fn kern_task2() {
 #[unsafe(link_section = ".user_task.task1")]
 extern "C" fn user_task1() {
     #[unsafe(link_section = ".user_task.data1")]
-    static MSG1: [u8; 18]= *b"[TASK 1]: bonjour\n";
+    static MSG1: [u8; 18] = *b"[TASK 1]: bonjour\n";
 
     loop {
         //print!("[TASK 1]: bonjour\n");
@@ -249,7 +253,9 @@ extern "C" fn user_task1() {
         }
 
         for _ in 0..50_000_000 {
-            unsafe { core::arch::asm!("nop"); }
+            unsafe {
+                core::arch::asm!("nop");
+            }
         }
     }
 }
@@ -275,7 +281,9 @@ extern "C" fn user_task2() {
         }
 
         for _ in 0..50_000_000 {
-            unsafe { core::arch::asm!("nop"); }
+            unsafe {
+                core::arch::asm!("nop");
+            }
         }
     }
 }
@@ -289,4 +297,3 @@ pub fn run_scheduler() {
     add_task(kern_task2);
     //schedule();
 }
-

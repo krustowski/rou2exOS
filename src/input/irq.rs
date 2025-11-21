@@ -3,12 +3,14 @@ use core::sync::atomic::{AtomicUsize, Ordering};
 const MAX_RECEPTORS: usize = 5;
 const USER_KBUF_SIZE: usize = 256;
 
+static mut TEMP_PID: usize = 123;
+
 pub struct Subscriber {
     pub buf_ptr: u64,
-    pub pid: usize,                     
-    kbuf: [u8; USER_KBUF_SIZE],     
-    head: AtomicUsize,              
-    tail: AtomicUsize,          
+    pub pid: usize,
+    kbuf: [u8; USER_KBUF_SIZE],
+    head: AtomicUsize,
+    tail: AtomicUsize,
 }
 
 impl Subscriber {
@@ -42,11 +44,16 @@ impl Subscriber {
         while copied < len {
             let tail = self.tail.load(Ordering::Relaxed);
             let head = self.head.load(Ordering::Acquire);
-            if tail == head { break; } // empty
-                                       //
+            if tail == head {
+                break;
+            } // empty
+              //
             let byte = unsafe { core::ptr::read_volatile(self.kbuf.as_ptr().add(tail)) };
-            unsafe { core::ptr::write_volatile(dst.add(copied), byte); }
-            self.tail.store((tail + 1) % USER_KBUF_SIZE, Ordering::Release);
+            unsafe {
+                core::ptr::write_volatile(dst.add(copied), byte);
+            }
+            self.tail
+                .store((tail + 1) % USER_KBUF_SIZE, Ordering::Release);
             copied += 1;
         }
         copied
@@ -55,7 +62,11 @@ impl Subscriber {
     pub fn available(&self) -> usize {
         let head = self.head.load(Ordering::Acquire);
         let tail = self.tail.load(Ordering::Relaxed);
-        if head >= tail { head - tail } else { USER_KBUF_SIZE - tail + head }
+        if head >= tail {
+            head - tail
+        } else {
+            USER_KBUF_SIZE - tail + head
+        }
     }
 
     pub fn clear(&self) {
@@ -72,14 +83,13 @@ pub static mut RECEPTORS: [Subscriber; MAX_RECEPTORS] = [
     Subscriber::new(),
 ];
 
-const TEMP_PID: usize = 123;
-
 pub fn pipe_subscribe(addr: u64) -> isize {
     unsafe {
         #[expect(static_mut_refs)]
         for s in RECEPTORS.iter_mut() {
             if s.pid == 0 {
                 s.pid = TEMP_PID;
+                TEMP_PID += 1;
                 s.buf_ptr = addr;
                 s.clear();
 
@@ -95,7 +105,7 @@ pub fn pipe_unsubscribe(_addr: u64) -> isize {
     unsafe {
         #[expect(static_mut_refs)]
         for s in RECEPTORS.iter_mut() {
-            if s.pid == TEMP_PID {
+            if s.pid == TEMP_PID - 1 {
                 s.pid = 0;
                 s.buf_ptr = 0;
                 s.clear();
@@ -105,4 +115,3 @@ pub fn pipe_unsubscribe(_addr: u64) -> isize {
     }
     -1
 }
-

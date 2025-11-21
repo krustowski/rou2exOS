@@ -1,5 +1,5 @@
 use crate::input::port::{read, write};
-use crate::video::sysprint::{Result};
+use crate::video::sysprint::Result;
 pub fn init_pit(frequency_hz: u32) {
     if frequency_hz == 0 {
         return;
@@ -10,14 +10,13 @@ pub fn init_pit(frequency_hz: u32) {
 
     // PIT control port
     write(0x43, 0x36);
-    write(0x40, (divisor & 0xFF) as u8);        // low byte
+    write(0x40, (divisor & 0xFF) as u8); // low byte
     write(0x40, ((divisor >> 8) & 0xFF) as u8); // high byte
 
     // Enable interrupts
     unsafe {
         core::arch::asm!("sti");
     }
-
 }
 
 pub unsafe fn remap_pic() {
@@ -69,17 +68,18 @@ pub unsafe fn remap_pic() {
     write(PIC2_DATA, a2);
 }
 
-
 pub unsafe fn io_wait() {
     write(0x80, 0);
 }
 
 pub fn pic_pit_init() -> Result {
     debugln!("Remapping PIC");
-    unsafe { remap_pic(); }
+    unsafe {
+        remap_pic();
+    }
 
     debugln!("Starting 100Hz timer");
-    init_pit(1); // 100Hz -> 10ms per tick???
+    init_pit(100); // 100Hz -> 10ms per tick???
 
     Result::Passed
 }

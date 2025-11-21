@@ -10,11 +10,10 @@ pub struct TagHeader {
 #[repr(C)]
 #[derive(Debug)]
 struct MemoryMapTag {
-    typ: u32,       
-    size: u32,          
+    typ: u32,
+    size: u32,
     entry_size: u32,
-    entry_version: u32, 
-                        
+    entry_version: u32,
 }
 
 #[repr(C, packed)]
@@ -22,11 +21,11 @@ struct MemoryMapTag {
 struct MemoryMapEntry {
     base_addr: u64,
     length: u64,
-    typ: u32,   
-    reserved: u32,  
+    typ: u32,
+    reserved: u32,
 }
 
-#[derive(Clone,Copy,Default)]
+#[derive(Clone, Copy, Default)]
 #[repr(C, packed)]
 pub struct FramebufferTag {
     pub typ: u32,
@@ -55,7 +54,7 @@ pub struct AcpiRSDPTag {
 pub struct AcpiSDTHeader {
     pub signature: [u8; 4],
     pub length: u32,
-    pub revision: u8, 
+    pub revision: u8,
     pub checksum: u8,
     pub oemid: [u8; 6],
     pub oem_table_id: [u8; 8],
@@ -121,7 +120,9 @@ pub unsafe fn parse_multiboot2_info(base_addr: usize, _fb_tag: &FramebufferTag) 
                 let entry_size = mmap_tag.entry_size as usize;
 
                 if entry_size > 0 {
-                    let entries_count = (mmap_tag.size as usize - core::mem::size_of::<MemoryMapTag>()) / entry_size;
+                    let entries_count = (mmap_tag.size as usize
+                        - core::mem::size_of::<MemoryMapTag>())
+                        / entry_size;
 
                     for i in 0..entries_count {
                         let entry_ptr = entries_start.add(i * entry_size) as *const MemoryMapEntry;
@@ -169,20 +170,19 @@ pub unsafe fn parse_multiboot2_info(base_addr: usize, _fb_tag: &FramebufferTag) 
                     let fb_ptr = virt_base as *mut u32;
 
                     let test_ptr = virt_base as *mut u32;
-                    *test_ptr = 0xFFFFFFFF; 
+                    *test_ptr = 0xFFFFFFFF;
 
                     //crate::mem::pages::identity_map(p4_table as *mut u64, 4 * 1024 * 1024);
                     //crate::mem::pages::identity_map(p4_table as *mut u64, 0x1000);
 
                     /*crate::mem::pages::map_32mb(
-                        p4_ptr, 
-                        fb_tag.addr as usize, 
+                        p4_ptr,
+                        fb_tag.addr as usize,
                         virt_base as usize,
                     );*/
 
                     //x86_64::instructions::tlb::flush_all();
                     //Cr3::write(PhysFrame::from_start_address(PhysAddr::new(p4_phys as u64)).unwrap(), Cr3Flags::empty());
-
 
                     /*for y in 0..500  {
                         for x in 0..500  {
@@ -197,18 +197,36 @@ pub unsafe fn parse_multiboot2_info(base_addr: usize, _fb_tag: &FramebufferTag) 
                     }*/
 
                     /*for y in 0..150 {
-                        for x in 0..200 {
-                            super::font::put_pixel(x, y, 0xdeadbeef, fb_ptr, 4096, 32);
-                            }
-                            }*/
+                    for x in 0..200 {
+                        super::font::put_pixel(x, y, 0xdeadbeef, fb_ptr, 4096, 32);
+                        }
+                        }*/
                     draw_rect(fb_ptr, 150, 150, 100, 100, 4096, 0x00ffffff);
                     draw_rect(fb_ptr, 250, 250, 100, 100, 4096, 0x00ff0000);
                     draw_rect(fb_ptr, 350, 350, 100, 100, 4096, 0x0000ff00);
                     draw_rect(fb_ptr, 450, 450, 100, 100, 4096, 0x000000ff);
 
                     if let Some(font) = parse_psf(super::font::PSF_FONT) {
-                        draw_text_psf("[guest@rou2ex:/] > ", &font, 25, 30, 0x0000ff00, fb_ptr, fb_tag.pitch as usize, fb_tag.bpp as usize);
-                        draw_text_psf("[guest@rou2ex:/] > ", &font, 25, 50, 0x00ffd700, fb_ptr, fb_tag.pitch as usize, fb_tag.bpp as usize);
+                        draw_text_psf(
+                            "[guest@rou2ex:/] > ",
+                            &font,
+                            25,
+                            30,
+                            0x0000ff00,
+                            fb_ptr,
+                            fb_tag.pitch as usize,
+                            fb_tag.bpp as usize,
+                        );
+                        draw_text_psf(
+                            "[guest@rou2ex:/] > ",
+                            &font,
+                            25,
+                            50,
+                            0x00ffd700,
+                            fb_ptr,
+                            fb_tag.pitch as usize,
+                            fb_tag.bpp as usize,
+                        );
 
                         //draw_char("ABCDEFGHIJKLMNOPQRSTUVWXYZ", 35, 35, fb_ptr, fb_tag.pitch as usize, 0xdeadbeef, FONT_RAW);
                     }
@@ -218,7 +236,6 @@ pub unsafe fn parse_multiboot2_info(base_addr: usize, _fb_tag: &FramebufferTag) 
                 }
 
                 //dump_debug_log_to_file();
-
             }
 
             14 => {
@@ -256,7 +273,15 @@ fn align_up(x: usize, align: usize) -> usize {
     (x + align - 1) & !(align - 1)
 }
 
-pub unsafe fn draw_rect(ptr: *mut u32, x0: usize, y0: usize, w: usize, h: usize, pitch: usize, color: u32) {
+pub unsafe fn draw_rect(
+    ptr: *mut u32,
+    x0: usize,
+    y0: usize,
+    w: usize,
+    h: usize,
+    pitch: usize,
+    color: u32,
+) {
     for y in y0..(y0 + h) {
         for x in x0..(x0 + w) {
             let offset = y * (pitch / 4) + x;
@@ -265,5 +290,3 @@ pub unsafe fn draw_rect(ptr: *mut u32, x0: usize, y0: usize, w: usize, h: usize,
         }
     }
 }
-
-

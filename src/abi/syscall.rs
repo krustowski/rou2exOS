@@ -73,8 +73,8 @@ extern "C" fn syscall_inner(arg1: u64, arg2: u64, syscall_no: u64) -> SyscallRet
                     "mov rdi, {0}",
                     "mov rsi, {1}",
                     "jmp kernel_return",
-                    in(reg) arg1,
                     in(reg) arg2,
+                    in(reg) arg1,
                 );
             };
         }

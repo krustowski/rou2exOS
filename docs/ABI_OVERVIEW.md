@@ -2,7 +2,6 @@
 
 This overview document presents the rou2exOS (aka `r2`) kernel interface for external applications. Applications should utilize custom programming language libraries provided in [the apps repository](https://github.com/krustowski/rou2exOS-apps) and statically link them with their source code. Examples on how to use such libraries, how to compile them and link them are provided in directories named by concerned languages.
 
-
 ## Privilege Levels
 
 The privilege levels are to be specified and defined in the Global Descriptor Table (GDT) in early boot sequence procedures.
@@ -10,7 +9,7 @@ The privilege levels are to be specified and defined in the Global Descriptor Ta
 | CPU Ring | Common Interrupt | Target purpose |
 |----------|------------------|----------------|
 | `0` | *      | kernel space |
-| `1` | `0x7d` | kernel tasks, drivers, kernel services | 
+| `1` | `0x7d` | kernel tasks, drivers, kernel services |
 | `2` | `0x7e` | privileged user space, services, privileged shell access |
 | `3` | `0x7f` | user space, user programs, common shell |
 
@@ -30,7 +29,6 @@ Please note that all values passed into a syscall must be aligned to 8 bytes (64
 | `RDI`    | argument No. 1 | `0x01` |
 | `RSI`    | argument No. 2 | `0x123abc` |
 
-
 ### Table of Syscalls (int 0x7f)
 
 Please note that these lists are incomplete as listed syscalls have to be implemented in the kernel ABI. To be expanded.
@@ -42,13 +40,13 @@ Please note that these lists are incomplete as listed syscalls have to be implem
 |  `0x00`|  process ID | program return code | Graceful exit of a program/process/task. | ✅ |
 |  `0x01`|  `0x01`|  pointer to SysInfo struct | Get the system information summary. Pointer in arg. 2 has to be casted to the SysInfo struct provided by a language library. Memory must be already allocated. | ✅ |
 |        |  `0x02`|  pointer to SysInfo struct | Set the system information summary. Pointer in arg, 2 is a pointer to the SysInfo structure with new information items. | ❌ |
-|  `0x02`|  `0x01`| pointer to RTC struct | Get the Real Time Clock (RTC) data. | ✅ | 
+|  `0x02`|  `0x01`| pointer to RTC struct | Get the Real Time Clock (RTC) data. | ✅ |
 |  `0x03`|  `0x01`| pointer to circular buffer | Register a buffer to receive scancodes from IRQ1 | ✅ |
 |        |  `0x02`| pointer to circular buffer | Unregister a buffer to receive scancodes from IRQ1 | ✅ |
 |        |  `0x03`| pointer to circular buffer | Read from the buffer. | ✅ |
 |  `0x0a`|  pointer to type pointer | size in bytes to allocate | Allocate a memory block on heap. The pointer to the allocated block is returned in `RAX`, or is `0x00` if the allocation procedure fails. | ❌ |
 |  `0x0b`|  pointer to type pointer | size in bytes to allocate | Reallocate the memory block on heap. | ❌ |
-|  `0x0f`|  pointer to type pointer | `0x00` | Free the allocated memory on heap. | ❌ | 
+|  `0x0f`|  pointer to type pointer | `0x00` | Free the allocated memory on heap. | ❌ |
 
 #### Video + Audio Output
 
@@ -56,6 +54,7 @@ Please note that these lists are incomplete as listed syscalls have to be implem
 |-------------|------------|------------|-----------------|-------------|
 |  `0x10`|  pointer to string data | string length | Print provided string to terminal. | ✅ |
 |  `0x11`|  `0x00` | `0x00` | Clear the screen. | ✅ |
+|  `0x12`| encoded position | encoded color | Write a graphical pixel. | ✅ |
 |  `0x1a`|  frequency in Hz | length in milliseconds | Play the frequency. | ✅ |
 |  `0x1b`|  `0x01`| pointer to the audio file | Play the MIDI audio file. | ✅ |
 |  `0x1f`|  `0x00`|  `0x00`| Stop the player. | ✅ |
@@ -90,7 +89,6 @@ Please note that these lists are incomplete as listed syscalls have to be implem
 |        |  `0x03` |  pointer to buffer | Create a TCP packet. | ✅ |
 |  `0x34`|  `0x01` |  pointer to buffer | Send an IPv4 packet.  | ✅ |
 
-
 ### Syscall Return Codes
 
 | Code (uint64) | Meaning |
@@ -102,12 +100,11 @@ Please note that these lists are incomplete as listed syscalls have to be implem
 | `0xfe` | `FileNotFound` |
 | `0xff` | `InvalidSyscall` |
 
-
 ### Type Definitions
 
 #### SysInfo
 
-```rust 
+```rust
 pub struct SysInfo {
     pub system_name: [u8; 32],
     pub system_user: [u8; 32],
@@ -127,7 +124,7 @@ typedef struct {
 } __attribute__((packed)) SysInfo_T;
 ```
 
-#### RTC 
+#### RTC
 
 ```rust
 #[repr(C, packed)]
@@ -191,4 +188,3 @@ typedef struct {
     uint32_t file_size;
 } __attribute__((packed)) Entry_T;
 ```
-

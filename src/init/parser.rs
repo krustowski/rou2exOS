@@ -1,21 +1,17 @@
-use crate::video::sysprint::{Result};
-use crate::init::boot::{FramebufferTag};
-use crate::init::boot::{parse_multiboot2_info};
+use crate::init::boot::parse_multiboot2_info;
+use crate::init::boot::FramebufferTag;
+use crate::video::sysprint::Result;
 
-pub fn parse_info(multiboot_ptr: u64, fb_tag: &FramebufferTag) -> Result {
+pub fn parse_info(m2_ptr: u32, fb_tag: &mut FramebufferTag) -> Result {
+    debug!("Multiboot2 pointer: ");
+    debugn!(m2_ptr);
+    debugln!("");
+
     unsafe {
-        debug!("Multiboot2 pointer: ");
-        debugn!(multiboot_ptr);
-        debugln!("");
-
-        if parse_multiboot2_info((multiboot_ptr as u32) as usize, fb_tag) > 0 {
+        if parse_multiboot2_info(m2_ptr, fb_tag) > 0 {
             return Result::Passed;
         }
     }
-
-    debug!("Multiboot2 pointer: ");
-    debugn!(multiboot_ptr);
-    debugln!("");
 
     Result::Failed
 }

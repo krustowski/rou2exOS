@@ -26,11 +26,11 @@ mod vga;
 
 /// Kernel entrypoint
 #[unsafe(no_mangle)]
-pub extern "C" fn kernel_main(_multiboot2_magic: u32, multiboot_ptr: u32) { 
+pub extern "C" fn kernel_main(_multiboot2_magic: u32, multiboot_ptr: u32) {
     debugln!("Kernel loaded");
 
     // Run init checks and initialize system
-    init::check::init(multiboot_ptr as u64);
+    init::check::init(multiboot_ptr);
 
     // Run the shell loop
     debugln!("Starting shell...");
@@ -49,8 +49,8 @@ use core::panic::PanicInfo;
 /// Panic handler for panic fucntion invocations
 #[panic_handler]
 fn panic(info: &PanicInfo) -> ! {
-    use vga::write::{string, number, newline};
     use vga::buffer::Color;
+    use vga::write::{newline, number, string};
 
     let vga_index: &mut isize = &mut 0;
 
@@ -95,4 +95,3 @@ pub extern "C" fn core_fmt_write() {
         x86_64::instructions::hlt();
     }
 }
-

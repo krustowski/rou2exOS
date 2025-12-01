@@ -16,7 +16,7 @@ use crate::tui::{
 };
 use crate::video;
 
-const KERNEL_VERSION: &[u8] = b"0.9.6";
+const KERNEL_VERSION: &[u8] = b"0.10.1";
 
 struct Command {
     name: &'static [u8],

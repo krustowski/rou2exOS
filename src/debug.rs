@@ -1,6 +1,6 @@
+use crate::{clear_screen, error, printb};
 use core::fmt::{self, Write};
 use spin::Mutex;
-use crate::{clear_screen, error, printb};
 
 const DEBUG_LOG_SIZE: usize = 8192;
 
@@ -34,7 +34,6 @@ impl DebugLog {
     pub fn append(&mut self, data: &[u8]) {
         let remaining = DEBUG_LOG_SIZE - self.len;
         let to_copy = core::cmp::min(data.len(), remaining);
-
 
         if let Some(slice) = self.buffer.get_mut(self.len..self.len + to_copy) {
             if let Some(data) = data.get(..to_copy) {
@@ -82,7 +81,7 @@ macro_rules! debugn {
 macro_rules! debug {
     ($s:expr) => {{
         if let Some(mut log) = $crate::debug::DEBUG_LOG.try_lock() {
-            // Only &[u8], *str and b"literal" 
+            // Only &[u8], *str and b"literal"
             let bytes = ($s).as_ref();
             log.append(bytes);
         }
@@ -153,8 +152,8 @@ pub fn dump_debug_log_to_file() {
     let floppy = Floppy;
 
     // Dump log to display
-    clear_screen!();
-    printb!(dbg.data());
+    //clear_screen!();
+    //printb!(dbg.data());
 
     match Filesystem::new(&floppy) {
         Ok(fs) => {
@@ -186,4 +185,3 @@ fn print_stack_info() {
         debugln!("");
     }
 }
-

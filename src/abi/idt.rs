@@ -20,6 +20,8 @@ extern "x86-interrupt" fn page_fault_handler(
     error!("EXCEPTION: PAGE FAULT");
     warn!("\nAccessed Address: ");
 
+    rprint!("EXCEPTION: PAGE FAULT\n");
+
     match Cr2::read() {
         Ok(addr) => {
             printx!(addr.as_u64());

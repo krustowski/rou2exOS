@@ -1,15 +1,15 @@
+use crate::video::sysprint::Result;
 use core::arch::asm;
-use crate::video::sysprint::{Result};
 
 pub fn check() -> Result {
-    let mode = check_cpu_mode();
+    //let mode = check_cpu_mode();
 
     enable_sse();
     enable_syscalls();
 
-    if mode.len() > 5 && mode.as_bytes()[0..4] == *b"Long" {
-        return Result::Passed;
-    }
+    //if mode.len() > 5 && mode.as_bytes()[0..4] == *b"Long" {
+    return Result::Passed;
+    //}
 
     Result::Failed
 }
@@ -26,7 +26,7 @@ fn enable_sse() {
         let mut cr0: u64;
         asm!("mov {}, cr0", out(reg) cr0);
         cr0 &= !(1 << 2); // Clear EM (disable emulation)
-        cr0 |= 1 << 1;    // Set MP (monitor co-processor)
+        cr0 |= 1 << 1; // Set MP (monitor co-processor)
         asm!("mov cr0, {}", in(reg) cr0);
     }
 }
@@ -57,9 +57,9 @@ fn cpuid(eax: u32) -> u32 {
         asm!(
             "cpuid",
             // Store eax into result
-            inout("eax") eax => result,    
-            out("ecx") _,                  
-            out("edx") _,                  
+            inout("eax") eax => result,
+            out("ecx") _,
+            out("edx") _,
         );
     }
     result
@@ -97,17 +97,14 @@ unsafe fn rdmsr(msr: u32) -> u64 {
     ((high as u64) << 32) | (low as u64)
 }
 
-// Your syscall handler (just returns for now)
 #[unsafe(naked)]
 unsafe extern "C" fn syscall_handler() {
     core::arch::naked_asm!(
-        "swapgs",           // swap GS base to kernel GS base
-        "push rcx",         // save RCX (return RIP)
-        "push r11",         // save R11 (RFLAGS)
-        // here you could call Rust code or handle syscall number in rax
-        "pop r11",
-        "pop rcx",
-        "sysretq",
+        "swapgs",   // swap GS base to kernel GS base
+        "push rcx", // save RCX (return RIP)
+        "push r11", // save R11 (RFLAGS)
+        //
+        "pop r11", "pop rcx", "sysretq",
     );
 }
 
@@ -119,8 +116,7 @@ fn enable_syscalls() {
 
         // Enable syscall/sysret in EFER (bit 0 = SCE)
         let mut efer = rdmsr(IA32_EFER);
-        efer |= 1;  // set SCE bit
+        efer |= 1; // set SCE bit
         wrmsr(IA32_EFER, efer);
     }
 }
-

@@ -3,12 +3,12 @@ cargo-features = ["panic-immediate-abort"]
 [package]
 name = "kernel"
 description = ""
-version = "0.10.0"
+version = "0.10.1"
 edition = "2021"
 authors = ["krusty <krusty@vxn.dev>"]
 
 [dependencies]
-x86_64 = { version = "0.15.3", default-features = false, features = [
+x86_64 = { version = "0.15.4", default-features = false, features = [
     "instructions",
     "abi_x86_interrupt",
 ] }
@@ -30,7 +30,7 @@ lto = false
 [profile.release]
 lto = false
 panic = "abort"
-debug = 2
+debug = false
 
 
 [[bin]]

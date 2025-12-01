@@ -1,4 +1,4 @@
-ENTRY(start)
+ENTRY(_start)
 
 SECTIONS {
     . = 0x100000; /* 1 MB offset */
@@ -8,7 +8,6 @@ SECTIONS {
     }
 
     .text : {
-	*(.text.entry)
         *(.text*)
     }
 

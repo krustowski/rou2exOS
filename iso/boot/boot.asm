@@ -31,9 +31,9 @@ tss64:
    
 align 4
 multiboot_magic:
-    resq 1
+    resb 4
 multiboot_ptr:
-    resq 1
+    resb 4
 
 ;
 ;  Text Section + Kernel Entry Point
@@ -46,10 +46,7 @@ extern __stack_bottom
 extern __stack_top
 
 extern kernel_main
-global start
-
-global multiboot_magic
-global multiboot_ptr
+global _start
 
 global tss64
 global dma
@@ -64,11 +61,13 @@ global gdt_descriptor
 global gdt_tss_descriptor
 global idt_ptr
 
+global multiboot_ptr
+
 global debug_flag
 debug_flag:
     db 0    ; 1 = enabled
 
-start:
+_start:
     mov [multiboot_magic], eax
     mov [multiboot_ptr], ebx
 
@@ -245,10 +244,15 @@ set_up_page_tables:
     mov dword [p3_table + ecx * 8 + 4], 0
 
     inc ecx
-    cmp ecx, 3
+    cmp ecx, 5
     jne .map_1gib
 
     ; Allow CPL=3 access at 0x600_000--0xA00_000
+
+    mov eax, 0x400000
+    or eax, 0b11100111
+    mov [p2_table + 2 * 8], eax
+    mov dword [p2_table + 2 * 8 + 4], 0 
 
     mov eax, 0x600000
     or eax, 0b11100111

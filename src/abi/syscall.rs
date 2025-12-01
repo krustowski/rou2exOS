@@ -97,7 +97,7 @@ extern "C" fn syscall_inner(arg1: u64, arg2: u64, syscall_no: u64) -> SyscallRet
                 0x01 => unsafe {
                     let name = b"rou2ex";
                     let user = b"guest";
-                    let version = b"v0.10.0";
+                    let version = b"v0.10.1";
                     let path = b"/";
 
                     if let Some(nm) = (*sysinfo_ptr).system_name.get_mut(0..name.len()) {
@@ -247,6 +247,39 @@ extern "C" fn syscall_inner(arg1: u64, arg2: u64, syscall_no: u64) -> SyscallRet
 
             clear_screen!();
         }
+
+        /*
+         *  Syscall 0x12 --- Write graphical pixel
+         *
+         *  Arg1: encoded position
+         *  Arg2: encoded color
+         */
+        0x12 => unsafe {
+            let x = arg1 as u32 >> 16;
+            let y = (arg1 & 0xffff) as u32;
+
+            let bg = arg2 as u16 >> 8;
+            let fg = arg2 as u16 & 0xff;
+
+            let color = 0x00ffff00;
+
+            let fb = crate::init::check::FRAMEBUFFER_PTR;
+            let ptr = fb.addr as *mut u64;
+
+            rprint!("X: ");
+            rprintn!(x);
+            rprint!(", Y: ");
+            rprintn!(y);
+            rprint!(", FB: ");
+            rprintn!(fb.addr);
+            rprint!("\n");
+
+            for x0 in 0..100 {
+                let offset = y * (fb.pitch / 4) + x + x0;
+
+                ptr.add(offset as usize).write_volatile(color);
+            }
+        },
 
         /*
          *  Syscall 0x1a --- Play a frequency

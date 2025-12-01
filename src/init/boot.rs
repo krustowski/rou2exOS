@@ -1,4 +1,7 @@
-use crate::init::font::{draw_text_psf, parse_psf};
+use crate::{
+    debug::dump_debug_log_to_file,
+    init::font::{draw_text_psf, parse_psf},
+};
 
 #[repr(C)]
 #[derive(Debug)]
@@ -63,9 +66,9 @@ pub struct AcpiSDTHeader {
     pub creatpr_revision: u32,
 }
 
-pub unsafe fn parse_multiboot2_info(base_addr: usize, _fb_tag: &FramebufferTag) -> usize {
+pub unsafe fn parse_multiboot2_info(base_addr: u32, fb_tag: &mut FramebufferTag) -> usize {
     // Ensure alignment (Multiboot2 requires 8-byte aligned structure)
-    let addr = align_up(base_addr, 8);
+    let addr = align_up(base_addr as usize, 8);
 
     // First 4 bytes: total size of the multiboot info
     let total_size = *(addr as *const u32) as usize;
@@ -142,11 +145,16 @@ pub unsafe fn parse_multiboot2_info(base_addr: usize, _fb_tag: &FramebufferTag) 
             8 => {
                 debugln!("Framebuffer tag: ");
 
-                let fb_tag = &*(ptr as *const FramebufferTag);
+                //let fb_tag = &*(ptr as *const FramebufferTag);
+                *fb_tag = *(ptr as *const FramebufferTag);
 
                 debug!("Framebuffer address: ");
-                debugn!(fb_tag.addr as u64);
+                debugn!(fb_tag.addr);
                 debugln!("");
+
+                rprint!("Framebuffer address: ");
+                rprintn!(fb_tag.addr);
+                rprint!("\n");
 
                 debug!("(bpp + res): ");
                 debugn!(fb_tag.bpp as u64);
@@ -156,55 +164,65 @@ pub unsafe fn parse_multiboot2_info(base_addr: usize, _fb_tag: &FramebufferTag) 
                 debugn!(fb_tag.height as u64);
                 debugln!("");
 
+                rprint!("(bpp + res): ");
+                rprintn!(fb_tag.bpp as u64);
+                rprint!(" + ");
+                rprintn!(fb_tag.width as u64);
+                rprint!("x");
+                rprintn!(fb_tag.height as u64);
+                rprint!("\n");
+
                 debug!("Pitch: ");
                 debugn!(fb_tag.pitch);
                 debugln!("");
 
+                //framebuffer_tag = fb_tag;
+
                 unsafe {
-                    // let p4_ptr = &raw mut p4_table as *mut u64;
+                    //let virt_base = 0xFFFF_FF80_0000_0000u64;
+                    //let fb_ptr = virt_base as *mut u32;
 
-                    // let p4_virt = &raw const p4_table as usize;
-                    // let p4_phys = p4_virt;
+                    //let test_ptr = virt_base as *mut u32;
+                    //*test_ptr = 0xFFFFFFFF;
 
-                    let virt_base = 0xFFFF_FF80_0000_0000u64;
-                    let fb_ptr = virt_base as *mut u32;
+                    let fb_ptr = fb_tag.addr as *mut u32;
 
-                    let test_ptr = virt_base as *mut u32;
-                    *test_ptr = 0xFFFFFFFF;
-
-                    //crate::mem::pages::identity_map(p4_table as *mut u64, 4 * 1024 * 1024);
-                    //crate::mem::pages::identity_map(p4_table as *mut u64, 0x1000);
-
-                    /*crate::mem::pages::map_32mb(
-                        p4_ptr,
-                        fb_tag.addr as usize,
-                        virt_base as usize,
-                    );*/
-
-                    //x86_64::instructions::tlb::flush_all();
-                    //Cr3::write(PhysFrame::from_start_address(PhysAddr::new(p4_phys as u64)).unwrap(), Cr3Flags::empty());
-
-                    /*for y in 0..500  {
-                        for x in 0..500  {
-                                //let offset = y * fb_tag.pitch + x * (fb_tag.bpp as u32 / 8);
-                            let offset = y * fb_tag.pitch / 4 + x;
-                            //let color = 0x00ff00ff;
-
-                            fb_ptr.add(offset as usize).write_volatile(0xdeadbeef);
-                            fb_ptr.add(offset as usize + 1).write_volatile(0xfefab0);
-                            fb_ptr.add(offset as usize + 2).write_volatile(0xdeadbeef);
-                        }
-                    }*/
-
-                    /*for y in 0..150 {
-                    for x in 0..200 {
-                        super::font::put_pixel(x, y, 0xdeadbeef, fb_ptr, 4096, 32);
-                        }
-                        }*/
-                    draw_rect(fb_ptr, 150, 150, 100, 100, 4096, 0x00ffffff);
-                    draw_rect(fb_ptr, 250, 250, 100, 100, 4096, 0x00ff0000);
-                    draw_rect(fb_ptr, 350, 350, 100, 100, 4096, 0x0000ff00);
-                    draw_rect(fb_ptr, 450, 450, 100, 100, 4096, 0x000000ff);
+                    draw_rect(
+                        fb_ptr,
+                        150,
+                        150,
+                        100,
+                        100,
+                        fb_tag.pitch as usize,
+                        0x00ffffff,
+                    );
+                    draw_rect(
+                        fb_ptr,
+                        250,
+                        250,
+                        100,
+                        100,
+                        fb_tag.pitch as usize,
+                        0x00ff0000,
+                    );
+                    draw_rect(
+                        fb_ptr,
+                        350,
+                        350,
+                        100,
+                        100,
+                        fb_tag.pitch as usize,
+                        0x0000ff00,
+                    );
+                    draw_rect(
+                        fb_ptr,
+                        450,
+                        450,
+                        100,
+                        100,
+                        fb_tag.pitch as usize,
+                        0x000000ff,
+                    );
 
                     if let Some(font) = parse_psf(super::font::PSF_FONT) {
                         draw_text_psf(
@@ -227,15 +245,10 @@ pub unsafe fn parse_multiboot2_info(base_addr: usize, _fb_tag: &FramebufferTag) 
                             fb_tag.pitch as usize,
                             fb_tag.bpp as usize,
                         );
-
-                        //draw_char("ABCDEFGHIJKLMNOPQRSTUVWXYZ", 35, 35, fb_ptr, fb_tag.pitch as usize, 0xdeadbeef, FONT_RAW);
                     }
-
-                    //draw_test_char(35, 35, fb_ptr);
-                    //draw_text_psf("ABCDEFGHIJKLMNOPQRSTUVWXYZ",&FONT_RAW, 35, 35, 0x00ff00, fb_ptr, fb_tag.pitch, fb_tag.bpp);
                 }
 
-                //dump_debug_log_to_file();
+                dump_debug_log_to_file();
             }
 
             14 => {

@@ -1,10 +1,8 @@
 //use crate::debug::dump_debug_log_to_file;
 
-use core::result;
-
 use crate::init::{ascii, boot, color, cpu, fs, heap, idt, parser, pit, video};
 
-use crate::task::task::INIT_DONE;
+use crate::task::process::INIT_DONE;
 use crate::video::vga;
 //Results of init system
 use crate::video::sysprint::Result;

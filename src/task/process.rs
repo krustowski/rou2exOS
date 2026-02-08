@@ -1,4 +1,4 @@
-use crate::{input::keyboard::keyboard_loop, task::task::INIT_DONE};
+use crate::input::keyboard::keyboard_loop;
 
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
@@ -56,6 +56,8 @@ pub struct Process {
 extern "C" {
     static mut tss64: crate::init::idt::Tss64;
 }
+
+pub static mut INIT_DONE: bool = false;
 
 static mut PROCESS_LIST: [Option<Process>; 4] = [None, None, None, None];
 pub static mut CURRENT_PID: usize = 0;

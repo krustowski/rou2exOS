@@ -942,7 +942,7 @@ fn cmd_run(args: &[u8]) {
                 // Create a new process to be run
                 let proc = crate::task::process::create_process(
                     &filename,
-                    crate::task::process::Mode::Kernel,
+                    crate::task::process::Mode::User,
                     entry_fn as u64,
                     stack_top,
                 );
@@ -951,7 +951,7 @@ fn cmd_run(args: &[u8]) {
                     idle();
                 } else {
                     rprint!("Error starting new process...\n");
-                    error!("Error starting new process...\n");
+                    error!("Error starting new process...\n\n");
                 }
 
                 //rprint!("Jumping to the program entry point...\n");

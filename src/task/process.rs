@@ -104,10 +104,6 @@ pub unsafe fn setup_processes() {
 
     core::ptr::copy_nonoverlapping(src, dst, 4096);
 
-    //
-    //
-    //
-
     let proc0 = create_process(b"init", Mode::Kernel, 0, 0x190_000);
     let proc1 = create_process(b"numbers", Mode::Kernel, 0x800_000, 0x7a0_000);
     let proc2 = create_process(b"shell", Mode::Kernel, keyboard_loop as u64, 0x700_000);
@@ -199,8 +195,8 @@ pub fn create_process(
             stack_segment = 0x10;
         }
         Mode::User => {
-            code_segment = 0x18;
-            stack_segment = 0x20;
+            code_segment = 0x1b;
+            stack_segment = 0x23;
         }
     }
 
@@ -230,7 +226,7 @@ pub fn create_process(
             rax: 0,
             rip: entry_point,
             cs: code_segment,
-            rflags: 0x202, // IF=1 (interrupt flag)
+            rflags: 0x202, // IF = 1
             rsp: process_stack_top,
             ss: stack_segment,
         },

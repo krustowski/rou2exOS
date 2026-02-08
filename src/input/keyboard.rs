@@ -1,8 +1,8 @@
 use crate::fs::fat12::{block::Floppy, fs::Filesystem};
 use crate::init::config::PATH_CLUSTER;
+use crate::init::config::{get_path, HOST, USER};
 use crate::input::cmd;
 use crate::input::port;
-use crate::init::config::{HOST, USER, get_path};
 use crate::video::{self, vga};
 
 /// The macimum size of an input to the shell console.
@@ -16,15 +16,15 @@ static mut CAPS_LOCK_ON: bool = false;
 fn render_prompt() {
     let path = get_path() as &[u8];
 
-    print!("[", vga::Color::Green);
+    print!("", vga::Color::Red);
     printb!(USER);
     print!("@");
     printb!(HOST);
     print!(":");
-    print!("", vga::Color::Blue);
-    printb!(path);
     print!("", vga::Color::Green);
-    print!("] > ");
+    printb!(path);
+    print!("", vga::Color::Red);
+    print!(" > ");
     print!("", vga::Color::White);
 }
 
@@ -68,7 +68,7 @@ pub fn keyboard_read_scancode() -> u8 {
     port::read(0x60)
 }
 
-/// Main command shell loop. 
+/// Main command shell loop.
 #[unsafe(no_mangle)]
 pub extern "C" fn keyboard_loop() -> ! {
     let mut input_buffer = [0u8; INPUT_BUFFER_SIZE];
@@ -158,7 +158,7 @@ pub extern "C" fn keyboard_loop() -> ! {
                 printb!(&[ascii]);
             }
         }
-    };
+    }
 }
 
 /// Runs operations when the Backspace key has been pressed.
@@ -198,7 +198,6 @@ fn handle_tab_completion(input_buffer: &mut [u8; INPUT_BUFFER_SIZE], input_len: 
 
                 fs.for_each_entry(PATH_CLUSTER, |entry| {
                     if entry.name[0] != 0x00 && entry.name[0] != 0xE5 {
-
                         let mut clean_name = [0u8; 12];
 
                         let name_end = entry.name[..8].iter().position(|&c| c == b' ').unwrap_or(8);
@@ -216,14 +215,17 @@ fn handle_tab_completion(input_buffer: &mut [u8; INPUT_BUFFER_SIZE], input_len: 
                         }
 
                         // TODO: Review this, it is overeng'd to fix the linker panicking errors.
-                        if ext_end <= 3 && name_end > 0 && name_end <= 8 && ext_end + name_end <= 12 {
+                        if ext_end <= 3 && name_end > 0 && name_end <= 8 && ext_end + name_end <= 12
+                        {
                             // Directories should not contain dots in their name (no extensions)
                             if cmd != b"cd" || ext_end != 0 {
                                 clean_name[name_end] = b'.';
                             }
 
                             // Copy the file extension
-                            if let Some(slice) = clean_name.get_mut(name_end + 1..name_end + ext_end + 1) {
+                            if let Some(slice) =
+                                clean_name.get_mut(name_end + 1..name_end + ext_end + 1)
+                            {
                                 if let Some(sl) = entry.ext.get(..ext_end) {
                                     slice.copy_from_slice(sl);
                                 }
@@ -262,10 +264,12 @@ fn handle_tab_completion(input_buffer: &mut [u8; INPUT_BUFFER_SIZE], input_len: 
                                 name_end + 1 + ext_end // include dot
                             } else {
                                 name_end
-                            }; 
+                            };
 
                             // Copy the match into buffer
-                            if let Some(slice) = input_buffer.get_mut(cmd.len() + 1..cmd.len() + 1 + clean_name_len) {
+                            if let Some(slice) =
+                                input_buffer.get_mut(cmd.len() + 1..cmd.len() + 1 + clean_name_len)
+                            {
                                 if name_end + ext_end + 1 > 12 {
                                     return;
                                 }
@@ -316,49 +320,199 @@ pub fn scancode_to_ascii(sc: u8) -> Option<u8> {
 
         let ch = match sc {
             // Number row (with Shift symbols)
-            0x02 => if shifted { b'!' } else { b'1' },
-            0x03 => if shifted { b'@' } else { b'2' },
-            0x04 => if shifted { b'#' } else { b'3' },
-            0x05 => if shifted { b'$' } else { b'4' },
-            0x06 => if shifted { b'%' } else { b'5' },
-            0x07 => if shifted { b'^' } else { b'6' },
-            0x08 => if shifted { b'&' } else { b'7' },
-            0x09 => if shifted { b'*' } else { b'8' },
-            0x0A => if shifted { b'(' } else { b'9' },
-            0x0B => if shifted { b')' } else { b'0' },
-            0x0C => if shifted { b'_' } else { b'-' },
-            0x0D => if shifted { b'+' } else { b'=' },
+            0x02 => {
+                if shifted {
+                    b'!'
+                } else {
+                    b'1'
+                }
+            }
+            0x03 => {
+                if shifted {
+                    b'@'
+                } else {
+                    b'2'
+                }
+            }
+            0x04 => {
+                if shifted {
+                    b'#'
+                } else {
+                    b'3'
+                }
+            }
+            0x05 => {
+                if shifted {
+                    b'$'
+                } else {
+                    b'4'
+                }
+            }
+            0x06 => {
+                if shifted {
+                    b'%'
+                } else {
+                    b'5'
+                }
+            }
+            0x07 => {
+                if shifted {
+                    b'^'
+                } else {
+                    b'6'
+                }
+            }
+            0x08 => {
+                if shifted {
+                    b'&'
+                } else {
+                    b'7'
+                }
+            }
+            0x09 => {
+                if shifted {
+                    b'*'
+                } else {
+                    b'8'
+                }
+            }
+            0x0A => {
+                if shifted {
+                    b'('
+                } else {
+                    b'9'
+                }
+            }
+            0x0B => {
+                if shifted {
+                    b')'
+                } else {
+                    b'0'
+                }
+            }
+            0x0C => {
+                if shifted {
+                    b'_'
+                } else {
+                    b'-'
+                }
+            }
+            0x0D => {
+                if shifted {
+                    b'+'
+                } else {
+                    b'='
+                }
+            }
 
             // Letters (Caps Lock + Shift logic)
             0x10..=0x19 | 0x1E..=0x26 | 0x2C..=0x32 => {
                 let lower = match sc {
-                    0x10 => b'q', 0x11 => b'w', 0x12 => b'e', 0x13 => b'r', 0x14 => b't',
-                    0x15 => b'y', 0x16 => b'u', 0x17 => b'i', 0x18 => b'o', 0x19 => b'p',
-                    0x1E => b'a', 0x1F => b's', 0x20 => b'd', 0x21 => b'f', 0x22 => b'g',
-                    0x23 => b'h', 0x24 => b'j', 0x25 => b'k', 0x26 => b'l',
-                    0x2C => b'z', 0x2D => b'x', 0x2E => b'c', 0x2F => b'v',
-                    0x30 => b'b', 0x31 => b'n', 0x32 => b'm',
+                    0x10 => b'q',
+                    0x11 => b'w',
+                    0x12 => b'e',
+                    0x13 => b'r',
+                    0x14 => b't',
+                    0x15 => b'y',
+                    0x16 => b'u',
+                    0x17 => b'i',
+                    0x18 => b'o',
+                    0x19 => b'p',
+                    0x1E => b'a',
+                    0x1F => b's',
+                    0x20 => b'd',
+                    0x21 => b'f',
+                    0x22 => b'g',
+                    0x23 => b'h',
+                    0x24 => b'j',
+                    0x25 => b'k',
+                    0x26 => b'l',
+                    0x2C => b'z',
+                    0x2D => b'x',
+                    0x2E => b'c',
+                    0x2F => b'v',
+                    0x30 => b'b',
+                    0x31 => b'n',
+                    0x32 => b'm',
                     _ => return None,
                 };
                 let upper = lower.to_ascii_uppercase();
-                if caps ^ shifted { upper } else { lower }
+                if caps ^ shifted {
+                    upper
+                } else {
+                    lower
+                }
             }
 
             // Punctuation
-            0x1A => if shifted { b'{' } else { b'[' },
-            0x1B => if shifted { b'}' } else { b']' },
-            0x27 => if shifted { b':' } else { b';' },
-            0x28 => if shifted { b'"' } else { b'\'' },
-            0x29 => if shifted { b'~' } else { b'`' },
-            0x2B => if shifted { b'|' } else { b'\\' },
-            0x33 => if shifted { b'<' } else { b',' },
-            0x34 => if shifted { b'>' } else { b'.' },
-            0x35 => if shifted { b'?' } else { b'/' },
+            0x1A => {
+                if shifted {
+                    b'{'
+                } else {
+                    b'['
+                }
+            }
+            0x1B => {
+                if shifted {
+                    b'}'
+                } else {
+                    b']'
+                }
+            }
+            0x27 => {
+                if shifted {
+                    b':'
+                } else {
+                    b';'
+                }
+            }
+            0x28 => {
+                if shifted {
+                    b'"'
+                } else {
+                    b'\''
+                }
+            }
+            0x29 => {
+                if shifted {
+                    b'~'
+                } else {
+                    b'`'
+                }
+            }
+            0x2B => {
+                if shifted {
+                    b'|'
+                } else {
+                    b'\\'
+                }
+            }
+            0x33 => {
+                if shifted {
+                    b'<'
+                } else {
+                    b','
+                }
+            }
+            0x34 => {
+                if shifted {
+                    b'>'
+                } else {
+                    b'.'
+                }
+            }
+            0x35 => {
+                if shifted {
+                    b'?'
+                } else {
+                    b'/'
+                }
+            }
 
             // Control keys
-            0x0E => 8,         // Backspace
-            0x1C => b'\n',     // Enter
-            0x39 => b' ',      // Space
+            0x0E => 8,     // Backspace
+            0x1C => b'\n', // Enter
+            0x39 => b' ',  // Space
 
             _ => return None,
         };
@@ -395,7 +549,6 @@ pub fn split_cmd(input: &[u8]) -> (&[u8], &[u8]) {
 
     // Break the input at first space
     if let Some(pos) = trimmed.iter().position(|&c| c == b' ') {
-
         let cmd = trimmed.get(..pos).unwrap_or(&[]);
         let mut rest = trimmed.get(pos + 1..).unwrap_or(&[]);
 
@@ -407,4 +560,3 @@ pub fn split_cmd(input: &[u8]) -> (&[u8], &[u8]) {
         (trimmed, &[])
     }
 }
-

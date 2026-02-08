@@ -1,8 +1,9 @@
 pub mod pipe;
 pub mod process;
+pub mod task;
 
 pub struct Task {
-    pub regs: process::Registers,
+    pub regs: process::Context,
     //pub stack: &'static mut [u8],
     pub stack: u64,
     pub is_done: bool,
@@ -41,7 +42,7 @@ fn add_task(entry: extern "C" fn()) {
     let stack = new_stack();
     let rsp = stack + 0x90000 - 8; // top of stack
 
-    let regs = process::Registers {
+    let regs = process::Context {
         r15: 0,
         r14: 0,
         r13: 0,
@@ -80,7 +81,8 @@ fn add_task(entry: extern "C" fn()) {
 }
 
 extern "C" {
-    fn context_switch(old: *mut process::Registers, new: *const process::Registers);
+    //fn context_switch(old: *mut process::Registers, new: *const process::Registers);
+    fn context_switch(old: *mut u64, new: *const u64);
     //fn context_switch_kern(old: *mut Registers, new: *const Registers);
 }
 
@@ -117,7 +119,7 @@ pub extern "C" fn end_task(task_id: usize) {
 }
 
 #[no_mangle]
-pub extern "C" fn schedule() {
+pub extern "C" fn schedule_old() {
     unsafe {
         // Get current task slot mutable reference
         let old_task_opt = &mut TASKS[CURRENT_TASK];
@@ -164,8 +166,10 @@ pub extern "C" fn schedule() {
 
                     // Perform the context switch with valid pointers
                     context_switch(
-                        &mut old_task.regs as *mut process::Registers,
-                        &next_task.regs as *const process::Registers,
+                        //&mut old_task.regs.rsp as *mut process::Registers,
+                        //&next_task.regs.rsp as *const process::Registers,
+                        &mut old_task.regs.rsp as *mut u64,
+                        &next_task.regs.rsp as *const u64,
                     );
 
                     //break;
@@ -295,5 +299,5 @@ pub fn run_scheduler() {
 
     add_task(kern_task1);
     add_task(kern_task2);
-    //schedule();
+    //schedule_old();
 }

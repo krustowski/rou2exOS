@@ -61,12 +61,7 @@ pub fn init(m2_ptr: u32) {
     ascii::ascii_art();
 
     unsafe {
-        //crate::task::task::setup_tasks();
         crate::task::process::setup_processes();
-        //crate::task::run_scheduler();
-    }
-
-    unsafe {
         INIT_DONE = true;
     }
 }

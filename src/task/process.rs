@@ -37,7 +37,8 @@ pub enum Status {
 
 #[derive(Debug, Clone, Copy)]
 pub struct Process {
-    id: u64,
+    id: usize,
+    name: [u8; 16],
     pub status: Status,
     context: Context,
     kernel_stack: [u8; 4096],
@@ -46,6 +47,7 @@ pub struct Process {
 
 static mut PROCESS_LIST: [Option<Process>; 3] = [None, None, None];
 static mut CURRENT_PID: usize = 0;
+static mut NEXT_FREE_PID: usize = 0;
 
 //static mut SCHEDULER_STARTED: bool = false;
 
@@ -65,15 +67,29 @@ pub unsafe fn schedule(old: *mut Context) -> *mut Context {
 
     let mut next = (CURRENT_PID + 1) % PROCESS_LIST.len();
 
-    if PROCESS_LIST[next].unwrap().status == Status::Idle {
+    loop {
+        if PROCESS_LIST[next].unwrap().status != Status::Idle {
+            break;
+        }
         next += 1;
+        next %= PROCESS_LIST.len();
     }
 
     PROCESS_LIST[CURRENT_PID].as_mut().unwrap().context = *old;
+
+    if PROCESS_LIST[CURRENT_PID].unwrap().status != Status::Idle {
+        PROCESS_LIST[CURRENT_PID].as_mut().unwrap().status = Status::Ready;
+    }
+
+    PROCESS_LIST[next].as_mut().unwrap().status = Status::Running;
     CURRENT_PID = next;
 
     crate::input::port::write(0x20, 0x20);
     &mut PROCESS_LIST[next].as_mut().unwrap().context as *mut _
+}
+
+pub unsafe fn idle() {
+    PROCESS_LIST[CURRENT_PID].as_mut().unwrap().status = Status::Idle;
 }
 
 /*pub unsafe fn schedule(context: *const Context) -> *const Context {
@@ -113,11 +129,9 @@ pub unsafe fn setup_processes() {
     //
     //
 
-    let mut proc0 = create_process(0, 0x190_000);
-    let proc1 = create_process(user_entry as u64, 0x7f0_000);
-    let proc2 = create_process(keyboard_loop as u64, 0x700_000);
-
-    proc0.status = Status::Idle;
+    let proc0 = create_process(b"init", 0, 0x190_000);
+    let proc1 = create_process(b"numbers", user_entry as u64, 0x7f0_000);
+    let proc2 = create_process(b"shell", keyboard_loop as u64, 0x700_000);
 
     PROCESS_LIST = [Some(proc0), Some(proc1), Some(proc2)]
 }
@@ -141,15 +155,51 @@ extern "C" fn user_entry() -> ! {
     }
 }
 
-fn create_process(entry_point: u64, process_stack_top: u64) -> Process {
+pub unsafe fn list_processes() {
+    println!("RUNNING PROCESSES");
+
+    for process in PROCESS_LIST.iter().flatten() {
+        printn!(process.id);
+        print!("   ");
+        printb!(&process.name);
+
+        match process.status {
+            Status::Ready => {
+                print!(" (Ready)");
+            }
+            Status::Running => {
+                print!(" (Running)");
+            }
+            Status::Idle => {
+                print!(" (Idle)");
+            }
+            Status::Dead => {
+                print!(" (Dead)");
+            }
+        }
+
+        println!();
+    }
+}
+
+fn create_process(name_slice: &[u8], entry_point: u64, process_stack_top: u64) -> Process {
+    let mut name: [u8; 16] = [0; 16];
+
+    if let Some(mut slice) = name.get_mut(0..name_slice.len()) {
+        (*slice)[..name_slice.len()].copy_from_slice(name_slice);
+    }
+
     Process {
-        id: 0,
+        id: unsafe {
+            NEXT_FREE_PID += 1;
+            NEXT_FREE_PID - 1
+        },
+        name: name,
         status: Status::Ready,
         context: Context {
             r15: 0,
             r14: 0,
             r13: 0,
-
             r12: 0,
             r11: 0,
             r10: 0,

@@ -16,7 +16,7 @@ use crate::tui::{
 };
 use crate::video;
 
-const KERNEL_VERSION: &[u8] = b"0.10.1";
+const KERNEL_VERSION: &[u8] = b"0.10.2";
 
 struct Command {
     name: &'static [u8],
@@ -157,12 +157,6 @@ static COMMANDS: &[Command] = &[
         description: b"runs a simple VGA text mode snake-like game",
         function: cmd_snake,
         hidden: false,
-    },
-    Command {
-        name: b"task",
-        description: b"starts a simple task scheduler",
-        function: cmd_task,
-        hidden: true,
     },
     Command {
         name: b"tasks",
@@ -1032,12 +1026,10 @@ fn cmd_snake(_args: &[u8]) {
     app::snake::menu::menu_loop();
 }
 
-fn cmd_task(_args: &[u8]) {
-    crate::task::run_scheduler();
-}
-
 fn cmd_tasks(_args: &[u8]) {
-    crate::task::status();
+    unsafe {
+        crate::task::process::list_processes();
+    }
 }
 
 /// Experimental command function to demonstrate the implementation state of the TCP/IP stack.

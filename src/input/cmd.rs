@@ -9,6 +9,8 @@ use crate::init::config::PATH_CLUSTER;
 use crate::input::keyboard;
 use crate::input::keyboard::keyboard_loop;
 use crate::net;
+use crate::task::process::idle;
+use crate::task::process::start_process;
 use crate::time;
 use crate::tui::{
     app::TuiApp,
@@ -830,8 +832,12 @@ fn cmd_run(args: &[u8]) {
 
     // 12 = filename + ext + dot
     let mut filename = [b' '; 12];
+
     if let Some(slice) = filename.get_mut(..filename_input.len()) {
         slice.copy_from_slice(filename_input);
+    }
+    if let Some(slice) = filename.get_mut(9..12) {
+        slice.copy_from_slice(b"ELF");
     }
 
     let floppy = Floppy::init();
@@ -851,15 +857,15 @@ fn cmd_run(args: &[u8]) {
                     }
                 });
 
-                rprint!("Size: ");
-                rprintn!(size);
-                rprint!("\n");
-
                 if cluster == 0 {
                     error!("no such file found");
                     error!();
                     return;
                 }
+
+                rprint!("Size: ");
+                rprintn!(size);
+                rprint!("\n");
 
                 let load_addr: u64 = 0x690_000;
 
@@ -933,15 +939,23 @@ fn cmd_run(args: &[u8]) {
                 let entry_fn: extern "C" fn() -> u64 =
                     core::mem::transmute(entry_addr as *const ());
 
-                rprint!("Jumping to the program entry point...\n");
-                //prg_fn();
-                //super::elf::jump_to_elf(entry_fn, stack_top);
-                super::elf::jump_to_elf(entry_fn, stack_top, arg);
+                // Create a new process to be run
+                let proc = crate::task::process::create_process(
+                    &filename,
+                    crate::task::process::Mode::Kernel,
+                    entry_fn as u64,
+                    stack_top,
+                );
 
-                //let entry: extern "C" fn(u32) -> u32 = core::mem::transmute((load_addr + 0x41) as *mut u8);
+                if start_process(proc) {
+                    idle();
+                } else {
+                    rprint!("Error starting new process...\n");
+                    error!("Error starting new process...\n");
+                }
 
-                //let result = run_program(entry, arg);
-                //let result = entry(arg);
+                //rprint!("Jumping to the program entry point...\n");
+                //super::elf::jump_to_elf(entry_fn, stack_top, arg);
             }
         }
         Err(e) => {

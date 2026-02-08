@@ -64,18 +64,24 @@ extern "C" fn syscall_inner(arg1: u64, arg2: u64, syscall_no: u64) -> SyscallRet
          *  Arg2: program return code
          */
         0x00 => {
-            rprint!("[TASK ");
-            rprintn!(arg1);
-            rprint!("]: exit\n");
-
             unsafe {
-                core::arch::asm!(
+                rprint!("[TASK ");
+                //rprintn!(arg1);
+                rprintn!(crate::task::process::CURRENT_PID);
+                rprint!("]: exit, return code: ");
+                rprintn!(arg2);
+                rprint!("\n");
+
+                crate::task::process::idle();
+                crate::task::process::resume(2);
+
+                /*core::arch::asm!(
                     "mov rdi, {0}",
                     "mov rsi, {1}",
                     "jmp kernel_return",
                     in(reg) arg2,
                     in(reg) arg1,
-                );
+                );*/
             };
         }
 
@@ -96,8 +102,8 @@ extern "C" fn syscall_inner(arg1: u64, arg2: u64, syscall_no: u64) -> SyscallRet
             match arg1 {
                 0x01 => unsafe {
                     let name = b"rou2ex";
-                    let user = b"guest";
-                    let version = b"v0.10.1";
+                    let user = b"root";
+                    let version = b"v0.10.2";
                     let path = b"/";
 
                     if let Some(nm) = (*sysinfo_ptr).system_name.get_mut(0..name.len()) {

@@ -27,6 +27,14 @@ pub struct Context {
     pub ss: u64,
 }
 
+#[derive(Debug, Clone, Copy)]
+pub enum Mode {
+    Kernel,
+    //Driver,
+    //Superuser,
+    User,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Status {
     Ready,
@@ -39,17 +47,19 @@ pub enum Status {
 pub struct Process {
     id: usize,
     name: [u8; 16],
+    mode: Mode,
     pub status: Status,
     context: Context,
     kernel_stack: [u8; 4096],
-    //    next: *mut Process,
 }
 
-static mut PROCESS_LIST: [Option<Process>; 3] = [None, None, None];
-static mut CURRENT_PID: usize = 0;
-static mut NEXT_FREE_PID: usize = 0;
+extern "C" {
+    static mut tss64: crate::init::idt::Tss64;
+}
 
-//static mut SCHEDULER_STARTED: bool = false;
+static mut PROCESS_LIST: [Option<Process>; 4] = [None, None, None, None];
+pub static mut CURRENT_PID: usize = 0;
+static mut NEXT_FREE_PID: usize = 0;
 
 #[no_mangle]
 pub unsafe fn schedule(old: *mut Context) -> *mut Context {
@@ -58,17 +68,10 @@ pub unsafe fn schedule(old: *mut Context) -> *mut Context {
         return old;
     }
 
-    /*if !SCHEDULER_STARTED {
-        SCHEDULER_STARTED = true;
-
-        crate::input::port::write(0x20, 0x20);
-        return &mut PROCESS_LIST[CURRENT_PID].as_mut().unwrap().context;
-    }*/
-
     let mut next = (CURRENT_PID + 1) % PROCESS_LIST.len();
 
     loop {
-        if PROCESS_LIST[next].unwrap().status != Status::Idle {
+        if !PROCESS_LIST[next].is_none() && PROCESS_LIST[next].unwrap().status != Status::Idle {
             break;
         }
         next += 1;
@@ -83,45 +86,21 @@ pub unsafe fn schedule(old: *mut Context) -> *mut Context {
 
     PROCESS_LIST[next].as_mut().unwrap().status = Status::Running;
     CURRENT_PID = next;
+    tss64.rsp0 = &PROCESS_LIST[next].unwrap().kernel_stack as *const _ as u64;
 
     crate::input::port::write(0x20, 0x20);
     &mut PROCESS_LIST[next].as_mut().unwrap().context as *mut _
 }
 
 pub unsafe fn idle() {
-    PROCESS_LIST[CURRENT_PID].as_mut().unwrap().status = Status::Idle;
-}
-
-/*pub unsafe fn schedule(context: *const Context) -> *const Context {
-    #[expect(static_mut_refs)]
-    let next_pid = (CURRENT_PID + 1) % PROCESS_LIST.len();
-
-    if let Some(current) = &mut PROCESS_LIST[CURRENT_PID] {
-        if !context.is_null() {
-            current.context = context;
-        }
-
-        if let Some(next_process) = &mut PROCESS_LIST[next_pid] {
-            CURRENT_PID = next_pid;
-
-            //context_switch(next_proc.context, &*next_proc.context);
-            return next_process.context;
-        } else {
-            return current.context;
-        }
-    } else {
-        core::arch::asm!("hlt");
-        loop {}
+    if !PROCESS_LIST[CURRENT_PID].is_none() {
+        PROCESS_LIST[CURRENT_PID].as_mut().unwrap().status = Status::Idle;
     }
-}*/
-
-extern "C" {
-    fn context_switch(old_regs: *mut Context, new_regs: *const Context);
 }
 
 pub unsafe fn setup_processes() {
     let src = user_entry as *const u8;
-    let dst = 0x620_000 as *mut u8;
+    let dst = 0x800_000 as *mut u8;
 
     core::ptr::copy_nonoverlapping(src, dst, 4096);
 
@@ -129,11 +108,28 @@ pub unsafe fn setup_processes() {
     //
     //
 
-    let proc0 = create_process(b"init", 0, 0x190_000);
-    let proc1 = create_process(b"numbers", user_entry as u64, 0x7f0_000);
-    let proc2 = create_process(b"shell", keyboard_loop as u64, 0x700_000);
+    let proc0 = create_process(b"init", Mode::Kernel, 0, 0x190_000);
+    let proc1 = create_process(b"numbers", Mode::Kernel, 0x800_000, 0x7a0_000);
+    let proc2 = create_process(b"shell", Mode::Kernel, keyboard_loop as u64, 0x700_000);
 
-    PROCESS_LIST = [Some(proc0), Some(proc1), Some(proc2)]
+    PROCESS_LIST = [Some(proc0), Some(proc1), Some(proc2), None]
+}
+
+pub unsafe fn start_process(proc: Process) -> bool {
+    for candidate in PROCESS_LIST.as_mut() {
+        if candidate.is_none() || candidate.unwrap().status == Status::Dead {
+            *candidate = Some(proc);
+            return true;
+        }
+    }
+
+    false
+}
+
+pub unsafe fn resume(pid: usize) {
+    if pid < PROCESS_LIST.len() && !PROCESS_LIST[pid].is_none() {
+        PROCESS_LIST[pid].as_mut().unwrap().status = Status::Ready;
+    }
 }
 
 #[no_mangle]
@@ -182,11 +178,30 @@ pub unsafe fn list_processes() {
     }
 }
 
-fn create_process(name_slice: &[u8], entry_point: u64, process_stack_top: u64) -> Process {
+pub fn create_process(
+    name_slice: &[u8],
+    mode: Mode,
+    entry_point: u64,
+    process_stack_top: u64,
+) -> Process {
     let mut name: [u8; 16] = [0; 16];
 
     if let Some(mut slice) = name.get_mut(0..name_slice.len()) {
         (*slice)[..name_slice.len()].copy_from_slice(name_slice);
+    }
+
+    let mut code_segment = 0;
+    let mut stack_segment = 0;
+
+    match mode {
+        Mode::Kernel => {
+            code_segment = 0x08;
+            stack_segment = 0x10;
+        }
+        Mode::User => {
+            code_segment = 0x18;
+            stack_segment = 0x20;
+        }
     }
 
     Process {
@@ -194,7 +209,8 @@ fn create_process(name_slice: &[u8], entry_point: u64, process_stack_top: u64) -
             NEXT_FREE_PID += 1;
             NEXT_FREE_PID - 1
         },
-        name: name,
+        name,
+        mode,
         status: Status::Ready,
         context: Context {
             r15: 0,
@@ -213,12 +229,10 @@ fn create_process(name_slice: &[u8], entry_point: u64, process_stack_top: u64) -
             rbx: 0,
             rax: 0,
             rip: entry_point,
-            cs: 0x08, // user code segment selector (RPL=3)
-            //cs: 0x1B,      // user code segment selector (RPL=3)
+            cs: code_segment,
             rflags: 0x202, // IF=1 (interrupt flag)
             rsp: process_stack_top,
-            //ss: 0x23, // user stack segment selector
-            ss: 0x10, // user stack segment selector
+            ss: stack_segment,
         },
         kernel_stack: [0; 4096],
     }

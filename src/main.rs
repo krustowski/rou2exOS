@@ -37,8 +37,10 @@ pub extern "C" fn kernel_main(_multiboot2_magic: u32, multiboot_ptr: u32) {
     //println!("Starting shell...\n");
     //input::keyboard::keyboard_loop();
 
-    loop {
-        unsafe {
+    unsafe {
+        crate::task::process::idle();
+
+        loop {
             core::arch::asm!("pause");
         }
     }

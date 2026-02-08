@@ -101,7 +101,7 @@ extern "C" fn syscall_inner(arg1: u64, arg2: u64, syscall_no: u64) -> SyscallRet
 
             match arg1 {
                 0x01 => unsafe {
-                    let name = b"rou2ex";
+                    let name = b"rourex";
                     let user = b"root";
                     let version = b"v0.10.2";
                     let path = b"/";
@@ -188,7 +188,7 @@ extern "C" fn syscall_inner(arg1: u64, arg2: u64, syscall_no: u64) -> SyscallRet
                                 }
 
                                 // No data: block current process until dispatcher wakes it
-                                //block_current_process_on_keyboard();
+                                // idle();
                                 // After wake, try copy again
 
                                 s.copy_to_user(arg2 as *mut u8, 16);

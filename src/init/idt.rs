@@ -1,9 +1,7 @@
 use crate::abi::idt::{install_isrs, load_idt};
-use crate::video::sysprint::{Result};
-
+use crate::video::sysprint::Result;
 
 pub fn idt_isrs_init() -> Result {
-
     install_isrs();
 
     load_idt();
@@ -14,17 +12,20 @@ pub fn idt_isrs_init() -> Result {
     setup_tss_descriptor(base_addr, 0x67);
 
     reload_gdt();
-    
+
     load_tss(0x28);
 
     Result::Passed
-} 
+}
 
 extern "C" {
     static mut tss64: Tss64;
     static mut gdt_start: u8;
     static mut gdt_end: u8;
     static mut gdt_tss_descriptor: [u8; 16];
+    static mut __stack_top: u64;
+    static mut ist0_stack_top: u64;
+    static mut ist1_stack_top: u64;
 }
 
 #[repr(C, packed)]
@@ -97,7 +98,6 @@ fn make_tss_descriptor(base: u64, limit: u32) -> [u8; 16] {
     desc[10] = ((base >> 48) & 0xFF) as u8;
     desc[11] = ((base >> 56) & 0xFF) as u8;
 
-    // The rest (12-15) must be zero per spec
     desc[12] = 0;
     desc[13] = 0;
     desc[14] = 0;
@@ -107,11 +107,11 @@ fn make_tss_descriptor(base: u64, limit: u32) -> [u8; 16] {
 }
 
 #[repr(C, packed)]
-struct Tss64 {
+pub struct Tss64 {
     reserved0: u32,
-    rsp0: u64,
-    rsp1: u64,
-    rsp2: u64,
+    pub rsp0: u64,
+    pub rsp1: u64,
+    pub rsp2: u64,
     reserved1: u64,
     ist1: u64,
     ist2: u64,
@@ -127,14 +127,13 @@ struct Tss64 {
 
 fn init_tss() {
     unsafe {
-        // Zero out the whole TSS first (probably redundant if in .bss)
+        // Zero out the whole TSS
         core::ptr::write_bytes(&raw mut tss64 as *mut u8, 0, core::mem::size_of::<Tss64>());
 
         // Set kernel stack (top) pointer for ring 0 (rsp0)
-        tss64.rsp0 = 0x190000;
-
-        // IST pointers (interrupt stacks)
-        // tss64.ist1 = some_stack_address;
+        tss64.rsp0 = __stack_top;
+        tss64.ist1 = ist0_stack_top;
+        tss64.ist2 = ist1_stack_top;
 
         // IO Map base: set to size of TSS to disable IO bitmap
         tss64.io_map_base = core::mem::size_of::<Tss64>() as u16;

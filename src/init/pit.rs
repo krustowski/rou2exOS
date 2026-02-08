@@ -1,5 +1,6 @@
 use crate::input::port::{read, write};
 use crate::video::sysprint::Result;
+
 pub fn init_pit(frequency_hz: u32) {
     if frequency_hz == 0 {
         return;
@@ -79,7 +80,7 @@ pub fn pic_pit_init() -> Result {
     }
 
     debugln!("Starting 100Hz timer");
-    init_pit(100); // 100Hz -> 10ms per tick???
+    init_pit(100);
 
     Result::Passed
 }

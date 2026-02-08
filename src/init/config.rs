@@ -1,5 +1,5 @@
-pub const USER: &[u8] = b"guest";
-pub const HOST: &[u8] = b"rou2ex";
+pub const USER: &[u8] = b"root";
+pub const HOST: &[u8] = b"rourex";
 
 pub static mut PATH: &[u8] = b"/";
 pub static mut PATH_CLUSTER: u16 = 0;
@@ -16,9 +16,7 @@ pub fn set_path(new_path: &[u8]) {
 }
 
 pub fn get_path() -> &'static [u8] {
-    unsafe {
-        core::slice::from_raw_parts((&raw const PATH_BUF).cast(), PATH_LEN)
-    }
+    unsafe { core::slice::from_raw_parts((&raw const PATH_BUF).cast(), PATH_LEN) }
 }
 
 //
@@ -53,13 +51,10 @@ extern "C" {
 }
 
 pub fn debug_enabled() -> bool {
-    unsafe { 
-        debug_flag != 0 
-    }
+    unsafe { debug_flag != 0 }
 }
 
 extern "C" {
     static __stack_start: u8;
     static __stack_end: u8;
 }
-

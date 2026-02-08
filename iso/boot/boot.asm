@@ -22,6 +22,10 @@ p3_fb_table:
 	resb 4096
 
 align 16
+ist0_stack:
+    resb 4096
+ist0_stack_top:
+
 ist1_stack:
     resb 4096
 ist1_stack_top:
@@ -47,6 +51,11 @@ extern __stack_top
 
 extern kernel_main
 global _start
+
+global ist0_stack
+global ist1_stack
+global ist0_stack_top
+global ist1_stack_top
 
 global tss64
 global dma

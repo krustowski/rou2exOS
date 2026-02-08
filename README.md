@@ -18,7 +18,14 @@ qemu-system-x86_64 -boot d -cdrom r2.iso -fda fat.img
 
 ## Preview
 
+![rou2exOS startup](/.github/img/r2-kernel-boot-v0.10.2.jpg)
+
+^ __v0.10.2__
+
 ![rou2exOS startup](/.github/img/r2-kernel-boot-v0.10.1.png)
+
+^__v0.10.1__
+
 
 ## How to build and run from source
 

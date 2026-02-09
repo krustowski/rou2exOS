@@ -54,6 +54,8 @@ pub extern "C" fn kernel_main(_multiboot2_magic: u32, multiboot_ptr: u32) {
 
 use core::panic::PanicInfo;
 
+use crate::input::keyboard::keyboard_loop;
+
 /// Panic handler for panic fucntion invocations
 #[panic_handler]
 fn panic(info: &PanicInfo) -> ! {
@@ -74,7 +76,8 @@ fn panic(info: &PanicInfo) -> ! {
         newline(vga_index);
     }
 
-    loop {}
+    println!();
+    keyboard_loop();
 }
 
 #[unsafe(no_mangle)]

@@ -16,7 +16,7 @@ use crate::tui::{
     app::TuiApp,
     widget::{Container, Label, Window},
 };
-use crate::video;
+use crate::video::vga::Color;
 
 const KERNEL_VERSION: &[u8] = b"0.10.2";
 
@@ -531,9 +531,9 @@ fn cmd_help(_args: &[u8]) {
         }
 
         // Print the command name and description
-        print!(" ", video::vga::Color::Blue);
+        print!(" ", Color::Blue);
         printb!(cmd.name);
-        print!(": ", video::vga::Color::White);
+        print!(": ", Color::White);
         printb!(cmd.description);
         println!();
     }
@@ -569,25 +569,38 @@ fn cmd_http(_args: &[u8]) {
     }
 }
 
+fn parse_u64(bytes: &[u8]) -> Option<u64> {
+    let mut value: u64 = 0;
+
+    for &b in bytes {
+        if b < b'0' || b > b'9' {
+            return None;
+        }
+        value = value.checked_mul(10)?.checked_add((b - b'0') as u64)?;
+    }
+
+    Some(value)
+}
+
 fn cmd_kill(args: &[u8]) {
-    if args.is_empty() || args.len() > 12 {
+    if args.is_empty() {
         warn!("usage: kill <pid>\n");
         return;
     }
 
-    unsafe {
-        crate::task::process::kill(1);
+    let (first, _) = keyboard::split_cmd(args);
+
+    if let Some(pid) = parse_u64(first) {
+        print!("Killing PID ", Color::White);
+        printn!(pid);
+        println!();
+
+        unsafe {
+            crate::task::process::kill(pid as usize);
+        }
+    } else {
+        error!("Invalid PID lmao\n");
     }
-
-    // This split_cmd invocation trims the b'\0' tail from the input args.
-    let (filename_input, _) = keyboard::split_cmd(args);
-
-    if filename_input.is_empty() || filename_input.len() > 12 {
-        warn!("Usage: run <binary name>\n");
-        return;
-    }
-
-    super::elf::run_elf(filename_input, args, super::elf::RunMode::Foreground);
 }
 
 /// Experimental command function to evaluate the current TUI rendering options.
@@ -769,10 +782,7 @@ fn cmd_read(args: &[u8]) {
 
                 fs.read_file(cluster as u16, &mut buf);
 
-                print!(
-                    "Dumping file raw contents:\n",
-                    video::vga::Color::DarkYellow
-                );
+                print!("Dumping file raw contents:\n", Color::DarkYellow);
                 printb!(&buf);
                 println!();
             } else {
@@ -958,10 +968,7 @@ unsafe fn run_program(entry: extern "C" fn(u32) -> u32, arg: u32) -> u32 {
 /// Experimental command function to demonstrate the current state of the shutdown process
 /// implemented.
 fn cmd_shutdown(_args: &[u8]) {
-    print!(
-        "\n\n --- Shutting down the system",
-        video::vga::Color::DarkCyan
-    );
+    print!("\n\n --- Shutting down the system", Color::DarkCyan);
 
     // Burn some CPU time
     for _ in 0..3 {

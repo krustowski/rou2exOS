@@ -58,6 +58,8 @@ pub fn init(m2_ptr: u32) {
     color::color_demo();
     ascii::ascii_art();
 
+    rprint!("Kernel init done! Starting the kernel task scheduler...\n");
+
     unsafe {
         crate::task::process::setup_processes();
         INIT_DONE = true;

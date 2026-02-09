@@ -76,9 +76,8 @@ pub extern "C" fn keyboard_loop() -> ! {
 
     let mut ctrl_down = false;
 
-    //print!("\nStarting shell...\n\n");
+    print!("\nStarting shell...\n\n");
 
-    // Write prompt
     render_prompt();
 
     loop {

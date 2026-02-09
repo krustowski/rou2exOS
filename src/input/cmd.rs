@@ -599,7 +599,7 @@ fn cmd_kill(args: &[u8]) {
             crate::task::process::kill(pid as usize);
         }
     } else {
-        error!("Invalid PID lmao\n");
+        error!("invalid PID lmao\n");
     }
 }
 

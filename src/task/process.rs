@@ -74,6 +74,10 @@ pub unsafe fn schedule(old: *mut Context) -> *mut Context {
     let mut next = (CURRENT_PID + 1) % PROCESS_LIST.len();
 
     loop {
+        if !PROCESS_LIST[next].is_none() && PROCESS_LIST[next].unwrap().status == Status::Dead {
+            PROCESS_LIST[next] = None;
+        }
+
         if !PROCESS_LIST[next].is_none()
             && PROCESS_LIST[next].unwrap().status != Status::Idle
             && PROCESS_LIST[next].unwrap().status != Status::Crashed
@@ -88,8 +92,13 @@ pub unsafe fn schedule(old: *mut Context) -> *mut Context {
 
     if PROCESS_LIST[CURRENT_PID].unwrap().status != Status::Idle
         && PROCESS_LIST[CURRENT_PID].unwrap().status != Status::Crashed
+        && PROCESS_LIST[CURRENT_PID].unwrap().status != Status::Dead
     {
         PROCESS_LIST[CURRENT_PID].as_mut().unwrap().status = Status::Ready;
+    }
+
+    if PROCESS_LIST[CURRENT_PID].unwrap().status == Status::Dead {
+        PROCESS_LIST[CURRENT_PID] = None;
     }
 
     PROCESS_LIST[next].as_mut().unwrap().status = Status::Running;
@@ -119,6 +128,10 @@ pub unsafe fn crash() {
 
 pub unsafe fn kill(pid: usize) {
     if pid < PROCESS_LIST.len() && !PROCESS_LIST[pid].is_none() {
+        rprint!("KILL PID ");
+        rprintn!(pid);
+        rprint!("\n\n");
+
         PROCESS_LIST[pid].as_mut().unwrap().status = Status::Dead;
     }
 }

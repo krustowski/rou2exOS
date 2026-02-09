@@ -113,6 +113,12 @@ static COMMANDS: &[Command] = &[
         hidden: true,
     },
     Command {
+        name: b"kill",
+        description: b"makes a process dead",
+        function: cmd_kill,
+        hidden: false,
+    },
+    Command {
         name: b"menu",
         description: b"renders a sample menu",
         function: cmd_menu,
@@ -561,6 +567,27 @@ fn cmd_http(_args: &[u8]) {
             break;
         }
     }
+}
+
+fn cmd_kill(args: &[u8]) {
+    if args.is_empty() || args.len() > 12 {
+        warn!("usage: kill <pid>\n");
+        return;
+    }
+
+    unsafe {
+        crate::task::process::kill(1);
+    }
+
+    // This split_cmd invocation trims the b'\0' tail from the input args.
+    let (filename_input, _) = keyboard::split_cmd(args);
+
+    if filename_input.is_empty() || filename_input.len() > 12 {
+        warn!("Usage: run <binary name>\n");
+        return;
+    }
+
+    super::elf::run_elf(filename_input, args, super::elf::RunMode::Foreground);
 }
 
 /// Experimental command function to evaluate the current TUI rendering options.

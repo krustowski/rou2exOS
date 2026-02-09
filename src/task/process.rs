@@ -29,10 +29,10 @@ pub struct Context {
 
 #[derive(Debug, Clone, Copy)]
 pub enum Mode {
-    Kernel,
-    //Driver,
-    //Superuser,
-    User,
+    Kernel, // RING0
+    Driver, // RING1
+    PrUser, // RING2
+    User,   // RING3
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -40,6 +40,7 @@ pub enum Status {
     Ready,
     Running,
     Idle,
+    Crashed,
     Dead,
 }
 
@@ -73,7 +74,10 @@ pub unsafe fn schedule(old: *mut Context) -> *mut Context {
     let mut next = (CURRENT_PID + 1) % PROCESS_LIST.len();
 
     loop {
-        if !PROCESS_LIST[next].is_none() && PROCESS_LIST[next].unwrap().status != Status::Idle {
+        if !PROCESS_LIST[next].is_none()
+            && PROCESS_LIST[next].unwrap().status != Status::Idle
+            && PROCESS_LIST[next].unwrap().status != Status::Crashed
+        {
             break;
         }
         next += 1;
@@ -100,6 +104,18 @@ pub unsafe fn idle() {
     }
 }
 
+pub unsafe fn crash() {
+    if !PROCESS_LIST[CURRENT_PID].is_none() {
+        PROCESS_LIST[CURRENT_PID].as_mut().unwrap().status = Status::Crashed;
+    }
+}
+
+pub unsafe fn resume(pid: usize) {
+    if pid < PROCESS_LIST.len() && !PROCESS_LIST[pid].is_none() {
+        PROCESS_LIST[pid].as_mut().unwrap().status = Status::Ready;
+    }
+}
+
 pub unsafe fn setup_processes() {
     let src = user_entry as *const u8;
     let dst = 0x800_000 as *mut u8;
@@ -122,12 +138,6 @@ pub unsafe fn start_process(proc: Process) -> bool {
     }
 
     false
-}
-
-pub unsafe fn resume(pid: usize) {
-    if pid < PROCESS_LIST.len() && !PROCESS_LIST[pid].is_none() {
-        PROCESS_LIST[pid].as_mut().unwrap().status = Status::Ready;
-    }
 }
 
 #[no_mangle]
@@ -167,6 +177,9 @@ pub unsafe fn list_processes() {
             Status::Idle => {
                 print!(" (Idle)");
             }
+            Status::Crashed => {
+                print!(" (Crashed)");
+            }
             Status::Dead => {
                 print!(" (Dead)");
             }
@@ -200,6 +213,7 @@ pub fn create_process(
             code_segment = 0x1b;
             stack_segment = 0x23;
         }
+        _ => {}
     }
 
     Process {

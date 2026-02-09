@@ -35,6 +35,12 @@ static COMMANDS: &[Command] = &[
         hidden: false,
     },
     Command {
+        name: b"bg",
+        description: b"runs an ELF binary in background",
+        function: cmd_bg,
+        hidden: false,
+    },
+    Command {
         name: b"cd",
         description: b"changes the current directory",
         function: cmd_cd,
@@ -44,7 +50,7 @@ static COMMANDS: &[Command] = &[
         name: b"chat",
         description: b"starts a chat",
         function: cmd_chat,
-        hidden: false,
+        hidden: true,
     },
     Command {
         name: b"cls",
@@ -56,7 +62,7 @@ static COMMANDS: &[Command] = &[
         name: b"debug",
         description: b"dumps the debug log into a file",
         function: cmd_debug,
-        hidden: false,
+        hidden: true,
     },
     Command {
         name: b"dir",
@@ -74,13 +80,19 @@ static COMMANDS: &[Command] = &[
         name: b"ed",
         description: b"runs a minimalistic text editor",
         function: cmd_ed,
-        hidden: false,
+        hidden: true,
     },
     Command {
         name: b"ether",
         description: b"runs the Ethernet frame handler",
         function: cmd_ether,
         hidden: true,
+    },
+    Command {
+        name: b"fg",
+        description: b"runs an ELF binary in foreground",
+        function: cmd_fg,
+        hidden: false,
     },
     Command {
         name: b"fsck",
@@ -134,7 +146,7 @@ static COMMANDS: &[Command] = &[
         name: b"response",
         description: b"waits for ICMP/SLIP request to come, then sends a response back",
         function: cmd_response,
-        hidden: false,
+        hidden: true,
     },
     Command {
         name: b"rm",
@@ -146,7 +158,7 @@ static COMMANDS: &[Command] = &[
         name: b"run",
         description: b"loads the binary executable in memory and gives it the control",
         function: cmd_run,
-        hidden: false,
+        hidden: true,
     },
     Command {
         name: b"shutdown",
@@ -164,7 +176,7 @@ static COMMANDS: &[Command] = &[
         name: b"tasks",
         description: b"lists currently running tasks",
         function: cmd_tasks,
-        hidden: true,
+        hidden: false,
     },
     Command {
         name: b"tcp",
@@ -327,6 +339,41 @@ pub fn to_uppercase_ascii(input: &mut [u8; 11]) {
 fn cmd_beep(_args: &[u8]) {
     audio::midi::play_melody();
     audio::beep::stop_beep();
+}
+
+/// Runs an ELF binary in background (won't make kernel shell Idle).
+fn cmd_bg(args: &[u8]) {
+    if args.is_empty() || args.len() > 12 {
+        warn!("usage: run <binary name>\n");
+        return;
+    }
+
+    // This split_cmd invocation trims the b'\0' tail from the input args.
+    let (filename_input, _) = keyboard::split_cmd(args);
+
+    if filename_input.is_empty() || filename_input.len() > 12 {
+        warn!("Usage: run <binary name>\n");
+        return;
+    }
+
+    super::elf::run_elf(filename_input, args, super::elf::RunMode::Background);
+}
+
+fn cmd_fg(args: &[u8]) {
+    if args.is_empty() || args.len() > 12 {
+        warn!("usage: run <binary name>\n");
+        return;
+    }
+
+    // This split_cmd invocation trims the b'\0' tail from the input args.
+    let (filename_input, _) = keyboard::split_cmd(args);
+
+    if filename_input.is_empty() || filename_input.len() > 12 {
+        warn!("Usage: run <binary name>\n");
+        return;
+    }
+
+    super::elf::run_elf(filename_input, args, super::elf::RunMode::Foreground);
 }
 
 /// Changes the current directory to one matching an input from keyboard.
@@ -818,7 +865,7 @@ fn cmd_rm(args: &[u8]) {
 
 fn cmd_run(args: &[u8]) {
     if args.is_empty() || args.len() > 12 {
-        warn!("usage: run <binary name>");
+        warn!("usage: run <binary name>\n");
         return;
     }
 
@@ -830,139 +877,7 @@ fn cmd_run(args: &[u8]) {
         return;
     }
 
-    // 12 = filename + ext + dot
-    let mut filename = [b' '; 12];
-
-    if let Some(slice) = filename.get_mut(..filename_input.len()) {
-        slice.copy_from_slice(filename_input);
-    }
-    if let Some(slice) = filename.get_mut(9..12) {
-        slice.copy_from_slice(b"ELF");
-    }
-
-    let floppy = Floppy::init();
-
-    // Init the filesystem to look for a match
-    match Filesystem::new(&floppy) {
-        Ok(fs) => {
-            unsafe {
-                let mut cluster: u16 = 0;
-                let mut offset = 0;
-                let mut size = 0;
-
-                fs.for_each_entry(config::PATH_CLUSTER, |entry| {
-                    if entry.name.starts_with(filename_input) && entry.ext.starts_with(b"ELF") {
-                        cluster = entry.start_cluster;
-                        size = entry.file_size;
-                    }
-                });
-
-                if cluster == 0 {
-                    error!("no such file found");
-                    error!();
-                    return;
-                }
-
-                rprint!("Size: ");
-                rprintn!(size);
-                rprint!("\n");
-
-                let load_addr: u64 = 0x690_000;
-
-                while size - offset > 0 {
-                    let lba = fs.cluster_to_lba(cluster);
-                    let mut sector = [0u8; 512];
-
-                    fs.device.read_sector(lba, &mut sector);
-
-                    let dst = load_addr as *mut u8;
-
-                    //core::ptr::copy_nonoverlapping(sector.as_ptr(), dst.add(offset as usize), 512.min((size - offset) as usize));
-
-                    rprint!("Loading ELF image to memory segment\n");
-                    for i in 0..512 {
-                        if let Some(byte) = sector.get(i) {
-                            *dst.add(i + offset as usize) = *byte;
-                        }
-                    }
-
-                    cluster = fs.read_fat12_entry(cluster);
-
-                    rprint!("Cluster: ");
-                    rprintn!(cluster);
-                    rprint!("\n");
-
-                    if cluster >= 0xFF8 || cluster == 0 {
-                        break;
-                    }
-
-                    //rprint!("offset++\n");
-                    offset += 512;
-                }
-
-                let arg: u64 = 555;
-                //let result: u32;
-
-                //let entry_ptr = (load_addr + 0x18) as *const u64;
-                //let entry_addr = *entry_ptr;
-                //let entry_addr = core::ptr::read_unaligned((load_addr + 0x18) as *const u64);
-                let entry_ptr = (load_addr + 0x18) as *const u8;
-
-                rprint!("First 16 bytes (load_addr + 0x18): ");
-                for i in 0..16 {
-                    rprintn!(*entry_ptr.add(i));
-                    rprint!(" ");
-                }
-                rprint!("\n");
-
-                /*let entry_addr = u64::from_le_bytes([
-                    *entry_ptr.add(0),
-                    *entry_ptr.add(1),
-                    *entry_ptr.add(2),
-                    *entry_ptr.add(3),
-                    *entry_ptr.add(4),
-                    *entry_ptr.add(5),
-                    *entry_ptr.add(6),
-                    *entry_ptr.add(7),
-                ]);*/
-
-                // assume `elf_image` is a pointer to the loaded ELF file in memory
-                let entry_addr = super::elf::load_elf64(load_addr as usize);
-
-                rprint!("ELF entry point: ");
-                rprintn!(entry_addr);
-                rprint!("\n");
-
-                let stack_top = 0x7fffff;
-
-                // cast and jump
-                let entry_fn: extern "C" fn() -> u64 =
-                    core::mem::transmute(entry_addr as *const ());
-
-                // Create a new process to be run
-                let proc = crate::task::process::create_process(
-                    &filename,
-                    crate::task::process::Mode::User,
-                    entry_fn as u64,
-                    stack_top,
-                );
-
-                if start_process(proc) {
-                    idle();
-                } else {
-                    rprint!("Error starting new process...\n");
-                    error!("Error starting new process...\n\n");
-                }
-
-                //rprint!("Jumping to the program entry point...\n");
-                //super::elf::jump_to_elf(entry_fn, stack_top, arg);
-            }
-        }
-        Err(e) => {
-            error!(e);
-            error!();
-        }
-    }
+    super::elf::run_elf(filename_input, args, super::elf::RunMode::Foreground);
 }
 
 const USER_STACK_SIZE: usize = 0x8000; // 32 KiB

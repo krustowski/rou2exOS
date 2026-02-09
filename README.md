@@ -20,11 +20,17 @@ qemu-system-x86_64 -boot d -cdrom r2.iso -fda fat.img
 
 ![rou2exOS startup](/.github/img/r2-kernel-boot-v0.10.2.jpg)
 
-^ __v0.10.2__
+^ __v0.10.2__: kernel init process output
+
+![hellofs-output-clock](/.github/img/r2-hellofs-output-v0.10.4.png)
+
+^ __v0.10.4__: external executable output + clock process
+
+### Legacy
 
 ![rou2exOS startup](/.github/img/r2-kernel-boot-v0.10.1.png)
 
-^__v0.10.1__
+^__v0.10.1__: kernel init process output
 
 
 ## How to build and run from source

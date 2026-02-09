@@ -9,7 +9,7 @@ use x86_64::{
 use crate::{
     abi::syscall::{syscall_80h, syscall_handler},
     input::keyboard::keyboard_loop,
-    task::process::crash,
+    task::process::{crash, idle, resume},
 };
 
 #[link_section = ".idt"]
@@ -43,6 +43,7 @@ extern "x86-interrupt" fn page_fault_handler(
 
     //keyboard_loop();
     unsafe {
+        resume(2);
         crash();
     }
 }
@@ -61,6 +62,7 @@ extern "x86-interrupt" fn general_protection_fault_handler(
 
     //keyboard_loop();
     unsafe {
+        resume(2);
         crash();
     }
 }
@@ -76,6 +78,7 @@ extern "x86-interrupt" fn invalid_opcode_handler(stack_frame: InterruptStackFram
 
     //keyboard_loop();
     unsafe {
+        resume(2);
         crash();
     }
 }
@@ -98,6 +101,7 @@ extern "x86-interrupt" fn double_fault_handler(
 
     //keyboard_loop();
     unsafe {
+        resume(2);
         crash();
 
         loop {

@@ -86,7 +86,9 @@ pub unsafe fn schedule(old: *mut Context) -> *mut Context {
 
     PROCESS_LIST[CURRENT_PID].as_mut().unwrap().context = *old;
 
-    if PROCESS_LIST[CURRENT_PID].unwrap().status != Status::Idle {
+    if PROCESS_LIST[CURRENT_PID].unwrap().status != Status::Idle
+        && PROCESS_LIST[CURRENT_PID].unwrap().status != Status::Crashed
+    {
         PROCESS_LIST[CURRENT_PID].as_mut().unwrap().status = Status::Ready;
     }
 
@@ -107,6 +109,17 @@ pub unsafe fn idle() {
 pub unsafe fn crash() {
     if !PROCESS_LIST[CURRENT_PID].is_none() {
         PROCESS_LIST[CURRENT_PID].as_mut().unwrap().status = Status::Crashed;
+    }
+
+    /*core::arch::asm!("int 0x20");
+    loop {
+        core::arch::asm!("hlt");
+    }*/
+}
+
+pub unsafe fn kill(pid: usize) {
+    if pid < PROCESS_LIST.len() && !PROCESS_LIST[pid].is_none() {
+        PROCESS_LIST[pid].as_mut().unwrap().status = Status::Dead;
     }
 }
 

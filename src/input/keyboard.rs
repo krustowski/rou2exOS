@@ -81,7 +81,8 @@ pub extern "C" fn keyboard_loop() -> ! {
     render_prompt();
 
     loop {
-        let key = keyboard_read_scancode();
+        //let key = keyboard_read_scancode();
+        let key = load_scancode();
 
         if key & 0x80 != 0 {
             // Key released
@@ -557,5 +558,42 @@ pub fn split_cmd(input: &[u8]) -> (&[u8], &[u8]) {
         (cmd, rest)
     } else {
         (trimmed, &[])
+    }
+}
+
+//
+//
+//
+
+pub unsafe fn push_scancode(scancode: u8) {
+    SCANCODE_BUF[SCANCODE_BUF_HEAD] = scancode;
+    SCANCODE_BUF_HEAD += 1;
+    SCANCODE_BUF_HEAD %= 2048;
+
+    SCANCODE_BUF_LOCKED = false;
+    //crate::task::process::resume(3);
+}
+
+static mut SCANCODE_BUF_HEAD: usize = 0;
+static mut SCANCODE_BUF: [u8; 2048] = [0; 2048];
+pub static mut SCANCODE_BUF_LOCKED: bool = true;
+
+pub fn load_scancode() -> u8 {
+    loop {
+        unsafe {
+            if SCANCODE_BUF_LOCKED {
+                //crate::task::process::idle();
+                core::arch::asm!("pause");
+                continue;
+            }
+
+            /*if port::read(0x64) & 1 == 0 {
+                SCANCODE_BUF_LOCKED = true;
+                continue;
+            }*/
+
+            SCANCODE_BUF_LOCKED = true;
+            return SCANCODE_BUF[(SCANCODE_BUF_HEAD - 1) % 2048];
+        }
     }
 }

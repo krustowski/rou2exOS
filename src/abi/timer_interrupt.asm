@@ -5,6 +5,7 @@ global timer_interrupt_stub
 extern schedule
 
 timer_interrupt_stub:
+    cli
     push r15
     push r14
     push r13
@@ -41,6 +42,7 @@ timer_interrupt_stub:
     pop r13
     pop r14
     pop r15
+    sti
 
     iretq
 

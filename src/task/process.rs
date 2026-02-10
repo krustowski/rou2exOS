@@ -123,8 +123,7 @@ pub unsafe fn crash() {
         PROCESS_LIST[CURRENT_PID].as_mut().unwrap().status = Status::Crashed;
     }
 
-    /*core::arch::asm!("int 0x20");
-    loop {
+    /*loop {
         core::arch::asm!("hlt");
     }*/
 }

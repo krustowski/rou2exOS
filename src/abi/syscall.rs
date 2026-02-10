@@ -153,7 +153,7 @@ extern "C" fn syscall_inner(arg1: u64, arg2: u64, syscall_no: u64) -> SyscallRet
                 0x01 => unsafe {
                     let name = b"rourex";
                     let user = b"root";
-                    let version = b"v0.10.4";
+                    let version = b"v0.10.5";
                     let path = b"/";
 
                     if let Some(nm) = (*sysinfo_ptr).system_name.get_mut(0..name.len()) {

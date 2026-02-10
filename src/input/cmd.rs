@@ -18,7 +18,7 @@ use crate::tui::{
 };
 use crate::video::vga::Color;
 
-const KERNEL_VERSION: &[u8] = b"0.10.4";
+const KERNEL_VERSION: &[u8] = b"0.10.5";
 
 struct Command {
     name: &'static [u8],

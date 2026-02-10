@@ -181,7 +181,7 @@ pub fn run_elf(filename_input: &[u8], args: &[u8], mode: RunMode) -> bool {
                 rprintn!(entry_addr);
                 rprint!("\n");
 
-                let stack_top = 0x7fffff;
+                let stack_top = 0x800_000;
 
                 // cast and jump
                 let entry_fn: extern "C" fn() -> u64 =

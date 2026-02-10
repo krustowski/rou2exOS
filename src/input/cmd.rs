@@ -18,7 +18,7 @@ use crate::tui::{
 };
 use crate::video::vga::Color;
 
-const KERNEL_VERSION: &[u8] = b"0.10.2";
+const KERNEL_VERSION: &[u8] = b"0.10.4";
 
 struct Command {
     name: &'static [u8],
@@ -179,12 +179,6 @@ static COMMANDS: &[Command] = &[
         hidden: false,
     },
     Command {
-        name: b"tasks",
-        description: b"lists currently running tasks",
-        function: cmd_tasks,
-        hidden: false,
-    },
-    Command {
         name: b"tcp",
         description: b"tests the TCP implementation",
         function: cmd_tcp,
@@ -194,6 +188,12 @@ static COMMANDS: &[Command] = &[
         name: b"time",
         description: b"prints system time and date",
         function: cmd_time,
+        hidden: false,
+    },
+    Command {
+        name: b"ts",
+        description: b"lists currently running tasks",
+        function: cmd_ts,
         hidden: false,
     },
     Command {
@@ -349,16 +349,16 @@ fn cmd_beep(_args: &[u8]) {
 
 /// Runs an ELF binary in background (won't make kernel shell Idle).
 fn cmd_bg(args: &[u8]) {
-    if args.is_empty() || args.len() > 12 {
-        warn!("usage: run <binary name>\n");
+    if args.is_empty() {
+        warn!("usage: bg <binary name>\n");
         return;
     }
 
     // This split_cmd invocation trims the b'\0' tail from the input args.
     let (filename_input, _) = keyboard::split_cmd(args);
 
-    if filename_input.is_empty() || filename_input.len() > 12 {
-        warn!("Usage: run <binary name>\n");
+    if filename_input.is_empty() || filename_input.len() > 8 {
+        warn!("Usage: bg <binary name>\n");
         return;
     }
 
@@ -366,16 +366,16 @@ fn cmd_bg(args: &[u8]) {
 }
 
 fn cmd_fg(args: &[u8]) {
-    if args.is_empty() || args.len() > 12 {
-        warn!("usage: run <binary name>\n");
+    if args.is_empty() {
+        warn!("usage: fg <binary name>\n");
         return;
     }
 
     // This split_cmd invocation trims the b'\0' tail from the input args.
     let (filename_input, _) = keyboard::split_cmd(args);
 
-    if filename_input.is_empty() || filename_input.len() > 12 {
-        warn!("Usage: run <binary name>\n");
+    if filename_input.is_empty() || filename_input.len() > 8 {
+        warn!("Usage: fg <binary name>\n");
         return;
     }
 
@@ -605,9 +605,6 @@ fn cmd_kill(args: &[u8]) {
 
 /// Experimental command function to evaluate the current TUI rendering options.
 fn cmd_menu(_args: &[u8]) {
-    // Working sample, but loops without exit
-    //app::menu::menu_loop(vga_index);
-
     // Set the labels
     let mut label1 = Label {
         x: 0,
@@ -989,12 +986,6 @@ fn cmd_snake(_args: &[u8]) {
     app::snake::menu::menu_loop();
 }
 
-fn cmd_tasks(_args: &[u8]) {
-    unsafe {
-        crate::task::process::list_processes();
-    }
-}
-
 /// Experimental command function to demonstrate the implementation state of the TCP/IP stack.
 fn cmd_tcp(_args: &[u8]) {
     app::tcp_handler::handle();
@@ -1042,6 +1033,12 @@ fn cmd_time(_args: &[u8]) {
 
     printn!(y as u64);
     println!();
+}
+
+fn cmd_ts(_args: &[u8]) {
+    unsafe {
+        crate::task::process::list_processes();
+    }
 }
 
 /// Experimental command function to show the system uptime.

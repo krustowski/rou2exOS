@@ -51,7 +51,7 @@ pub struct Process {
     mode: Mode,
     pub status: Status,
     context: Context,
-    kernel_stack: [u8; 4096],
+    kernel_stack: [u8; 8096],
 }
 
 extern "C" {
@@ -103,7 +103,10 @@ pub unsafe fn schedule(old: *mut Context) -> *mut Context {
 
     PROCESS_LIST[next].as_mut().unwrap().status = Status::Running;
     CURRENT_PID = next;
-    tss64.rsp0 = &PROCESS_LIST[next].unwrap().kernel_stack as *const _ as u64;
+
+    let kstack = PROCESS_LIST[next].unwrap().kernel_stack;
+    tss64.rsp0 = (kstack.as_ptr() as u64) + kstack.len() as u64;
+    tss64.rsp0 &= !0xF;
 
     crate::input::port::write(0x20, 0x20);
     &mut PROCESS_LIST[next].as_mut().unwrap().context as *mut _
@@ -144,12 +147,12 @@ pub unsafe fn resume(pid: usize) {
 
 pub unsafe fn setup_processes() {
     let src = user_entry as *const u8;
-    let dst = 0x800_000 as *mut u8;
+    let dst = 0x7d0_000 as *mut u8;
 
     core::ptr::copy_nonoverlapping(src, dst, 4096);
 
     let proc0 = create_process(b"init", Mode::Kernel, 0, 0x190_000);
-    let proc1 = create_process(b"numbers", Mode::Kernel, 0x800_000, 0x7a0_000);
+    let proc1 = create_process(b"clock", Mode::Kernel, 0x7d0_000, 0x7a0_000);
     let proc2 = create_process(b"shell", Mode::Kernel, keyboard_loop as u64, 0x700_000);
 
     PROCESS_LIST = [Some(proc0), Some(proc1), Some(proc2), None]
@@ -168,14 +171,37 @@ pub unsafe fn start_process(proc: Process) -> bool {
 
 #[no_mangle]
 extern "C" fn user_entry() -> ! {
-    let mut i = 0;
+    use crate::vga::buffer::Color;
+    use crate::vga::write::{newline, number, string};
+
+    //let mut i = 0;
     loop {
         unsafe {
-            i += 1;
-            rprintn!(i);
-            rprint!("\n");
+            //i += 1;
+            //rprintn!(i);
+            //rprint!("\n");
 
-            core::arch::asm!("int 0x20");
+            let vga_index: &mut isize = &mut 144;
+
+            let (y, mo, d, h, m, s) = crate::time::rtc::read_rtc_full();
+
+            // Hours
+            number(vga_index, h as u64);
+            string(vga_index, b":", crate::vga::buffer::Color::White);
+
+            // Minutes
+            if m < 10 {
+                string(vga_index, b"0", Color::White);
+            }
+            number(vga_index, m as u64);
+            string(vga_index, b":", Color::White);
+
+            // Seconds
+            if s < 10 {
+                string(vga_index, b"0", Color::White);
+            }
+            number(vga_index, s as u64);
+            newline(vga_index);
 
             for _ in 0..50_000 {
                 //core::arch::asm!("mov rdx, 0", "int 0x7f", "hlt");
@@ -272,6 +298,6 @@ pub fn create_process(
             rsp: process_stack_top,
             ss: stack_segment,
         },
-        kernel_stack: [0; 4096],
+        kernel_stack: [0; 8096],
     }
 }

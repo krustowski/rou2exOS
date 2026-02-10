@@ -121,38 +121,6 @@ extern "C" {
     fn timer_interrupt_stub();
 }
 
-/*#[no_mangle]
-extern "x86-interrupt" fn timer_handler(stack: InterruptStackFrame) {
-    unsafe {
-        let context = &crate::task::process::Context {
-            r15: 0,
-            r14: 0,
-            r13: 0,
-            r12: 0,
-            r11: 0,
-            r10: 0,
-            r9: 0,
-            r8: 0,
-            rdi: 0,
-            rsi: 0,
-            rbp: 0,
-            rdx: 0,
-            rcx: 0,
-            rbx: 0,
-            rax: 0,
-            //rip: stack.instruction_pointer.as_u64(),
-            rip: 0,
-            cs: stack.code_segment.0 as u64,
-            rflags: stack.cpu_flags.bits(),
-            rsp: stack.stack_pointer.as_u64(),
-            ss: stack.stack_segment.0 as u64,
-        };
-
-        crate::task::process::schedule(context);
-        crate::input::port::write(0x20, 0x20);
-    }
-}*/
-
 extern "x86-interrupt" fn keyboard_handler(_stack: InterruptStackFrame) {
     let scancode = crate::input::port::read_u8(0x60);
 
@@ -197,9 +165,14 @@ pub fn install_isrs() {
     unsafe { IDT[0x20].set_handler_addr(VirtAddr::new(timer_interrupt_stub as u64)) };
     unsafe { IDT[0x21].set_handler_fn(keyboard_handler) };
     unsafe { IDT[0x26].set_handler_fn(floppy_drive_handler) };
-    unsafe {
+    /*unsafe {
         IDT[0x7f]
             .set_handler_fn(syscall_handler)
+            .set_privilege_level(x86_64::PrivilegeLevel::Ring3)
+    };*/
+    unsafe {
+        IDT[0x7f]
+            .set_handler_addr(VirtAddr::new(syscall_handler as u64))
             .set_privilege_level(x86_64::PrivilegeLevel::Ring3)
     };
     unsafe { IDT[0x80].set_handler_fn(syscall_80h) };

@@ -28,7 +28,7 @@ enum SyscallReturnCode {
 
 /// This function is the syscall ABI dispatching routine. It is called exclusively from the ISR
 /// for interrupt 0x7f.
-#[unsafe(naked)]
+/*#[unsafe(naked)]
 pub extern "x86-interrupt" fn syscall_handler(_: InterruptStackFrame) {
     naked_asm!(
         "mov rcx, rdx",
@@ -37,6 +37,59 @@ pub extern "x86-interrupt" fn syscall_handler(_: InterruptStackFrame) {
         "iretq",
         syscall = sym syscall_inner,
     )
+}*/
+
+#[unsafe(naked)]
+pub extern "C" fn syscall_handler() -> ! {
+    core::arch::naked_asm!(
+        "mov rcx, rdx",
+        "cld",
+
+        "push rax",
+        "push rbx",
+        "push rcx",
+        "push rdx",
+        "push rsi",
+        "push rdi",
+        "push rbp",
+        "push r8",
+        //"push r9",
+        "push r10",
+        "push r11",
+        "push r12",
+        "push r13",
+        "push r14",
+        "push r15",
+
+        "sub rsp, 8",
+        "mov rdx, rax",
+
+        "call {syscall_inner}",
+
+        "mov r9, rax",
+        "add rsp, 8",
+
+        "pop r15",
+        "pop r14",
+        "pop r13",
+        "pop r12",
+        "pop r11",
+        "pop r10",
+        //"pop r9",
+        "pop r8",
+        "pop rbp",
+        "pop rdi",
+        "pop rsi",
+        "pop rdx",
+        "pop rcx",
+        "pop rbx",
+        "pop rax",
+
+        "mov rax, r9",
+
+        "iretq",
+        syscall_inner = sym syscall_inner,
+    );
 }
 
 extern "C" fn syscall_inner(arg1: u64, arg2: u64, syscall_no: u64) -> SyscallReturnCode {
@@ -60,7 +113,7 @@ extern "C" fn syscall_inner(arg1: u64, arg2: u64, syscall_no: u64) -> SyscallRet
         /*
          *  Syscall 0x00 --- Program graceful exit
          *
-         *  Arg1: program/process/task ID
+         *  Arg1: any
          *  Arg2: program return code
          */
         0x00 => {
@@ -72,16 +125,13 @@ extern "C" fn syscall_inner(arg1: u64, arg2: u64, syscall_no: u64) -> SyscallRet
                 rprintn!(arg2);
                 rprint!("\n");
 
-                crate::task::process::idle();
                 crate::task::process::resume(2);
+                crate::task::process::idle();
 
-                /*core::arch::asm!(
-                    "mov rdi, {0}",
-                    "mov rsi, {1}",
-                    "jmp kernel_return",
-                    in(reg) arg2,
-                    in(reg) arg1,
-                );*/
+                core::arch::asm!("sti");
+                loop {
+                    core::arch::asm!("pause");
+                }
             };
         }
 
@@ -103,7 +153,7 @@ extern "C" fn syscall_inner(arg1: u64, arg2: u64, syscall_no: u64) -> SyscallRet
                 0x01 => unsafe {
                     let name = b"rourex";
                     let user = b"root";
-                    let version = b"v0.10.2";
+                    let version = b"v0.10.4";
                     let path = b"/";
 
                     if let Some(nm) = (*sysinfo_ptr).system_name.get_mut(0..name.len()) {

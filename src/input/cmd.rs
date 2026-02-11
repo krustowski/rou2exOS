@@ -18,7 +18,7 @@ use crate::tui::{
 };
 use crate::video::vga::Color;
 
-const KERNEL_VERSION: &[u8] = b"0.10.5";
+const KERNEL_VERSION: &[u8] = b"0.10.6";
 
 struct Command {
     name: &'static [u8],
@@ -107,6 +107,12 @@ static COMMANDS: &[Command] = &[
         hidden: false,
     },
     Command {
+        name: b"hlt",
+        description: b"shuts down the system",
+        function: cmd_hlt,
+        hidden: false,
+    },
+    Command {
         name: b"http",
         description: b"runs a simple HTTP/UDP handler",
         function: cmd_http,
@@ -167,12 +173,6 @@ static COMMANDS: &[Command] = &[
         hidden: true,
     },
     Command {
-        name: b"shutdown",
-        description: b"shuts down the system",
-        function: cmd_shutdown,
-        hidden: false,
-    },
-    Command {
         name: b"snake",
         description: b"runs a simple VGA text mode snake-like game",
         function: cmd_snake,
@@ -203,9 +203,9 @@ static COMMANDS: &[Command] = &[
         hidden: true,
     },
     Command {
-        name: b"version",
+        name: b"ver",
         description: b"prints the kernel version",
-        function: cmd_version,
+        function: cmd_ver,
         hidden: false,
     },
     Command {
@@ -537,6 +537,28 @@ fn cmd_help(_args: &[u8]) {
         printb!(cmd.description);
         println!();
     }
+}
+
+fn cmd_hlt(_args: &[u8]) {
+    print!("\n\n --- Shutting down the system", Color::DarkCyan);
+
+    // Burn some CPU time
+    for _ in 0..3 {
+        for _ in 0..3_500_000 {
+            unsafe {
+                core::arch::asm!("nop");
+            }
+        }
+        printb!(b". ");
+    }
+
+    // Invoke the ACPI shutdown attempt (if present)
+    acpi::shutdown::shutdown();
+}
+
+/// Meta command to run the Snake game.
+fn cmd_snake(_args: &[u8]) {
+    app::snake::menu::menu_loop();
 }
 
 /// Experimental command function to test the HTTP over UDP implementation.
@@ -914,78 +936,8 @@ fn cmd_run(args: &[u8]) {
     super::elf::run_elf(filename_input, args, super::elf::RunMode::Foreground);
 }
 
-const USER_STACK_SIZE: usize = 0x8000; // 32 KiB
-static mut USER_STACK: [u8; USER_STACK_SIZE] = [0; USER_STACK_SIZE];
-
-unsafe extern "C" fn user_program_return() -> ! {
-    core::arch::asm!(
-        "mov rdi, rax",
-        "jmp {handler}",
-        handler = sym handle_program_return,
-        options(noreturn)
-    );
-}
-
-extern "C" fn handle_program_return(retval: u64) -> ! {
-    rprint!("Program returned: ");
-    rprintn!(retval);
-    rprint!("\n");
-
-    keyboard_loop();
-}
-
-// TODO: why are we chopping off 32 bits off of all the regs
-unsafe fn run_program(entry: extern "C" fn(u32) -> u32, arg: u32) -> u32 {
-    let mut ret: u32;
-
-    // Get stack top
-    let user_stack_top = (&raw const USER_STACK).add(USER_STACK_SIZE);
-
-    let return_addr = user_program_return as usize;
-
-    core::arch::asm!(
-        "mov {old_rsp}, rsp",
-        "mov rsp, {stack}",
-        "push {ret_addr}",
-        "mov rdi, {arg:r}",
-        "call {entry}",
-        "mov rsp, {old_rsp}",
-        stack = in(reg) user_stack_top.offset(-8),
-        ret_addr = in(reg) return_addr,
-        entry = in(reg) entry,
-        old_rsp = lateout(reg) _,
-        arg = in(reg) arg,
-        out("rax") ret,
-        options(nostack),
-    );
-
-    ret
-}
-
 /// Experimental command function to demonstrate the current state of the shutdown process
 /// implemented.
-fn cmd_shutdown(_args: &[u8]) {
-    print!("\n\n --- Shutting down the system", Color::DarkCyan);
-
-    // Burn some CPU time
-    for _ in 0..3 {
-        for _ in 0..3_500_000 {
-            unsafe {
-                core::arch::asm!("nop");
-            }
-        }
-        printb!(b". ");
-    }
-
-    // Invoke the ACPI shutdown attempt (if present)
-    acpi::shutdown::shutdown();
-}
-
-/// Meta command to run the Snake game.
-fn cmd_snake(_args: &[u8]) {
-    app::snake::menu::menu_loop();
-}
-
 /// Experimental command function to demonstrate the implementation state of the TCP/IP stack.
 fn cmd_tcp(_args: &[u8]) {
     app::tcp_handler::handle();
@@ -1071,7 +1023,7 @@ fn cmd_uptime(_args: &[u8]) {
 }
 
 /// Prints system information set, mainly version and name.
-fn cmd_version(_args: &[u8]) {
+fn cmd_ver(_args: &[u8]) {
     print!("Version: ");
     printb!(KERNEL_VERSION);
     println!();

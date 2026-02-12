@@ -1,10 +1,13 @@
 const QUEUE_MSG_COUNT_MAX: usize = 10;
 
-#[derive(Clone, Copy)]
+#[derive(Debug, Clone, Copy)]
 pub struct Message {
     port_id: usize,
+    src_pid: usize,
+    dst_pid: usize,
 }
 
+#[derive(Debug, Clone, Copy)]
 pub struct Queue {
     buffer: [Option<Message>; QUEUE_MSG_COUNT_MAX],
     head: usize,
@@ -13,6 +16,15 @@ pub struct Queue {
 }
 
 impl Queue {
+    pub fn new() -> Queue {
+        Queue {
+            buffer: [None; QUEUE_MSG_COUNT_MAX],
+            head: 0,
+            tail: 0,
+            msg_count: 0,
+        }
+    }
+
     pub fn push(&mut self, msg: Message) -> bool {
         if self.msg_count == QUEUE_MSG_COUNT_MAX {
             // The queue is full, or blocked
@@ -34,7 +46,7 @@ impl Queue {
             return None;
         }
 
-        // Fetch "the first"" item from the queue and yeet its contents
+        // Fetch "the first" item from the queue and yeet its contents
         let msg = self.buffer[self.head].take();
 
         // Update the counters and pointers

@@ -39,9 +39,16 @@ pub enum Mode {
 pub enum Status {
     Ready,
     Running,
-    Idle,
+    Blocked,
     Crashed,
+    Idle,
     Dead,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct Port {
+    id: usize,
+    used: bool,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -52,6 +59,7 @@ pub struct Process {
     pub status: Status,
     context: Context,
     kernel_stack: [u8; 8096],
+    ports: [Port; 2],
 }
 
 extern "C" {
@@ -81,6 +89,7 @@ pub unsafe fn schedule(old: *mut Context) -> *mut Context {
         if !PROCESS_LIST[next].is_none()
             && PROCESS_LIST[next].unwrap().status != Status::Idle
             && PROCESS_LIST[next].unwrap().status != Status::Crashed
+            && PROCESS_LIST[next].unwrap().status != Status::Blocked
         {
             break;
         }
@@ -93,6 +102,7 @@ pub unsafe fn schedule(old: *mut Context) -> *mut Context {
     if PROCESS_LIST[CURRENT_PID].unwrap().status != Status::Idle
         && PROCESS_LIST[CURRENT_PID].unwrap().status != Status::Crashed
         && PROCESS_LIST[CURRENT_PID].unwrap().status != Status::Dead
+        && PROCESS_LIST[CURRENT_PID].unwrap().status != Status::Blocked
     {
         PROCESS_LIST[CURRENT_PID].as_mut().unwrap().status = Status::Ready;
     }
@@ -110,6 +120,12 @@ pub unsafe fn schedule(old: *mut Context) -> *mut Context {
 
     crate::input::port::write(0x20, 0x20);
     &mut PROCESS_LIST[next].as_mut().unwrap().context as *mut _
+}
+
+pub unsafe fn block(port_no: u64) {
+    if !PROCESS_LIST[CURRENT_PID].is_none() {
+        PROCESS_LIST[CURRENT_PID].as_mut().unwrap().status = Status::Blocked;
+    }
 }
 
 pub unsafe fn idle() {

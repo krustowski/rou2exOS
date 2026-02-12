@@ -1,5 +1,6 @@
 pub mod pipe;
 pub mod process;
+pub mod queue;
 
 pub struct Task {
     pub regs: process::Context,

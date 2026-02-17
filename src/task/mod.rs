@@ -1,10 +1,11 @@
+pub mod context;
 pub mod pipe;
 pub mod process;
 pub mod queue;
 pub mod scheduler;
 
-pub struct Task {
-    pub regs: process::Context,
+/*pub struct Task {
+    pub regs: context::Context,
     //pub stack: &'static mut [u8],
     pub stack: u64,
     pub is_done: bool,
@@ -43,7 +44,7 @@ fn add_task(entry: extern "C" fn()) {
     let stack = new_stack();
     let rsp = stack + 0x90000 - 8; // top of stack
 
-    let regs = process::Context {
+    let regs = context::Context {
         r15: 0,
         r14: 0,
         r13: 0,
@@ -301,4 +302,4 @@ pub fn run_scheduler() {
     add_task(kern_task1);
     add_task(kern_task2);
     //schedule_old();
-}
+}*/

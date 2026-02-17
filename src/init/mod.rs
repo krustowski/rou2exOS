@@ -4,11 +4,13 @@ pub mod config;
 pub mod cpu;
 pub mod font;
 pub mod fs;
-pub mod idt;
 pub mod heap;
+pub mod idt;
 pub mod pit;
 //mod multiboot2;
-pub mod check;
 pub mod boot;
+pub mod check;
 pub mod parser;
+pub mod process;
 pub mod video;
+

@@ -2,7 +2,6 @@
 
 use crate::init::{ascii, boot, color, cpu, fs, heap, idt, parser, pit, video};
 
-use crate::task::process::INIT_DONE;
 use crate::video::vga;
 //Results of init system
 use crate::video::sysprint::Result;
@@ -51,17 +50,17 @@ pub fn init(m2_ptr: u32) {
         video::print_result(&FRAMEBUFFER_PTR)
     });
 
-    result!("Starting PIC timer", pit::pic_pit_init());
-
     result!("Checking floppy drive", fs::floppy_check_init());
 
     color::color_demo();
     ascii::ascii_art();
 
-    rprint!("Kernel init done! Starting the kernel task scheduler...\n");
+    rprint!("Kernel init done!\n");
 
     unsafe {
-        crate::task::process::setup_processes();
-        INIT_DONE = true;
+        super::process::init_processes();
+        //crate::task::scheduler::list_processes();
     }
+    //result!("Starting PIC time and task scheduler", pit::pic_pit_init());
+    pit::pic_pit_init();
 }

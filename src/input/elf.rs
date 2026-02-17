@@ -105,9 +105,9 @@ pub fn run_elf(filename_input: &[u8], args: &[u8], mode: RunMode) -> bool {
     // 12 = filename + ext + dot
     let mut filename = [b' '; 12];
 
-    if let Some(slice) = filename.get_mut(..filename_input.len()) {
+    /*if let Some(slice) = filename.get_mut(..filename_input.len()) {
         slice.copy_from_slice(filename_input);
-    }
+    }*/
     if let Some(slice) = filename.get_mut(9..12) {
         slice.copy_from_slice(b"ELF");
     }
@@ -126,6 +126,10 @@ pub fn run_elf(filename_input: &[u8], args: &[u8], mode: RunMode) -> bool {
                     if entry.name.starts_with(filename_input) && entry.ext.starts_with(b"ELF") {
                         cluster = entry.start_cluster;
                         size = entry.file_size;
+
+                        if let Some(slice) = filename.get_mut(0..8) {
+                            slice.copy_from_slice(&entry.name);
+                        }
                     }
                 });
 
@@ -184,29 +188,34 @@ pub fn run_elf(filename_input: &[u8], args: &[u8], mode: RunMode) -> bool {
                 let stack_top = 0x800_000;
 
                 // cast and jump
-                let entry_fn: extern "C" fn() -> u64 =
-                    core::mem::transmute(entry_addr as *const ());
+                //let entry_fn: extern "C" fn() -> ! = core::mem::transmute(entry_addr as *const ());
+
+                let mut name: [u8; 16] = [b' '; 16];
+
+                if let Some(slice) = name.get_mut(0..12) {
+                    slice.copy_from_slice(&filename[0..12]);
+                }
 
                 // Create a new process to be run
-                let proc = crate::task::process::create_process(
-                    &filename,
+                let pid = crate::task::scheduler::new_process(
+                    name,
                     crate::task::process::Mode::User,
-                    entry_fn as u64,
+                    entry_addr as u64,
                     stack_top,
                 );
 
-                if crate::task::process::start_process(proc) {
-                    match mode {
-                        RunMode::Background => {}
-                        RunMode::Foreground => {
-                            // Make the kernel shell idle
-                            crate::task::process::idle();
-                        }
-                    }
-                } else {
+                if pid == 0xff || pid == 0x00 {
                     rprint!("Error starting new process...\n");
                     error!("Error starting new process...\n\n");
                     return false;
+                }
+
+                match mode {
+                    RunMode::Background => {}
+                    RunMode::Foreground => {
+                        // Make the kernel shell idle
+                        crate::task::scheduler::idle(0xff);
+                    }
                 }
             }
         }

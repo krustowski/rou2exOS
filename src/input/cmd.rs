@@ -9,8 +9,6 @@ use crate::init::config::PATH_CLUSTER;
 use crate::input::keyboard;
 use crate::input::keyboard::keyboard_loop;
 use crate::net;
-use crate::task::process::idle;
-use crate::task::process::start_process;
 use crate::time;
 use crate::tui::{
     app::TuiApp,
@@ -618,7 +616,7 @@ fn cmd_kill(args: &[u8]) {
         println!();
 
         unsafe {
-            crate::task::process::kill(pid as usize);
+            crate::task::scheduler::kill(pid as usize);
         }
     } else {
         error!("invalid PID lmao\n");
@@ -989,7 +987,7 @@ fn cmd_time(_args: &[u8]) {
 
 fn cmd_ts(_args: &[u8]) {
     unsafe {
-        crate::task::process::list_processes();
+        crate::task::scheduler::list_processes();
     }
 }
 

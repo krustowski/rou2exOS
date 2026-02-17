@@ -38,7 +38,7 @@ pub extern "C" fn kernel_main(_multiboot2_magic: u32, multiboot_ptr: u32) {
     //input::keyboard::keyboard_loop();
 
     unsafe {
-        crate::task::process::idle();
+        task::scheduler::idle(0xff);
 
         loop {
             core::arch::asm!("pause");
@@ -53,8 +53,6 @@ pub extern "C" fn kernel_main(_multiboot2_magic: u32, multiboot_ptr: u32) {
 // #[lang = "eh_personality"] extern fn eh_personality() {}
 
 use core::panic::PanicInfo;
-
-use crate::input::keyboard::keyboard_loop;
 
 /// Panic handler for panic fucntion invocations
 #[panic_handler]
@@ -76,8 +74,11 @@ fn panic(info: &PanicInfo) -> ! {
         newline(vga_index);
     }
 
-    println!();
-    keyboard_loop();
+    unsafe {
+        loop {
+            core::arch::asm!("hlt");
+        }
+    }
 }
 
 #[unsafe(no_mangle)]

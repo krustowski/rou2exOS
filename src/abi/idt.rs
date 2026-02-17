@@ -8,8 +8,7 @@ use x86_64::{
 
 use crate::{
     abi::syscall::{syscall_80h, syscall_handler},
-    input::keyboard::keyboard_loop,
-    task::process::{crash, idle, resume},
+    task::scheduler,
 };
 
 #[link_section = ".idt"]
@@ -41,10 +40,9 @@ extern "x86-interrupt" fn page_fault_handler(
     printx!(stack_frame.stack_pointer.as_u64());
     print!("\n\n");
 
-    //keyboard_loop();
     unsafe {
-        resume(2);
-        crash();
+        scheduler::crash(0xff);
+        scheduler::wake(2);
     }
 }
 
@@ -60,10 +58,9 @@ extern "x86-interrupt" fn general_protection_fault_handler(
     printx!(frame.stack_pointer.as_u64());
     print!("\n\n");
 
-    //keyboard_loop();
     unsafe {
-        resume(2);
-        crash();
+        //scheduler::crash(0xff);
+        //scheduler::wake(2);
     }
 }
 
@@ -76,10 +73,9 @@ extern "x86-interrupt" fn invalid_opcode_handler(stack_frame: InterruptStackFram
     printx!(stack_frame.stack_pointer.as_u64());
     print!("\n\n");
 
-    //keyboard_loop();
     unsafe {
-        resume(2);
-        crash();
+        scheduler::crash(0xff);
+        scheduler::wake(2);
     }
 }
 
@@ -101,8 +97,8 @@ extern "x86-interrupt" fn double_fault_handler(
 
     //keyboard_loop();
     unsafe {
-        resume(2);
-        crash();
+        scheduler::crash(0xff);
+        scheduler::wake(2);
 
         loop {
             core::arch::asm!("hlt");

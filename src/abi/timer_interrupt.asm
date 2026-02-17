@@ -2,10 +2,9 @@ BITS 64
 
 section .text
 global timer_interrupt_stub
-extern schedule
+extern scheduler_schedule
 
 timer_interrupt_stub:
-    cli
     push r15
     push r14
     push r13
@@ -23,7 +22,7 @@ timer_interrupt_stub:
     push rax
 
     mov rdi, rsp
-    call schedule
+    call scheduler_schedule
 
     mov rsp, rax
 
@@ -42,7 +41,6 @@ timer_interrupt_stub:
     pop r13
     pop r14
     pop r15
-    sti
 
     iretq
 

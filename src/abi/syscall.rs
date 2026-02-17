@@ -1,4 +1,4 @@
-use core::arch::naked_asm;
+use core::{arch::naked_asm, ptr::copy_nonoverlapping};
 
 use x86_64::structures::idt::InterruptStackFrame;
 
@@ -9,7 +9,10 @@ use crate::{
     },
     input::{elf, irq},
     net::{icmp, ipv4, serial, tcp},
-    //task::process::schedule,
+    task::{
+        queue::Message,
+        scheduler::{self},
+    },
     time::rtc,
 };
 
@@ -28,20 +31,9 @@ enum SyscallReturnCode {
 
 /// This function is the syscall ABI dispatching routine. It is called exclusively from the ISR
 /// for interrupt 0x7f.
-/*#[unsafe(naked)]
-pub extern "x86-interrupt" fn syscall_handler(_: InterruptStackFrame) {
-    naked_asm!(
-        "mov rcx, rdx",
-        "cld",
-        "call {syscall}",
-        "iretq",
-        syscall = sym syscall_inner,
-    )
-}*/
-
 #[unsafe(naked)]
-pub extern "C" fn syscall_handler() -> ! {
-    core::arch::naked_asm!(
+pub extern "x86-interrupt" fn syscall_handler(_: InterruptStackFrame) -> ! {
+    naked_asm!(
         "mov rcx, rdx",
         "cld",
 
@@ -118,20 +110,19 @@ extern "C" fn syscall_inner(arg1: u64, arg2: u64, syscall_no: u64) -> SyscallRet
          */
         0x00 => {
             unsafe {
+                let pid = scheduler::get_current_pid();
+
                 rprint!("[TASK ");
                 //rprintn!(arg1);
-                rprintn!(crate::task::process::CURRENT_PID);
+                rprintn!(pid);
                 rprint!("]: exit, return code: ");
                 rprintn!(arg2);
                 rprint!("\n");
 
-                crate::task::process::resume(2);
-                crate::task::process::idle();
+                scheduler::kill(pid);
+                scheduler::wake(2);
 
-                core::arch::asm!("sti");
-                loop {
-                    core::arch::asm!("pause");
-                }
+                core::arch::asm!("int 0x20");
             };
         }
 
@@ -140,7 +131,6 @@ extern "C" fn syscall_inner(arg1: u64, arg2: u64, syscall_no: u64) -> SyscallRet
          *
          *  Arg1: 0x01 or 0x02
          *  Arg2: pointer to system info struct (*mut SysInfo)
-         *
          */
         0x01 => {
             if !(USERLAND_START..=USERLAND_END).contains(&arg2) {
@@ -1128,6 +1118,63 @@ extern "C" fn syscall_inner(arg1: u64, arg2: u64, syscall_no: u64) -> SyscallRet
 
                     ipv4::send_packet(slice);
                 }
+            }
+        }
+
+        /*
+         *  Syscall 0x35 --- Receive data. Try to pop the port queue. Blocking op
+         *
+         *  Arg1: target pid
+         *  Arg2: pointer to a buffer
+         */
+        0x35 => {
+            if !(USERLAND_START..=USERLAND_END).contains(&arg2) {
+                return SyscallReturnCode::InvalidInput;
+            }
+
+            unsafe {
+                let buf = arg2;
+                let current_pid = scheduler::get_current_pid();
+
+                if let Some(q_msg) = scheduler::pop_msg(current_pid) {
+                    if q_msg.dst_pid != current_pid {
+                        let msg = Message::new(0, 0xff, current_pid, buf);
+                        scheduler::block(current_pid, msg);
+
+                        return SyscallReturnCode::Ok;
+                    }
+
+                    // TODO: check the pointer address bounds!
+                    // TODO: unuglify this
+                    copy_nonoverlapping(q_msg.buf_addr as *const u8, buf as *mut u8, 512);
+                    scheduler::wake(current_pid);
+                } else {
+                    let msg = Message::new(0, 0xff, current_pid, buf);
+                    scheduler::block(current_pid, msg);
+                }
+            }
+        }
+
+        /*
+         *  Syscall 0x36 --- Send data. Try to push to the port queue
+         *
+         *  Arg1: op code
+         *  Arg2: pointer to a buffer
+         */
+        0x36 => {
+            if !(USERLAND_START..=USERLAND_END).contains(&arg2) {
+                return SyscallReturnCode::InvalidInput;
+            }
+
+            let target_pid = arg1 as usize;
+            let buf = arg2;
+
+            unsafe {
+                let current_pid = scheduler::get_current_pid();
+                let msg = Message::new(0, current_pid, target_pid, buf);
+
+                scheduler::push_msg(target_pid, msg);
+                scheduler::wake(target_pid);
             }
         }
 

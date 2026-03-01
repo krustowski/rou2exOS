@@ -43,9 +43,13 @@ extern "x86-interrupt" fn page_fault_handler(
     unsafe {
         scheduler::crash(0xff);
         scheduler::wake(2);
+
+        core::arch::asm!("int 0x20");
     }
 }
 
+#[no_mangle]
+#[link_section = ".text"]
 extern "x86-interrupt" fn general_protection_fault_handler(
     frame: InterruptStackFrame,
     error_code: u64,
@@ -59,11 +63,15 @@ extern "x86-interrupt" fn general_protection_fault_handler(
     print!("\n\n");
 
     unsafe {
-        //scheduler::crash(0xff);
-        //scheduler::wake(2);
+        scheduler::crash(0xff);
+        scheduler::wake(2);
+
+        core::arch::asm!("int 0x20");
     }
 }
 
+#[no_mangle]
+#[link_section = ".text"]
 extern "x86-interrupt" fn invalid_opcode_handler(stack_frame: InterruptStackFrame) {
     error!("EXCEPTION: INVALID OPCODE");
 
@@ -76,9 +84,13 @@ extern "x86-interrupt" fn invalid_opcode_handler(stack_frame: InterruptStackFram
     unsafe {
         scheduler::crash(0xff);
         scheduler::wake(2);
+
+        core::arch::asm!("int 0x20");
     }
 }
 
+#[no_mangle]
+#[link_section = ".text"]
 extern "x86-interrupt" fn double_fault_handler(
     stack_frame: InterruptStackFrame,
     error_code: u64,
@@ -100,6 +112,7 @@ extern "x86-interrupt" fn double_fault_handler(
         scheduler::crash(0xff);
         scheduler::wake(2);
 
+        core::arch::asm!("int 0x20");
         loop {
             core::arch::asm!("hlt");
         }
@@ -117,6 +130,8 @@ extern "C" {
     fn timer_interrupt_stub();
 }
 
+#[no_mangle]
+#[link_section = ".text"]
 extern "x86-interrupt" fn keyboard_handler(_stack: InterruptStackFrame) {
     let scancode = crate::input::port::read_u8(0x60);
 
@@ -135,6 +150,8 @@ extern "x86-interrupt" fn keyboard_handler(_stack: InterruptStackFrame) {
     crate::input::port::write(0x20, 0x20);
 }
 
+#[no_mangle]
+#[link_section = ".text"]
 extern "x86-interrupt" fn floppy_drive_handler(_stack: InterruptStackFrame) {
     // Acknowledge the PIC
     //crate::input::port::write(0x20, 0x20);

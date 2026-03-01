@@ -1,4 +1,5 @@
-use crate::fs::fat12::{block::{BlockDevice, Floppy}, fs::Filesystem};
+use crate::fs::block::BlockDevice;
+use crate::fs::fat12::{block::Floppy, fs::Filesystem};
 
 /// The number of bytes in a sector
 const BYTES_PER_SECTOR: usize = 512;
@@ -29,19 +30,18 @@ impl FatTable {
 
         match Filesystem::new(&floppy) {
             Ok(fs) => {
-        for i in 0..FAT_SECTORS {
-
-            //fs.device.read_sector(FAT_START_SECTOR + i as u16, &mut data[i * BYTES_PER_SECTOR..][..BYTES_PER_SECTOR], vga_index);
-            fs.device.read_sector((FAT_START_SECTOR + i as u16) as u64, &mut buf);
-            data[i * BYTES_PER_SECTOR..(i + 1) * BYTES_PER_SECTOR].copy_from_slice(&buf);
-        }
-        Self { data }
+                for i in 0..FAT_SECTORS {
+                    //fs.device.read_sector(FAT_START_SECTOR + i as u16, &mut data[i * BYTES_PER_SECTOR..][..BYTES_PER_SECTOR], vga_index);
+                    fs.device
+                        .read_sector((FAT_START_SECTOR + i as u16) as u64, &mut buf);
+                    data[i * BYTES_PER_SECTOR..(i + 1) * BYTES_PER_SECTOR].copy_from_slice(&buf);
+                }
+                Self { data }
             }
-            Err(_) => {
-                Self { data: [0u8; FAT_SECTORS * BYTES_PER_SECTOR] }
-            }
+            Err(_) => Self {
+                data: [0u8; FAT_SECTORS * BYTES_PER_SECTOR],
+            },
         }
-
     }
 
     /// Get the next cluster in the chain
@@ -136,4 +136,3 @@ impl FatTable {
         (0xFF8..=0xFFF).contains(&cluster)
     }
 }
-

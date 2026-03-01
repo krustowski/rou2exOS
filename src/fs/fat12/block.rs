@@ -1,49 +1,4 @@
-pub trait BlockDevice {
-    /// Reads 1 sector (usually 512 bytes) at the given LBA into `buffer`
-    fn read_sector(&self, lba: u64, buffer: &mut [u8]);
-
-    /// Writes 1 sector from `buffer` to `lba`
-    fn write_sector(&self, lba: u64, buffer: &[u8; 512]);
-}
-
-static mut DISK_DATA: [u8; 1024 * 512] = [0u8; 1024 * 512]; // 1024 sectors
-const CMD_WRITE_SECTOR: u8 = 0x45; // 0x40 | 0x05 = write with MFM, multi-track
-
-pub struct MemDisk {
-    pub data: &'static mut [u8], // Must be sector-aligned
-}
-
-//
-//  MEMDISK
-//
-
-impl MemDisk {
-    pub fn new(data: &'static mut [u8]) -> Self {
-        Self { data }
-    }
-
-    fn sector_offset(&self, lba: u64) -> usize {
-        (lba as usize) * 512
-    }
-}
-
-impl BlockDevice for MemDisk {
-    fn read_sector(&self, lba: u64, buffer: &mut [u8]) {
-        let offset = self.sector_offset(lba);
-        let slice = &self.data[offset..offset + 512];
-        buffer.copy_from_slice(slice);
-    }
-
-    fn write_sector(&self, _lba: u64, _buffer: &[u8; 512]) {
-        //let offset = self.sector_offset(lba);
-        //let slice = &self.data[offset..offset + 512];
-        //slice.copy_from_slice(buffer);
-    }
-}
-
-//
-//  FLOPPY
-//
+use crate::fs::block::BlockDevice;
 
 pub struct Floppy;
 
@@ -56,18 +11,18 @@ impl BlockDevice for Floppy {
             Self::init();
             self.set_read_mode();
 
-            self.send_byte(0x46);          // Read data
-            self.send_byte(h << 2);  // drive 0, head
-            self.send_byte(c);             // Cylinder
-            self.send_byte(h);             // Head
-            self.send_byte(s);             // Sector (1-based)
-            self.send_byte(2);             // 512 = 2^2
-            self.send_byte(18);            // Last sector
-            self.send_byte(0x1B);          // GAP3
-            self.send_byte(0xFF);          // DTL (don't care for 512B)
+            self.send_byte(0x46); // Read data
+            self.send_byte(h << 2); // drive 0, head
+            self.send_byte(c); // Cylinder
+            self.send_byte(h); // Head
+            self.send_byte(s); // Sector (1-based)
+            self.send_byte(2); // 512 = 2^2
+            self.send_byte(18); // Last sector
+            self.send_byte(0x1B); // GAP3
+            self.send_byte(0xFF); // DTL (don't care for 512B)
 
-            self.wait_for_irq();    // Wait for IRQ 6
-            
+            self.wait_for_irq(); // Wait for IRQ 6
+
             /*for i in 0..10 {
                 debugn!(dma[i]);
             }
@@ -97,8 +52,8 @@ impl BlockDevice for Floppy {
 
 pub unsafe fn outb(port: u16, value: u8) {
     core::arch::asm!(
-        "out dx, al", 
-        in("dx") port, 
+        "out dx, al",
+        in("dx") port,
         in("al") value
     );
 }
@@ -106,8 +61,8 @@ pub unsafe fn outb(port: u16, value: u8) {
 pub unsafe fn inb(port: u16) -> u8 {
     let val: u8;
     core::arch::asm!(
-        "in al, dx", 
-        out("al") val, 
+        "in al, dx",
+        out("al") val,
         in("dx") port
     );
     val
@@ -124,6 +79,9 @@ pub unsafe fn inb(port: u16) -> u8 {
 
 #[unsafe(link_section = ".dma")]
 pub static mut DMA: [u8; 512] = [0; 512];
+
+static mut DISK_DATA: [u8; 1024 * 512] = [0u8; 1024 * 512]; // 1024 sectors
+const CMD_WRITE_SECTOR: u8 = 0x45; // 0x40 | 0x05 = write with MFM, multi-track
 
 //#[unsafe(link_section = ".dma")]
 //#[unsafe(no_mangle)]
@@ -151,7 +109,7 @@ const DMA_ADDR_2: u16 = 0x04;
 const DMA_COUNT_2: u16 = 0x05;
 const DMA_PAGE_2: u16 = 0x81;
 const DMA_BUFFER_ADDR: u32 = 0x1000; // Physical address, must be < 64 KiB and page-aligned
-const DMA_BUFFER_SIZE: u16 = 512;    // 1 sector
+const DMA_BUFFER_SIZE: u16 = 512; // 1 sector
 
 //
 //
@@ -348,19 +306,19 @@ impl Floppy {
 
             self.wait_ready();
 
-            outb(DOR, 0x1C);   // Enable motor and controller
+            outb(DOR, 0x1C); // Enable motor and controller
             self.setup_write(data); // Setup DMA for writing
 
             // Send command packet to FDC
             self.send_byte(CMD_WRITE_SECTOR);
-            self.send_byte(head << 2);         // Drive 0, head
-            self.send_byte(cylinder);          // Cylinder number
-            self.send_byte(head);              // Head
-            self.send_byte(sector);            // Sector number (starts at 1)
-            self.send_byte(2);                 // 512 bytes/sector => 2^2 = 512
-            self.send_byte(18);                // Sectors/track (usually 18)
-            self.send_byte(0x1B);              // GAP3 length (standard = 0x1B)
-            self.send_byte(0xFF);              // Data length (0xFF for default)
+            self.send_byte(head << 2); // Drive 0, head
+            self.send_byte(cylinder); // Cylinder number
+            self.send_byte(head); // Head
+            self.send_byte(sector); // Sector number (starts at 1)
+            self.send_byte(2); // 512 bytes/sector => 2^2 = 512
+            self.send_byte(18); // Sectors/track (usually 18)
+            self.send_byte(0x1B); // GAP3 length (standard = 0x1B)
+            self.send_byte(0xFF); // Data length (0xFF for default)
 
             self.wait_for_irq(); // wait for IRQ 6 (must be handled)
 
@@ -373,4 +331,3 @@ impl Floppy {
         }
     }
 }
-

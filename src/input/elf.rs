@@ -1,6 +1,6 @@
 use core::ptr::{copy_nonoverlapping, write_bytes};
 
-use crate::fs::fat12::block::BlockDevice;
+use crate::fs::block::BlockDevice;
 use crate::input::keyboard::keyboard_loop;
 
 #[repr(C)]
@@ -95,6 +95,8 @@ pub enum RunMode {
     Background,
 }
 
+static mut STACK_NO: usize = 0;
+
 use crate::fs::fat12::{block::Floppy, fs::Filesystem};
 
 pub fn run_elf(filename_input: &[u8], args: &[u8], mode: RunMode) -> bool {
@@ -143,7 +145,8 @@ pub fn run_elf(filename_input: &[u8], args: &[u8], mode: RunMode) -> bool {
                 rprintn!(size);
                 rprint!("\n");
 
-                let load_addr: u64 = 0x690_000;
+                let addrs = [0x640_000, 0x680_000, 0x6c0_000, 0x700_000];
+                let load_addr: u64 = addrs[STACK_NO % 4];
 
                 while size - offset > 0 {
                     let lba = fs.cluster_to_lba(cluster);
@@ -185,7 +188,9 @@ pub fn run_elf(filename_input: &[u8], args: &[u8], mode: RunMode) -> bool {
                 rprintn!(entry_addr);
                 rprint!("\n");
 
-                let stack_top = 0x800_000;
+                let stacks = [0x700_000, 0x740_000, 0x780_000, 0x7c0_000];
+                let stack_top = stacks[STACK_NO % 4];
+                STACK_NO += 1;
 
                 // cast and jump
                 //let entry_fn: extern "C" fn() -> ! = core::mem::transmute(entry_addr as *const ());

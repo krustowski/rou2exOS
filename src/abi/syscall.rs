@@ -3,10 +3,8 @@ use core::{arch::naked_asm, ptr::copy_nonoverlapping};
 use x86_64::structures::idt::InterruptStackFrame;
 
 use crate::{
-    fs::fat12::{
-        block::{BlockDevice, Floppy},
-        fs::Filesystem,
-    },
+    fs::block::BlockDevice,
+    fs::fat12::{block::Floppy, fs::Filesystem},
     input::{elf, irq},
     net::{icmp, ipv4, serial, tcp},
     task::{
@@ -28,6 +26,8 @@ enum SyscallReturnCode {
     FileNotFound = 0xfe,
     InvalidSyscall = 0xff,
 }
+
+static mut MSG_BUF: [[u8; 512]; 5] = [[0; 512], [0; 512], [0; 512], [0; 512], [0; 512]];
 
 /// This function is the syscall ABI dispatching routine. It is called exclusively from the ISR
 /// for interrupt 0x7f.
@@ -1133,24 +1133,16 @@ extern "C" fn syscall_inner(arg1: u64, arg2: u64, syscall_no: u64) -> SyscallRet
             }
 
             unsafe {
-                let buf = arg2;
+                let buf = arg2 as *mut u8;
                 let current_pid = scheduler::get_current_pid();
 
-                if let Some(q_msg) = scheduler::pop_msg(current_pid) {
-                    if q_msg.dst_pid != current_pid {
-                        let msg = Message::new(0, 0xff, current_pid, buf);
-                        scheduler::block(current_pid, msg);
-
-                        return SyscallReturnCode::Ok;
-                    }
-
-                    // TODO: check the pointer address bounds!
-                    // TODO: unuglify this
-                    copy_nonoverlapping(q_msg.buf_addr as *const u8, buf as *mut u8, 512);
-                    scheduler::wake(current_pid);
+                if let Some(msg) = scheduler::pop_msg(current_pid) {
+                    copy_nonoverlapping(msg.buf_addr as *const u8, buf, 512);
                 } else {
-                    let msg = Message::new(0, 0xff, current_pid, buf);
-                    scheduler::block(current_pid, msg);
+                    scheduler::block(
+                        current_pid,
+                        Message::new(0, 0xff, current_pid, 512, buf as u64),
+                    );
                 }
             }
         }
@@ -1167,12 +1159,13 @@ extern "C" fn syscall_inner(arg1: u64, arg2: u64, syscall_no: u64) -> SyscallRet
             }
 
             let target_pid = arg1 as usize;
-            let buf = arg2;
+            let buf = arg2 as *const u8;
 
             unsafe {
+                copy_nonoverlapping(buf, MSG_BUF[0].as_mut_ptr(), 512);
                 let current_pid = scheduler::get_current_pid();
-                let msg = Message::new(0, current_pid, target_pid, buf);
 
+                let msg = Message::new(0, current_pid, target_pid, 512, MSG_BUF[0].as_ptr() as u64);
                 scheduler::push_msg(target_pid, msg);
                 scheduler::wake(target_pid);
             }

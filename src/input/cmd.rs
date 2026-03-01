@@ -2,12 +2,10 @@ use crate::acpi;
 use crate::app;
 use crate::audio;
 use crate::debug;
-use crate::fs::fat12::block::BlockDevice;
 use crate::fs::fat12::{block::Floppy, check::run_check, fs::Filesystem};
 use crate::init::config;
 use crate::init::config::PATH_CLUSTER;
 use crate::input::keyboard;
-use crate::input::keyboard::keyboard_loop;
 use crate::net;
 use crate::time;
 use crate::tui::{

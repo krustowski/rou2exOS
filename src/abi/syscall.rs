@@ -20,14 +20,13 @@ const USERLAND_END: u64 = 0x800_000;
 #[repr(u64)]
 enum SyscallReturnCode {
     Ok = 0x00,
+    BlockingReturn = 0xfa,
     NotImplemented = 0xfb,
     InvalidInput = 0xfc,
     FilesystemError = 0xfd,
     FileNotFound = 0xfe,
     InvalidSyscall = 0xff,
 }
-
-static mut MSG_BUF: [[u8; 512]; 5] = [[0; 512], [0; 512], [0; 512], [0; 512], [0; 512]];
 
 /// This function is the syscall ABI dispatching routine. It is called exclusively from the ISR
 /// for interrupt 0x7f.
@@ -37,50 +36,64 @@ pub extern "x86-interrupt" fn syscall_handler(_: InterruptStackFrame) -> ! {
         "mov rcx, rdx",
         "cld",
 
-        "push rax",
-        "push rbx",
-        "push rcx",
-        "push rdx",
+        "push r15",
+        "push r14",
+        "push r13",
+        "push r12",
+        "push r11",
+        "push r10",
+        "push r9",
+        "push r8",
         "push rsi",
         "push rdi",
         "push rbp",
-        "push r8",
-        //"push r9",
-        "push r10",
-        "push r11",
-        "push r12",
-        "push r13",
-        "push r14",
-        "push r15",
+        "push rdx",
+        "push rcx",
+        "push rbx",
+        "push rax",
 
-        "sub rsp, 8",
         "mov rdx, rax",
 
         "call {syscall_inner}",
 
-        "mov r9, rax",
-        "add rsp, 8",
+        "mov r12, rax",
 
-        "pop r15",
-        "pop r14",
-        "pop r13",
-        "pop r12",
-        "pop r11",
-        "pop r10",
-        //"pop r9",
-        "pop r8",
+        "cmp rax, 0xfa",
+        "jne .no_switch",
+
+        "mov rdi, rsp",
+        "call {scheduler_schedule}",
+        "mov cr3, rdx",
+        "mov rsp, rax",
+
+        ".no_switch:",
+
+        "pop rax",
+
+        "cmp r12, 0xfa",
+        "je .restore_same",
+
+        "mov rax, r12",
+        ".restore_same:",
+
+        "pop rbx",
+        "pop rcx",
+        "pop rdx",
         "pop rbp",
         "pop rdi",
         "pop rsi",
-        "pop rdx",
-        "pop rcx",
-        "pop rbx",
-        "pop rax",
-
-        "mov rax, r9",
+        "pop r8",
+        "pop r9",
+        "pop r10",
+        "pop r11",
+        "pop r12",
+        "pop r13",
+        "pop r14",
+        "pop r15",
 
         "iretq",
         syscall_inner = sym syscall_inner,
+        scheduler_schedule = sym scheduler::scheduler_schedule,
     );
 }
 
@@ -858,8 +871,10 @@ extern "C" fn syscall_inner(arg1: u64, arg2: u64, syscall_no: u64) -> SyscallRet
                         // let entry_ptr = (load_addr + 0x18) as *const u8;
 
                         unsafe {
+                            let pml4 = crate::mem::pages::new_process_pml4(0x600_000, 0x200_000);
+
                             // Assume `elf_image` is a pointer to the loaded ELF file in memory
-                            let entry_addr = elf::load_elf64(load_addr as usize);
+                            let entry_addr = elf::load_elf64(load_addr as usize, pml4);
 
                             // Cast and jump
                             let entry_fn: extern "C" fn() -> u64 =
@@ -1137,12 +1152,14 @@ extern "C" fn syscall_inner(arg1: u64, arg2: u64, syscall_no: u64) -> SyscallRet
                 let current_pid = scheduler::get_current_pid();
 
                 if let Some(msg) = scheduler::pop_msg(current_pid) {
-                    copy_nonoverlapping(msg.buf_addr as *const u8, buf, 512);
+                    rprint!("Coping msg data to process' buf...\n");
+                    copy_nonoverlapping(msg.data.as_ptr(), buf, 512);
+                    rprint!("Done.\n");
                 } else {
                     scheduler::block(
-                        current_pid,
-                        Message::new(0, 0xff, current_pid, 512, buf as u64),
+                        current_pid, //Message::new(0, 0xff, current_pid, 512, [0u8; 512]),
                     );
+                    return SyscallReturnCode::BlockingReturn;
                 }
             }
         }
@@ -1162,10 +1179,11 @@ extern "C" fn syscall_inner(arg1: u64, arg2: u64, syscall_no: u64) -> SyscallRet
             let buf = arg2 as *const u8;
 
             unsafe {
-                copy_nonoverlapping(buf, MSG_BUF[0].as_mut_ptr(), 512);
                 let current_pid = scheduler::get_current_pid();
+                let mut msg = Message::new(0, current_pid, target_pid, 512, [0u8; 512]);
 
-                let msg = Message::new(0, current_pid, target_pid, 512, MSG_BUF[0].as_ptr() as u64);
+                copy_nonoverlapping(buf, msg.data.as_mut_ptr(), 512);
+
                 scheduler::push_msg(target_pid, msg);
                 scheduler::wake(target_pid);
             }

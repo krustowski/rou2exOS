@@ -23,7 +23,7 @@ timer_interrupt_stub:
 
     mov rdi, rsp
     call scheduler_schedule
-
+    mov cr3, rdx
     mov rsp, rax
 
     pop rax

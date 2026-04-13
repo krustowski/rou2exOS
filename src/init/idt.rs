@@ -1,73 +1,82 @@
+use x86_64::structures::gdt::{Descriptor, GlobalDescriptorTable};
+use x86_64::structures::tss::TaskStateSegment;
+use x86_64::VirtAddr;
+
 use crate::abi::idt::{install_isrs, load_idt};
+
+pub static mut TSS: TaskStateSegment = TaskStateSegment::new();
+static mut GDT: Option<GlobalDescriptorTable> = None;
+
+pub const KERNEL_STACK_TOP: u64 = 0xFFFF_8000_0019_0000;
+
+static mut P4_TABLE: [u64; 512] = [0; 512];
+
+const IST_STACK_SIZE: usize = 4096;
+
+#[repr(align(16))]
+struct AlignedStack([u8; IST_STACK_SIZE]);
+
+static mut IST0_STACK: AlignedStack = AlignedStack([0; IST_STACK_SIZE]);
+static mut IST1_STACK: AlignedStack = AlignedStack([0; IST_STACK_SIZE]);
+
+fn init_gdt_tss() {
+    unsafe {
+        // Allocate GDT in high-half memory (just static mutable is fine in Rust)
+        GDT = Some(GlobalDescriptorTable::new());
+
+        let gdt = GDT.as_mut().unwrap();
+
+        let code_selector = gdt.append(Descriptor::kernel_code_segment());
+        let data_selector = gdt.append(Descriptor::kernel_data_segment());
+
+        let user_code_selector = gdt.append(Descriptor::user_code_segment());
+        let user_data_selector = gdt.append(Descriptor::user_data_segment());
+
+        // TSS entry
+        let tss_selector = gdt.append(Descriptor::tss_segment(&TSS));
+
+        // Load GDT
+        gdt.load();
+
+        // Load TSS
+        x86_64::instructions::tables::load_tss(tss_selector);
+    }
+}
+
+fn init_tss_stacks() {
+    unsafe {
+        TSS.privilege_stack_table[0] = VirtAddr::new(KERNEL_STACK_TOP);
+
+        TSS.interrupt_stack_table[0] =
+            VirtAddr::new((&IST0_STACK.0 as *const _ as u64) + IST0_STACK.0.len() as u64);
+        TSS.interrupt_stack_table[1] =
+            VirtAddr::new((&IST1_STACK.0 as *const _ as u64) + IST1_STACK.0.len() as u64);
+
+        TSS.iomap_base = core::mem::size_of::<TaskStateSegment>() as u16;
+    }
+}
+
+//
+//
+//
+//
+//
+
 use crate::video::sysprint::Result;
 
-pub fn idt_isrs_init() -> Result {
+pub fn idt_cpu_tables() -> Result {
     install_isrs();
 
     load_idt();
 
-    init_tss();
-
-    let base_addr = &raw const tss64 as u64;
-    setup_tss_descriptor(base_addr, 0x67);
-
-    reload_gdt();
-
-    load_tss(0x28);
+    init_gdt_tss();
 
     Result::Passed
 }
 
-extern "C" {
-    static mut tss64: Tss64;
-    static mut gdt_start: u8;
-    static mut gdt_end: u8;
-    static mut gdt_tss_descriptor: [u8; 16];
-    static mut __stack_top: u64;
-    static mut ist0_stack_top: u64;
-    static mut ist1_stack_top: u64;
-}
-
-#[repr(C, packed)]
-struct DescriptorTablePointer {
-    limit: u16,
-    base: u64,
-}
-
-fn reload_gdt() {
-    unsafe {
-        // Prepare GDTR
-        let gdtr = DescriptorTablePointer {
-            limit: (&raw const gdt_end as usize - &raw const gdt_start as usize - 1) as u16,
-            base: &raw const gdt_start as u64,
-        };
-
-        // Load new GDT
-        core::arch::asm!(
-            "lgdt [{}]",
-            in(reg) &gdtr,
-            options(nostack, preserves_flags),
-        );
-    }
-}
-
-fn load_tss(tss_selector: u16) {
-    unsafe {
-        core::arch::asm!(
-            "ltr {0:x}",
-            in(reg) tss_selector,
-            options(nostack, preserves_flags),
-        );
-    }
-}
-
-fn setup_tss_descriptor(base: u64, limit: u32) {
-    let desc = make_tss_descriptor(base, limit);
-    #[expect(static_mut_refs)]
-    unsafe {
-        gdt_tss_descriptor.copy_from_slice(&desc);
-    }
-}
+//
+//
+//
 
 fn make_tss_descriptor(base: u64, limit: u32) -> [u8; 16] {
     let mut desc = [0u8; 16];
@@ -104,38 +113,4 @@ fn make_tss_descriptor(base: u64, limit: u32) -> [u8; 16] {
     desc[15] = 0;
 
     desc
-}
-
-#[repr(C, packed)]
-pub struct Tss64 {
-    reserved0: u32,
-    pub rsp0: u64,
-    pub rsp1: u64,
-    pub rsp2: u64,
-    reserved1: u64,
-    ist1: u64,
-    ist2: u64,
-    ist3: u64,
-    ist4: u64,
-    ist5: u64,
-    ist6: u64,
-    ist7: u64,
-    reserved2: u64,
-    reserved3: u16,
-    io_map_base: u16,
-}
-
-fn init_tss() {
-    unsafe {
-        // Zero out the whole TSS
-        core::ptr::write_bytes(&raw mut tss64 as *mut u8, 0, core::mem::size_of::<Tss64>());
-
-        // Set kernel stack (top) pointer for ring 0 (rsp0)
-        tss64.rsp0 = __stack_top;
-        tss64.ist1 = ist0_stack_top;
-        tss64.ist2 = ist1_stack_top;
-
-        // IO Map base: set to size of TSS to disable IO bitmap
-        tss64.io_map_base = core::mem::size_of::<Tss64>() as u16;
-    }
 }

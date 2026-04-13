@@ -34,7 +34,7 @@ pub fn init(m2_ptr: u32) {
 
     rprint!("SSE Enabled!\n");
 
-    result!("Reloading GDT, TSS, IDT and ISRs", idt::idt_isrs_init());
+    result!("Reloading GDT, TSS, IDT and ISRs", idt::idt_cpu_tables());
 
     rprint!("Tables reloaded!\n");
 

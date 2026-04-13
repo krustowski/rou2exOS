@@ -15,14 +15,8 @@ p4_table:
 	resb 4096
 p3_table:           
 	resb 4096
-p3_kernel_table:           
-	resb 4096
 p2_table:           
 	resb 4096
-p2_kernel_table:           
-	resb 4096
-p2_kernel_stack:
-    resb 4096
 
 p3_fb_table:           
 	resb 4096
@@ -193,85 +187,92 @@ idt_end:
 section .text
 
 zero_table:
-    xor ecx, ecx
+    mov ecx, 512          
+    xor eax, eax        
+
 .zero_loop:
-    mov word [edi + ecx*8], 0
-    inc ecx
-    cmp ecx, 512
-    jne .zero_loop
+    mov [edi], eax
+    add edi, 8
+    loop .zero_loop
+
     ret
 
-;--- set up full higher-half kernel + stack mapping ---
 set_up_page_tables:
-    ; zero all tables first
     lea edi, [p4_table]
     call zero_table
+
     lea edi, [p3_table]
     call zero_table
+
     lea edi, [p2_table]
     call zero_table
-    lea edi, [p3_fb_table]
-    call zero_table
 
-    ; PML4[0] → P3 (low memory)
+    ; Map P4[0] → P3
+    mov eax, p3_table
+    or eax, 0b111
+    mov [p4_table + 0 * 8], eax
+    mov dword [p4_table + 0 * 8 + 4], 0
+
+    ; Map P4[511] → P3  (higher-half mirror)
     mov eax, p3_table
     or eax, 0b11
-    mov [p4_table + 0*8], eax
-    mov dword [p4_table + 0*8 + 4], 0
+    mov [p4_table + 511 * 8], eax
+    mov dword [p4_table + 511 * 8 + 4], 0
 
-    ; PML4[511] → P3 (higher-half kernel)
-    mov eax, p3_table
-    or eax, 0b11
-    mov [p4_table + 511*8], eax
-    mov dword [p4_table + 511*8 + 4], 0
 
-    ; P3[0] → P2 (low memory)
+    mov eax, p3_fb_table
+    or eax, 0b111
+    mov [p4_table + 1 * 8], eax
+    mov dword [p4_table + 1 * 8 + 4], 0
+
+    ; Map P3[0] → P2
     mov eax, p2_table
-    or eax, 0b11
-    mov [p3_table + 0*8], eax
-    mov dword [p3_table + 0*8 + 4], 0
+    or eax, 0b111
+    mov [p3_table + 0 * 8], eax
+    mov dword [p3_table + 0 * 8 + 4], 0
 
-    ;--- Identity map 1 GiB (low memory) ---
+    ; Identity map 1 GiB (512 runs) using huge pages
+
     xor ecx, ecx
-.map_low_2mb:
-    mov eax, ecx
-    shl eax, 21            ; 2 MiB * ecx
-    or eax, 0b10000011     ; present + writable + PS
-    mov [p2_table + ecx*8], eax
-    mov dword [p2_table + ecx*8 + 4], 0
+.map_2mib:
+    mov eax, 0x200000
+    mul ecx
+    or eax, 0b10000011        
+    mov [p2_table + ecx * 8], eax
+    mov dword [p2_table + ecx * 8 + 4], 0
+
     inc ecx
     cmp ecx, 512
-    jne .map_low_2mb
+    jne .map_2mib
 
-    ;--- Map higher-half kernel (physical 1 MiB → virtual FFFFFFFF80000000) ---
-    xor ecx, ecx
-.map_kernel_2mb:
-    mov eax, ecx
-    shl eax, 21            ; 2 MiB blocks
-    add eax, 0x00100000    ; kernel physical offset
-    or eax, 0b10000011     ; present + writable + PS
-    ; higher-half starts at P3[0] -> PML4[511] covers 0xFFFFFFFF80000000
-    mov [p2_table + (512 + ecx)*8], eax
-    mov dword [p2_table + (512 + ecx)*8 + 4], 0
-    inc ecx
-    cmp ecx, 8             ; map 16 MiB kernel
-    jne .map_kernel_2mb
+    mov ecx, 1
+.map_1gib:
+    mov eax, 0x40000000
+    mul ecx
+    or eax, 0b10000011        
+    mov [p3_table + ecx * 8], eax
+    mov dword [p3_table + ecx * 8 + 4], 0
 
-    ;--- Map kernel stack (8 MiB stack example at FFFFFFFF8039E000) ---
-    ; stack physical 0x01000000 -> virtual FFFFFFFF8039E000
-    ; compute page table index relative to P3[0] -> P2 entries
-    mov ecx, 0
-.map_stack_2mb:
-    mov eax, ecx
-    shl eax, 21
-    add eax, 0x01000000    ; physical stack base
-    or eax, 0b10000011     ; present + writable + PS
-    ; stack is at P2 entry 512 + 8 (kernel) + ecx
-    mov [p2_table + (512 + 8 + ecx)*8], eax
-    mov dword [p2_table + (512 + 8 + ecx)*8 + 4], 0
     inc ecx
-    cmp ecx, 4             ; 8 MiB stack (4 * 2 MiB)
-    jne .map_stack_2mb
+    cmp ecx, 5
+    jne .map_1gib
+
+    ; Allow CPL=3 access at 0x600_000--0xA00_000
+
+    mov eax, 0x400000
+    or eax, 0b11100111
+    mov [p2_table + 2 * 8], eax
+    mov dword [p2_table + 2 * 8 + 4], 0 
+
+    mov eax, 0x600000
+    or eax, 0b11100111
+    mov [p2_table + 3 * 8], eax
+    mov dword [p2_table + 3 * 8 + 4], 0 
+
+    mov eax, 0x800000
+    or eax, 0b11100111
+    mov [p2_table + 4 * 8], eax
+    mov dword [p2_table + 4 * 8 + 4], 0 
 
     ret
 
@@ -322,11 +323,10 @@ long_mode_entry:
     ; Clear the stack
     mov rsp, __stack_top
 
-    mov rdi, [multiboot_magic]
     mov rsi, [multiboot_ptr]
+    mov rdi, [multiboot_magic]
 
     mov rax, kernel_main
-    ;mov rax, 0xffffffff80000000
     jmp rax
 
     hlt

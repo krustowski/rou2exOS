@@ -1,80 +1,131 @@
-// Pre-allocated memory space for page tables (e.g., 64 KiB)
-const PAGE_TABLE_MEMORY_SIZE: usize = 128 * 1024;
-static mut PAGE_TABLE_MEMORY: [u8; PAGE_TABLE_MEMORY_SIZE] = [0; 128 * 1024];
-static mut NEXT_FREE_PAGE: usize = 0x1000;
-
-unsafe fn alloc_page() -> *mut u8 {
-    if NEXT_FREE_PAGE + 0x1000 > PAGE_TABLE_MEMORY_SIZE {
-        panic!("Out of preallocated page table memory!");
-    }
-    let addr = &mut PAGE_TABLE_MEMORY[NEXT_FREE_PAGE] as *mut u8;
-    NEXT_FREE_PAGE += 0x1000;
-    core::ptr::write_bytes(addr, 0, 0x1000);
-    addr
+extern "C" {
+    static p4_table: u64;
 }
 
-pub unsafe fn map_32mb(p4: *mut u64, phys_start: usize, virt_start: usize) {
-    let p4_index = (virt_start >> 39) & 0x1FF;
-    let p3_index = (virt_start >> 30) & 0x1FF;
-    // let p2_index = (virt_start >> 21) & 0x1FF;
-    // let p1_index = (virt_start >> 12) & 0x1FF;
+unsafe fn walk_pml4() {
+    let p4: [u64; 512];
+    let mut p3: [u64; 512];
+    let mut p2: [u64; 512];
+    let mut p1: [u64; 512];
 
-    let p3 = get_or_alloc_table(p4.add(p4_index).as_mut().unwrap());
-    //let p3 = alloc_page();
-    p4.add(p4_index).write(p3 as u64 | 0x3); // present + writable
-
-    let p2 = get_or_alloc_table(p3.add(p3_index).as_mut().unwrap());
-    //let p2 = alloc_page();
-    p3.add(p3_index).write(p2 as u64 | 0x3);
-
-    for i in 0..16 {
-        let p1 = alloc_page();
-        p2.add(i).write(p1 as u64 | 0x3);
-
+    for i in 0..512 {
         for j in 0..512 {
-            let frame = phys_start + ((i * 512 + j) * 0x1000);
-            p1.add(j).write(frame as u8 | 0x3);
+            for k in 0..512 {}
         }
     }
 }
 
-pub unsafe fn identity_map(p4: *mut u64, size: usize) {
-    let page_count = size / 0x1000;
-    let p1_tables = page_count.div_ceil(512);
+//
+//
+//
 
-    let p3 = get_or_alloc_table(p4);
-    p4.write(p3 as u64 | 0x3);
+pub const PAGE_SIZE: usize = 4096;
+pub const ENTRIES: usize = 512;
 
-    let p2 = get_or_alloc_table(p3);
-    p3.write(p2 as u64 | 0x3);
+// Page flags
+pub const PRESENT: u64 = 1 << 0;
+pub const WRITE: u64 = 1 << 1;
+pub const USER: u64 = 1 << 2;
+pub const NX: u64 = 1 << 63;
 
-    for i in 0..p1_tables {
-        let p1 = alloc_page();
-        debug!("identity_map: allocating P1[");
-        debugn!(i);
-        debug!("] = ");
-        debugn!(p1);
-        debugln!("");
-        p2.add(i).write(p1 as u64 | 0x3);
-        for j in 0..512 {
-            let page_idx = i * 512 + j;
-            if page_idx >= page_count {
-                break;
-            }
-            let phys = (page_idx * 0x1000) as u64;
-            p1.add(j).write(phys as u8 | 0x3);
-        }
-    }
+// We'll keep a very simple frame allocator
+static mut NEXT_FREE_FRAME: usize = 0x400000; // after kernel
+
+pub static mut KERNEL_HH_MAPPED: bool = false;
+pub static mut KERNEL_PML4: u64 = 0;
+
+pub unsafe fn alloc_frame() -> usize {
+    let frame = NEXT_FREE_FRAME;
+    NEXT_FREE_FRAME += PAGE_SIZE;
+    // clear the page for safety
+    core::ptr::write_bytes(frame as *mut u8, 0, PAGE_SIZE);
+    frame
 }
 
-unsafe fn get_or_alloc_table(entry: *mut u64) -> *mut u64 {
-    let val = entry.read();
-    if val & 1 == 0 {
-        let new_page = alloc_page() as u64 | 0x3;
-        entry.write(new_page);
-        (new_page & 0x000f_ffff_ffff_f000) as *mut u64
+pub unsafe fn map_page(pml4_phys: usize, virt: usize, phys: usize, flags: u64) {
+    let pml4 = pml4_phys as *mut u64;
+
+    let pml4_idx = (virt >> 39) & 0x1FF;
+    let pdpt_idx = (virt >> 30) & 0x1FF;
+    let pd_idx = (virt >> 21) & 0x1FF;
+    let pt_idx = (virt >> 12) & 0x1FF;
+
+    // ---------------- PML4 ----------------
+    let pml4_entry = pml4.add(pml4_idx);
+    let pdpt_ptr: *mut u64;
+
+    if (*pml4_entry & PRESENT) == 0 {
+        let frame = alloc_frame();
+        *pml4_entry = (frame as u64) | PRESENT | WRITE | (flags & USER);
+        pdpt_ptr = frame as *mut u64;
     } else {
-        (val & 0x000f_ffff_ffff_f000) as *mut u64
+        if (flags & USER) != 0 {
+            *pml4_entry |= USER; // propagate USER upward
+        }
+        pdpt_ptr = (*pml4_entry & 0x000F_FFFF_FFFF_F000) as *mut u64;
+    }
+
+    // ---------------- PDPT ----------------
+    let pdpt_entry = pdpt_ptr.add(pdpt_idx);
+    let pd_ptr: *mut u64;
+
+    if (*pdpt_entry & PRESENT) == 0 {
+        let frame = alloc_frame();
+        *pdpt_entry = (frame as u64) | PRESENT | WRITE | (flags & USER);
+        pd_ptr = frame as *mut u64;
+    } else {
+        if (flags & USER) != 0 {
+            *pdpt_entry |= USER;
+        }
+        pd_ptr = (*pdpt_entry & 0x000F_FFFF_FFFF_F000) as *mut u64;
+    }
+
+    // ---------------- PD ----------------
+    let pd_entry = pd_ptr.add(pd_idx);
+    let pt_ptr: *mut u64;
+
+    if (*pd_entry & PRESENT) == 0 {
+        let frame = alloc_frame();
+        *pd_entry = (frame as u64) | PRESENT | WRITE | (flags & USER);
+        pt_ptr = frame as *mut u64;
+    } else {
+        if (flags & USER) != 0 {
+            *pd_entry |= USER;
+        }
+        pt_ptr = (*pd_entry & 0x000F_FFFF_FFFF_F000) as *mut u64;
+    }
+
+    // ---------------- PT (final page) ----------------
+    let pt_entry = pt_ptr.add(pt_idx);
+
+    let phys_clean = (phys as u64) & 0x000F_FFFF_FFFF_F000;
+
+    *pt_entry = phys_clean | flags | PRESENT;
+}
+
+pub unsafe fn copy_kernel_half(old_pml4: usize, new_pml4: usize) {
+    let old = old_pml4 as *mut u64;
+    let new = new_pml4 as *mut u64;
+
+    for i in 0..2 {
+        new.add(i).write(old.add(i).read());
+    }
+
+    for i in 256..512 {
+        new.add(i).write(old.add(i).read());
     }
 }
 
+pub unsafe fn new_process_pml4(user_base: usize, user_size: usize) -> usize {
+    let new_pml4 = alloc_frame();
+    copy_kernel_half(KERNEL_PML4 as usize, new_pml4);
+
+    // Map identity-mapped user pages
+    let mut addr = user_base;
+    while addr < user_base + user_size {
+        map_page(new_pml4, addr, addr, PRESENT | WRITE | USER);
+        addr += PAGE_SIZE;
+    }
+
+    new_pml4
+}

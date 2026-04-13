@@ -2,19 +2,27 @@ const QUEUE_MSG_COUNT_MAX: usize = 10;
 
 #[derive(Debug, Clone, Copy)]
 pub struct Message {
-    pub port_id: usize,
     pub src_pid: usize,
     pub dst_pid: usize,
-    pub buf_addr: u64,
+    pub port_id: usize,
+    pub msg_len: usize,
+    pub data: [u8; 512],
 }
 
 impl Message {
-    pub fn new(port_id: usize, src_pid: usize, dst_pid: usize, buf_addr: u64) -> Self {
+    pub fn new(
+        port_id: usize,
+        src_pid: usize,
+        dst_pid: usize,
+        msg_len: usize,
+        data: [u8; 512],
+    ) -> Self {
         Self {
-            port_id,
             src_pid,
             dst_pid,
-            buf_addr,
+            port_id,
+            msg_len,
+            data,
         }
     }
 }

@@ -17,6 +17,7 @@ macro_rules! nasm {
 }
 
 fn main() {
+    nasm!("iso/boot/mb2.asm", "iso/boot/mb2.o");
     nasm!("iso/boot/boot.asm", "iso/boot/boot.o");
     nasm!("src/task/context.asm", "src/task/context.o");
     nasm!("src/abi/timer_interrupt.asm", "src/abi/timer_interrupt.o");

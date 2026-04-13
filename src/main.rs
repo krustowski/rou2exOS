@@ -5,7 +5,7 @@
 
 #[macro_use]
 mod debug;
-mod multiboot2;
+//mod multiboot2;
 #[macro_use]
 mod video;
 
@@ -27,6 +27,31 @@ mod vga;
 /// Kernel entrypoint
 #[unsafe(no_mangle)]
 pub extern "C" fn kernel_main(_multiboot2_magic: u32, multiboot_ptr: u32) {
+    /*unsafe {
+        if !mem::pages::KERNEL_HH_MAPPED {
+            // identity map low 4MB
+            mem::pages::map_page(
+                mem::pages::KERNEL_PML4 as usize,
+                0x0,
+                0x0,
+                mem::pages::PRESENT | mem::pages::WRITE,
+            );
+
+            // map kernel high-half
+            mem::pages::map_page(
+                mem::pages::KERNEL_PML4 as usize,
+                0xffffffff80000000,
+                0x00100000, // physical load address
+                mem::pages::PRESENT | mem::pages::WRITE,
+            );
+
+            mem::pages::KERNEL_HH_MAPPED = true;
+
+            let high_entry = crate::kernel_main;
+            (high_entry)(_multiboot2_magic, multiboot_ptr);
+        }
+    }*/
+
     debugln!("Kernel loaded");
 
     // Run init checks and initialize system

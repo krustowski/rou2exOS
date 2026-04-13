@@ -1,4 +1,5 @@
 use crate::input::keyboard::keyboard_loop;
+use crate::mem::pages::KERNEL_PML4;
 use crate::task::{process::Mode, scheduler};
 
 pub unsafe fn init_processes() {
@@ -11,14 +12,34 @@ unsafe fn setup_processes() {
 
     core::ptr::copy_nonoverlapping(src, dst, 4096);
 
+    KERNEL_PML4 = x86_64::registers::control::Cr3::read()
+        .0
+        .start_address()
+        .as_u64();
+
+    let pml4 = crate::mem::pages::new_process_pml4(0, 0) as u64;
+
     //scheduler::new_process(*b"init            ", Mode::Kernel, clock_test as u64, 0x190_000);
-    scheduler::new_process(*b"init            ", Mode::Kernel, 0x7d0_000, 0x190_000);
-    scheduler::new_process(*b"clock           ", Mode::Kernel, 0x7d0_000, 0x7a0_000);
+    scheduler::new_process(
+        *b"init            ",
+        Mode::Kernel,
+        0x7d0_000,
+        0x190_000,
+        KERNEL_PML4,
+    );
+    scheduler::new_process(
+        *b"clock           ",
+        Mode::Kernel,
+        0x7d0_000,
+        0x7a0_000,
+        pml4,
+    );
     scheduler::new_process(
         *b"shell           ",
         Mode::Kernel,
         keyboard_loop as u64,
         0x700_000,
+        KERNEL_PML4,
     );
 }
 

@@ -33,9 +33,9 @@ compile_kernel:
 #TODO: Please add an option to compile a debug kernel with debugging symbols and no optimizations
 
 build_iso:
-	@grub-mkrescue \
+	@grub2-mkrescue \
 		-o r2.iso iso/ \
-		--modules="multiboot2 video video_bochs video_cirrus gfxterm all_video"
+		--modules="multiboot2 vbe video video_bochs video_cirrus gfxterm all_video"
 
 build_floppy:
 	@dd \
@@ -48,12 +48,15 @@ build_floppy:
 		fat.img
 	@echo "Hello from floppy!" > /tmp/hello.txt
 	@mcopy -i fat.img /tmp/hello.txt ::HELLO.TXT 
-	@mcopy -i fat.img ./print.bin ::PRINT.BIN
-	@mcopy -i fat.img ./print.elf ::PRINT.ELF
-	@mcopy -i fat.img ./go.elf ::GO.ELF
-	@mcopy -i fat.img ./sh.elf ::SH.ELF
-	@mcopy -i fat.img ./icmpresp.elf ::ICMPRESP.ELF
-	@mcopy -i fat.img ./garn.elf ::GARN.ELF
+	@mcopy -i fat.img ../r2_app/c/hello-fs/hellofs.elf ::HELLOFS.ELF
+	@mcopy -i fat.img ../r2_app/c/them/them.elf ::THEM.ELF
+	@mcopy -i fat.img ../r2_app/c/them/vlak.com ::VLAK.COM
+	@mcopy -i fat.img ../r2_app/c/them/prg0.bin ::PRG0.BIN
+	@mcopy -i fat.img ../r2_app/c/icmpresp/icmpresp.elf ::ICMP.ELF
+	@mcopy -i fat.img ../r2_app/c/ipc/ipc.elf ::IPC.ELF
+	@mcopy -i fat.img ../r2_app/c/r2sh/r2sh.elf ::SH.ELF
+	@mcopy -i fat.img ../r2_app/c/calc/calc.elf ::CALC.ELF
+	@mcopy -i fat.img ../r2_app/c/tst/tst.elf ::TST.ELF
 
 #
 #  RUN
@@ -101,7 +104,7 @@ run_iso_pty:
 run_iso_floppy: build_floppy
 	@qemu-system-x86_64 \
 		-boot d \
-		-m 2G \
+		-m 4G \
 		-vga std \
 		-cdrom r2.iso \
 		-fda fat.img \

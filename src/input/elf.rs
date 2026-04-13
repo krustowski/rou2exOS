@@ -2,6 +2,7 @@ use core::ptr::{copy_nonoverlapping, write_bytes};
 
 use crate::fs::block::BlockDevice;
 use crate::input::keyboard::keyboard_loop;
+use crate::mem::pages::{PAGE_SIZE, PRESENT, USER, WRITE};
 
 #[repr(C)]
 #[derive(Debug)]
@@ -37,7 +38,7 @@ struct Elf64Phdr {
 
 const PT_LOAD: u32 = 1;
 
-pub unsafe fn load_elf64(elf_addr: usize) -> usize {
+pub unsafe fn load_elf64(elf_addr: usize, pml4: usize) -> usize {
     let ehdr = &*(elf_addr as *const Elf64Ehdr);
 
     rprint!("First 16 bytes (elf_addr + 0x18): ");
@@ -58,26 +59,38 @@ pub unsafe fn load_elf64(elf_addr: usize) -> usize {
 
         if ph.p_type == PT_LOAD {
             let src = (elf_addr + ph.p_offset as usize) as *const u8;
-            let dst = ph.p_vaddr as *mut u8;
 
-            // Sane debug info
-            rprint!("Loading segment ");
-            rprintn!(i);
-            rprint!(" to ");
-            rprintn!(ph.p_vaddr);
-            rprint!(", filesz = ");
-            rprintn!(ph.p_filesz);
-            rprint!(", memsz = ");
-            rprintn!(ph.p_memsz);
-            rprint!("\n");
+            let mut offset = 0usize;
+            while offset < ph.p_memsz as usize {
+                //let virt_page = (ph.p_vaddr as usize + offset) & !0xFFF;
+                //let virt = ph.p_vaddr as usize + offset;
 
-            copy_nonoverlapping(src, dst, ph.p_filesz as usize);
-            if ph.p_memsz > ph.p_filesz {
-                write_bytes(
-                    dst.add(ph.p_filesz as usize),
-                    0,
-                    (ph.p_memsz - ph.p_filesz) as usize,
-                );
+                let virt = ph.p_vaddr as usize + offset;
+                let page_base = virt & !0xFFF;
+                let page_offset = virt & 0xFFF;
+
+                rprint!("p_vaddr: ");
+                rprintn!(ph.p_vaddr);
+                rprint!(", p_offset: ");
+                rprintn!(ph.p_offset);
+                rprint!("\n");
+
+                // Allocate physical frame
+                let phys = crate::mem::pages::alloc_frame();
+                crate::mem::pages::map_page(pml4, page_base, phys, PRESENT | WRITE | USER);
+
+                // Copy file data if inside filesz
+                if offset < ph.p_filesz as usize {
+                    let copy_size = core::cmp::min(PAGE_SIZE, ph.p_filesz as usize - offset);
+
+                    copy_nonoverlapping(
+                        src.add(offset),
+                        (phys + page_offset) as *mut u8,
+                        copy_size,
+                    );
+                }
+
+                offset += PAGE_SIZE;
             }
         }
     }
@@ -94,8 +107,6 @@ pub enum RunMode {
     Foreground,
     Background,
 }
-
-static mut STACK_NO: usize = 0;
 
 use crate::fs::fat12::{block::Floppy, fs::Filesystem};
 
@@ -145,8 +156,7 @@ pub fn run_elf(filename_input: &[u8], args: &[u8], mode: RunMode) -> bool {
                 rprintn!(size);
                 rprint!("\n");
 
-                let addrs = [0x640_000, 0x680_000, 0x6c0_000, 0x700_000];
-                let load_addr: u64 = addrs[STACK_NO % 4];
+                let load_addr = 0x600_000;
 
                 while size - offset > 0 {
                     let lba = fs.cluster_to_lba(cluster);
@@ -181,19 +191,18 @@ pub fn run_elf(filename_input: &[u8], args: &[u8], mode: RunMode) -> bool {
                 }
                 rprint!("\n");
 
-                // assume `elf_image` is a pointer to the loaded ELF file in memory
-                let entry_addr = load_elf64(load_addr as usize);
+                let new_cr3 = crate::mem::pages::new_process_pml4(0, 0);
+
+                rprint!("phys at 0x600000: ");
+                rprintn!(*(0x600000 as *const u64));
+                rprint!("\n");
+
+                // Assume `elf_image` is a pointer to the loaded ELF file in memory
+                let entry_addr = load_elf64(load_addr as usize, new_cr3);
 
                 rprint!("ELF entry point: ");
                 rprintn!(entry_addr);
                 rprint!("\n");
-
-                let stacks = [0x700_000, 0x740_000, 0x780_000, 0x7c0_000];
-                let stack_top = stacks[STACK_NO % 4];
-                STACK_NO += 1;
-
-                // cast and jump
-                //let entry_fn: extern "C" fn() -> ! = core::mem::transmute(entry_addr as *const ());
 
                 let mut name: [u8; 16] = [b' '; 16];
 
@@ -201,12 +210,26 @@ pub fn run_elf(filename_input: &[u8], args: &[u8], mode: RunMode) -> bool {
                     slice.copy_from_slice(&filename[0..12]);
                 }
 
+                let stack_pages = 4;
+                let stack_top = 0x800000;
+
+                for i in 0..stack_pages {
+                    let phys = crate::mem::pages::alloc_frame();
+                    crate::mem::pages::map_page(
+                        new_cr3 as usize,
+                        stack_top - (i + 1) * PAGE_SIZE,
+                        phys,
+                        PRESENT | WRITE | USER,
+                    );
+                }
+
                 // Create a new process to be run
                 let pid = crate::task::scheduler::new_process(
                     name,
                     crate::task::process::Mode::User,
                     entry_addr as u64,
-                    stack_top,
+                    stack_top as u64,
+                    new_cr3 as u64,
                 );
 
                 if pid == 0xff || pid == 0x00 {

@@ -1,4 +1,5 @@
 use spin::Mutex;
+use x86_64::VirtAddr;
 
 use super::{
     process::{Mode, Process, Status},
@@ -16,10 +17,6 @@ pub struct Scheduler {
     next_free_pid: usize,
 }
 
-extern "C" {
-    static mut tss64: crate::init::idt::Tss64;
-}
-
 impl Scheduler {
     const fn new() -> Self {
         Self {
@@ -29,7 +26,7 @@ impl Scheduler {
         }
     }
 
-    pub unsafe fn schedule(&mut self, old: *mut u64) -> *mut u64 {
+    pub unsafe fn schedule(&mut self, old: *mut u64) -> (*mut u64, u64) {
         let mut next = self.current_pid;
         let start = next;
 
@@ -37,7 +34,13 @@ impl Scheduler {
             next = (next + 1) % self.processes.len();
 
             if next == start {
-                return old;
+                return (
+                    old,
+                    x86_64::registers::control::Cr3::read()
+                        .0
+                        .start_address()
+                        .as_u64(),
+                );
             }
 
             let next_proc = self.processes[next].as_ref();
@@ -70,6 +73,10 @@ impl Scheduler {
         //curr_proc.context = *old;
         //copy_nonoverlapping(old, &mut curr_proc.context, 1);
         curr_proc.last_rsp = old as u64;
+        /*curr_proc.cr3 = x86_64::registers::control::Cr3::read()
+        .0
+        .start_address()
+        .as_u64();*/
 
         if !matches!(
             curr_proc.status,
@@ -92,24 +99,31 @@ impl Scheduler {
         // Prepare a custom kernel stack for the next process
         let kern_stack = &next_proc.kernel_stack;
 
-        // Update the RSP0 field in TSS; align it to 16bits
-        tss64.rsp0 = (kern_stack.as_ptr() as u64) + kern_stack.len() as u64;
-        tss64.rsp0 &= !0x0F;
+        // Update the RSP0 field in TSS; align it to 16 bytes
+        crate::init::idt::TSS.privilege_stack_table[0] =
+            VirtAddr::new((kern_stack.as_ptr() as u64) + kern_stack.len() as u64);
+        //tss64.rsp0 &= !0x0F;
 
         rprint!("RETURNING RSP: ");
         rprintn!(next_proc.last_rsp);
         rprint!(", RIP: ");
-        rprintn!(*((next_proc.last_rsp + 120) as *const u64)); // should be RIP
+        rprintn!(*((next_proc.last_rsp + 120) as *const u64));
         rprint!(", CS: ");
-        rprintn!(*((next_proc.last_rsp + 128) as *const u64)); // should be CS
+        rprintn!(*((next_proc.last_rsp + 128) as *const u64));
         rprint!(", NEXT PID: ");
         rprintn!(next);
         rprint!(", RFLAGS: ");
-        rprintn!(*((next_proc.last_rsp + 136) as *const u64)); // should be RFLAGS
+        rprintn!(*((next_proc.last_rsp + 136) as *const u64));
+        rprint!("\n");
+
+        rprint!("Next CR3: ");
+        rprintn!(next_proc.cr3);
+        rprint!("Kernel stack ptr: ");
+        rprintn!(kern_stack.as_ptr() as u64);
         rprint!("\n");
 
         //&mut next_proc.context
-        next_proc.last_rsp as *mut u64
+        (next_proc.last_rsp as *mut u64, next_proc.cr3)
     }
 
     fn check_pid(&self, pid: usize) -> bool {
@@ -159,19 +173,25 @@ impl Scheduler {
 
     pub fn kill(&mut self, pid: usize) {
         self.set_status(pid, Status::Dead);
+        self.next_free_pid = pid;
 
         rprint!("KILL PID ");
         rprintn!(pid);
         rprint!("\n\n");
     }
 
-    pub fn block(&mut self, pid: usize, msg: Message) {
+    pub fn block(&mut self, pid: usize) {
         if !self.check_pid(pid) {
             return;
         }
 
+        //self.processes[pid].as_mut().unwrap().ports[0].block_msg = Some(msg);
+        //self.push_msg(pid, msg);
         self.set_status(pid, Status::Blocked);
-        self.processes[pid].as_mut().unwrap().ports[0].block_msg = Some(msg);
+
+        unsafe {
+            //core::arch::asm!("int 0x20");
+        }
     }
 
     pub unsafe fn list_processes(&self) {
@@ -215,8 +235,19 @@ impl Scheduler {
     }
 
     fn get_next_pid(&mut self) -> usize {
-        self.next_free_pid += 1;
-        self.next_free_pid - 1
+        let mut pid = 0;
+        loop {
+            if !self.check_pid(pid) {
+                break;
+            }
+            pid += 1;
+
+            if pid == self.processes.len() {
+                return 0xff;
+            }
+        }
+        self.next_free_pid = pid;
+        self.next_free_pid
     }
 
     pub fn get_current_pid(&self) -> usize {
@@ -229,8 +260,13 @@ impl Scheduler {
         mode: Mode,
         entry: u64,
         stack_top: u64,
+        pml4: u64,
     ) -> usize {
         let pid: usize = self.get_next_pid();
+
+        if pid == 0xff {
+            return 0xff;
+        }
 
         let mut proc: Option<Process> = None;
         let mut pos: usize = 0;
@@ -241,10 +277,15 @@ impl Scheduler {
                 continue;
             }
 
-            proc = Some(Process::new(pid, name, mode, entry, stack_top));
+            proc = Some(Process::new(pid, name, mode, entry, stack_top, pml4 as u64));
 
             unsafe {
-                let kstack_top = proc.as_mut().unwrap().kernel_stack.as_ptr().add(32768) as u64;
+                let kstack_top = proc
+                    .as_mut()
+                    .unwrap()
+                    .kernel_stack
+                    .as_ptr()
+                    .add(super::process::STACK_SIZE) as u64;
                 let mut sp = kstack_top;
 
                 sp &= !0xF;
@@ -320,13 +361,18 @@ impl Scheduler {
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn scheduler_schedule(mut old: *mut u64) -> *mut u64 {
+pub unsafe extern "C" fn scheduler_schedule(mut old: *mut u64) -> (*mut u64, u64) {
+    let mut cr3: u64 = x86_64::registers::control::Cr3::read()
+        .0
+        .start_address()
+        .as_u64();
+
     if let Some(mut sch) = SCHEDULER.try_lock() {
-        old = sch.schedule(old);
+        (old, cr3) = sch.schedule(old);
     }
 
     crate::input::port::write(0x20, 0x20);
-    old
+    (old, cr3)
 }
 
 pub unsafe fn kill(pid: usize) {
@@ -335,9 +381,9 @@ pub unsafe fn kill(pid: usize) {
     }
 }
 
-pub unsafe fn block(pid: usize, msg: Message) {
+pub unsafe fn block(pid: usize) {
     if let Some(mut sch) = SCHEDULER.try_lock() {
-        sch.block(pid, msg);
+        sch.block(pid);
     }
 }
 
@@ -365,9 +411,15 @@ pub unsafe fn list_processes() {
     }
 }
 
-pub unsafe fn new_process(name: [u8; 16], mode: Mode, entry: u64, stack_top: u64) -> usize {
+pub unsafe fn new_process(
+    name: [u8; 16],
+    mode: Mode,
+    entry: u64,
+    stack_top: u64,
+    pml4: u64,
+) -> usize {
     if let Some(mut sch) = SCHEDULER.try_lock() {
-        return sch.new_process(name, mode, entry, stack_top);
+        return sch.new_process(name, mode, entry, stack_top, pml4);
     }
 
     0xff

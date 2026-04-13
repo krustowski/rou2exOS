@@ -3,6 +3,7 @@ use core::arch::naked_asm;
 use x86_64::{
     registers::control::Cr2,
     structures::idt::{InterruptDescriptorTable, InterruptStackFrame, PageFaultErrorCode},
+    structures::tss::TaskStateSegment,
     VirtAddr,
 };
 

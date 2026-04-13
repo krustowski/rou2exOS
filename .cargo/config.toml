@@ -8,7 +8,7 @@ rustflags = ["-C", "target-feature=-redzone"]
 
 [target.x86_64-r2]
 runner = "qemu-system-x86_64"
-rustflags = ["-C", "link-arg=-Tlinker.ld"]
+rustflags = ["-C", "link-arg=-Tlinker.ld", "-C", "code-model=kernel"]
 
 # [target.'cfg(target_os = "none")']
 # runner = "bootimage runner"

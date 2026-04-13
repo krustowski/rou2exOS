@@ -1,14 +1,12 @@
-use crate::task::{
-    context::Context,
-    queue::{Message, Queue},
-};
+use crate::mem::pages::{PAGE_SIZE, PRESENT, USER, WRITE};
+use crate::task::queue::{Message, Queue};
 
 #[derive(Debug, Clone, Copy)]
 pub enum Mode {
     Kernel, // RING0
-    Driver, // RING1
-    PrUser, // RING2
-    User,   // RING3
+    //Driver, // RING1
+    //PrUser, // RING2
+    User, // RING3
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -41,11 +39,17 @@ pub struct Process {
     pub kernel_stack: &'static [u8; STACK_SIZE],
     pub ports: [Port; 1],
     pub stack_top: u64,
+    pub cr3: u64,
     //pub context: Context,
 }
 
-const STACK_SIZE: usize = 32768;
-static mut KSTACK_POOL: [[u8; STACK_SIZE]; 5] = [
+pub const STACK_SIZE: usize = 32768;
+static mut KSTACK_POOL: [[u8; STACK_SIZE]; 10] = [
+    [0; STACK_SIZE],
+    [0; STACK_SIZE],
+    [0; STACK_SIZE],
+    [0; STACK_SIZE],
+    [0; STACK_SIZE],
     [0; STACK_SIZE],
     [0; STACK_SIZE],
     [0; STACK_SIZE],
@@ -60,6 +64,7 @@ impl Process {
         mode: Mode,
         entry_point: u64,
         process_stack_top: u64,
+        pml4: u64,
     ) -> Process {
         let mut name: [u8; 16] = [0; 16];
 
@@ -73,9 +78,11 @@ impl Process {
             mode,
             status: Status::Ready,
             last_rsp: 0,
+            cr3: pml4,
+            //cr3: unsafe { crate::mem::pages::new_process_pml4(0x600_000, 0x200_000) } as u64,
             //context: Context::new(entry_point, code_segment, process_stack_top, stack_segment),
             stack_top: process_stack_top,
-            kernel_stack: unsafe { &KSTACK_POOL[id % 5] },
+            kernel_stack: unsafe { &mut KSTACK_POOL[id] },
             ports: [Port {
                 id: 0,
                 block_msg: None,

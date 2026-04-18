@@ -30,10 +30,20 @@ compile_kernel:
 		--target x86_64-r2.json
 	@cp target/kernel_graphics/x86_64-r2/release/kernel.elf iso/boot/kernel_graphics.elf
 
-#TODO: Please add an option to compile a debug kernel with debugging symbols and no optimizations
+# To enable rprint!/rprintn!/rprintb! on COM1 (serial debug mode, breaks SLIP networking):
+#   make build EXTRA_FEATURES=serial_debug
+EXTRA_FEATURES ?=
+compile_kernel_debug:
+	@cargo build \
+		--features "kernel_text,serial_debug,$(EXTRA_FEATURES)" \
+		--target-dir target/kernel_text_debug \
+		--release \
+		-Z build-std=core,compiler_builtins \
+		--target x86_64-r2.json
+	@cp target/kernel_text_debug/x86_64-r2/release/kernel.elf iso/boot/kernel_text.elf
 
 build_iso:
-	@grub-mkrescue \
+	@grub2-mkrescue \
 		-o r2.iso iso/ \
 		--modules="multiboot2 video video_bochs video_cirrus gfxterm all_video"
 
@@ -48,12 +58,11 @@ build_floppy:
 		fat.img
 	@echo "Hello from floppy!" > /tmp/hello.txt
 	@mcopy -i fat.img /tmp/hello.txt ::HELLO.TXT 
-	@mcopy -i fat.img ./print.bin ::PRINT.BIN
-	@mcopy -i fat.img ./print.elf ::PRINT.ELF
-	@mcopy -i fat.img ./go.elf ::GO.ELF
-	@mcopy -i fat.img ./sh.elf ::SH.ELF
-	@mcopy -i fat.img ./icmpresp.elf ::ICMPRESP.ELF
-	@mcopy -i fat.img ./garn.elf ::GARN.ELF
+	@mcopy -i fat.img ../r2_app/c/icmpresp/icmpresp.elf ::ICMPR.ELF
+	@mcopy -i fat.img ../r2_app/c/garn/garn.elf ::GARN.ELF
+	@mcopy -i fat.img ../r2_app/c/them/prg0.bin ::PRG0.BIN
+	@mcopy -i fat.img ../r2_app/c/them/them.elf ::THEM.ELF
+
 
 #
 #  RUN
@@ -105,7 +114,9 @@ run_iso_floppy: build_floppy
 		-vga std \
 		-cdrom r2.iso \
 		-fda fat.img \
-		-serial pty
+		-serial pty \
+		-audiodev pa,id=snd0 \
+		-machine pcspk-audiodev=snd0
 
 run_iso_floppy_drive: 
 	@sudo qemu-system-x86_64 \

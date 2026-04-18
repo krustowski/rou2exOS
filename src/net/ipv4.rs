@@ -34,14 +34,14 @@ pub fn create_packet(
     let total_len = (header_len + payload.len()) as u16;
 
     let header = Ipv4Header {
-        version_ihl: (4 << 4) | 5,                  // Version 4, IHL=5 (20 bytes)
+        version_ihl: (4 << 4) | 5, // Version 4, IHL=5 (20 bytes)
         dscp_ecn: 0,
         total_length: total_len.to_be(),
         identification: 0x1337u16.to_be(),
         flags_fragment_offset: (0x4000u16).to_be(), // Don't Fragment flag
         ttl: 64,
         protocol,
-        header_checksum: 0,                         // To be calculated
+        header_checksum: 0, // To be calculated
         source_ip: source,
         dest_ip: dest,
     };
@@ -96,7 +96,6 @@ pub fn parse_packet(packet: &[u8]) -> Option<(Ipv4Header, &[u8])> {
     Some((header, payload_slice))
 }
 
-
 /// Compute IPv4 header checksum
 fn ipv4_checksum(data: &[u8]) -> u16 {
     let mut sum = 0u32;
@@ -105,7 +104,7 @@ fn ipv4_checksum(data: &[u8]) -> u16 {
     for chunk in &mut chunks {
         if let Some(w1) = chunk.first() {
             if let Some(w2) = chunk.get(1) {
-                sum = sum.wrapping_add( u16::from_be_bytes([*w1, *w2]) as u32 );
+                sum = sum.wrapping_add(u16::from_be_bytes([*w1, *w2]) as u32);
             }
         }
     }
@@ -130,8 +129,6 @@ pub fn send_packet(packet: &[u8]) {
     let mut encoded_buf = [0u8; 4096];
 
     if let Some(encoded_len) = slip::encode(packet, &mut encoded_buf) {
-        serial::init();
-
         let encoded_slice = encoded_buf.get(..encoded_len).unwrap_or(&[]);
         for &b in encoded_slice {
             serial::write(b);
@@ -145,13 +142,10 @@ pub fn receive_loop(callback: fn(packet: &[u8]) -> u8) -> u8 {
     let mut packet_buf: [u8; 2048] = [0; 2048];
     let mut temp_len: usize = 0;
 
-    serial::init();
-
     loop {
         // While the keyboard is idle...
         while port::read(0x64) & 1 == 0 {
             if serial::ready() && temp_len <= temp_buf.len() {
-
                 if let Some(p) = temp_buf.get_mut(temp_len) {
                     *p = serial::read();
                 }
@@ -176,17 +170,18 @@ pub fn receive_loop(callback: fn(packet: &[u8]) -> u8) -> u8 {
 }
 
 /// Called when you receive a new serial byte
-pub fn receive_loop_tcp(conns: &mut [Option<tcp::TcpConnection>; MAX_CONNS], callback: fn(conns: &mut [Option<tcp::TcpConnection>; MAX_CONNS], packet: &[u8]) -> u8) -> u8 {
+pub fn receive_loop_tcp(
+    conns: &mut [Option<tcp::TcpConnection>; MAX_CONNS],
+    callback: fn(conns: &mut [Option<tcp::TcpConnection>; MAX_CONNS], packet: &[u8]) -> u8,
+) -> u8 {
     let mut temp_buf: [u8; 2048] = [0; 2048];
     let mut packet_buf: [u8; 2048] = [0; 2048];
     let mut temp_len: usize = 0;
 
-    serial::init();
-
     loop {
         // While the keyboard is idle...
         while port::read(0x64) & 1 == 0 {
-            if serial::ready() &&  temp_len <= temp_buf.len() {
+            if serial::ready() && temp_len <= temp_buf.len() {
                 if let Some(p) = temp_buf.get_mut(temp_len) {
                     *p = serial::read();
                 }
@@ -209,4 +204,3 @@ pub fn receive_loop_tcp(conns: &mut [Option<tcp::TcpConnection>; MAX_CONNS], cal
     }
     3
 }
-

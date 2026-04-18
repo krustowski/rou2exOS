@@ -15,7 +15,10 @@ use crate::{
 };
 
 const USERLAND_START: u64 = 0x600_000;
-const USERLAND_END: u64 = 0x800_000;
+// Must match USERLAND_END in src/input/elf.rs.  Stacks are placed at
+// 0x840_000–0x8C0_000, so any pointer from a user stack lives above the
+// old 0x800_000 ceiling and was incorrectly rejected by every syscall.
+const USERLAND_END: u64 = 0xA00_000;
 
 #[repr(u64)]
 enum SyscallReturnCode {
@@ -85,6 +88,11 @@ pub extern "x86-interrupt" fn syscall_handler(_: InterruptStackFrame) -> ! {
 }
 
 extern "C" fn syscall_inner(arg1: u64, arg2: u64, syscall_no: u64) -> SyscallReturnCode {
+    // Re-enable interrupts so the PIT timer can preempt long-running syscalls.
+    // The scheduler uses try_lock, so a timer tick during a scheduler operation
+    // will simply fail to acquire the lock and return the old RSP unchanged.
+    unsafe { core::arch::asm!("sti", options(nomem, nostack)); }
+
     debug!("syscall_handler: called: ");
     debugn!(syscall_no);
     debug!(", arg1: ");
@@ -934,9 +942,14 @@ extern "C" fn syscall_inner(arg1: u64, arg2: u64, syscall_no: u64) -> SyscallRet
                     serial::init();
                 }
 
-                // Read from UART
+                // Read from UART — returns InvalidInput when no byte is ready,
+                // so userland can distinguish "no data" from a real read.
                 0x02 => {
                     if !(USERLAND_START..=USERLAND_END).contains(&arg2) {
+                        return SyscallReturnCode::InvalidInput;
+                    }
+
+                    if !serial::ready() {
                         return SyscallReturnCode::InvalidInput;
                     }
 
@@ -1139,10 +1152,7 @@ extern "C" fn syscall_inner(arg1: u64, arg2: u64, syscall_no: u64) -> SyscallRet
                 if let Some(msg) = scheduler::pop_msg(current_pid) {
                     copy_nonoverlapping(msg.buf_addr as *const u8, buf, 512);
                 } else {
-                    scheduler::block(
-                        current_pid,
-                        Message::new(0, 0xff, current_pid, 512, buf as u64),
-                    );
+                    scheduler::block(current_pid, Message::new(0, 0xff, current_pid, 512));
                 }
             }
         }
@@ -1165,7 +1175,7 @@ extern "C" fn syscall_inner(arg1: u64, arg2: u64, syscall_no: u64) -> SyscallRet
                 copy_nonoverlapping(buf, MSG_BUF[0].as_mut_ptr(), 512);
                 let current_pid = scheduler::get_current_pid();
 
-                let msg = Message::new(0, current_pid, target_pid, 512, MSG_BUF[0].as_ptr() as u64);
+                let msg = Message::new(0, current_pid, target_pid, 512);
                 scheduler::push_msg(target_pid, msg);
                 scheduler::wake(target_pid);
             }

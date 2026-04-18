@@ -133,7 +133,7 @@ fn handle_tcp_packet(conn: &mut tcp::TcpConnection, tcp_header: &tcp::TcpHeader,
         return 1;
 
     } else if conn.state == tcp::TcpState::Established {
-        if payload.is_empty() {
+        if !payload.is_empty() {
             conn.ack_num = u32::from_be(tcp_header.seq_num).wrapping_add(payload.len() as u32);
 
             // Try to parse a minimal GET request

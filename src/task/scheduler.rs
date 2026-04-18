@@ -1,11 +1,9 @@
 use spin::Mutex;
 
 use super::{
-    process::{Mode, Process, Status},
+    process::{Mode, Process, Status, MAX_PROCESSES},
     queue::Message,
 };
-
-const MAX_PROCESSES: usize = 5;
 
 static SCHEDULER: Mutex<Scheduler> = Mutex::new(Scheduler::new());
 
@@ -234,14 +232,26 @@ impl Scheduler {
 
         let mut proc: Option<Process> = None;
         let mut pos: usize = 0;
+        let mut found_slot = false;
 
         for slot in self.processes.iter() {
-            if !slot.is_none() {
+            if slot.is_some() {
                 pos += 1;
                 continue;
             }
+            found_slot = true;
+            break;
+        }
 
-            proc = Some(Process::new(pid, name, mode, entry, stack_top));
+        if !found_slot || pos >= MAX_PROCESSES {
+            return 0xff;
+        }
+
+        {
+            // Process::new takes `slot` (not pid) so the kernel stack pool is
+            // indexed by slot position — each slot always owns the same stack
+            // entry regardless of how many times it has been recycled.
+            proc = Some(Process::new(pid, pos, name, mode, entry, stack_top));
 
             unsafe {
                 let kstack_top = proc.as_mut().unwrap().kernel_stack.as_ptr().add(32768) as u64;
@@ -294,12 +304,6 @@ impl Scheduler {
 
                 proc.as_mut().unwrap().last_rsp = sp;
             }
-
-            break;
-        }
-
-        if proc.is_none() {
-            return 0xff;
         }
 
         rprint!("NEW PROCESS: ");

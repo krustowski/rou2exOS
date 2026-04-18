@@ -1,5 +1,3 @@
-use core::arch::naked_asm;
-
 use x86_64::{
     registers::control::Cr2,
     structures::idt::{InterruptDescriptorTable, InterruptStackFrame, PageFaultErrorCode},
@@ -44,7 +42,12 @@ extern "x86-interrupt" fn page_fault_handler(
         scheduler::crash(0xff);
         scheduler::wake(2);
 
-        core::arch::asm!("int 0x20");
+        // Re-enable interrupts so the PIT timer fires and the scheduler can
+        // switch to the shell.
+        core::arch::asm!("sti");
+        loop {
+            core::arch::asm!("hlt");
+        }
     }
 }
 
@@ -66,7 +69,10 @@ extern "x86-interrupt" fn general_protection_fault_handler(
         scheduler::crash(0xff);
         scheduler::wake(2);
 
-        core::arch::asm!("int 0x20");
+        core::arch::asm!("sti");
+        loop {
+            core::arch::asm!("hlt");
+        }
     }
 }
 
@@ -85,7 +91,10 @@ extern "x86-interrupt" fn invalid_opcode_handler(stack_frame: InterruptStackFram
         scheduler::crash(0xff);
         scheduler::wake(2);
 
-        core::arch::asm!("int 0x20");
+        core::arch::asm!("sti");
+        loop {
+            core::arch::asm!("hlt");
+        }
     }
 }
 
@@ -112,7 +121,7 @@ extern "x86-interrupt" fn double_fault_handler(
         scheduler::crash(0xff);
         scheduler::wake(2);
 
-        core::arch::asm!("int 0x20");
+        core::arch::asm!("sti");
         loop {
             core::arch::asm!("hlt");
         }

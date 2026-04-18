@@ -37,6 +37,11 @@ struct Elf64Phdr {
 
 const PT_LOAD: u32 = 1;
 
+/// Lowest virtual address a userland ELF segment may occupy.
+const USERLAND_START: u64 = 0x600_000;
+/// Highest virtual address (exclusive) a userland ELF segment may occupy.
+const USERLAND_END: u64 = 0xA00_000;
+
 pub unsafe fn load_elf64(elf_addr: usize) -> usize {
     let ehdr = &*(elf_addr as *const Elf64Ehdr);
 
@@ -57,10 +62,22 @@ pub unsafe fn load_elf64(elf_addr: usize) -> usize {
         let ph = &*phdrs.add(i as usize);
 
         if ph.p_type == PT_LOAD {
+            // Reject any segment that would land outside the user-accessible
+            // region.  This prevents a malformed ELF from scribbling over
+            // kernel memory.
+            let seg_end = ph.p_vaddr.saturating_add(ph.p_memsz);
+            if ph.p_vaddr < USERLAND_START || seg_end > USERLAND_END {
+                rprint!("ELF segment ");
+                rprintn!(i);
+                rprint!(" vaddr=");
+                rprintn!(ph.p_vaddr);
+                rprint!(" is outside userland — skipping\n");
+                continue;
+            }
+
             let src = (elf_addr + ph.p_offset as usize) as *const u8;
             let dst = ph.p_vaddr as *mut u8;
 
-            // Sane debug info
             rprint!("Loading segment ");
             rprintn!(i);
             rprint!(" to ");
@@ -82,10 +99,6 @@ pub unsafe fn load_elf64(elf_addr: usize) -> usize {
         }
     }
 
-    //rprint!("ELF entry point: ");
-    //rprintn!(ehdr.e_entry);
-    //rprint!("\n");
-
     ehdr.e_entry as usize
 }
 
@@ -99,7 +112,7 @@ static mut STACK_NO: usize = 0;
 
 use crate::fs::fat12::{block::Floppy, fs::Filesystem};
 
-pub fn run_elf(filename_input: &[u8], args: &[u8], mode: RunMode) -> bool {
+pub fn run_elf(filename_input: &[u8], _args: &[u8], mode: RunMode) -> bool {
     if filename_input.is_empty() || filename_input.len() > 8 {
         return false;
     }
@@ -145,8 +158,8 @@ pub fn run_elf(filename_input: &[u8], args: &[u8], mode: RunMode) -> bool {
                 rprintn!(size);
                 rprint!("\n");
 
-                let addrs = [0x640_000, 0x680_000, 0x6c0_000, 0x700_000];
-                let load_addr: u64 = addrs[STACK_NO % 4];
+                let addrs = [0x640_000, 0x680_000, 0x6c0_000, 0x700_000, 0x720_000];
+                let load_addr: u64 = addrs[STACK_NO % 5];
 
                 while size - offset > 0 {
                     let lba = fs.cluster_to_lba(cluster);
@@ -181,15 +194,27 @@ pub fn run_elf(filename_input: &[u8], args: &[u8], mode: RunMode) -> bool {
                 }
                 rprint!("\n");
 
-                // assume `elf_image` is a pointer to the loaded ELF file in memory
+                // Parse and copy ELF segments to their p_vaddr destinations.
                 let entry_addr = load_elf64(load_addr as usize);
 
                 rprint!("ELF entry point: ");
                 rprintn!(entry_addr);
                 rprint!("\n");
 
-                let stacks = [0x700_000, 0x740_000, 0x780_000, 0x7c0_000];
-                let stack_top = stacks[STACK_NO % 4];
+                // Ensure the User bit is set in the active page table for the
+                // entire userland region so CPL=3 code can access its own
+                // pages.  This is belt-and-suspenders on top of boot.asm but
+                // makes the mapping explicit and survives any future boot.asm
+                // changes.
+                crate::mem::pages::ensure_user_pages(USERLAND_START, USERLAND_END);
+
+                // Stacks live at the top of the user-accessible region
+                // (0x400000–0x9FFFFF, user-flag set in boot.asm).  Each slot
+                // gets 256 KB of stack space, starting well above where code
+                // typically loads (0x600000+), so normal stack growth never
+                // collides with ELF segments.
+                let stacks = [0x8C0_000u64, 0x8A0_000, 0x880_000, 0x860_000, 0x840_000];
+                let stack_top = stacks[STACK_NO % 5];
                 STACK_NO += 1;
 
                 // cast and jump

@@ -45,7 +45,8 @@ pub struct Process {
 }
 
 const STACK_SIZE: usize = 32768;
-static mut KSTACK_POOL: [[u8; STACK_SIZE]; 5] = [
+pub const MAX_PROCESSES: usize = 5;
+static mut KSTACK_POOL: [[u8; STACK_SIZE]; MAX_PROCESSES] = [
     [0; STACK_SIZE],
     [0; STACK_SIZE],
     [0; STACK_SIZE],
@@ -54,8 +55,13 @@ static mut KSTACK_POOL: [[u8; STACK_SIZE]; 5] = [
 ];
 
 impl Process {
+    /// `slot` is the index in the scheduler's `processes` array (0–4).  It is
+    /// used to select a kernel stack from `KSTACK_POOL` so that each occupied
+    /// slot always owns a distinct stack regardless of how many times that slot
+    /// has been recycled (i.e. regardless of the monotonically-increasing PID).
     pub fn new(
         id: usize,
+        slot: usize,
         name_slice: [u8; 16],
         mode: Mode,
         entry_point: u64,
@@ -73,9 +79,8 @@ impl Process {
             mode,
             status: Status::Ready,
             last_rsp: 0,
-            //context: Context::new(entry_point, code_segment, process_stack_top, stack_segment),
             stack_top: process_stack_top,
-            kernel_stack: unsafe { &KSTACK_POOL[id % 5] },
+            kernel_stack: unsafe { &KSTACK_POOL[slot % MAX_PROCESSES] },
             ports: [Port {
                 id: 0,
                 block_msg: None,

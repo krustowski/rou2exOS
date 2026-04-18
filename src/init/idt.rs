@@ -130,10 +130,12 @@ fn init_tss() {
         // Zero out the whole TSS
         core::ptr::write_bytes(&raw mut tss64 as *mut u8, 0, core::mem::size_of::<Tss64>());
 
-        // Set kernel stack (top) pointer for ring 0 (rsp0)
-        tss64.rsp0 = __stack_top;
-        tss64.ist1 = ist0_stack_top;
-        tss64.ist2 = ist1_stack_top;
+        // Set kernel stack (top) pointer for ring 0 (rsp0).
+        // These are linker/assembler labels — we need their *addresses*, not the
+        // bytes stored at those addresses (which are zero-initialised .bss).
+        tss64.rsp0 = core::ptr::addr_of!(__stack_top) as u64;
+        tss64.ist1 = core::ptr::addr_of!(ist0_stack_top) as u64;
+        tss64.ist2 = core::ptr::addr_of!(ist1_stack_top) as u64;
 
         // IO Map base: set to size of TSS to disable IO bitmap
         tss64.io_map_base = core::mem::size_of::<Tss64>() as u16;

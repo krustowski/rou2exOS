@@ -157,7 +157,7 @@ extern "C" fn syscall_inner(arg1: u64, arg2: u64, syscall_no: u64) -> SyscallRet
                 0x01 => unsafe {
                     let name = b"rourex";
                     let user = b"root";
-                    let version = b"v0.10.6";
+                    let version = b"v0.10.7";
                     let path = b"/";
 
                     if let Some(nm) = (*sysinfo_ptr).system_name.get_mut(0..name.len()) {
@@ -231,21 +231,14 @@ extern "C" fn syscall_inner(arg1: u64, arg2: u64, syscall_no: u64) -> SyscallRet
                 }
 
                 0x03 => {
+                    let pid = unsafe { scheduler::get_current_pid() };
+
                     unsafe {
-                        #[expect(static_mut_refs)] // this is bad but i cant figure out how to fix
+                        #[expect(static_mut_refs)]
                         for s in irq::RECEPTORS.iter() {
-                            if s.pid == 123 {
-                                // Try copy immediately
-                                let copied = s.copy_to_user(arg2 as *mut u8, 16);
-                                if copied > 0 {
-                                    break;
-                                }
-
-                                // No data: block current process until dispatcher wakes it
-                                // idle();
-                                // After wake, try copy again
-
+                            if s.pid == pid {
                                 s.copy_to_user(arg2 as *mut u8, 16);
+                                break;
                             }
                         }
                     }
@@ -766,7 +759,7 @@ extern "C" fn syscall_inner(arg1: u64, arg2: u64, syscall_no: u64) -> SyscallRet
                     });
 
                     unsafe {
-                        core::ptr::copy_nonoverlapping(kentries.as_ptr(), entries, offset);
+                        core::ptr::copy_nonoverlapping(kentries.as_ptr(), entries, 32);
                     }
                 }
                 Err(e) => {

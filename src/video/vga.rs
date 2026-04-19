@@ -1,7 +1,7 @@
-use core::fmt::{self, Write};
 use crate::input::port;
-use spin::{mutex::Mutex};
+use core::fmt::{self, Write};
 use core::sync::atomic::{AtomicBool, Ordering};
+use spin::mutex::Mutex;
 
 /// VGA text mode buffer dimensions.
 pub const BUFFER_WIDTH: usize = 80;
@@ -16,7 +16,10 @@ static WRITER_INIT: AtomicBool = AtomicBool::new(false);
 
 /// Initializes the unique Writer instance.
 pub fn init_writer() {
-    if WRITER_INIT.compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst).is_ok() {
+    if WRITER_INIT
+        .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
+        .is_ok()
+    {
         let writter = Writer::new();
         unsafe {
             WRITER = Some(Mutex::new(writter));
@@ -130,7 +133,7 @@ impl Writer {
             self.move_cursor();
         }
     }
-    
+
     /// Sets the specified ColorCode from provided foreground and background colors.
     pub fn set_color(&mut self, fg: Color, bg: Color) {
         self.color_code = ColorCode::new(fg, bg)
@@ -151,7 +154,7 @@ impl Writer {
     pub fn write_byte(&mut self, byte: u8) {
         match byte {
             b'\n' => self.new_line(),
-            b'\r' => {
+            (0x08 | b'\r') => {
                 // Backspace = move cursor back and overwrite the ScreenChar on that position
                 let mut row = self.row_pos;
                 let mut col = self.col_pos;
@@ -221,7 +224,6 @@ impl Writer {
         port::write(0x3D5, (pos & 0xFF) as u8);
     }
 
-
     /// Returns a mutable reference to the video buffer.
     fn buffer_mut(&mut self) -> &mut Buffer {
         unsafe { &mut *self.buffer }
@@ -257,4 +259,3 @@ impl Writer {
         }
     }
 }
-

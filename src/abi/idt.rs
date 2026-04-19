@@ -149,12 +149,12 @@ extern "x86-interrupt" fn keyboard_handler(_stack: InterruptStackFrame) {
     unsafe {
         crate::input::keyboard::push_scancode(scancode);
 
-        /*#[expect(static_mut_refs)] // this is bad but i cant figure out how to fix
+        #[expect(static_mut_refs)]
         for s in crate::input::irq::RECEPTORS.iter() {
             if s.pid != 0 {
                 s.push_irq(scancode);
             }
-        }*/
+        }
     }
 
     // Acknowledge the PIC

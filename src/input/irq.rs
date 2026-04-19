@@ -1,9 +1,9 @@
 use core::sync::atomic::{AtomicUsize, Ordering};
 
+use crate::task::scheduler;
+
 const MAX_RECEPTORS: usize = 5;
 const USER_KBUF_SIZE: usize = 256;
-
-static mut TEMP_PID: usize = 123;
 
 pub struct Subscriber {
     pub buf_ptr: u64,
@@ -24,21 +24,31 @@ impl Subscriber {
         }
     }
 
-    /// Called from IRQ context
+    /// Called from IRQ context.
+    /// Writes `b` into the kernel ring buffer (for drain-syscall readers) and
+    /// directly into `buf_ptr[0]` for programs that poll the mailbox slot.
     pub fn push_irq(&self, b: u8) {
+        // Mailbox path: write to the user buffer only when the slot is empty.
+        if self.buf_ptr != 0 {
+            unsafe {
+                if core::ptr::read_volatile(self.buf_ptr as *const u8) == 0 {
+                    core::ptr::write_volatile(self.buf_ptr as *mut u8, b);
+                }
+            }
+        }
+
+        // Ring-buffer path: always enqueue into kbuf for drain-syscall readers.
         let head = self.head.load(Ordering::Relaxed);
         let next = (head + 1) % USER_KBUF_SIZE;
-        let tail = self.tail.load(Ordering::Acquire);
-        if next == tail {
-            return;
+        if next != self.tail.load(Ordering::Acquire) {
+            unsafe {
+                core::ptr::write_volatile(self.kbuf.as_ptr().add(head) as *mut u8, b);
+            }
+            self.head.store(next, Ordering::Release);
         }
-        unsafe {
-            //core::ptr::write_volatile(self.kbuf.as_ptr().add(head) as *mut u8, b);
-            core::ptr::write_volatile(self.buf_ptr as *mut u8, b);
-        }
-        self.head.store(next, Ordering::Release);
     }
 
+    /// Drain up to `len` bytes from the kernel ring buffer into `dst`.
     pub fn copy_to_user(&self, dst: *mut u8, len: usize) -> usize {
         let mut copied = 0usize;
         while copied < len {
@@ -46,12 +56,9 @@ impl Subscriber {
             let head = self.head.load(Ordering::Acquire);
             if tail == head {
                 break;
-            } // empty
-              //
-            let byte = unsafe { core::ptr::read_volatile(self.kbuf.as_ptr().add(tail)) };
-            unsafe {
-                core::ptr::write_volatile(dst.add(copied), byte);
             }
+            let byte = unsafe { core::ptr::read_volatile(self.kbuf.as_ptr().add(tail)) };
+            unsafe { core::ptr::write_volatile(dst.add(copied), byte) };
             self.tail
                 .store((tail + 1) % USER_KBUF_SIZE, Ordering::Release);
             copied += 1;
@@ -84,28 +91,33 @@ pub static mut RECEPTORS: [Subscriber; MAX_RECEPTORS] = [
 ];
 
 pub fn pipe_subscribe(addr: u64) -> isize {
+    let pid = unsafe { scheduler::get_current_pid() };
+
     unsafe {
         #[expect(static_mut_refs)]
         for s in RECEPTORS.iter_mut() {
             if s.pid == 0 {
-                s.pid = TEMP_PID;
-                TEMP_PID += 1;
+                s.pid = pid;
                 s.buf_ptr = addr;
                 s.clear();
 
-                rprint!("New subscriber registered\n");
+                rprint!("kbd: pid ");
+                rprintn!(pid as u64);
+                rprint!(" subscribed\n");
                 return 0;
             }
         }
     }
-    -1 // busy
+    -1
 }
 
 pub fn pipe_unsubscribe(_addr: u64) -> isize {
+    let pid = unsafe { scheduler::get_current_pid() };
+
     unsafe {
         #[expect(static_mut_refs)]
         for s in RECEPTORS.iter_mut() {
-            if s.pid == TEMP_PID - 1 {
+            if s.pid == pid {
                 s.pid = 0;
                 s.buf_ptr = 0;
                 s.clear();

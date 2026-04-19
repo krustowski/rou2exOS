@@ -61,6 +61,8 @@ extern "x86-interrupt" fn general_protection_fault_handler(
 
     warn!("\nError code: ");
     printn!(error_code);
+    warn!("\nRIP: ");
+    printx!(frame.instruction_pointer.as_u64());
     warn!("\nStack frame SP: ");
     printx!(frame.stack_pointer.as_u64());
     print!("\n\n");

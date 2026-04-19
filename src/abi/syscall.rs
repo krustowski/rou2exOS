@@ -4,7 +4,7 @@ use x86_64::structures::idt::InterruptStackFrame;
 
 use crate::{
     fs::block::BlockDevice,
-    fs::fat12::{block::Floppy, fs::Filesystem},
+    fs::fat12::{block::Floppy, check, fs::Filesystem},
     input::{elf, irq},
     net::{icmp, ipv4, serial, tcp},
     task::{
@@ -91,7 +91,9 @@ extern "C" fn syscall_inner(arg1: u64, arg2: u64, syscall_no: u64) -> SyscallRet
     // Re-enable interrupts so the PIT timer can preempt long-running syscalls.
     // The scheduler uses try_lock, so a timer tick during a scheduler operation
     // will simply fail to acquire the lock and return the old RSP unchanged.
-    unsafe { core::arch::asm!("sti", options(nomem, nostack)); }
+    unsafe {
+        core::arch::asm!("sti", options(nomem, nostack));
+    }
 
     debug!("syscall_handler: called: ");
     debugn!(syscall_no);
@@ -130,7 +132,11 @@ extern "C" fn syscall_inner(arg1: u64, arg2: u64, syscall_no: u64) -> SyscallRet
                 scheduler::kill(pid);
                 scheduler::wake(2);
 
-                core::arch::asm!("int 0x20");
+                core::arch::asm!("sti");
+                loop {
+                    core::arch::asm!("int 0x20");
+                    core::arch::asm!("hlt");
+                }
             };
         }
 
@@ -888,6 +894,28 @@ extern "C" fn syscall_inner(arg1: u64, arg2: u64, syscall_no: u64) -> SyscallRet
 
             if !file_found {
                 return SyscallReturnCode::FileNotFound;
+            }
+        }
+
+        /*
+         *  Syscall 0x2B --- Run filesystem check (fsck)
+         *
+         *  Arg1: unused
+         *  Arg2: pointer to FsckReport_T (4 × u64: errors, orphans, cross_linked, invalid)
+         */
+        0x2B => {
+            if !(USERLAND_START..=USERLAND_END).contains(&arg2) {
+                return SyscallReturnCode::InvalidInput;
+            }
+
+            let report = check::run_check();
+            let out = arg2 as *mut u64;
+
+            unsafe {
+                out.add(0).write_volatile(report.errors as u64);
+                out.add(1).write_volatile(report.orphan_clusters as u64);
+                out.add(2).write_volatile(report.cross_linked as u64);
+                out.add(3).write_volatile(report.invalid_entries as u64);
             }
         }
 

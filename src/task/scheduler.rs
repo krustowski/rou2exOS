@@ -186,6 +186,18 @@ impl Scheduler {
                 printb!(&proc.name);
                 print!("   ");
 
+                match proc.mode {
+                    Mode::Kernel => {
+                        print!(" K");
+                    }
+                    Mode::User => {
+                        print!(" U");
+                    }
+                    _ => {
+                        print!("  ");
+                    }
+                }
+
                 match proc.status {
                     Status::Ready => {
                         print!(" (Ready)");

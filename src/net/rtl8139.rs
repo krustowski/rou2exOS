@@ -4,7 +4,7 @@ use crate::net::pci;
 pub const PCI_VENDOR_ID_REALTEK: u16 = 0x10EC;
 pub const PCI_DEVICE_ID_RTL8139: u16 = 0x8139;
 
-const RTL8139_IO_BASE: u16 = 0xC000;
+pub static mut RTL8139_IO_BASE: u16 = 0xC000; // overwritten by rtl8139_init() from PCI BAR0
 const NUM_TX_BUFFERS: usize = 4;
 
 static mut RX_BUFFER: [u8; 8192 + 16 + 1500] = [0; 8192 + 16 + 1500];
@@ -16,12 +16,15 @@ static mut TX_INDEX: usize = 0;
 
 pub fn receive_frame(buf: &mut [u8]) -> Option<usize> {
     unsafe {
-        let isr = port::read(RTL8139_IO_BASE + 0x3E); // ISR (Interrupt Status Register)
-        if isr & 0x01 == 0 {
-            return None; // No packet received
+        // Check buffer-not-empty: CBR (current buffer read ptr, 0x3A) != CAPR+16 (0x38)
+        let capr = port::read_u16(RTL8139_IO_BASE + 0x38).wrapping_add(16) as usize;
+        let cbr = port::read_u16(RTL8139_IO_BASE + 0x3A) as usize;
+        if capr == cbr {
+            return None; // RX buffer empty
         }
 
-        port::write_u8(RTL8139_IO_BASE + 0x3E, 0x01); // Acknowledge RX interrupt
+        // Acknowledge any pending ROK in ISR
+        port::write_u8(RTL8139_IO_BASE + 0x3E, 0x01);
 
         let offset = RX_OFFSET & 0x1FFF;
         //let rx_buf = &RX_BUFFER[offset..];
@@ -35,7 +38,7 @@ pub fn receive_frame(buf: &mut [u8]) -> Option<usize> {
             let _rx_status = u16::from_le_bytes([rx_buf[0], rx_buf[1]]);
             let len = u16::from_le_bytes([rx_buf[2], rx_buf[3]]) as usize;
 
-            if len == 0 || len > buf.len() {
+            if len < 14 || len > buf.len() {
                 return None;
             }
 
@@ -48,8 +51,10 @@ pub fn receive_frame(buf: &mut [u8]) -> Option<usize> {
 
             RX_OFFSET = (RX_OFFSET + len + 4 + 3) & !3; // Align to 4 bytes
 
-            // Tell the card the packet has been read
-            port::write_u16(RTL8139_IO_BASE + 0x38, RX_OFFSET as u16);
+            // CAPR (0x38): tell the card how far we've read.
+            // RTL8139 datasheet quirk: write (offset - 16) to avoid off-by-one
+            // in the NIC's empty/full detection.
+            port::write_u16(RTL8139_IO_BASE + 0x38, RX_OFFSET.wrapping_sub(16) as u16);
 
             Some(len)
         } else {
@@ -58,26 +63,33 @@ pub fn receive_frame(buf: &mut [u8]) -> Option<usize> {
     }
 }
 
-pub fn send_frame(data: &[u8]) -> Result<(), &'static str> {
-    if data.len() > 2048 {
+/// Send `len` bytes from `data`. Ethernet minimum is 60 bytes; pad with zeros if shorter.
+pub fn send_frame(data: &[u8], len: usize) -> Result<(), &'static str> {
+    const ETH_MIN: usize = 60;
+    let send_len = if len < ETH_MIN { ETH_MIN } else { len };
+
+    if send_len > 2048 {
         return Err("Frame too large");
     }
 
     unsafe {
         let tx_idx = TX_INDEX;
         let buf = &mut TX_BUFFERS[tx_idx];
-        buf[..data.len()].copy_from_slice(data);
+        buf[..len].copy_from_slice(&data[..len]);
+        if len < ETH_MIN {
+            // zero-pad to minimum frame size
+            for b in buf[len..ETH_MIN].iter_mut() {
+                *b = 0;
+            }
+        }
 
-        // Write buffer address
         let buf_phys = buf.as_ptr() as u32;
         let tx_addr_port = RTL8139_IO_BASE + 0x20 + (tx_idx * 4) as u16;
         port::write_u32(tx_addr_port, buf_phys);
 
-        // Write length
         let tx_status_port = RTL8139_IO_BASE + 0x10 + (tx_idx * 4) as u16;
-        port::write_u32(tx_status_port, data.len() as u32);
+        port::write_u32(tx_status_port, send_len as u32);
 
-        // Advance TX index
         TX_INDEX = (TX_INDEX + 1) % NUM_TX_BUFFERS;
     }
 
@@ -86,10 +98,23 @@ pub fn send_frame(data: &[u8]) -> Result<(), &'static str> {
 
 
 pub fn rtl8139_init() {
-    // Enable bus mastering
+    // Discover the actual I/O base from PCI BAR0 before touching any registers
+    let discovered = pci::find_io_base(PCI_VENDOR_ID_REALTEK, PCI_DEVICE_ID_RTL8139);
+    unsafe {
+        if discovered != 0 {
+            RTL8139_IO_BASE = discovered;
+        }
+    }
+
     pci::enable_bus_mastering(PCI_VENDOR_ID_REALTEK, PCI_DEVICE_ID_RTL8139);
 
-    let io_base = RTL8139_IO_BASE;
+    let io_base = unsafe { RTL8139_IO_BASE };
+
+    // Reset ring-buffer read pointer so re-launch starts clean
+    unsafe { RX_OFFSET = 0; }
+
+    // Power on (CONFIG1 = 0x00 puts chip in normal power mode)
+    port::write_u8(io_base + 0x52, 0x00);
 
     // Reset
     port::write_u8(io_base + 0x37, 0x10);

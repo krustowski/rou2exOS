@@ -107,7 +107,8 @@ fn send_arp_reply(payload: &[u8]) {
         payload,
     );
 
-    rtl8139::send_frame(&frame).unwrap();
+    let frame_len = 14 + payload.len();
+    rtl8139::send_frame(&frame, frame_len).unwrap();
 }
 
 

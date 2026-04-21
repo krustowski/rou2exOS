@@ -87,7 +87,7 @@ pub extern "x86-interrupt" fn syscall_handler(_: InterruptStackFrame) -> ! {
     );
 }
 
-extern "C" fn syscall_inner(arg1: u64, arg2: u64, syscall_no: u64) -> SyscallReturnCode {
+extern "C" fn syscall_inner(arg1: u64, arg2: u64, syscall_no: u64) -> u64 {
     // Re-enable interrupts so the PIT timer can preempt long-running syscalls.
     // The scheduler uses try_lock, so a timer tick during a scheduler operation
     // will simply fail to acquire the lock and return the old RSP unchanged.
@@ -148,7 +148,7 @@ extern "C" fn syscall_inner(arg1: u64, arg2: u64, syscall_no: u64) -> SyscallRet
          */
         0x01 => {
             if !(USERLAND_START..=USERLAND_END).contains(&arg2) {
-                return SyscallReturnCode::InvalidInput;
+                return SyscallReturnCode::InvalidInput as u64;
             }
 
             let sysinfo_ptr = arg2 as *mut SysInfo;
@@ -191,7 +191,7 @@ extern "C" fn syscall_inner(arg1: u64, arg2: u64, syscall_no: u64) -> SyscallRet
          */
         0x02 => {
             if !(USERLAND_START..=USERLAND_END).contains(&arg2) {
-                return SyscallReturnCode::InvalidInput;
+                return SyscallReturnCode::InvalidInput as u64;
             }
 
             if arg1 == 0x01 {
@@ -218,7 +218,7 @@ extern "C" fn syscall_inner(arg1: u64, arg2: u64, syscall_no: u64) -> SyscallRet
          */
         0x03 => {
             if !(USERLAND_START..=USERLAND_END).contains(&arg2) {
-                return SyscallReturnCode::InvalidInput;
+                return SyscallReturnCode::InvalidInput as u64;
             }
 
             match arg1 {
@@ -256,11 +256,11 @@ extern "C" fn syscall_inner(arg1: u64, arg2: u64, syscall_no: u64) -> SyscallRet
          */
         0x0a => {
             if !(USERLAND_START..=USERLAND_END).contains(&arg1) {
-                return SyscallReturnCode::InvalidInput;
+                return SyscallReturnCode::InvalidInput as u64;
             }
 
             // TODO
-            return SyscallReturnCode::NotImplemented;
+            return SyscallReturnCode::NotImplemented as u64;
         }
 
         /*
@@ -271,7 +271,7 @@ extern "C" fn syscall_inner(arg1: u64, arg2: u64, syscall_no: u64) -> SyscallRet
          */
         0x10 => {
             if !(USERLAND_START..=USERLAND_END).contains(&arg1) {
-                return SyscallReturnCode::InvalidInput;
+                return SyscallReturnCode::InvalidInput as u64;
             }
 
             let ptr = arg1 as *const u8;
@@ -295,7 +295,7 @@ extern "C" fn syscall_inner(arg1: u64, arg2: u64, syscall_no: u64) -> SyscallRet
          */
         0x11 => {
             if arg1 != 0x00 || arg2 != 0x00 {
-                return SyscallReturnCode::InvalidInput;
+                return SyscallReturnCode::InvalidInput as u64;
             }
 
             clear_screen!();
@@ -342,7 +342,7 @@ extern "C" fn syscall_inner(arg1: u64, arg2: u64, syscall_no: u64) -> SyscallRet
          */
         0x1a => {
             if !(20..=20_000).contains(&arg1) {
-                return SyscallReturnCode::InvalidInput;
+                return SyscallReturnCode::InvalidInput as u64;
             }
 
             crate::audio::beep::beep(arg1 as u32);
@@ -358,7 +358,7 @@ extern "C" fn syscall_inner(arg1: u64, arg2: u64, syscall_no: u64) -> SyscallRet
          */
         0x1b => {
             if !(USERLAND_START..=USERLAND_END).contains(&arg2) {
-                return SyscallReturnCode::InvalidInput;
+                return SyscallReturnCode::InvalidInput as u64;
             }
 
             let name_ptr = arg1 as *const u8;
@@ -399,19 +399,19 @@ extern "C" fn syscall_inner(arg1: u64, arg2: u64, syscall_no: u64) -> SyscallRet
                     }
 
                     if !file_found {
-                        return SyscallReturnCode::FileNotFound;
+                        return SyscallReturnCode::FileNotFound as u64;
                     }
 
                     if let Some(midi) = crate::audio::midi::parse_midi_format0(&buf) {
                         crate::audio::midi::play_midi(&midi);
                         crate::audio::beep::stop_beep();
                     } else {
-                        return SyscallReturnCode::FilesystemError;
+                        return SyscallReturnCode::FilesystemError as u64;
                     }
                 }
 
                 _ => {
-                    return SyscallReturnCode::InvalidInput;
+                    return SyscallReturnCode::InvalidInput as u64;
                 }
             }
         }
@@ -424,7 +424,7 @@ extern "C" fn syscall_inner(arg1: u64, arg2: u64, syscall_no: u64) -> SyscallRet
          */
         0x1f => {
             if arg1 != 0x00 || arg2 != 0x00 {
-                return SyscallReturnCode::InvalidInput;
+                return SyscallReturnCode::InvalidInput as u64;
             }
 
             crate::audio::beep::stop_beep();
@@ -440,7 +440,7 @@ extern "C" fn syscall_inner(arg1: u64, arg2: u64, syscall_no: u64) -> SyscallRet
             if !(USERLAND_START..=USERLAND_END).contains(&arg1)
                 || !(USERLAND_START..=USERLAND_END).contains(&arg2)
             {
-                return SyscallReturnCode::InvalidInput;
+                return SyscallReturnCode::InvalidInput as u64;
             }
 
             let name_ptr = arg1 as *const u8;
@@ -497,9 +497,9 @@ extern "C" fn syscall_inner(arg1: u64, arg2: u64, syscall_no: u64) -> SyscallRet
                     });
 
                     if !file_read {
-                        return SyscallReturnCode::FileNotFound;
+                        return SyscallReturnCode::FileNotFound as u64;
                     } else {
-                        return SyscallReturnCode::Ok;
+                        return SyscallReturnCode::Ok as u64;
                     }
                 }
 
@@ -507,7 +507,7 @@ extern "C" fn syscall_inner(arg1: u64, arg2: u64, syscall_no: u64) -> SyscallRet
                     rprint!(e);
                     rprint!("\n");
 
-                    return SyscallReturnCode::FilesystemError;
+                    return SyscallReturnCode::FilesystemError as u64;
                 }
             }
         }
@@ -522,7 +522,7 @@ extern "C" fn syscall_inner(arg1: u64, arg2: u64, syscall_no: u64) -> SyscallRet
             if !(USERLAND_START..=USERLAND_END).contains(&arg1)
                 || !(USERLAND_START..=USERLAND_END).contains(&arg2)
             {
-                return SyscallReturnCode::InvalidInput;
+                return SyscallReturnCode::InvalidInput as u64;
             }
 
             let name_ptr = arg1 as *const u8;
@@ -544,7 +544,7 @@ extern "C" fn syscall_inner(arg1: u64, arg2: u64, syscall_no: u64) -> SyscallRet
                     rprint!(e);
                     rprint!("\n");
 
-                    return SyscallReturnCode::FilesystemError;
+                    return SyscallReturnCode::FilesystemError as u64;
                 }
             }
         }
@@ -559,7 +559,7 @@ extern "C" fn syscall_inner(arg1: u64, arg2: u64, syscall_no: u64) -> SyscallRet
             if !(USERLAND_START..=USERLAND_END).contains(&arg1)
                 || !(USERLAND_START..=USERLAND_END).contains(&arg2)
             {
-                return SyscallReturnCode::InvalidInput;
+                return SyscallReturnCode::InvalidInput as u64;
             }
 
             let (name_old, ext_old) = format_filename(arg1 as *const u8);
@@ -596,14 +596,14 @@ extern "C" fn syscall_inner(arg1: u64, arg2: u64, syscall_no: u64) -> SyscallRet
                     });
 
                     if !file_found {
-                        return SyscallReturnCode::FileNotFound;
+                        return SyscallReturnCode::FileNotFound as u64;
                     }
                 }
                 Err(e) => {
                     rprint!(e);
                     rprint!("\n");
 
-                    return SyscallReturnCode::FilesystemError;
+                    return SyscallReturnCode::FilesystemError as u64;
                 }
             }
         }
@@ -616,7 +616,7 @@ extern "C" fn syscall_inner(arg1: u64, arg2: u64, syscall_no: u64) -> SyscallRet
          */
         0x23 => {
             if !(USERLAND_START..=USERLAND_END).contains(&arg1) || arg2 != 0 {
-                return SyscallReturnCode::InvalidInput;
+                return SyscallReturnCode::InvalidInput as u64;
             }
 
             let (name, ext) = format_filename(arg1 as *const u8);
@@ -646,14 +646,14 @@ extern "C" fn syscall_inner(arg1: u64, arg2: u64, syscall_no: u64) -> SyscallRet
                     });
 
                     if !file_found {
-                        return SyscallReturnCode::FileNotFound;
+                        return SyscallReturnCode::FileNotFound as u64;
                     }
                 }
                 Err(e) => {
                     rprint!(e);
                     rprint!("\n");
 
-                    return SyscallReturnCode::FilesystemError;
+                    return SyscallReturnCode::FilesystemError as u64;
                 }
             }
         }
@@ -666,7 +666,7 @@ extern "C" fn syscall_inner(arg1: u64, arg2: u64, syscall_no: u64) -> SyscallRet
          */
         0x24 => {
             // TODO
-            return SyscallReturnCode::NotImplemented;
+            return SyscallReturnCode::NotImplemented as u64;
         }
 
         /*
@@ -677,7 +677,7 @@ extern "C" fn syscall_inner(arg1: u64, arg2: u64, syscall_no: u64) -> SyscallRet
          */
         0x25 => {
             // TODO
-            return SyscallReturnCode::NotImplemented;
+            return SyscallReturnCode::NotImplemented as u64;
         }
 
         /*
@@ -688,7 +688,7 @@ extern "C" fn syscall_inner(arg1: u64, arg2: u64, syscall_no: u64) -> SyscallRet
          */
         0x26 => {
             // TODO
-            return SyscallReturnCode::NotImplemented;
+            return SyscallReturnCode::NotImplemented as u64;
         }
 
         /*
@@ -699,7 +699,7 @@ extern "C" fn syscall_inner(arg1: u64, arg2: u64, syscall_no: u64) -> SyscallRet
          */
         0x27 => {
             if !(USERLAND_START..=USERLAND_END).contains(&arg2) {
-                return SyscallReturnCode::InvalidInput;
+                return SyscallReturnCode::InvalidInput as u64;
             }
 
             let name_ptr = arg2 as *const u8;
@@ -720,7 +720,7 @@ extern "C" fn syscall_inner(arg1: u64, arg2: u64, syscall_no: u64) -> SyscallRet
                     rprint!(e);
                     rprint!("\n");
 
-                    return SyscallReturnCode::FilesystemError;
+                    return SyscallReturnCode::FilesystemError as u64;
                 }
             }
         }
@@ -766,7 +766,7 @@ extern "C" fn syscall_inner(arg1: u64, arg2: u64, syscall_no: u64) -> SyscallRet
                     rprint!(e);
                     rprint!("\n");
 
-                    return SyscallReturnCode::FilesystemError;
+                    return SyscallReturnCode::FilesystemError as u64;
                 }
             }
         }
@@ -779,7 +779,7 @@ extern "C" fn syscall_inner(arg1: u64, arg2: u64, syscall_no: u64) -> SyscallRet
          */
         0x29 => {
             // TODO
-            return SyscallReturnCode::NotImplemented;
+            return SyscallReturnCode::NotImplemented as u64;
         }
 
         /*
@@ -792,7 +792,7 @@ extern "C" fn syscall_inner(arg1: u64, arg2: u64, syscall_no: u64) -> SyscallRet
             if !(USERLAND_START..=USERLAND_END).contains(&arg1)
                 || !(USERLAND_START..=USERLAND_END).contains(&arg2)
             {
-                return SyscallReturnCode::InvalidInput;
+                return SyscallReturnCode::InvalidInput as u64;
             }
 
             let (name, ext) = format_filename(arg1 as *const u8);
@@ -881,12 +881,12 @@ extern "C" fn syscall_inner(arg1: u64, arg2: u64, syscall_no: u64) -> SyscallRet
                     rprint!(e);
                     rprint!("\n");
 
-                    return SyscallReturnCode::FilesystemError;
+                    return SyscallReturnCode::FilesystemError as u64;
                 }
             }
 
             if !file_found {
-                return SyscallReturnCode::FileNotFound;
+                return SyscallReturnCode::FileNotFound as u64;
             }
         }
 
@@ -898,7 +898,7 @@ extern "C" fn syscall_inner(arg1: u64, arg2: u64, syscall_no: u64) -> SyscallRet
          */
         0x2B => {
             if !(USERLAND_START..=USERLAND_END).contains(&arg2) {
-                return SyscallReturnCode::InvalidInput;
+                return SyscallReturnCode::InvalidInput as u64;
             }
 
             let report = check::run_check();
@@ -935,7 +935,7 @@ extern "C" fn syscall_inner(arg1: u64, arg2: u64, syscall_no: u64) -> SyscallRet
          */
         0x31 => {
             if !(USERLAND_START..=USERLAND_END).contains(&arg2) {
-                return SyscallReturnCode::InvalidInput;
+                return SyscallReturnCode::InvalidInput as u64;
             }
 
             let port = arg1 as *const u16;
@@ -957,7 +957,7 @@ extern "C" fn syscall_inner(arg1: u64, arg2: u64, syscall_no: u64) -> SyscallRet
                 0x01 => {
                     // Serial init
                     if arg2 != 0x00 {
-                        return SyscallReturnCode::InvalidInput;
+                        return SyscallReturnCode::InvalidInput as u64;
                     }
 
                     serial::init();
@@ -967,11 +967,11 @@ extern "C" fn syscall_inner(arg1: u64, arg2: u64, syscall_no: u64) -> SyscallRet
                 // so userland can distinguish "no data" from a real read.
                 0x02 => {
                     if !(USERLAND_START..=USERLAND_END).contains(&arg2) {
-                        return SyscallReturnCode::InvalidInput;
+                        return SyscallReturnCode::InvalidInput as u64;
                     }
 
                     if !serial::ready() {
-                        return SyscallReturnCode::InvalidInput;
+                        return SyscallReturnCode::InvalidInput as u64;
                     }
 
                     let value = arg2 as *mut u32;
@@ -984,7 +984,7 @@ extern "C" fn syscall_inner(arg1: u64, arg2: u64, syscall_no: u64) -> SyscallRet
                 // Write to UART
                 0x03 => {
                     if !(USERLAND_START..=USERLAND_END).contains(&arg2) {
-                        return SyscallReturnCode::InvalidInput;
+                        return SyscallReturnCode::InvalidInput as u64;
                     }
 
                     let value = arg2 as *const u32;
@@ -995,7 +995,7 @@ extern "C" fn syscall_inner(arg1: u64, arg2: u64, syscall_no: u64) -> SyscallRet
                 }
 
                 _ => {
-                    return SyscallReturnCode::InvalidInput;
+                    return SyscallReturnCode::InvalidInput as u64;
                 }
             }
         }
@@ -1008,7 +1008,7 @@ extern "C" fn syscall_inner(arg1: u64, arg2: u64, syscall_no: u64) -> SyscallRet
          */
         0x33 => {
             if !(USERLAND_START..=USERLAND_END).contains(&arg2) {
-                return SyscallReturnCode::InvalidInput;
+                return SyscallReturnCode::InvalidInput as u64;
             }
 
             match arg1 {
@@ -1024,7 +1024,7 @@ extern "C" fn syscall_inner(arg1: u64, arg2: u64, syscall_no: u64) -> SyscallRet
                         let total_len = u16::from_be((*header).total_length);
 
                         if total_len >= 1500 {
-                            return SyscallReturnCode::InvalidInput;
+                            return SyscallReturnCode::InvalidInput as u64;
                         }
 
                         core::ptr::copy_nonoverlapping(
@@ -1046,7 +1046,7 @@ extern "C" fn syscall_inner(arg1: u64, arg2: u64, syscall_no: u64) -> SyscallRet
                         );
 
                         if ipv4_len == 0 {
-                            return SyscallReturnCode::InvalidInput;
+                            return SyscallReturnCode::InvalidInput as u64;
                         }
 
                         let ipv4_slice = ipv4_buffer.get(..ipv4_len).unwrap_or(&[]);
@@ -1138,7 +1138,7 @@ extern "C" fn syscall_inner(arg1: u64, arg2: u64, syscall_no: u64) -> SyscallRet
          */
         0x34 => {
             if !(USERLAND_START..=USERLAND_END).contains(&arg2) {
-                return SyscallReturnCode::InvalidInput;
+                return SyscallReturnCode::InvalidInput as u64;
             }
 
             if arg1 == 0x01 {
@@ -1152,6 +1152,26 @@ extern "C" fn syscall_inner(arg1: u64, arg2: u64, syscall_no: u64) -> SyscallRet
 
                     ipv4::send_packet(slice);
                 }
+            } else if arg1 == 0x04 {
+                // Raw Ethernet frame TX: derive the frame length from the headers.
+                // ETH header = 14 bytes; ethertype at bytes [12..14].
+                let packet = arg2 as *const u8;
+                unsafe {
+                    let ethertype = u16::from_be_bytes([*packet.add(12), *packet.add(13)]);
+                    let len: usize = match ethertype {
+                        0x0800 => {
+                            // IPv4: total_length is at bytes [16..18] of the full frame
+                            let ip_total = u16::from_be_bytes([*packet.add(16), *packet.add(17)]);
+                            14 + ip_total as usize
+                        }
+                        0x0806 => 14 + 28, // ARP over Ethernet is always 42 bytes
+                        _ => 0,
+                    };
+                    if len >= 14 && len <= 1514 {
+                        let slice = core::slice::from_raw_parts(packet, len);
+                        let _ = crate::net::rtl8139::send_frame(slice, len);
+                    }
+                }
             }
         }
 
@@ -1163,7 +1183,7 @@ extern "C" fn syscall_inner(arg1: u64, arg2: u64, syscall_no: u64) -> SyscallRet
          */
         0x35 => {
             if !(USERLAND_START..=USERLAND_END).contains(&arg2) {
-                return SyscallReturnCode::InvalidInput;
+                return SyscallReturnCode::InvalidInput as u64;
             }
 
             unsafe {
@@ -1171,7 +1191,9 @@ extern "C" fn syscall_inner(arg1: u64, arg2: u64, syscall_no: u64) -> SyscallRet
                 let current_pid = scheduler::get_current_pid();
 
                 if let Some(msg) = scheduler::pop_msg(current_pid) {
-                    copy_nonoverlapping(msg.buf_addr as *const u8, buf, 512);
+                    let len = if msg.port_id > 0 { msg.port_id } else { 512 };
+                    copy_nonoverlapping(msg.buf_addr as *const u8, buf, len);
+                    return len as u64;
                 } else {
                     scheduler::block(current_pid, Message::new(0, 0xff, current_pid, 512));
                 }
@@ -1186,7 +1208,7 @@ extern "C" fn syscall_inner(arg1: u64, arg2: u64, syscall_no: u64) -> SyscallRet
          */
         0x36 => {
             if !(USERLAND_START..=USERLAND_END).contains(&arg2) {
-                return SyscallReturnCode::InvalidInput;
+                return SyscallReturnCode::InvalidInput as u64;
             }
 
             let target_pid = arg1 as usize;
@@ -1203,6 +1225,17 @@ extern "C" fn syscall_inner(arg1: u64, arg2: u64, syscall_no: u64) -> SyscallRet
         }
 
         /*
+         *  Syscall 0x37 --- Register as the userland Ethernet driver.
+         *  Stores the calling PID in netdrv and initialises the RTL8139.
+         */
+        0x37 => {
+            unsafe {
+                let pid = scheduler::get_current_pid();
+                crate::net::netdrv::register_driver(pid);
+            }
+        }
+
+        /*
          *  Unknown syscall
          */
         _ => {
@@ -1210,11 +1243,11 @@ extern "C" fn syscall_inner(arg1: u64, arg2: u64, syscall_no: u64) -> SyscallRet
             rprintn!(syscall_no);
             rprint!("\n");
 
-            return SyscallReturnCode::InvalidSyscall;
+            return SyscallReturnCode::InvalidSyscall as u64;
         }
     }
 
-    SyscallReturnCode::Ok
+    SyscallReturnCode::Ok as u64
 }
 
 fn format_filename(name_ptr: *const u8) -> ([u8; 8], [u8; 3]) {

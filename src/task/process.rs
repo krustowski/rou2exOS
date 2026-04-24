@@ -5,10 +5,10 @@ use crate::task::{
 
 #[derive(Debug, Clone, Copy)]
 pub enum Mode {
-    Kernel, // RING0
-    Driver, // RING1
-    PrUser, // RING2
-    User,   // RING3
+    Kernel,  // RING0
+    _Driver, // RING1
+    _PrUser, // RING2
+    User,    // RING3
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -41,12 +41,20 @@ pub struct Process {
     pub kernel_stack: &'static [u8; STACK_SIZE],
     pub ports: [Port; 1],
     pub stack_top: u64,
-    //pub context: Context,
+    /// Physical address of this process's P4 page table, or 0 for kernel processes
+    /// (which reuse the boot-time KERNEL_CR3).
+    pub cr3: u64,
 }
 
 const STACK_SIZE: usize = 32768;
-pub const MAX_PROCESSES: usize = 5;
+pub const MAX_PROCESSES: usize = 10;
+
 static mut KSTACK_POOL: [[u8; STACK_SIZE]; MAX_PROCESSES] = [
+    [0; STACK_SIZE],
+    [0; STACK_SIZE],
+    [0; STACK_SIZE],
+    [0; STACK_SIZE],
+    [0; STACK_SIZE],
     [0; STACK_SIZE],
     [0; STACK_SIZE],
     [0; STACK_SIZE],
@@ -64,8 +72,9 @@ impl Process {
         slot: usize,
         name_slice: [u8; 16],
         mode: Mode,
-        entry_point: u64,
+        _entry_point: u64,
         process_stack_top: u64,
+        cr3: u64,
     ) -> Process {
         let mut name: [u8; 16] = [0; 16];
 
@@ -81,6 +90,7 @@ impl Process {
             last_rsp: 0,
             stack_top: process_stack_top,
             kernel_stack: unsafe { &KSTACK_POOL[slot % MAX_PROCESSES] },
+            cr3,
             ports: [Port {
                 id: 0,
                 block_msg: None,

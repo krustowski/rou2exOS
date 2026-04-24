@@ -7,6 +7,10 @@ use super::{
 
 static SCHEDULER: Mutex<Scheduler> = Mutex::new(Scheduler::new());
 
+/// PID of the kernel shell process.  Set once when the shell is first spawned
+/// and read by exception handlers so they wake the right process on crash.
+static mut SHELL_PID: usize = 0;
+
 #[repr(C)]
 pub struct Scheduler {
     processes: [Option<Process>; MAX_PROCESSES],
@@ -21,7 +25,7 @@ extern "C" {
 impl Scheduler {
     const fn new() -> Self {
         Self {
-            processes: [None, None, None, None, None],
+            processes: [None, None, None, None, None, None, None, None, None, None],
             current_pid: 0,
             next_free_pid: 0,
         }
@@ -106,7 +110,26 @@ impl Scheduler {
         rprintn!(*((next_proc.last_rsp + 136) as *const u64)); // should be RFLAGS
         rprint!("\n");
 
-        //&mut next_proc.context
+        // Switch to the next process's address space.  Writing CR3 always
+        // flushes the TLB, so no explicit invalidation is needed.
+        let next_cr3 = next_proc.cr3;
+        if next_cr3 != 0 {
+            core::arch::asm!(
+                "mov cr3, {}",
+                in(reg) next_cr3,
+                options(nostack, preserves_flags),
+            );
+        } else {
+            let kernel_cr3 = crate::mem::pages::KERNEL_CR3;
+            if kernel_cr3 != 0 {
+                core::arch::asm!(
+                    "mov cr3, {}",
+                    in(reg) kernel_cr3,
+                    options(nostack, preserves_flags),
+                );
+            }
+        }
+
         next_proc.last_rsp as *mut u64
     }
 
@@ -173,7 +196,9 @@ impl Scheduler {
     }
 
     pub unsafe fn list_processes(&self) {
-        print!("RUNNING PROCESSES\n");
+        print!("SLOT PID NAME                M STATUS\n");
+
+        let mut slot = 0;
 
         for process in self.processes.iter() {
             if process.is_none() {
@@ -181,6 +206,10 @@ impl Scheduler {
             }
 
             if let Some(proc) = process {
+                printn!(slot);
+                slot += 1;
+                print!("    ");
+
                 printn!(proc.id);
                 print!("   ");
                 printb!(&proc.name);
@@ -194,7 +223,7 @@ impl Scheduler {
                         print!(" U");
                     }
                     _ => {
-                        print!("  ");
+                        print!(" ?");
                     }
                 }
 
@@ -239,6 +268,7 @@ impl Scheduler {
         mode: Mode,
         entry: u64,
         stack_top: u64,
+        cr3: u64,
     ) -> usize {
         let pid: usize = self.get_next_pid();
 
@@ -263,7 +293,7 @@ impl Scheduler {
             // Process::new takes `slot` (not pid) so the kernel stack pool is
             // indexed by slot position — each slot always owns the same stack
             // entry regardless of how many times it has been recycled.
-            proc = Some(Process::new(pid, pos, name, mode, entry, stack_top));
+            proc = Some(Process::new(pid, pos, name, mode, entry, stack_top, cr3));
 
             unsafe {
                 let kstack_top = proc.as_mut().unwrap().kernel_stack.as_ptr().add(32768) as u64;
@@ -385,9 +415,15 @@ pub unsafe fn list_processes() {
     }
 }
 
-pub unsafe fn new_process(name: [u8; 16], mode: Mode, entry: u64, stack_top: u64) -> usize {
+pub unsafe fn new_process(
+    name: [u8; 16],
+    mode: Mode,
+    entry: u64,
+    stack_top: u64,
+    cr3: u64,
+) -> usize {
     if let Some(mut sch) = SCHEDULER.try_lock() {
-        return sch.new_process(name, mode, entry, stack_top);
+        return sch.new_process(name, mode, entry, stack_top, cr3);
     }
 
     0xff
@@ -399,6 +435,14 @@ pub unsafe fn get_current_pid() -> usize {
     }
 
     0xff
+}
+
+pub unsafe fn set_shell_pid(pid: usize) {
+    SHELL_PID = pid;
+}
+
+pub unsafe fn get_shell_pid() -> usize {
+    SHELL_PID
 }
 
 pub unsafe fn push_msg(pid: usize, msg: Message) {

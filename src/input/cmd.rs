@@ -1,10 +1,8 @@
 use crate::acpi;
-use crate::app;
 use crate::audio;
 use crate::debug;
 use crate::fs::fat12::{block::Floppy, check::run_check, fs::Filesystem};
 use crate::init::config;
-use crate::init::config::PATH_CLUSTER;
 use crate::input::keyboard;
 use crate::net;
 use crate::time;
@@ -14,7 +12,7 @@ use crate::tui::{
 };
 use crate::video::vga::Color;
 
-const KERNEL_VERSION: &[u8] = b"0.10.6";
+const KERNEL_VERSION: &[u8] = b"0.11.0";
 
 struct Command {
     name: &'static [u8],
@@ -43,12 +41,6 @@ static COMMANDS: &[Command] = &[
         hidden: false,
     },
     Command {
-        name: b"chat",
-        description: b"starts a chat",
-        function: cmd_chat,
-        hidden: true,
-    },
-    Command {
         name: b"cls",
         description: b"clears the screen",
         function: cmd_clear,
@@ -71,18 +63,6 @@ static COMMANDS: &[Command] = &[
         description: b"echos the arguments",
         function: cmd_echo,
         hidden: false,
-    },
-    Command {
-        name: b"ed",
-        description: b"runs a minimalistic text editor",
-        function: cmd_ed,
-        hidden: true,
-    },
-    Command {
-        name: b"ether",
-        description: b"runs the Ethernet frame handler",
-        function: cmd_ether,
-        hidden: true,
     },
     Command {
         name: b"fg",
@@ -109,12 +89,6 @@ static COMMANDS: &[Command] = &[
         hidden: false,
     },
     Command {
-        name: b"http",
-        description: b"runs a simple HTTP/UDP handler",
-        function: cmd_http,
-        hidden: true,
-    },
-    Command {
         name: b"kill",
         description: b"makes a process dead",
         function: cmd_kill,
@@ -139,22 +113,10 @@ static COMMANDS: &[Command] = &[
         hidden: false,
     },
     Command {
-        name: b"ping",
-        description: b"pings the host over the serial line (ICMP/SLIP)",
-        function: cmd_ping,
-        hidden: true,
-    },
-    Command {
         name: b"read",
         description: b"prints the output of a file",
         function: cmd_read,
         hidden: false,
-    },
-    Command {
-        name: b"response",
-        description: b"waits for ICMP/SLIP request to come, then sends a response back",
-        function: cmd_response,
-        hidden: true,
     },
     Command {
         name: b"rm",
@@ -166,18 +128,6 @@ static COMMANDS: &[Command] = &[
         name: b"run",
         description: b"loads the binary executable in memory and gives it the control",
         function: cmd_run,
-        hidden: true,
-    },
-    Command {
-        name: b"snake",
-        description: b"runs a simple VGA text mode snake-like game",
-        function: cmd_snake,
-        hidden: false,
-    },
-    Command {
-        name: b"tcp",
-        description: b"tests the TCP implementation",
-        function: cmd_tcp,
         hidden: true,
     },
     Command {
@@ -202,12 +152,6 @@ static COMMANDS: &[Command] = &[
         name: b"ver",
         description: b"prints the kernel version",
         function: cmd_ver,
-        hidden: false,
-    },
-    Command {
-        name: b"write",
-        description: b"writes arguments to a sample file on floppy",
-        function: cmd_write,
         hidden: false,
     },
 ];
@@ -263,6 +207,19 @@ pub fn split_cmd(input: &[u8]) -> (&[u8], &[u8]) {
         // No space found, entire input is the command
         (input, &[])
     }
+}
+
+fn parse_u64(bytes: &[u8]) -> Option<u64> {
+    let mut value: u64 = 0;
+
+    for &b in bytes {
+        if b < b'0' || b > b'9' {
+            return None;
+        }
+        value = value.checked_mul(10)?.checked_add((b - b'0') as u64)?;
+    }
+
+    Some(value)
 }
 
 /// Defines the maximum amount of IPv4 addresses that could be parsed from an input.
@@ -380,70 +337,59 @@ fn cmd_fg(args: &[u8]) {
 
 /// Changes the current directory to one matching an input from keyboard.
 fn cmd_cd(args: &[u8]) {
-    // 12 = name + extension + dot
-    if args.is_empty() || args.len() > 12 {
-        unsafe {
-            config::PATH_CLUSTER = 0;
-            config::set_path(b"/");
+    if let Some(mut syscfg) = crate::init::config::SYSTEM_CONFIG.try_lock() {
+        // 12 = name + extension + dot
+        if args.is_empty() || args.len() > 12 {
+            syscfg.set_path(b"/", 0);
+            return;
         }
-        return;
-    }
 
-    // This split_cmd invocation trims the b'\0' tail from the input args.
-    let (filename_input, _) = keyboard::split_cmd(args);
+        // This split_cmd invocation trims the b'\0' tail from the input args.
+        let (filename_input, _) = keyboard::split_cmd(args);
 
-    if filename_input.is_empty() || filename_input.len() > 12 {
-        warn!("Usage: cd <dirname>\n");
-        return;
-    }
+        if filename_input.is_empty() || filename_input.len() > 12 {
+            warn!("Usage: cd <dirname>\n");
+            return;
+        }
 
-    // 12 = filename + ext + dot
-    let mut filename = [b' '; 12];
-    if let Some(slice) = filename.get_mut(..filename_input.len()) {
-        slice.copy_from_slice(filename_input);
-    }
+        // 12 = filename + ext + dot
+        let mut filename = [b' '; 12];
+        if let Some(slice) = filename.get_mut(..filename_input.len()) {
+            slice.copy_from_slice(filename_input);
+        }
 
-    let floppy = Floppy::init();
+        let floppy = Floppy::init();
 
-    // Init the filesystem to look for a match
-    match Filesystem::new(&floppy) {
-        Ok(fs) => {
-            let mut cluster: u16 = 0;
+        // Init the filesystem to look for a match
+        match Filesystem::new(&floppy) {
+            Ok(fs) => {
+                let mut cluster: u16 = 0;
 
-            unsafe {
-                fs.for_each_entry(config::PATH_CLUSTER, |entry| {
+                let path_cluster = {
+                    if let Some(c) = config::SYSTEM_CONFIG.try_lock() {
+                        c.get_path_cluster()
+                    } else {
+                        0
+                    }
+                };
+
+                fs.for_each_entry(path_cluster, |entry| {
                     if entry.name.starts_with(filename_input) {
                         cluster = entry.start_cluster;
                     }
                 });
 
                 if cluster > 0 {
-                    config::PATH_CLUSTER = cluster;
-                    config::set_path(filename_input);
+                    syscfg.set_path(filename_input, cluster);
                 } else {
                     error!("No such directory\n");
                 }
             }
+            Err(e) => {
+                error!(e);
+                error!();
+            }
         }
-        Err(e) => {
-            error!(e);
-            error!();
-        }
-    }
-}
-
-/// Clears the screen and starts the TCP server accepting connections on TCP/12345.
-fn cmd_chat(args: &[u8]) {
-    clear_screen!();
-
-    let mut ips = [[0u8; 4]; MAX_IPS];
-    let count = parse_ip_args(args, &mut ips);
-
-    if count > 0 {
-        app::chat::tcp::handle_conns(&ips);
-    } else {
-        // Use dummy IP addresses to
-        app::chat::tcp::handle_conns(&[[0u8; 4]; 4]);
     }
 }
 
@@ -464,7 +410,15 @@ fn cmd_dir(_args: &[u8]) {
 
     match Filesystem::new(&floppy) {
         Ok(fs) => unsafe {
-            fs.for_each_entry(PATH_CLUSTER, |entry| {
+            let path_cluster = {
+                if let Some(c) = config::SYSTEM_CONFIG.try_lock() {
+                    c.get_path_cluster()
+                } else {
+                    0
+                }
+            };
+
+            fs.for_each_entry(path_cluster, |entry| {
                 if entry.name[0] == 0x00 || entry.name[0] == 0xE5 || entry.name[0] == 0xFF {
                     return;
                 }
@@ -483,33 +437,6 @@ fn cmd_dir(_args: &[u8]) {
 fn cmd_echo(args: &[u8]) {
     printb!(args);
     println!();
-}
-
-/// Runs a simplistic text editor.
-fn cmd_ed(args: &[u8]) {
-    let (filename_input, _) = keyboard::split_cmd(args);
-
-    if filename_input.is_empty() || filename_input.len() > 12 {
-        warn!("Usage: ed <filename>\n");
-        return;
-    }
-
-    // Copy the input into a space-padded slice
-    let mut filename = [b' '; 12];
-    if let Some(slice) = filename.get_mut(..filename_input.len()) {
-        slice.copy_from_slice(filename_input);
-    }
-
-    //to_uppercase_ascii(&mut filename);
-
-    // Run the editor
-    app::editor::edit_file(&filename);
-    clear_screen!();
-}
-
-/// Experimental command function to test the Ethernet implementation.
-fn cmd_ether(_args: &[u8]) {
-    app::ether::handle_packet();
 }
 
 /// Filesystem check utility.
@@ -550,54 +477,6 @@ fn cmd_hlt(_args: &[u8]) {
 
     // Invoke the ACPI shutdown attempt (if present)
     acpi::shutdown::shutdown();
-}
-
-/// Meta command to run the Snake game.
-fn cmd_snake(_args: &[u8]) {
-    app::snake::menu::menu_loop();
-}
-
-/// Experimental command function to test the HTTP over UDP implementation.
-fn cmd_http(_args: &[u8]) {
-    fn callback(packet: &[u8]) -> u8 {
-        if let Some((ipv4_header, ipv4_payload)) = net::ipv4::parse_packet(packet) {
-            // Match only UDP
-            if ipv4_header.protocol != 17 {
-                return 1;
-            }
-
-            // Handle the connection
-            return app::http_udp::udp_handler(&ipv4_header, ipv4_payload);
-        }
-        0
-    }
-
-    println!("Starting a simple HTTP/UDP handler (hit any key to interrupt)...");
-
-    loop {
-        // Run the receive loop = try to extract an encapsulated IPv4 packet in SLIP
-        let ret = net::ipv4::receive_loop(callback);
-
-        if ret == 0 {
-            println!("Received a HTTP request, sending response");
-        } else if ret == 3 {
-            println!("Keyboard interrupt");
-            break;
-        }
-    }
-}
-
-fn parse_u64(bytes: &[u8]) -> Option<u64> {
-    let mut value: u64 = 0;
-
-    for &b in bytes {
-        if b < b'0' || b > b'9' {
-            return None;
-        }
-        value = value.checked_mul(10)?.checked_add((b - b'0') as u64)?;
-    }
-
-    Some(value)
 }
 
 fn cmd_kill(args: &[u8]) {
@@ -684,9 +563,16 @@ fn cmd_mkdir(args: &[u8]) {
             }
 
             to_uppercase_ascii(&mut filename);
-            unsafe {
-                fs.create_subdirectory(&filename, PATH_CLUSTER);
-            }
+
+            let path_cluster = {
+                if let Some(c) = config::SYSTEM_CONFIG.try_lock() {
+                    c.get_path_cluster()
+                } else {
+                    0
+                }
+            };
+
+            fs.create_subdirectory(&filename, path_cluster);
         }
         Err(e) => {
             error!(e);
@@ -729,44 +615,21 @@ fn cmd_mv(args: &[u8]) {
             to_uppercase_ascii(&mut old_filename);
             to_uppercase_ascii(&mut new_filename);
 
-            unsafe {
-                fs.rename_file(PATH_CLUSTER, &old_filename, &new_filename);
-            }
+            let path_cluster = {
+                if let Some(c) = config::SYSTEM_CONFIG.try_lock() {
+                    c.get_path_cluster()
+                } else {
+                    0
+                }
+            };
+
+            fs.rename_file(path_cluster, &old_filename, &new_filename);
         }
         Err(e) => {
             error!(e);
             error!();
         }
     }
-}
-
-/// Sends an ICMP Echo request to the provided IPv4 address.
-fn cmd_ping(args: &[u8]) {
-    // Extract the address(es) from the input
-    let mut ips = [[0u8; 4]; MAX_IPS];
-    let _count = parse_ip_args(args, &mut ips);
-
-    // Set the ICMP parameters
-    let protocol = 1;
-    let identifier = 1342;
-    let sequence_no = 1;
-    let payload = b"iEcho request from r2";
-
-    // Buffers for ICMP and IPv4 packets (ICMP packet prefixed by an IPv4 header)
-    let mut icmp_buf = [0u8; 256];
-    let mut ipv4_buf = [0u8; 1500];
-
-    // Create ICMP packet and encapsulate it in the IPv4 packet
-    let icmp_len = net::icmp::create_packet(8, identifier, sequence_no, payload, &mut icmp_buf);
-    let icmp_slice = icmp_buf.get(..icmp_len).unwrap_or(&[]);
-
-    // Use the prepared ICMP packet as payload for IPv4 packet
-    let ipv4_len = net::ipv4::create_packet(ips[0], ips[1], protocol, icmp_slice, &mut ipv4_buf);
-    let ipv4_slice = ipv4_buf.get(..ipv4_len).unwrap_or(&[]);
-
-    println!("Sending ICMP Echo request...");
-
-    net::ipv4::send_packet(ipv4_slice);
 }
 
 /// This command function takes the argument, then tries to find a matching filename in the current
@@ -811,79 +674,6 @@ fn cmd_read(args: &[u8]) {
     }
 }
 
-/// An experimental demonstration of the ICMP Echo request handler. The implementation sends ICMP
-/// Echo response back to the original sender via IPv4/SLIP.
-fn cmd_response(_args: &[u8]) {
-    fn callback(packet: &[u8]) -> u8 {
-        if let Some((ipv4_header, ipv4_payload)) = net::ipv4::parse_packet(packet) {
-            // Match only ICMP packets
-            if ipv4_header.protocol != 1 {
-                return 1;
-            }
-
-            // Extract the ICMP header and (optional) payload
-            if let Some((icmp_header, icmp_payload)) = net::icmp::parse_packet(ipv4_payload) {
-                // Type 8 is Echo request
-                if icmp_header.icmp_type != 8 {
-                    return 2;
-                }
-
-                // Prepare buffers for new packets.
-                let mut icmp_buf = [0u8; 64];
-                let mut ipv4_buf = [0u8; 1500];
-
-                // Create an ICMP Echo response packet...
-                let icmp_len = net::icmp::create_packet(
-                    0,
-                    icmp_header.identifier,
-                    icmp_header.sequence_number,
-                    icmp_payload,
-                    &mut icmp_buf,
-                );
-                let icmp_slice = icmp_buf.get(..icmp_len).unwrap_or(&[]);
-
-                // ...and prefix it with IPv4 header.
-                let ipv4_len = net::ipv4::create_packet(
-                    ipv4_header.dest_ip,
-                    ipv4_header.source_ip,
-                    ipv4_header.protocol,
-                    icmp_slice,
-                    &mut ipv4_buf,
-                );
-                let ipv4_slice = ipv4_buf.get(..ipv4_len).unwrap_or(&[]);
-
-                net::ipv4::send_packet(ipv4_slice);
-            }
-        }
-        0
-    }
-
-    println!("Waiting for an ICMP echo request (hit any key to interrupt)...");
-
-    loop {
-        // Start the receive loop where SLIP frames are extracted from serial line and passed into
-        // the callback when complete
-        let ret = net::ipv4::receive_loop(callback);
-
-        match ret {
-            0 => {
-                println!("Received ICMP Echo request, sending Echo response back");
-            }
-            2 => {
-                println!("Received ICMP packet (not the Echo request), ignoring");
-            }
-            3 => {
-                println!("Keyboard interrupt");
-                break;
-            }
-            _ => {
-                // Hide this as it would spam the screen
-                //println!("Unknown IPv4 protocol number (not ICMP)");
-            }
-        }
-    }
-}
-
 /// Removes a file in the current directory according to the input.
 fn cmd_rm(args: &[u8]) {
     if args.is_empty() || args.len() > 11 {
@@ -904,9 +694,15 @@ fn cmd_rm(args: &[u8]) {
 
             to_uppercase_ascii(&mut filename);
 
-            unsafe {
-                fs.delete_file(PATH_CLUSTER, &filename);
-            }
+            let path_cluster = {
+                if let Some(c) = config::SYSTEM_CONFIG.try_lock() {
+                    c.get_path_cluster()
+                } else {
+                    0
+                }
+            };
+
+            fs.delete_file(path_cluster, &filename);
         }
         Err(e) => {
             error!(e);
@@ -930,13 +726,6 @@ fn cmd_run(args: &[u8]) {
     }
 
     super::elf::run_elf(filename_input, args, super::elf::RunMode::Foreground);
-}
-
-/// Experimental command function to demonstrate the current state of the shutdown process
-/// implemented.
-/// Experimental command function to demonstrate the implementation state of the TCP/IP stack.
-fn cmd_tcp(_args: &[u8]) {
-    app::tcp_handler::handle();
 }
 
 /// Prints current time and date in UTC as read from RTC in CMOS.
@@ -1052,9 +841,15 @@ fn cmd_write(args: &[u8]) {
 
             to_uppercase_ascii(&mut name);
 
-            unsafe {
-                fs.write_file(PATH_CLUSTER, &name, content);
-            }
+            let path_cluster = {
+                if let Some(c) = config::SYSTEM_CONFIG.try_lock() {
+                    c.get_path_cluster()
+                } else {
+                    0
+                }
+            };
+
+            fs.write_file(path_cluster, &name, content);
         }
         Err(e) => {
             error!(e);

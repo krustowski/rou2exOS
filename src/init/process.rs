@@ -1,28 +1,38 @@
 use crate::input::keyboard::keyboard_loop;
 use crate::task::{process::Mode, scheduler};
 pub unsafe fn init_processes() {
+    // Snapshot the boot-time CR3 before any per-process tables are created.
+    crate::mem::pages::save_kernel_cr3();
     setup_processes();
 }
 
 unsafe fn setup_processes() {
+    // Kernel process stacks must not overlap the userland virtual region
+    // 0x600_000–0x7FF_FFF that per-process page tables remap per-slot.
+    // 0x2B0_000 and 0x2D0_000 are in P2[1] (0x200_000–0x3FF_FFF), which is
+    // identity-mapped with kernel-only flags and always safe for ring-0 stacks.
     scheduler::new_process(
         *b"init            ",
         Mode::Kernel,
         clock_test as *const () as u64,
         0x190_000,
+        0,
     );
     scheduler::new_process(
         *b"clock           ",
         Mode::Kernel,
         clock_test as *const () as u64,
-        0x7a0_000,
+        0x2B0_000,
+        0,
     );
-    scheduler::new_process(
+    let shell_pid = scheduler::new_process(
         *b"shell           ",
         Mode::Kernel,
         keyboard_loop as *const () as u64,
-        0x700_000,
+        0x2D0_000,
+        0,
     );
+    scheduler::set_shell_pid(shell_pid);
 }
 
 #[no_mangle]

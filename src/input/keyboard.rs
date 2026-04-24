@@ -1,6 +1,5 @@
 use crate::fs::fat12::{block::Floppy, fs::Filesystem};
-use crate::init::config::PATH_CLUSTER;
-use crate::init::config::{get_path, HOST, USER};
+use crate::init::config::SYSTEM_CONFIG;
 use crate::input::cmd;
 use crate::input::port;
 use crate::video::{self, vga};
@@ -14,17 +13,9 @@ static mut CAPS_LOCK_ON: bool = false;
 
 /// Internal function to assemble the prompt contents.
 fn render_prompt() {
-    let path = get_path() as &[u8];
-
+    let prompt = crate::init::config::get_prompt();
     print!("", vga::Color::Red);
-    printb!(USER);
-    print!("@");
-    printb!(HOST);
-    print!(":");
-    print!("", vga::Color::Green);
-    printb!(path);
-    print!("", vga::Color::Red);
-    print!(" > ");
+    printb!(prompt);
     print!("", vga::Color::White);
 }
 
@@ -196,7 +187,15 @@ fn handle_tab_completion(input_buffer: &mut [u8; INPUT_BUFFER_SIZE], input_len: 
 
                 let padded_prefix = pad_prefix(prefix);
 
-                fs.for_each_entry(PATH_CLUSTER, |entry| {
+                let path_cluster = {
+                    if let Some(c) = SYSTEM_CONFIG.try_lock() {
+                        c.get_path_cluster()
+                    } else {
+                        0
+                    }
+                };
+
+                fs.for_each_entry(path_cluster, |entry| {
                     if entry.name[0] != 0x00 && entry.name[0] != 0xE5 {
                         let mut clean_name = [0u8; 12];
 

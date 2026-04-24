@@ -1,22 +1,116 @@
-pub const USER: &[u8] = b"root";
-pub const HOST: &[u8] = b"rourex";
+use spin::Mutex;
 
-pub static mut PATH: &[u8] = b"/";
-pub static mut PATH_CLUSTER: u16 = 0;
+pub static SYSTEM_CONFIG: Mutex<SystemConfig> = Mutex::new(SystemConfig::new());
 
-pub static mut PATH_BUF: [u8; 256] = [0u8; 256];
-pub static mut PATH_LEN: usize = 1;
+pub struct SystemConfig {
+    pub user: [u8; 32],
+    pub host: [u8; 32],
+    pub path: [u8; 32],
+    pub path_len: usize,
+    pub path_cluster: u16,
+    pub version: [u8; 16],
+}
 
-pub fn set_path(new_path: &[u8]) {
-    unsafe {
-        let len = new_path.len().min(256);
-        PATH_BUF[..len].copy_from_slice(&new_path[..len]);
-        PATH_LEN = len;
+impl SystemConfig {
+    const fn new() -> Self {
+        Self {
+            user: *b"root                            ",
+            host: *b"rourex                          ",
+            path: *b"/                               ",
+            path_len: 1,
+            path_cluster: 0,
+            version: *b"v0.11.0         ",
+        }
+    }
+
+    pub fn set_user(&mut self, new_user: &[u8]) {
+        let len = new_user.len().min(32);
+        self.user[..len].copy_from_slice(&new_user[..len]);
+        self.user[len..].fill(b' ');
+    }
+
+    pub fn get_user(&self) -> &[u8] {
+        let end = self
+            .user
+            .iter()
+            .rposition(|&b| b != b' ')
+            .map_or(0, |i| i + 1);
+        &self.user[..end]
+    }
+
+    pub fn set_host(&mut self, new_host: &[u8]) {
+        let len = new_host.len().min(32);
+        self.host[..len].copy_from_slice(&new_host[..len]);
+        self.host[len..].fill(b' ');
+    }
+
+    pub fn get_host(&self) -> &[u8] {
+        let end = self
+            .host
+            .iter()
+            .rposition(|&b| b != b' ')
+            .map_or(0, |i| i + 1);
+        &self.host[..end]
+    }
+
+    pub fn set_path(&mut self, new_path: &[u8], cluster: u16) {
+        let len = new_path.len().min(32);
+        self.path[..len].copy_from_slice(&new_path[..len]);
+        self.path[len..].fill(b' ');
+        self.path_len = len;
+        self.path_cluster = cluster;
+    }
+
+    pub fn get_path(&self) -> &[u8] {
+        let s = &self.path[..self.path_len.min(32)];
+        let end = s.iter().rposition(|&b| b != b' ').map_or(0, |i| i + 1);
+        &s[..end]
+    }
+
+    pub fn get_path_cluster(&self) -> u16 {
+        self.path_cluster
+    }
+
+    pub fn get_version(&self) -> &[u8] {
+        let end = self
+            .version
+            .iter()
+            .rposition(|&b| b != b' ')
+            .map_or(0, |i| i + 1);
+        &self.version[..end]
     }
 }
 
-pub fn get_path() -> &'static [u8] {
-    unsafe { core::slice::from_raw_parts((&raw const PATH_BUF).cast(), PATH_LEN) }
+static mut PROMPT_BUF: [u8; 80] = [0u8; 80];
+
+/// Assembles `user@host:path > ` into a static buffer and returns a slice of it.
+pub fn get_prompt() -> &'static [u8] {
+    unsafe {
+        let mut pos = 0usize;
+
+        let buf = &mut PROMPT_BUF;
+        let mut push = |s: &[u8]| {
+            for &b in s {
+                if pos < buf.len() {
+                    buf[pos] = b;
+                    pos += 1;
+                }
+            }
+        };
+
+        if let Some(cfg) = SYSTEM_CONFIG.try_lock() {
+            push(cfg.get_user());
+            push(b"@");
+            push(cfg.get_host());
+            push(b":");
+            push(cfg.get_path());
+            push(b" > ");
+        } else {
+            push(b"$ ");
+        }
+
+        core::slice::from_raw_parts(PROMPT_BUF.as_ptr(), pos)
+    }
 }
 
 //

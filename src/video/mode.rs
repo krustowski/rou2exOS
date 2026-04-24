@@ -24,6 +24,14 @@ pub fn init_video(fb: &crate::init::boot::FramebufferTag) {
     }
 }
 
+/// Switch the kernel's tracked video mode back to VGA text (0xB8000).
+/// Called after SET_VIDEO_MODE 0x03 so kernel text output lands in the right buffer.
+pub fn set_mode_text() {
+    unsafe {
+        VIDEO_MODE = Some(VideoMode::TextMode);
+    }
+}
+
 pub fn get_video_mode() -> Option<VideoMode> {
     unsafe {
         VIDEO_MODE

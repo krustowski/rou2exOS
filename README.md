@@ -26,6 +26,10 @@ qemu-system-x86_64 -boot d -cdrom r2.iso -fda fat.img
 
 ^ __v0.10.4__: external executable output + clock process
 
+![garn-task-listing](.github/img/r2-garn-task-listing-v0.10.8.png)
+
+^ __v0.10.8__: external program GARN (a combined HTTP/1.0 server and ICMP responder) and task listing in kernel shell
+
 ### Legacy
 
 ![rou2exOS startup](/.github/img/r2-kernel-boot-v0.10.1.png)

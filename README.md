@@ -28,7 +28,11 @@ qemu-system-x86_64 -boot d -cdrom r2.iso -fda fat.img
 
 ![garn-task-listing](.github/img/r2-garn-task-listing-v0.10.8.png)
 
-^ __v0.10.8__: external program GARN (a combined HTTP/1.0 server and ICMP responder) and task listing in kernel shell
+^ __v0.10.8__: external program `GARN.ELF` (a combined HTTP/1.0 server and ICMP responder) and task listing in kernel shell
+
+![gfxtest-output](.github/img/r2-gfxtest-output-v0.10.8.png)
+
+^ __v0.10.8__: external program `GFXTEST.ELF` to test the VGA/EGA capabilities in text mode
 
 ### Legacy
 

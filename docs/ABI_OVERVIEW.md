@@ -1,6 +1,6 @@
 # Application Binary Interface (ABI)
 
-This overview document presents the rou2exOS (aka `r2`) kernel interface for external applications. Applications should utilize custom programming language libraries provided in [the apps repository](https://github.com/krustowski/rou2exOS-apps) and statically link them with their source code. Examples on how to use such libraries, how to compile them and link them are provided in directories named by concerned languages.
+This overview document presents the rou2exOS (aka `r2`) kernel interface for external applications. Applications should utilize custom programming language libraries provided in [the apps repository](https://github.com/krustowski/r2apps) and statically link them with their source code. Examples on how to use such libraries, how to compile them and link them are provided in directories named by concerned languages.
 
 ## Privilege Levels
 
@@ -9,8 +9,8 @@ The privilege levels are to be specified and defined in the Global Descriptor Ta
 | CPU Ring | Common Interrupt | Target purpose |
 |----------|------------------|----------------|
 | `0` | *      | kernel space |
-| `1` | `0x7d` | kernel tasks, drivers, kernel services |
-| `2` | `0x7e` | privileged user space, services, privileged shell access |
+| ~~`1`~~ | ~~`0x7d`~~ | kernel tasks, drivers, kernel services |
+| ~~`2`~~ | ~~`0x7e`~~ | privileged user space, services, privileged shell access |
 | `3` | `0x7f` | user space, user programs, common shell |
 
 **Kernel itself handles multiple software (CPU exceptions) and hardware interrupts (e.g. IRQs).*
@@ -54,7 +54,10 @@ Please note that these lists are incomplete as listed syscalls have to be implem
 |-------------|------------|------------|-----------------|-------------|
 |  `0x10`|  pointer to string data | string length | Print provided string to terminal. | ✅ |
 |  `0x11`|  `0x00` | `0x00` | Clear the screen. | ✅ |
-|  `0x12`| encoded position | encoded color | Write a graphical pixel. | ✅ |
+|  `0x12`|  encoded position | encoded color | Write a graphical pixel. | ✅ |
+|  `0x13`|  a 320×200 VGA mode-13h palette-indexed buffer | pointer to RGB or default VGA palette | Write a VGA buffer into kernel framebuffer. | ✅ |
+|  `0x14`|  reserved (`0x00`) | reserved (`0x00`) | Maps physical VGA graphics RAM (0xA0000–0xAFFFF) into the calling process at virtual 0xA00_000 with USER+WRITE. Returns the virtual base address on success, 0 on failure.. | ✅ |
+|  `0x15`|  video mode | reserved (`0x00`) | Programs VGA hardware registers for the given mode. | ✅ |
 |  `0x1a`|  frequency in Hz | length in milliseconds | Play the frequency. | ✅ |
 |  `0x1b`|  `0x01`| pointer to the audio file | Play the MIDI audio file. | ✅ |
 |  `0x1f`|  `0x00`|  `0x00`| Stop the player. | ✅ |

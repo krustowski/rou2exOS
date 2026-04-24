@@ -3,8 +3,11 @@ use core::{arch::naked_asm, ptr::copy_nonoverlapping};
 use x86_64::structures::idt::InterruptStackFrame;
 
 use crate::{
-    fs::block::BlockDevice,
-    fs::fat12::{block::Floppy, check, fs::Filesystem},
+    fs::{
+        block::BlockDevice,
+        fat12::{block::Floppy, check, fs::Filesystem},
+    },
+    init::config::SYSTEM_CONFIG,
     input::{elf, irq},
     net::{icmp, ipv4, serial, tcp},
     task::{
@@ -30,7 +33,10 @@ enum SyscallReturnCode {
     InvalidSyscall = 0xff,
 }
 
-static mut MSG_BUF: [[u8; 512]; 5] = [[0; 512], [0; 512], [0; 512], [0; 512], [0; 512]];
+static mut MSG_BUF: [[u8; 512]; 10] = [
+    [0; 512], [0; 512], [0; 512], [0; 512], [0; 512], [0; 512], [0; 512], [0; 512], [0; 512],
+    [0; 512],
+];
 
 /// This function is the syscall ABI dispatching routine. It is called exclusively from the ISR
 /// for interrupt 0x7f.
@@ -130,7 +136,7 @@ extern "C" fn syscall_inner(arg1: u64, arg2: u64, syscall_no: u64) -> u64 {
                 rprint!("\n");
 
                 scheduler::kill(pid);
-                scheduler::wake(2);
+                scheduler::wake(scheduler::get_shell_pid());
 
                 core::arch::asm!("sti");
                 loop {
@@ -155,25 +161,30 @@ extern "C" fn syscall_inner(arg1: u64, arg2: u64, syscall_no: u64) -> u64 {
 
             match arg1 {
                 0x01 => unsafe {
-                    let name = b"rourex";
-                    let user = b"root";
-                    let version = b"v0.10.7";
-                    let path = b"/";
+                    if let Some(sc) = SYSTEM_CONFIG.try_lock() {
+                        let name = sc.get_host();
+                        let user = sc.get_user();
+                        let version = sc.get_version();
+                        let path = sc.get_path();
+                        let path_cluster = sc.get_path_cluster() as u32;
 
-                    if let Some(nm) = (*sysinfo_ptr).system_name.get_mut(0..name.len()) {
-                        nm.copy_from_slice(name);
-                    }
+                        if let Some(nm) = (*sysinfo_ptr).system_name.get_mut(0..name.len()) {
+                            nm.copy_from_slice(name);
+                        }
 
-                    if let Some(us) = (*sysinfo_ptr).system_user.get_mut(0..user.len()) {
-                        us.copy_from_slice(user);
-                    }
+                        if let Some(us) = (*sysinfo_ptr).system_user.get_mut(0..user.len()) {
+                            us.copy_from_slice(user);
+                        }
 
-                    if let Some(ph) = (*sysinfo_ptr).system_path.get_mut(0..path.len()) {
-                        ph.copy_from_slice(path);
-                    }
+                        if let Some(ph) = (*sysinfo_ptr).system_path.get_mut(0..path.len()) {
+                            ph.copy_from_slice(path);
+                        }
 
-                    if let Some(vn) = (*sysinfo_ptr).system_version.get_mut(0..version.len()) {
-                        vn.copy_from_slice(version);
+                        (*sysinfo_ptr).system_path_cluster = path_cluster;
+
+                        if let Some(vn) = (*sysinfo_ptr).system_version.get_mut(0..version.len()) {
+                            vn.copy_from_slice(version);
+                        }
                     }
                 },
                 0x02 => {
@@ -304,35 +315,123 @@ extern "C" fn syscall_inner(arg1: u64, arg2: u64, syscall_no: u64) -> u64 {
         /*
          *  Syscall 0x12 --- Write graphical pixel
          *
-         *  Arg1: encoded position
-         *  Arg2: encoded color
+         *  Arg1: (x << 16) | y  — screen coordinates
+         *  Arg2: 0x00RRGGBB color
          */
         0x12 => unsafe {
-            let x = arg1 as u32 >> 16;
-            let y = (arg1 & 0xffff) as u32;
-
-            let bg = arg2 as u16 >> 8;
-            let fg = arg2 as u16 & 0xff;
-
-            let color = 0x00ffff00;
+            let x = (arg1 as u32 >> 16) as u32;
+            let y = (arg1 as u32 & 0xffff) as u32;
+            let color = arg2 as u32;
 
             let fb = crate::init::check::FRAMEBUFFER_PTR;
-            let ptr = fb.addr as *mut u64;
-
-            rprint!("X: ");
-            rprintn!(x);
-            rprint!(", Y: ");
-            rprintn!(y);
-            rprint!(", FB: ");
-            rprintn!(fb.addr);
-            rprint!("\n");
-
-            for x0 in 0..100 {
-                let offset = y * (fb.pitch / 4) + x + x0;
-
+            if fb.addr != 0 && x < fb.width && y < fb.height {
+                let ptr = fb.addr as *mut u32;
+                let offset = y * (fb.pitch / 4) + x;
                 ptr.add(offset as usize).write_volatile(color);
             }
         },
+
+        /*
+         *  Syscall 0x13 --- Render VGA mode 13h framebuffer (320×200, 256-color)
+         *
+         *  Arg1: userland pointer to 64000-byte palette-indexed buffer
+         *  Arg2: userland pointer to 768-byte palette (256 × RGB triplets), or 0 for default
+         */
+        0x13 => unsafe {
+            if !(USERLAND_START..=USERLAND_END).contains(&arg1) {
+                return SyscallReturnCode::InvalidInput as u64;
+            }
+
+            let fb = crate::init::check::FRAMEBUFFER_PTR;
+            if fb.addr == 0 {
+                return SyscallReturnCode::Ok as u64;
+            }
+
+            let vga_buf = arg1 as *const u8;
+            let fb_ptr = fb.addr as *mut u32;
+            let pitch_px = fb.pitch / 4;
+
+            /* Use caller-supplied palette if valid, else fall back to default VGA palette */
+            let use_custom = (USERLAND_START..=USERLAND_END).contains(&arg2);
+            let pal_ptr = if use_custom {
+                arg2 as *const u8
+            } else {
+                core::ptr::null()
+            };
+
+            for y in 0..200u32 {
+                for x in 0..320u32 {
+                    let idx = *vga_buf.add((y * 320 + x) as usize) as usize;
+                    let color: u32 = if use_custom && !pal_ptr.is_null() {
+                        let r = *pal_ptr.add(idx * 3) as u32;
+                        let g = *pal_ptr.add(idx * 3 + 1) as u32;
+                        let b = *pal_ptr.add(idx * 3 + 2) as u32;
+                        (r << 16) | (g << 8) | b
+                    } else {
+                        vga_default_color(idx as u8)
+                    };
+                    let offset = y * pitch_px + x;
+                    fb_ptr.add(offset as usize).write_volatile(color);
+                }
+            }
+        },
+
+        /*
+         *  Syscall 0x14 --- Map VGA graphics RAM into the calling process
+         *
+         *  Arg1: 0x00 (reserved)
+         *  Arg2: pointer to u64 (*mut u64) — receives the virtual base address
+         *
+         *  Maps physical 0xA0000–0xAFFFF (64 KiB EGA/VGA window) at virtual
+         *  0xA00_000 in the current process's page table with USER+WRITE.
+         *  Idempotent: safe to call more than once.
+         *  On success the virtual base (0xA00_000) is written to *arg2.
+         */
+        0x14 => {
+            if !(USERLAND_START..=USERLAND_END).contains(&arg2) {
+                return SyscallReturnCode::InvalidInput as u64;
+            }
+
+            let virt_base = unsafe { crate::mem::pages::map_vram() };
+            if virt_base == 0 {
+                return SyscallReturnCode::InvalidInput as u64;
+            }
+
+            unsafe {
+                *(arg2 as *mut u64) = virt_base;
+            }
+        }
+
+        /*
+         *  Syscall 0x15 --- Set VGA hardware video mode
+         *
+         *  Arg1: mode number
+         *    0x03 — 80×25 color text  (restores kernel shell display)
+         *    0x0D — 320×200 16-color planar (EGA-style; VRAM at 0xA0000)
+         *    0x12 — 640×480 16-color planar (VRAM at 0xA0000, 4 planes)
+         *    0x13 — 320×200 256-color unchained (VRAM at 0xA0000, linear)
+         *  Arg2: 0x00 (reserved)
+         *
+         *  Programs Sequencer, CRTC, GC and AC registers directly.
+         *  After a successful call, graphical modes use the VGA window
+         *  mapped by syscall 0x14 (MAP_VRAM).  Mode 0x03 restores the
+         *  VGA text buffer at 0xB8000 as the active display.
+         */
+        0x15 => {
+            let mode = arg1 as u8;
+            let ok = unsafe { crate::video::vga_hw::set_video_mode(mode) };
+
+            if !ok {
+                return SyscallReturnCode::InvalidInput as u64;
+            }
+
+            // Keep the kernel's VIDEO_MODE consistent: text mode 0x03 reverts
+            // to the VGA text buffer; all others leave the VESA framebuffer
+            // address intact (it is simply not displayed by the hardware).
+            if mode == 0x03 {
+                crate::video::mode::set_mode_text();
+            }
+        }
 
         /*
          *  Syscall 0x1a --- Play a frequency
@@ -866,7 +965,7 @@ extern "C" fn syscall_inner(arg1: u64, arg2: u64, syscall_no: u64) -> u64 {
 
                         unsafe {
                             // Assume `elf_image` is a pointer to the loaded ELF file in memory
-                            let entry_addr = elf::load_elf64(load_addr as usize);
+                            let entry_addr = elf::load_elf64(load_addr as usize, 0);
 
                             // Cast and jump
                             let entry_fn: extern "C" fn() -> u64 =
@@ -922,8 +1021,11 @@ extern "C" fn syscall_inner(arg1: u64, arg2: u64, syscall_no: u64) -> u64 {
             let port = arg1 as *const u16;
             let value = arg2 as *const u32;
 
+            // VGA I/O registers are byte-wide; a 32-bit outd would cause QEMU to
+            // decompose the write into 4 consecutive byte writes (port, port+1, ...),
+            // corrupting adjacent registers (e.g. 0x3C8→idx also hits 0x3C9 with 0).
             unsafe {
-                crate::input::port::write_u32(*port, *value);
+                crate::input::port::write_u8(*port, *value as u8);
             }
         }
 
@@ -1225,15 +1327,22 @@ extern "C" fn syscall_inner(arg1: u64, arg2: u64, syscall_no: u64) -> u64 {
         }
 
         /*
-         *  Syscall 0x37 --- Register as the userland Ethernet driver.
-         *  Stores the calling PID in netdrv and initialises the RTL8139.
+         *  Syscall 0x37 --- Ethernet driver registration / port binding.
+         *
+         *  Arg1 = 0   → register as the global Ethernet driver (handles ARP, ICMP, and
+         *               any TCP port not explicitly bound). Initialises the RTL8139.
+         *  Arg1 = N>0 → bind TCP destination port N to the calling process. The kernel
+         *               will deliver only frames whose TCP dest port matches N.
          */
-        0x37 => {
-            unsafe {
-                let pid = scheduler::get_current_pid();
+        0x37 => unsafe {
+            let pid = scheduler::get_current_pid();
+            let port = arg1 as u16;
+            if port == 0 {
                 crate::net::netdrv::register_driver(pid);
+            } else {
+                crate::net::netdrv::bind_port(port, pid);
             }
-        }
+        },
 
         /*
          *  Unknown syscall
@@ -1283,6 +1392,29 @@ fn format_filename(name_ptr: *const u8) -> ([u8; 8], [u8; 3]) {
     }
 }
 
+/// Convert a VGA 256-color palette index to 0x00RRGGBB using the standard BIOS default palette.
+fn vga_default_color(idx: u8) -> u32 {
+    /* First 16 entries: standard CGA/EGA colors */
+    const CGA: [u32; 16] = [
+        0x000000, 0x0000AA, 0x00AA00, 0x00AAAA, 0xAA0000, 0xAA00AA, 0xAA5500, 0xAAAAAA, 0x555555,
+        0x5555FF, 0x55FF55, 0x55FFFF, 0xFF5555, 0xFF55FF, 0xFFFF55, 0xFFFFFF,
+    ];
+    if (idx as usize) < 16 {
+        return CGA[idx as usize];
+    }
+    /* 16-231: 6×6×6 color cube */
+    if idx < 232 {
+        let v = idx - 16;
+        let b = (v % 6) * 51;
+        let g = ((v / 6) % 6) * 51;
+        let r = (v / 36) * 51;
+        return ((r as u32) << 16) | ((g as u32) << 8) | (b as u32);
+    }
+    /* 232-255: grayscale */
+    let l = (idx - 232) as u32 * 10 + 8;
+    (l << 16) | (l << 8) | l
+}
+
 pub extern "x86-interrupt" fn syscall_80h(_stack: InterruptStackFrame) {
     //schedule();
 
@@ -1319,6 +1451,7 @@ pub struct SysInfo {
     pub system_user: [u8; 32],
     pub system_path: [u8; 32],
     pub system_version: [u8; 8],
+    pub system_path_cluster: u32,
     pub system_uptime: u32,
 }
 

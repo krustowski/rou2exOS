@@ -40,7 +40,7 @@ extern "x86-interrupt" fn page_fault_handler(
 
     unsafe {
         scheduler::crash(0xff);
-        scheduler::wake(2);
+        scheduler::wake(scheduler::get_shell_pid());
 
         // Re-enable interrupts so the PIT timer fires and the scheduler can
         // switch to the shell.
@@ -69,7 +69,7 @@ extern "x86-interrupt" fn general_protection_fault_handler(
 
     unsafe {
         scheduler::crash(0xff);
-        scheduler::wake(2);
+        scheduler::wake(scheduler::get_shell_pid());
 
         core::arch::asm!("sti");
         loop {
@@ -91,7 +91,7 @@ extern "x86-interrupt" fn invalid_opcode_handler(stack_frame: InterruptStackFram
 
     unsafe {
         scheduler::crash(0xff);
-        scheduler::wake(2);
+        scheduler::wake(scheduler::get_shell_pid());
 
         core::arch::asm!("sti");
         loop {
@@ -121,7 +121,7 @@ extern "x86-interrupt" fn double_fault_handler(
     //keyboard_loop();
     unsafe {
         scheduler::crash(0xff);
-        scheduler::wake(2);
+        scheduler::wake(scheduler::get_shell_pid());
 
         core::arch::asm!("sti");
         loop {

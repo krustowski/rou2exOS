@@ -42,7 +42,10 @@ const USERLAND_START: u64 = 0x600_000;
 /// Highest virtual address (exclusive) a userland ELF segment may occupy.
 const USERLAND_END: u64 = 0xA00_000;
 
-pub unsafe fn load_elf64(elf_addr: usize) -> usize {
+/// `phys_offset` is added to each segment's `p_vaddr` before writing so that
+/// the ELF data lands in the correct physical frame.  Pass 0 to write directly
+/// to the virtual address (used for inline kernel ELF loads via syscall 0x2A).
+pub unsafe fn load_elf64(elf_addr: usize, phys_offset: u64) -> usize {
     let ehdr = &*(elf_addr as *const Elf64Ehdr);
 
     rprint!("First 16 bytes (elf_addr + 0x18): ");
@@ -76,7 +79,7 @@ pub unsafe fn load_elf64(elf_addr: usize) -> usize {
             }
 
             let src = (elf_addr + ph.p_offset as usize) as *const u8;
-            let dst = ph.p_vaddr as *mut u8;
+            let dst = ph.p_vaddr.wrapping_add(phys_offset) as *mut u8;
 
             rprint!("Loading segment ");
             rprintn!(i);
@@ -112,7 +115,78 @@ static mut STACK_NO: usize = 0;
 
 use crate::fs::fat12::{block::Floppy, fs::Filesystem};
 
-pub fn run_elf(filename_input: &[u8], _args: &[u8], mode: RunMode) -> bool {
+/// Write the x86-64 SysV initial-stack layout (argc / argv) into user memory
+/// just below `stack_top` and return the new RSP that points at `argc`.
+///
+/// `args` is the raw command line (space-delimited tokens, may be NUL-padded).
+/// argv[0] is the first token (conventionally the program name).
+unsafe fn push_user_args(stack_top: u64, args: &[u8]) -> u64 {
+    const MAX_ARGS: usize = 8;
+    let mut ptrs = [0u64; MAX_ARGS];
+    let mut argc = 0usize;
+
+    // Trim trailing NUL padding.
+    let trimmed_len = args.iter().rposition(|&b| b != 0).map_or(0, |i| i + 1);
+    let args = &args[..trimmed_len];
+
+    let mut sp = stack_top;
+
+    // Write each space-delimited token as a NUL-terminated string, pushing
+    // bytes right-to-left so the string data grows down from stack_top.
+    let mut i = 0;
+    while i <= args.len() && argc < MAX_ARGS {
+        let mut j = i;
+        while j < args.len() && args[j] != b' ' {
+            j += 1;
+        }
+        if j > i {
+            sp -= 1;
+            *(sp as *mut u8) = 0; // NUL terminator
+            let mut k = j;
+            while k > i {
+                k -= 1;
+                sp -= 1;
+                *(sp as *mut u8) = args[k];
+            }
+            ptrs[argc] = sp;
+            argc += 1;
+        }
+        i = j + 1;
+    }
+
+    if argc == 0 {
+        return stack_top;
+    }
+
+    sp &= !7u64; // align to 8 bytes before writing pointers
+
+    // argv[argc] = NULL terminator.
+    sp -= 8;
+    *(sp as *mut u64) = 0;
+
+    // argv pointers, highest index first so argv[0] ends up at [rsp+8].
+    let mut k = argc;
+    while k > 0 {
+        k -= 1;
+        sp -= 8;
+        *(sp as *mut u64) = ptrs[k];
+    }
+
+    // Ensure (sp - 8) is 16-byte aligned so that rsp at _start satisfies the
+    // SysV ABI requirement that rsp is 16-byte aligned before `call main`.
+    if sp % 16 != 8 {
+        sp -= 8;
+        *(sp as *mut u64) = 0; // alignment padding
+    }
+
+    // argc.
+    sp -= 8;
+    *(sp as *mut u64) = argc as u64;
+
+    sp // caller passes this as stack_top to new_process
+}
+
+pub fn run_elf(filename_input: &[u8], args: &[u8], mode: RunMode) -> bool {
     if filename_input.is_empty() || filename_input.len() > 8 {
         return false;
     }
@@ -137,7 +211,15 @@ pub fn run_elf(filename_input: &[u8], _args: &[u8], mode: RunMode) -> bool {
                 let mut offset = 0;
                 let mut size = 0;
 
-                fs.for_each_entry(crate::init::config::PATH_CLUSTER, |entry| {
+                let path_cluster = {
+                    if let Some(c) = crate::init::config::SYSTEM_CONFIG.try_lock() {
+                        c.get_path_cluster()
+                    } else {
+                        0
+                    }
+                };
+
+                fs.for_each_entry(path_cluster, |entry| {
                     if entry.name.starts_with(filename_input) && entry.ext.starts_with(b"ELF") {
                         cluster = entry.start_cluster;
                         size = entry.file_size;
@@ -158,8 +240,11 @@ pub fn run_elf(filename_input: &[u8], _args: &[u8], mode: RunMode) -> bool {
                 rprintn!(size);
                 rprint!("\n");
 
-                let addrs = [0x640_000, 0x680_000, 0x6c0_000, 0x700_000, 0x720_000];
-                let load_addr: u64 = addrs[STACK_NO % 5];
+                let addrs = [
+                    0x640_000, 0x680_000, 0x6c0_000, 0x700_000, 0x720_000, 0x740_000, 0x760_000,
+                    0x780_000, 0x7A0_000, 0x7C0_000,
+                ];
+                let load_addr: u64 = addrs[STACK_NO % 10];
 
                 while size - offset > 0 {
                     let lba = fs.cluster_to_lba(cluster);
@@ -194,31 +279,47 @@ pub fn run_elf(filename_input: &[u8], _args: &[u8], mode: RunMode) -> bool {
                 }
                 rprint!("\n");
 
-                // Parse and copy ELF segments to their p_vaddr destinations.
-                let entry_addr = load_elf64(load_addr as usize);
+                let slot = STACK_NO % 10;
+
+                // Each slot gets its own 2 MiB physical frame at 16 MiB + slot*2 MiB.
+                // phys_offset remaps virtual 0x600_000 writes into that private frame.
+                let phys_frame = crate::mem::pages::user_frame_phys(slot);
+                let phys_offset = phys_frame.wrapping_sub(USERLAND_START);
+
+                // Parse and copy ELF segments into the slot's private physical frame.
+                let entry_addr = load_elf64(load_addr as usize, phys_offset);
 
                 rprint!("ELF entry point: ");
                 rprintn!(entry_addr);
                 rprint!("\n");
 
-                // Ensure the User bit is set in the active page table for the
-                // entire userland region so CPL=3 code can access its own
-                // pages.  This is belt-and-suspenders on top of boot.asm but
-                // makes the mapping explicit and survives any future boot.asm
-                // changes.
-                crate::mem::pages::ensure_user_pages(USERLAND_START, USERLAND_END);
+                // Build a per-process page table that maps vaddr 0x600_000 to
+                // the slot's private physical frame.
+                let cr3 = crate::mem::pages::create_user_page_table(slot);
 
                 // Stacks live at the top of the user-accessible region
                 // (0x400000–0x9FFFFF, user-flag set in boot.asm).  Each slot
                 // gets 256 KB of stack space, starting well above where code
                 // typically loads (0x600000+), so normal stack growth never
                 // collides with ELF segments.
-                let stacks = [0x8C0_000u64, 0x8A0_000, 0x880_000, 0x860_000, 0x840_000];
-                let stack_top = stacks[STACK_NO % 5];
+                let stacks = [
+                    0x8F0_000u64,
+                    0x8D0_000,
+                    0x8B0_000,
+                    0x890_000,
+                    0x870_000,
+                    0x850_000,
+                    0x830_000,
+                    0x810_000,
+                    0x7F0_000,
+                    0x7D0_000,
+                ];
+                let stack_top = stacks[slot];
                 STACK_NO += 1;
 
-                // cast and jump
-                //let entry_fn: extern "C" fn() -> ! = core::mem::transmute(entry_addr as *const ());
+                // Build the SysV argv frame just below stack_top so that
+                // _crt0 can read argc from [rsp] and &argv[0] from [rsp+8].
+                let user_rsp = push_user_args(stack_top, args);
 
                 let mut name: [u8; 16] = [b' '; 16];
 
@@ -231,7 +332,8 @@ pub fn run_elf(filename_input: &[u8], _args: &[u8], mode: RunMode) -> bool {
                     name,
                     crate::task::process::Mode::User,
                     entry_addr as u64,
-                    stack_top,
+                    user_rsp,
+                    cr3,
                 );
 
                 if pid == 0xff || pid == 0x00 {

@@ -116,6 +116,7 @@ pub struct SysInfo {
     pub system_user: [u8; 32],
     pub system_path: [u8; 32],
     pub system_version: [u8; 8],
+    pub system_path_cluster: u32,
     pub system_uptime: u32,
 }
 ```
@@ -126,6 +127,7 @@ typedef struct {
     uint8_t system_user[32];
     uint8_t system_path[32];
     uint8_t system_version[8];
+    uint32_t system_path_cluster;
     uint32_t  system_uptime;
 } __attribute__((packed)) SysInfo_T;
 ```

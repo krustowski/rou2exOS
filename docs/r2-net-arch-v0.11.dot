@@ -1,0 +1,93 @@
+digraph net_arch {
+    graph [
+        rankdir=TB,
+        label="rou2exOS  –  Network Frame Routing",
+        labelloc=t, fontsize=15,
+        fontname="Helvetica-Bold",
+        pad=0.8, nodesep=0.9, ranksep=1.3,
+        bgcolor=white
+    ];
+    node [fontname="Helvetica", fontsize=10, margin="0.3,0.18"];
+    edge [fontname="Helvetica", fontsize=9];
+
+    /* ── Remote computer ─────────────────────────── */
+    remote [
+        label="Remote Computer\n10.3.4.1",
+        shape=box, style="filled,rounded",
+        fillcolor="#1565C0", fontcolor=white, width=3.5
+    ];
+
+    /* ── NIC ─────────────────────────────────────── */
+    nic [
+        label="RTL8139 NIC\n52:54:00:12:34:56  /  10.3.4.2",
+        shape=box, style="filled,rounded",
+        fillcolor="#424242", fontcolor=white, width=4.5
+    ];
+
+    /* ── Kernel ───────────────────────────────────── */
+    subgraph cluster_kernel {
+        label="Kernel (rou2exOS)";
+        style=filled; fillcolor="#FFFDE7";
+        color="#F9A825"; penwidth=2;
+        fontname="Helvetica-Bold"; fontsize=12;
+        margin=20;
+
+        poll [
+            label="poll_and_deliver()\ntimer tick",
+            shape=ellipse, style=filled, fillcolor="#FFD54F",
+            width=3.2
+        ];
+        route [
+            label="tcp_dest_port( frame )\nPORT_REGISTRY:  { 80 → garn,  23 → tnt }",
+            shape=box, style="filled,rounded", fillcolor="#FFE082",
+            width=5.2
+        ];
+        poll -> route [label="  TCP / IPv4 frame"];
+    }
+
+    /* ── Userland ─────────────────────────────────── */
+    subgraph cluster_userland {
+        label="Userland";
+        style=filled; fillcolor="#F1F8E9";
+        color="#2E7D32"; penwidth=2;
+        fontname="Helvetica-Bold"; fontsize=12;
+        margin=20;
+
+        eth [
+            label="eth.elf\nnet_register()  [global]\nARP · ICMP · fallback",
+            shape=box, style="filled,rounded", fillcolor="#A5D6A7",
+            width=3.2
+        ];
+        garn [
+            label="garn\nnet_bind_port( 80 )\nHTTP / 1.0  server",
+            shape=box, style="filled,rounded", fillcolor="#90CAF9",
+            width=3.2
+        ];
+        tnt [
+            label="tnt\nnet_bind_port( 23 )\nTELNET  server",
+            shape=box, style="filled,rounded", fillcolor="#F48FB1",
+            width=3.2
+        ];
+    }
+
+    /* ── Inbound ──────────────────────────────────── */
+    remote -> nic  [label="  Ethernet frame"];
+    nic -> poll    [label="  receive_frame()"];
+
+    route -> eth   [label="  ARP / ICMP\l  unbound TCP\l",
+                    color="#2E7D32", fontcolor="#2E7D32"];
+    route -> garn  [label="  TCP  dst = 80",
+                    color="#1565C0", fontcolor="#1565C0"];
+    route -> tnt   [label="  TCP  dst = 23",
+                    color="#AD1457", fontcolor="#AD1457"];
+
+    /* ── Outbound (dashed, constraint=false) ─────── */
+    eth  -> nic [label="  send_eth_frame()",
+                 style=dashed, color="#9E9E9E", fontcolor="#757575",
+                 constraint=false];
+    garn -> nic [style=dashed, color="#9E9E9E", constraint=false];
+    tnt  -> nic [style=dashed, color="#9E9E9E", constraint=false];
+    nic -> remote [label="  outbound frame",
+                   style=dashed, color="#9E9E9E", fontcolor="#757575",
+                   constraint=false];
+}

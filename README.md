@@ -24,11 +24,11 @@ qemu-system-x86_64 -boot d -cdrom r2.iso -fda fat.img
 
 ![hellofs-output-clock](/.github/img/r2-hellofs-output-v0.10.4.png)
 
-^ __v0.10.4__: external executable output + clock process
+^ __v0.10.4__: external program `HELLOFS.ELF` output + clock process
 
 ![garn-task-listing](.github/img/r2-garn-task-listing-v0.10.8.png)
 
-^ __v0.10.8__ (pre-v0.11): external program `GARN.ELF` (a combined HTTP/1.0 server and ICMP responder) and task listing in kernel shell
+^ __v0.10.8__ (pre-v0.11): external program `GARN.ELF` (a combined HTTP/1.0 server ~~and ICMP responder~~) and task listing in kernel shell
 
 ![gfxtest-output](.github/img/r2-gfxtest-output-v0.10.8.png)
 

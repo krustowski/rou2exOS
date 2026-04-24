@@ -92,8 +92,9 @@ Please note that these lists are incomplete as listed syscalls have to be implem
 |        |  `0x02` |  pointer to buffer | Create an ICMP packet. | ✅ |
 |        |  `0x03` |  pointer to buffer | Create a TCP packet. | ✅ |
 |  `0x34`|  `0x01` |  pointer to buffer | Send an IPv4 packet.  | ✅ |
-|  0x35|  process ID |  pointer to buffer | Socket receive. Blocking op, pops a message form the process' MQ. | ✅  |
-|  0x36|  0x01 |  pointer to buffer | Socket send. Pushes a message to the process' MQ. | ✅  |
+|  `0x35`|  process ID |  pointer to buffer | Socket receive. Blocking op, pops a message form the process' MQ. | ✅  |
+|  `0x36`|  `0x01` |  pointer to buffer | Socket send. Pushes a message to the process' MQ. | ✅  |
+|  `0x37`| port number (0 for global driver) | Ethernet driver registration / port binding. | ✅ |
 
 ### Syscall Return Codes
 

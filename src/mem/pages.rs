@@ -1,7 +1,64 @@
-// Pre-allocated memory space for page tables (e.g., 64 KiB)
-const PAGE_TABLE_MEMORY_SIZE: usize = 128 * 1024;
-static mut PAGE_TABLE_MEMORY: [u8; PAGE_TABLE_MEMORY_SIZE] = [0; 128 * 1024];
-static mut NEXT_FREE_PAGE: usize = 0x1000;
+const PAGE_TABLE_MEMORY_SIZE: usize = 256 * 1024;
+
+#[repr(C, align(4096))]
+struct PageTablePool {
+    data: [u8; PAGE_TABLE_MEMORY_SIZE],
+}
+
+static mut PAGE_TABLE_POOL: PageTablePool = PageTablePool {
+    data: [0; PAGE_TABLE_MEMORY_SIZE],
+};
+static mut NEXT_FREE_PAGE: usize = 0;
+
+/// Physical address of the kernel's boot-time P4 table.  Saved once during
+/// early init so the scheduler can restore it when switching to a kernel process.
+pub static mut KERNEL_CR3: u64 = 0;
+
+/// Capture the current CR3 as the kernel's master page table reference.
+/// Must be called before any userland processes are spawned.
+pub unsafe fn save_kernel_cr3() {
+    KERNEL_CR3 = read_cr3() as u64;
+}
+
+/// Returns the physical base address of the 2 MiB frame reserved for userland
+/// slot `slot`.  Slots map to distinct non-overlapping frames starting at 16 MiB.
+pub fn user_frame_phys(slot: usize) -> u64 {
+    0x1000_000 + slot as u64 * 0x200_000
+}
+
+/// Build a per-process P4/P3/P2 hierarchy for userland slot `slot`.
+///
+/// The new tables share the kernel's identity-mapped entries for all addresses
+/// outside 0x600_000–0x7FF_FFF.  P2[3] is overridden to point at the slot's
+/// private 2 MiB physical frame so that every userland process sees its own
+/// code/data at virtual address 0x600_000 without interference.
+///
+/// Returns the physical address of the new P4 (suitable for writing to CR3).
+pub unsafe fn create_user_page_table(slot: usize) -> u64 {
+    let kernel_p4 = KERNEL_CR3 as *mut u64;
+    let kernel_p3 = (*kernel_p4 & 0x000f_ffff_ffff_f000) as *mut u64;
+    let kernel_p2 = (*kernel_p3 & 0x000f_ffff_ffff_f000) as *mut u64;
+
+    let new_p4 = alloc_page() as *mut u64;
+    let new_p3 = alloc_page() as *mut u64;
+    let new_p2 = alloc_page() as *mut u64;
+
+    // Clone kernel tables so all existing mappings (framebuffer, high memory,
+    // etc.) remain accessible from userland processes.
+    core::ptr::copy_nonoverlapping(kernel_p4, new_p4, 512);
+    core::ptr::copy_nonoverlapping(kernel_p3, new_p3, 512);
+    core::ptr::copy_nonoverlapping(kernel_p2, new_p2, 512);
+
+    // Give the slot its own private 2 MiB frame at vaddr 0x600_000.
+    let phys_frame = user_frame_phys(slot);
+    *new_p2.add(3) = phys_frame | PAGE_PRESENT | PAGE_WRITE | PAGE_USER | PAGE_PS;
+
+    // Wire P3[0] → new_p2, P4[0] → new_p3.
+    *new_p3 = new_p2 as u64 | PAGE_PRESENT | PAGE_WRITE | PAGE_USER;
+    *new_p4 = new_p3 as u64 | PAGE_PRESENT | PAGE_WRITE | PAGE_USER;
+
+    new_p4 as u64
+}
 
 /// Read the current CR3 value (physical address of the active PML4).
 #[inline]
@@ -93,10 +150,50 @@ unsafe fn alloc_page() -> *mut u8 {
     if NEXT_FREE_PAGE + 0x1000 > PAGE_TABLE_MEMORY_SIZE {
         panic!("Out of preallocated page table memory!");
     }
-    let addr = &mut PAGE_TABLE_MEMORY[NEXT_FREE_PAGE] as *mut u8;
+    let addr = &mut PAGE_TABLE_POOL.data[NEXT_FREE_PAGE] as *mut u8;
     NEXT_FREE_PAGE += 0x1000;
     core::ptr::write_bytes(addr, 0, 0x1000);
     addr
+}
+
+/// Map physical VGA graphics RAM (0xA0000–0xAFFFF, 64 KiB) into the current
+/// process's page table at virtual 0xA00_000, with USER+WRITE access.
+/// Safe to call multiple times; only installs a fresh P1 if P2[5] has no P1
+/// pointer yet (huge-page entries are replaced).  Returns 0xA00_000 on
+/// success, 0 if the page-table walk fails.
+pub unsafe fn map_vram() -> u64 {
+    const VRAM_PHYS: u64 = 0xA_0000; // physical: 640 KiB (EGA/VGA window)
+    const VRAM_VIRT: u64 = 0xA00_000; // virtual:  10 MiB (dedicated slot)
+    const P2_IDX: usize = 5; // (0xA00_000 >> 21) & 0x1FF
+
+    let p4 = read_cr3();
+    let p4e = *p4;
+    if p4e & PAGE_PRESENT == 0 {
+        return 0;
+    }
+    let p3 = (p4e & 0x000f_ffff_ffff_f000) as *mut u64;
+
+    let p3e = *p3;
+    if p3e & PAGE_PRESENT == 0 {
+        return 0;
+    }
+    let p2 = (p3e & 0x000f_ffff_ffff_f000) as *mut u64;
+
+    let existing = *p2.add(P2_IDX);
+    // Already a fine-grained P1 pointer (not a huge page): mapping is intact.
+    if existing & PAGE_PRESENT != 0 && existing & PAGE_PS == 0 {
+        return VRAM_VIRT;
+    }
+
+    // Allocate a P1 table and map 16 × 4 KiB pages → physical VRAM.
+    let p1 = alloc_page() as *mut u64;
+    for i in 0usize..16 {
+        *p1.add(i) = (VRAM_PHYS + i as u64 * 0x1000) | PAGE_PRESENT | PAGE_WRITE | PAGE_USER;
+    }
+    *p2.add(P2_IDX) = p1 as u64 | PAGE_PRESENT | PAGE_WRITE | PAGE_USER;
+    flush_tlb();
+
+    VRAM_VIRT
 }
 
 pub unsafe fn map_32mb(p4: *mut u64, phys_start: usize, virt_start: usize) {

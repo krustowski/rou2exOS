@@ -12,7 +12,6 @@ mod video;
 // Core kernel modules
 mod abi;
 mod acpi;
-mod app;
 mod audio;
 mod fs;
 mod init;

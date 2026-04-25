@@ -62,7 +62,9 @@ Please note that these lists are incomplete as listed syscalls have to be implem
 |  `0x1b`|  `0x01`| pointer to the audio file | Play the MIDI audio file. | ✅ |
 |  `0x1f`|  `0x00`|  `0x00`| Stop the player. | ✅ |
 
-#### Filesystem (FAT12)
+#### Filesystem (VFS / FAT12)
+
+File name arguments accept either a bare name relative to the current working directory (e.g. `FOO.TXT`) or an absolute VFS path (e.g. `/mnt/fat/FOO.TXT`).  Both forms are resolved through the VFS mount table.
 
 | Syscall No. | Argument 1 | Argument 2 | Purpose/Command | Implemented |
 |-------------|------------|------------|-----------------|-------------|
@@ -76,8 +78,9 @@ Please note that these lists are incomplete as listed syscalls have to be implem
 |  `0x27`|  cluster No. (current directory usually) | pointer to string data | Create a new subdirectory in such parent directory specified by name in argument No. 2. | ✅ |
 |  `0x28`|  cluster No. | pointer to array of entries | List the current directory. | ✅ |
 |  `0x29`|  pointer to file name string | pointer to uint64 (PID) | Execute a flat binary executable (.BIN usually). | ❌ |
-|  `0x2a`|  pointer to file name string | pointer to uint64 (PID) | Execute an ELF64 executable (.ELF). | ✅ |
-|  `0x2b` | unused | pointer to the CheckReport_T struct | Run the FAT12 filesystem check, populates the report (arg2). | ✅ |
+|  `0x2a`|  pointer to file name string | pointer to uint64 (PID) | Execute an ELF64 executable (.ELF). Auto-appends `.elf` if no extension given. | ✅ |
+|  `0x2b` | unused | pointer to `FsckReport_T` | Run the FAT12 filesystem check; populates the report struct pointed to by arg2. | ✅ |
+|  `0x2c` | unused | pointer to array of up to 8 `MountInfo_T` | List VFS mount points. Returns the number of active mounts as a u64. `fs_type`: `0`=none, `1`=rootfs, `2`=fat12. | ✅ |
 
 #### Port I/O and Networking
 
@@ -111,6 +114,8 @@ Please note that these lists are incomplete as listed syscalls have to be implem
 
 #### SysInfo
 
+`system_uptime` holds the number of seconds since boot, derived from the PIT tick counter (100 Hz).
+
 ```rust
 pub struct SysInfo {
     pub system_name: [u8; 32],
@@ -118,18 +123,18 @@ pub struct SysInfo {
     pub system_path: [u8; 32],
     pub system_version: [u8; 8],
     pub system_path_cluster: u32,
-    pub system_uptime: u32,
+    pub system_uptime: u32,  // seconds since boot
 }
 ```
 
 ```c
 typedef struct {
-    uint8_t system_name[32];
-    uint8_t system_user[32];
-    uint8_t system_path[32];
-    uint8_t system_version[8];
+    uint8_t  system_name[32];
+    uint8_t  system_user[32];
+    uint8_t  system_path[32];
+    uint8_t  system_version[8];
     uint32_t system_path_cluster;
-    uint32_t  system_uptime;
+    uint32_t system_uptime;   /* seconds since boot */
 } __attribute__((packed)) SysInfo_T;
 ```
 
@@ -196,4 +201,50 @@ typedef struct {
     uint16_t start_cluster;
     uint32_t file_size;
 } __attribute__((packed)) Entry_T;
+```
+
+#### FsckReport (syscall `0x2b`)
+
+```rust
+pub struct FsckReport {
+    pub errors: u64,
+    pub orphan_clusters: u64,
+    pub cross_linked: u64,
+    pub invalid_entries: u64,
+}
+```
+
+```c
+typedef struct {
+    uint64_t errors;
+    uint64_t orphan_clusters;
+    uint64_t cross_linked;
+    uint64_t invalid_entries;
+} __attribute__((packed)) FsckReport_T;
+```
+
+#### MountInfo (syscall `0x2c`)
+
+Each entry describes one VFS mount point.  The kernel writes up to 8 entries into the caller-supplied array and returns the count.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `path` | `uint8_t[32]` | Mount path, **not** NUL-terminated; use `path_len` |
+| `path_len` | `uint8_t` | Number of valid bytes in `path` |
+| `fs_type` | `uint8_t` | `0`=none, `1`=rootfs, `2`=fat12 |
+
+```rust
+pub struct MountInfo {
+    pub path: [u8; 32],
+    pub path_len: u8,
+    pub fs_type: u8,   // 0=none 1=rootfs 2=fat12
+}
+```
+
+```c
+typedef struct {
+    uint8_t path[32];
+    uint8_t path_len;
+    uint8_t fs_type;   /* 0=none, 1=rootfs, 2=fat12 */
+} __attribute__((packed)) MountInfo_T;
 ```

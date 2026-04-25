@@ -5,7 +5,8 @@ use x86_64::structures::idt::InterruptStackFrame;
 use crate::{
     fs::{
         block::BlockDevice,
-        fat12::{block::Floppy, check, fs::Filesystem},
+        fat12::{block::Floppy, check, fs::{fat83, Filesystem}},
+        vfs,
     },
     init::config::SYSTEM_CONFIG,
     input::{elf, irq},
@@ -185,6 +186,9 @@ extern "C" fn syscall_inner(arg1: u64, arg2: u64, syscall_no: u64) -> u64 {
                         if let Some(vn) = (*sysinfo_ptr).system_version.get_mut(0..version.len()) {
                             vn.copy_from_slice(version);
                         }
+
+                        (*sysinfo_ptr).system_uptime =
+                            crate::time::acpi::get_uptime_seconds() as u32;
                     }
                 },
                 0x02 => {
@@ -452,55 +456,30 @@ extern "C" fn syscall_inner(arg1: u64, arg2: u64, syscall_no: u64) -> u64 {
         /*
          *  Syscall 0x1b --- Play an audio file
          *
-         *  Arg2: audio file type
-         *  Arg2: pointer to file name (*const u8)
+         *  Arg1: audio file type (0x01 = MIDI format 0)
+         *  Arg2: pointer to NUL-terminated file name (*const u8)
          */
         0x1b => {
             if !(USERLAND_START..=USERLAND_END).contains(&arg2) {
                 return SyscallReturnCode::InvalidInput as u64;
             }
 
-            let name_ptr = arg1 as *const u8;
-            let (name, ext) = format_filename(name_ptr);
-
+            let name_slice = unsafe { nul_terminated_slice(arg2 as *const u8, 64) };
+            let (rel, base) = vfs_resolve_fat12(name_slice);
+            let name83 = fat83(rel);
             let mut buf: [u8; 4096] = [0u8; 4096];
-            let mut file_found = false;
 
             match arg1 {
-                // MIDI file format 0
                 0x01 => {
                     let floppy = Floppy::init();
-
                     match Filesystem::new(&floppy) {
-                        Ok(fs) => {
-                            fs.for_each_entry(0, |entry| {
-                                if entry.name[0] == 0x00
-                                    || entry.name[0] == 0xE5
-                                    || entry.attr & 0x08 != 0
-                                    || entry.attr & 0x10 != 0
-                                {
-                                    return;
-                                }
-
-                                if !entry.name.starts_with(&name) || !entry.ext.starts_with(&ext) {
-                                    return;
-                                }
-
-                                // Read the file directly into the client's buffer
-                                fs.read_file(entry.start_cluster, &mut buf);
-                                file_found = true;
-                            });
-                        }
-                        Err(e) => {
-                            rprint!(e);
-                            rprint!("\n");
-                        }
+                        Ok(fs) => match fs.find_entry(base, &name83) {
+                            None => return SyscallReturnCode::FileNotFound as u64,
+                            Some(entry) => { fs.read_file(entry.start_cluster, &mut buf); }
+                        },
+                        Err(e) => { rprint!(e); rprint!("\n");
+                            return SyscallReturnCode::FilesystemError as u64; }
                     }
-
-                    if !file_found {
-                        return SyscallReturnCode::FileNotFound as u64;
-                    }
-
                     if let Some(midi) = crate::audio::midi::parse_midi_format0(&buf) {
                         crate::audio::midi::play_midi(&midi);
                         crate::audio::beep::stop_beep();
@@ -508,10 +487,7 @@ extern "C" fn syscall_inner(arg1: u64, arg2: u64, syscall_no: u64) -> u64 {
                         return SyscallReturnCode::FilesystemError as u64;
                     }
                 }
-
-                _ => {
-                    return SyscallReturnCode::InvalidInput as u64;
-                }
+                _ => { return SyscallReturnCode::InvalidInput as u64; }
             }
         }
 
@@ -542,70 +518,34 @@ extern "C" fn syscall_inner(arg1: u64, arg2: u64, syscall_no: u64) -> u64 {
                 return SyscallReturnCode::InvalidInput as u64;
             }
 
-            let name_ptr = arg1 as *const u8;
-
-            let (name, ext) = format_filename(name_ptr);
-
+            let name_slice = unsafe { nul_terminated_slice(arg1 as *const u8, 64) };
+            let (rel, base) = vfs_resolve_fat12(name_slice);
+            let name83 = fat83(rel);
             let buf_ptr = arg2 as *mut u8;
             let floppy = Floppy::init();
-            let mut file_read: bool = false;
 
             match Filesystem::new(&floppy) {
                 Ok(fs) => {
-                    fs.for_each_entry(0, |entry| {
-                        if entry.name[0] == 0x00
-                            || entry.name[0] == 0xE5
-                            || entry.attr & 0x08 != 0
-                            || entry.attr & 0x10 != 0
-                        {
-                            return;
+                    let entry = match fs.find_entry(base, &name83) {
+                        Some(e) if e.attr & 0x10 == 0 => e,
+                        _ => return SyscallReturnCode::FileNotFound as u64,
+                    };
+                    let mut cluster = entry.start_cluster;
+                    let mut offset = 0u32;
+                    while offset < entry.file_size {
+                        let lba = fs.cluster_to_lba(cluster);
+                        let mut sector = [0u8; 512];
+                        fs.device.read_sector(lba, &mut sector);
+                        unsafe {
+                            copy_nonoverlapping(sector.as_ptr(), buf_ptr.add(offset as usize), 512);
                         }
-
-                        if !entry.name.starts_with(&name) || !entry.ext.starts_with(&ext) {
-                            return;
-                        }
-
-                        let mut cluster = entry.start_cluster;
-                        let mut offset = 0;
-
-                        while entry.file_size - offset > 0 {
-                            let lba = fs.cluster_to_lba(cluster);
-                            let mut sector = [0u8; 512];
-
-                            fs.device.read_sector(lba, &mut sector);
-
-                            let dst = buf_ptr;
-
-                            unsafe {
-                                core::ptr::copy_nonoverlapping(
-                                    sector.as_ptr(),
-                                    dst.add(offset as usize),
-                                    512,
-                                );
-                            }
-
-                            cluster = fs.read_fat12_entry(cluster);
-
-                            if cluster >= 0xFF8 || cluster == 0 {
-                                break;
-                            }
-
-                            offset += 512;
-                        }
-                        file_read = true;
-                    });
-
-                    if !file_read {
-                        return SyscallReturnCode::FileNotFound as u64;
-                    } else {
-                        return SyscallReturnCode::Ok as u64;
+                        cluster = fs.read_fat12_entry(cluster);
+                        if cluster >= 0xFF8 || cluster == 0 { break; }
+                        offset += 512;
                     }
                 }
-
                 Err(e) => {
-                    rprint!(e);
-                    rprint!("\n");
-
+                    rprint!(e); rprint!("\n");
                     return SyscallReturnCode::FilesystemError as u64;
                 }
             }
@@ -624,25 +564,16 @@ extern "C" fn syscall_inner(arg1: u64, arg2: u64, syscall_no: u64) -> u64 {
                 return SyscallReturnCode::InvalidInput as u64;
             }
 
-            let name_ptr = arg1 as *const u8;
-
-            let (name, ext) = format_filename(name_ptr);
-
-            let mut filename: [u8; 11] = [b' '; 11];
-            filename[0..8].copy_from_slice(&name);
-            filename[8..11].copy_from_slice(&ext);
-
+            let name_slice = unsafe { nul_terminated_slice(arg1 as *const u8, 64) };
+            let (rel, base) = vfs_resolve_fat12(name_slice);
+            let name83 = fat83(rel);
             let buf_ptr = arg2 as *const [u8; 512];
             let floppy = Floppy::init();
 
             match Filesystem::new(&floppy) {
-                Ok(fs) => unsafe {
-                    fs.write_file(0, &filename, &*buf_ptr);
-                },
+                Ok(fs) => unsafe { fs.write_file(base, &name83, &*buf_ptr); },
                 Err(e) => {
-                    rprint!(e);
-                    rprint!("\n");
-
+                    rprint!(e); rprint!("\n");
                     return SyscallReturnCode::FilesystemError as u64;
                 }
             }
@@ -661,56 +592,29 @@ extern "C" fn syscall_inner(arg1: u64, arg2: u64, syscall_no: u64) -> u64 {
                 return SyscallReturnCode::InvalidInput as u64;
             }
 
-            let (name_old, ext_old) = format_filename(arg1 as *const u8);
-            let (name_new, ext_new) = format_filename(arg2 as *const u8);
-
-            let mut filename_old: [u8; 11] = [b' '; 11];
-            filename_old[0..8].copy_from_slice(&name_old);
-            filename_old[8..11].copy_from_slice(&ext_old);
-
-            let mut filename_new: [u8; 11] = [b' '; 11];
-            filename_new[0..8].copy_from_slice(&name_new);
-            filename_new[8..11].copy_from_slice(&ext_new);
-
+            let old_slice = unsafe { nul_terminated_slice(arg1 as *const u8, 64) };
+            let new_slice = unsafe { nul_terminated_slice(arg2 as *const u8, 64) };
+            let (rel_old, base) = vfs_resolve_fat12(old_slice);
+            let old83 = fat83(rel_old);
+            let new83 = fat83(new_slice);
             let floppy = Floppy::init();
-            let mut file_found: bool = false;
 
             match Filesystem::new(&floppy) {
                 Ok(fs) => {
-                    fs.for_each_entry(0, |entry| {
-                        if entry.name[0] == 0x00 || entry.name[0] == 0xE5 || entry.attr & 0x08 != 0
-                        {
-                            return;
-                        }
-
-                        if !entry.name.starts_with(&name_old)
-                            || (!ext_old.is_empty() && !entry.ext.starts_with(&ext_old))
-                        {
-                            return;
-                        }
-
-                        // Read the file directly into the client's buffer
-                        fs.rename_file(0, &filename_old, &filename_new);
-                        file_found = true;
-                    });
-
-                    if !file_found {
+                    if fs.find_entry(base, &old83).is_none() {
                         return SyscallReturnCode::FileNotFound as u64;
                     }
+                    fs.rename_file(base, &old83, &new83);
                 }
-                Err(e) => {
-                    rprint!(e);
-                    rprint!("\n");
-
-                    return SyscallReturnCode::FilesystemError as u64;
-                }
+                Err(e) => { rprint!(e); rprint!("\n");
+                    return SyscallReturnCode::FilesystemError as u64; }
             }
         }
 
         /*
          *  Syscall 0x23 --- Delete a directory entry
          *
-         *  Arg1: pointer to original filename
+         *  Arg1: pointer to filename
          *  Arg2: 0x00
          */
         0x23 => {
@@ -718,42 +622,20 @@ extern "C" fn syscall_inner(arg1: u64, arg2: u64, syscall_no: u64) -> u64 {
                 return SyscallReturnCode::InvalidInput as u64;
             }
 
-            let (name, ext) = format_filename(arg1 as *const u8);
-
-            let mut filename: [u8; 11] = [b' '; 11];
-            filename[0..8].copy_from_slice(&name);
-            filename[8..11].copy_from_slice(&ext);
-
-            let mut file_found: bool = false;
+            let name_slice = unsafe { nul_terminated_slice(arg1 as *const u8, 64) };
+            let (rel, base) = vfs_resolve_fat12(name_slice);
+            let name83 = fat83(rel);
             let floppy = Floppy::init();
 
             match Filesystem::new(&floppy) {
                 Ok(fs) => {
-                    fs.for_each_entry(0, |entry| {
-                        if entry.name[0] == 0x00 || entry.name[0] == 0xE5 || entry.attr & 0x08 != 0
-                        {
-                            return;
-                        }
-
-                        if !entry.name.starts_with(&name) || !entry.ext.starts_with(&ext) {
-                            return;
-                        }
-
-                        // Read the file directly into the client's buffer
-                        fs.delete_file(0, &filename);
-                        file_found = true;
-                    });
-
-                    if !file_found {
+                    if fs.find_entry(base, &name83).is_none() {
                         return SyscallReturnCode::FileNotFound as u64;
                     }
+                    fs.delete_file(base, &name83);
                 }
-                Err(e) => {
-                    rprint!(e);
-                    rprint!("\n");
-
-                    return SyscallReturnCode::FilesystemError as u64;
-                }
+                Err(e) => { rprint!(e); rprint!("\n");
+                    return SyscallReturnCode::FilesystemError as u64; }
             }
         }
 
@@ -894,98 +776,62 @@ extern "C" fn syscall_inner(arg1: u64, arg2: u64, syscall_no: u64) -> u64 {
                 return SyscallReturnCode::InvalidInput as u64;
             }
 
-            let (name, ext) = format_filename(arg1 as *const u8);
-
-            let mut file_found: bool = false;
-            let mut file_size = 0;
-            let mut cluster = 0;
+            let name_slice = unsafe { nul_terminated_slice(arg1 as *const u8, 64) };
+            let (rel, base) = vfs_resolve_fat12(name_slice);
+            // Append .elf if no extension provided
+            let mut name_buf = [0u8; 13];
+            let full_name: &[u8] = if rel.contains(&b'.') {
+                rel
+            } else {
+                let n = rel.len().min(8);
+                name_buf[..n].copy_from_slice(&rel[..n]);
+                name_buf[n..n + 4].copy_from_slice(b".elf");
+                &name_buf[..n + 4]
+            };
+            let name83 = fat83(full_name);
 
             let floppy = Floppy::init();
-
             match Filesystem::new(&floppy) {
                 Ok(fs) => {
-                    fs.for_each_entry(0, |entry| {
-                        if entry.name[0] == 0x00
-                            || entry.name[0] == 0xE5
-                            || entry.attr & 0x08 != 0
-                            || entry.attr & 0x10 != 0
-                        {
-                            return;
-                        }
+                    let entry = match fs.find_entry(base, &name83) {
+                        Some(e) if e.attr & 0x10 == 0 => e,
+                        _ => return SyscallReturnCode::FileNotFound as u64,
+                    };
+                    let mut cluster = entry.start_cluster;
+                    let file_size = entry.file_size;
+                    let load_addr: u64 = 0x650_000;
+                    let stack_top = 0x670_000;
+                    let mut offset = 0u32;
 
-                        if !entry.name.starts_with(&name)
-                            || !entry.ext.starts_with(&ext)
-                            || &ext != b"ELF"
-                        {
-                            return;
-                        }
-
-                        file_found = true;
-                        file_size = entry.file_size;
-                        cluster = entry.start_cluster;
-
-                        //
-                        //  Load the whole ELF to a temp location
-                        //
-
-                        let load_addr: u64 = 0x650_000;
-                        let stack_top = 0x670_000;
-
-                        let mut offset = 0;
-
-                        while file_size - offset > 0 {
-                            let lba = fs.cluster_to_lba(cluster);
-                            let mut sector = [0u8; 512];
-
-                            fs.device.read_sector(lba, &mut sector);
-
-                            let dst = load_addr as *mut u8;
-
-                            rprint!("Loading ELF image to memory segment\n");
-
-                            unsafe {
-                                for i in 0..512 {
-                                    if let Some(byte) = sector.get(i) {
-                                        *dst.add(i + offset as usize) = *byte;
-                                    }
+                    while offset < file_size {
+                        let lba = fs.cluster_to_lba(cluster);
+                        let mut sector = [0u8; 512];
+                        fs.device.read_sector(lba, &mut sector);
+                        let dst = load_addr as *mut u8;
+                        unsafe {
+                            for i in 0..512 {
+                                if let Some(byte) = sector.get(i) {
+                                    *dst.add(i + offset as usize) = *byte;
                                 }
                             }
-
-                            cluster = fs.read_fat12_entry(cluster);
-
-                            if cluster >= 0xFF8 || cluster == 0 {
-                                break;
-                            }
-
-                            offset += 512;
                         }
+                        cluster = fs.read_fat12_entry(cluster);
+                        if cluster >= 0xFF8 || cluster == 0 { break; }
+                        offset += 512;
+                    }
 
-                        let arg: u64 = 555;
-                        // let entry_ptr = (load_addr + 0x18) as *const u8;
-
-                        unsafe {
-                            // Assume `elf_image` is a pointer to the loaded ELF file in memory
-                            let entry_addr = elf::load_elf64(load_addr as usize, 0);
-
-                            // Cast and jump
-                            let entry_fn: extern "C" fn() -> u64 =
-                                core::mem::transmute(entry_addr as *const ());
-
-                            rprint!("Jumping to the program entry point...\n");
-                            elf::jump_to_elf(entry_fn, stack_top, arg);
-                        }
-                    });
+                    unsafe {
+                        let entry_addr = elf::load_elf64(load_addr as usize, 0);
+                        let entry_fn: extern "C" fn() -> u64 =
+                            core::mem::transmute(entry_addr as *const ());
+                        rprint!("Jumping to the program entry point...\n");
+                        elf::jump_to_elf(entry_fn, stack_top, 555);
+                    }
                 }
                 Err(e) => {
-                    rprint!(e);
-                    rprint!("\n");
-
+                    rprint!(e); rprint!("\n");
                     return SyscallReturnCode::FilesystemError as u64;
                 }
-            }
-
-            if !file_found {
-                return SyscallReturnCode::FileNotFound as u64;
             }
         }
 
@@ -1009,6 +855,45 @@ extern "C" fn syscall_inner(arg1: u64, arg2: u64, syscall_no: u64) -> u64 {
                 out.add(2).write_volatile(report.cross_linked as u64);
                 out.add(3).write_volatile(report.invalid_entries as u64);
             }
+        }
+
+        /*
+         *  Syscall 0x2C --- List VFS mount table
+         *
+         *  Arg1: unused
+         *  Arg2: pointer to buffer (MAX_MOUNTS × 34 bytes: 32-byte path, 1-byte path_len, 1-byte fs_type)
+         *        fs_type encoding: 0=none, 1=rootfs, 2=fat12
+         *  Returns: number of mounts written
+         */
+        0x2C => {
+            if !(USERLAND_START..=USERLAND_END).contains(&arg2) {
+                return SyscallReturnCode::InvalidInput as u64;
+            }
+
+            let buf = arg2 as *mut u8;
+            let mut count = 0u64;
+
+            if let Some(vfs_table) = vfs::VFS.try_lock() {
+                let n = vfs_table.count();
+                for i in 0..n {
+                    if let Some(m) = vfs_table.get(i) {
+                        let fs_type_u8: u8 = match m.fs_type {
+                            vfs::FsType::None  => 0,
+                            vfs::FsType::Root  => 1,
+                            vfs::FsType::Fat12 => 2,
+                        };
+                        unsafe {
+                            let entry = buf.add(i * 34);
+                            copy_nonoverlapping(m.path.as_ptr(), entry, 32);
+                            entry.add(32).write_volatile(m.path_len as u8);
+                            entry.add(33).write_volatile(fs_type_u8);
+                        }
+                        count += 1;
+                    }
+                }
+            }
+
+            return count;
         }
 
         /*
@@ -1357,6 +1242,23 @@ extern "C" fn syscall_inner(arg1: u64, arg2: u64, syscall_no: u64) -> u64 {
     }
 
     SyscallReturnCode::Ok as u64
+}
+
+/// Read a NUL-terminated string from a validated userland pointer into a slice.
+unsafe fn nul_terminated_slice(ptr: *const u8, max: usize) -> &'static [u8] {
+    let len = (0..max).take_while(|&i| *ptr.add(i) != 0).count();
+    core::slice::from_raw_parts(ptr, len)
+}
+
+/// Resolve a user-provided filename/path to (fat12_relative_slice, base_cluster).
+/// Absolute paths under /mnt/fat are stripped to their FAT12-relative tail;
+/// bare names are resolved relative to the current working directory.
+fn vfs_resolve_fat12(path: &[u8]) -> (&[u8], u16) {
+    if let Some(rel) = vfs::try_fat12_absolute(path) {
+        return (rel, 0); // start from FAT12 root
+    }
+    let cwd = SYSTEM_CONFIG.try_lock().map_or(0, |c| c.get_path_cluster());
+    (path, cwd)
 }
 
 fn format_filename(name_ptr: *const u8) -> ([u8; 8], [u8; 3]) {

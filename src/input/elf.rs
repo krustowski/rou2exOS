@@ -113,7 +113,7 @@ pub enum RunMode {
 
 static mut STACK_NO: usize = 0;
 
-use crate::fs::fat12::{block::Floppy, fs::Filesystem};
+use crate::fs::fat12::{block::Floppy, fs::{fat83, Filesystem}};
 
 /// Write the x86-64 SysV initial-stack layout (argc / argv) into user memory
 /// just below `stack_top` and return the new RSP that points at `argc`.
@@ -187,48 +187,48 @@ unsafe fn push_user_args(stack_top: u64, args: &[u8]) -> u64 {
 }
 
 pub fn run_elf(filename_input: &[u8], args: &[u8], mode: RunMode) -> bool {
-    if filename_input.is_empty() || filename_input.len() > 8 {
+    if filename_input.is_empty() || filename_input.len() > 12 {
         return false;
     }
 
-    // 12 = filename + ext + dot
-    let mut filename = [b' '; 12];
-
-    /*if let Some(slice) = filename.get_mut(..filename_input.len()) {
-        slice.copy_from_slice(filename_input);
-    }*/
-    if let Some(slice) = filename.get_mut(9..12) {
-        slice.copy_from_slice(b"ELF");
-    }
+    // If the caller didn't include an extension, append .elf
+    let mut name_buf = [0u8; 13];
+    let full_name: &[u8] = if filename_input.contains(&b'.') {
+        filename_input
+    } else {
+        let n = filename_input.len().min(8);
+        name_buf[..n].copy_from_slice(&filename_input[..n]);
+        name_buf[n..n + 4].copy_from_slice(b".elf");
+        &name_buf[..n + 4]
+    };
+    let name83 = fat83(full_name);
 
     let floppy = Floppy::init();
-
-    // Init the filesystem to look for a match
     match Filesystem::new(&floppy) {
         Ok(fs) => {
             unsafe {
-                let mut cluster: u16 = 0;
                 let mut offset = 0;
-                let mut size = 0;
 
-                let path_cluster = {
-                    if let Some(c) = crate::init::config::SYSTEM_CONFIG.try_lock() {
-                        c.get_path_cluster()
-                    } else {
-                        0
+                let path_cluster = crate::init::config::SYSTEM_CONFIG
+                    .try_lock()
+                    .map_or(0, |c| c.get_path_cluster());
+
+                let entry = match fs.find_entry(path_cluster, &name83) {
+                    Some(e) if e.attr & 0x10 == 0 => e,
+                    _ => {
+                        error!("no such file found");
+                        error!();
+                        return false;
                     }
                 };
+                let cluster_start = entry.start_cluster;
+                let mut cluster = cluster_start;
+                let size = entry.file_size;
 
-                fs.for_each_entry(path_cluster, |entry| {
-                    if entry.name.starts_with(filename_input) && entry.ext.starts_with(b"ELF") {
-                        cluster = entry.start_cluster;
-                        size = entry.file_size;
-
-                        if let Some(slice) = filename.get_mut(0..8) {
-                            slice.copy_from_slice(&entry.name);
-                        }
-                    }
-                });
+                let mut filename = [b' '; 12];
+                filename[0..8].copy_from_slice(&entry.name);
+                filename[8] = b'.';
+                filename[9..12].copy_from_slice(&entry.ext);
 
                 if cluster == 0 {
                     error!("no such file found");

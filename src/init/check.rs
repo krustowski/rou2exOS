@@ -52,6 +52,8 @@ pub fn init(m2_ptr: u32) {
 
     result!("Checking floppy drive", fs::floppy_check_init());
 
+    fs::vfs_init();
+
     color::color_demo();
     ascii::ascii_art();
 

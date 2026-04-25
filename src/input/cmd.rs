@@ -1,7 +1,8 @@
 use crate::acpi;
 use crate::audio;
 use crate::debug;
-use crate::fs::fat12::{block::Floppy, check::run_check, fs::Filesystem};
+use crate::fs::fat12::{block::Floppy, check::run_check, fs::{fat83, Filesystem}};
+use crate::fs::vfs;
 use crate::init::config;
 use crate::input::keyboard;
 use crate::time;
@@ -99,6 +100,12 @@ static COMMANDS: &[Command] = &[
         name: b"mkdir",
         description: b"creates a subdirectory",
         function: cmd_mkdir,
+        hidden: false,
+    },
+    Command {
+        name: b"mount",
+        description: b"lists the VFS mount table",
+        function: cmd_mount,
         hidden: false,
     },
     Command {
@@ -332,59 +339,28 @@ fn cmd_fg(args: &[u8]) {
 
 /// Changes the current directory to one matching an input from keyboard.
 fn cmd_cd(args: &[u8]) {
-    if let Some(mut syscfg) = crate::init::config::SYSTEM_CONFIG.try_lock() {
-        // 12 = name + extension + dot
-        if args.is_empty() || args.len() > 12 {
-            syscfg.set_path(b"/", 0);
-            return;
-        }
+    let (name_input, _) = keyboard::split_cmd(args);
+    if name_input.is_empty() || name_input == b"/" || name_input == b".." {
+        if let Some(mut c) = config::SYSTEM_CONFIG.try_lock() { c.set_path(b"/", 0); }
+        return;
+    }
 
-        // This split_cmd invocation trims the b'\0' tail from the input args.
-        let (filename_input, _) = keyboard::split_cmd(args);
-
-        if filename_input.is_empty() || filename_input.len() > 12 {
-            warn!("Usage: cd <dirname>\n");
-            return;
-        }
-
-        // 12 = filename + ext + dot
-        let mut filename = [b' '; 12];
-        if let Some(slice) = filename.get_mut(..filename_input.len()) {
-            slice.copy_from_slice(filename_input);
-        }
-
-        let floppy = Floppy::init();
-
-        // Init the filesystem to look for a match
-        match Filesystem::new(&floppy) {
-            Ok(fs) => {
-                let mut cluster: u16 = 0;
-
-                let path_cluster = {
-                    if let Some(c) = config::SYSTEM_CONFIG.try_lock() {
-                        c.get_path_cluster()
-                    } else {
-                        0
+    let cwd = config::SYSTEM_CONFIG.try_lock().map_or(0, |c| c.get_path_cluster());
+    let floppy = Floppy::init();
+    match Filesystem::new(&floppy) {
+        Ok(fs) => {
+            let name83 = fat83(name_input);
+            match fs.find_entry(cwd, &name83) {
+                Some(entry) if entry.attr & 0x10 != 0 => {
+                    if let Some(mut c) = config::SYSTEM_CONFIG.try_lock() {
+                        c.set_path(name_input, entry.start_cluster);
                     }
-                };
-
-                fs.for_each_entry(path_cluster, |entry| {
-                    if entry.name.starts_with(filename_input) {
-                        cluster = entry.start_cluster;
-                    }
-                });
-
-                if cluster > 0 {
-                    syscfg.set_path(filename_input, cluster);
-                } else {
-                    error!("No such directory\n");
                 }
-            }
-            Err(e) => {
-                error!(e);
-                error!();
+                Some(_) => { error!("not a directory\n"); }
+                None     => { error!("no such directory\n"); }
             }
         }
+        Err(e) => { error!(e); error!(); }
     }
 }
 
@@ -576,133 +552,101 @@ fn cmd_mkdir(args: &[u8]) {
     }
 }
 
+fn cmd_mount(_args: &[u8]) {
+    if let Some(vfs_table) = vfs::VFS.try_lock() {
+        let count = vfs_table.count();
+        if count == 0 {
+            println!("No mounts.");
+            return;
+        }
+        for i in 0..count {
+            if let Some(m) = vfs_table.get(i) {
+                let path = &m.path[..m.path_len];
+                let fstype: &[u8] = match m.fs_type {
+                    vfs::FsType::Root  => b"rootfs",
+                    vfs::FsType::Fat12 => b"fat12",
+                    vfs::FsType::None  => b"none",
+                };
+                printb!(path);
+                print!(" (");
+                printb!(fstype);
+                print!(")\n");
+            }
+        }
+    } else {
+        error!("mount: VFS lock unavailable\n");
+    }
+}
+
 /// Renames given <old_name> to <new_name> in the current directory.
 fn cmd_mv(args: &[u8]) {
     if args.is_empty() {
-        warn!("Usage: mv <old> <new>");
+        warn!("Usage: mv <old> <new>\n");
         return;
     }
-
+    let (old, new) = split_cmd(args);
+    if old.is_empty() || new.is_empty() {
+        warn!("Usage: mv <old> <new>\n");
+        return;
+    }
+    let cwd = config::SYSTEM_CONFIG.try_lock().map_or(0, |c| c.get_path_cluster());
     let floppy = Floppy::init();
-
     match Filesystem::new(&floppy) {
         Ok(fs) => {
-            let (old, new) = split_cmd(args);
-
-            let mut old_filename: [u8; 11] = [b' '; 11];
-            let mut new_filename: [u8; 11] = [b' '; 11];
-
-            if new.is_empty() || old.is_empty() || old.len() > 11 || new.len() > 11 {
-                warn!("Usage: mv <old> <new>");
-                return;
-            }
-
-            if let Some(slice) = old_filename.get_mut(..) {
-                slice[..old.len()].copy_from_slice(old);
-                slice[8..11].copy_from_slice(b"TXT");
-            }
-
-            if let Some(slice) = new_filename.get_mut(..) {
-                slice[..new.len()].copy_from_slice(new);
-                slice[8..11].copy_from_slice(b"TXT");
-            }
-
-            to_uppercase_ascii(&mut old_filename);
-            to_uppercase_ascii(&mut new_filename);
-
-            let path_cluster = {
-                if let Some(c) = config::SYSTEM_CONFIG.try_lock() {
-                    c.get_path_cluster()
-                } else {
-                    0
-                }
-            };
-
-            fs.rename_file(path_cluster, &old_filename, &new_filename);
+            fs.rename_file(cwd, &fat83(old), &fat83(new));
         }
-        Err(e) => {
-            error!(e);
-            error!();
-        }
+        Err(e) => { error!(e); error!(); }
     }
 }
 
 /// This command function takes the argument, then tries to find a matching filename in the current
 /// directory, and finally it dumps its content to screen.
 fn cmd_read(args: &[u8]) {
-    if args.is_empty() || args.len() > 11 {
+    if args.is_empty() {
         warn!("Usage: read <filename>\n");
         return;
     }
-
+    let (name_input, _) = keyboard::split_cmd(args);
+    let (rel, cwd) = match vfs::try_fat12_absolute(name_input) {
+        Some(rel) => (rel, 0u16),
+        None      => (name_input, config::SYSTEM_CONFIG.try_lock().map_or(0, |c| c.get_path_cluster())),
+    };
     let floppy = Floppy::init();
-
     match Filesystem::new(&floppy) {
         Ok(fs) => {
-            let mut filename = [b' '; 11];
-
-            filename[..args.len()].copy_from_slice(args);
-            filename[8..11].copy_from_slice(b"TXT");
-
-            to_uppercase_ascii(&mut filename);
-
-            // TODO: tix this
-            //let cluster = fs.list_dir(config::PATH_CLUSTER, &filename);
-            let cluster = 0;
-
-            if cluster > 0 {
-                let mut buf = [0u8; 512];
-
-                fs.read_file(cluster as u16, &mut buf);
-
-                print!("Dumping file raw contents:\n", Color::DarkYellow);
-                printb!(&buf);
-                println!();
-            } else {
-                error!("No such file found");
+            let name83 = fat83(rel);
+            match fs.find_entry(cwd, &name83) {
+                Some(entry) if entry.attr & 0x10 == 0 => {
+                    let mut buf = [0u8; 4096];
+                    fs.read_file(entry.start_cluster, &mut buf);
+                    print!("File contents:\n", Color::DarkYellow);
+                    let len = (entry.file_size as usize).min(buf.len());
+                    printb!(&buf[..len]);
+                    println!();
+                }
+                Some(_) => { error!("not a file\n"); }
+                None     => { error!("no such file\n"); }
             }
         }
-        Err(e) => {
-            error!(e);
-            error!();
-        }
+        Err(e) => { error!(e); error!(); }
     }
 }
 
 /// Removes a file in the current directory according to the input.
 fn cmd_rm(args: &[u8]) {
-    if args.is_empty() || args.len() > 11 {
+    if args.is_empty() {
         warn!("Usage: rm <filename>\n");
         return;
     }
-
+    let (name_input, _) = keyboard::split_cmd(args);
+    let (rel, cwd) = match vfs::try_fat12_absolute(name_input) {
+        Some(rel) => (rel, 0u16),
+        None      => (name_input, config::SYSTEM_CONFIG.try_lock().map_or(0, |c| c.get_path_cluster())),
+    };
     let floppy = Floppy::init();
-
     match Filesystem::new(&floppy) {
-        Ok(fs) => {
-            let mut filename: [u8; 11] = [b' '; 11];
-
-            if let Some(slice) = filename.get_mut(..) {
-                slice[..args.len()].copy_from_slice(args);
-                slice[8..11].copy_from_slice(b"TXT");
-            }
-
-            to_uppercase_ascii(&mut filename);
-
-            let path_cluster = {
-                if let Some(c) = config::SYSTEM_CONFIG.try_lock() {
-                    c.get_path_cluster()
-                } else {
-                    0
-                }
-            };
-
-            fs.delete_file(path_cluster, &filename);
-        }
-        Err(e) => {
-            error!(e);
-            error!();
-        }
+        Ok(fs) => { fs.delete_file(cwd, &fat83(rel)); }
+        Err(e) => { error!(e); error!(); }
     }
 }
 
@@ -773,32 +717,24 @@ fn cmd_ts(_args: &[u8]) {
     }
 }
 
-/// Experimental command function to show the system uptime.
 fn cmd_uptime(_args: &[u8]) {
-    let total_seconds = time::acpi::get_uptime_seconds();
+    let total = time::acpi::get_uptime_seconds();
+    let h = total / 3600;
+    let m = (total % 3600) / 60;
+    let s = total % 60;
 
-    let h = total_seconds / 3600;
-    let m = (total_seconds % 3600) / 60;
-    let s = total_seconds % 60;
-
-    print!("System uptime: ");
-
-    // Hours
+    print!("Uptime: ");
     printn!(h);
-    print!(":");
-
-    // Minutes
-    if m < 10 {
-        print!("0");
-    }
+    print!(" hour");
+    if h != 1 { print!("s"); }
+    print!(" ");
     printn!(m);
-    print!(":");
-
-    // Seconds
-    if s < 10 {
-        print!("0");
-    }
+    print!(" minute");
+    if m != 1 { print!("s"); }
+    print!(" ");
     printn!(s);
+    print!(" second");
+    if s != 1 { print!("s"); }
     println!();
 }
 

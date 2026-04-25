@@ -4,12 +4,7 @@ use crate::debug;
 use crate::fs::fat12::{block::Floppy, check::run_check, fs::Filesystem};
 use crate::init::config;
 use crate::input::keyboard;
-use crate::net;
 use crate::time;
-use crate::tui::{
-    app::TuiApp,
-    widget::{Container, Label, Window},
-};
 use crate::video::vga::Color;
 
 const KERNEL_VERSION: &[u8] = b"0.11.0";
@@ -94,12 +89,12 @@ static COMMANDS: &[Command] = &[
         function: cmd_kill,
         hidden: false,
     },
-    Command {
+    /*Command {
         name: b"menu",
         description: b"renders a sample menu",
         function: cmd_menu,
         hidden: true,
-    },
+    },*/
     Command {
         name: b"mkdir",
         description: b"creates a subdirectory",
@@ -501,7 +496,7 @@ fn cmd_kill(args: &[u8]) {
 }
 
 /// Experimental command function to evaluate the current TUI rendering options.
-fn cmd_menu(_args: &[u8]) {
+/*fn cmd_menu(_args: &[u8]) {
     // Set the labels
     let mut label1 = Label {
         x: 0,
@@ -543,7 +538,7 @@ fn cmd_menu(_args: &[u8]) {
     let mut app = TuiApp::new();
     app.set_root(&mut window);
     app.run();
-}
+}*/
 
 /// Creates new subdirectory in the current directory.
 fn cmd_mkdir(args: &[u8]) {

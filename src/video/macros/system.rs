@@ -31,7 +31,7 @@ macro_rules! warn {
             $arg,
             $crate::video::vga::Color::Yellow,
             $crate::video::vga::Color::Black
-        );
+        )
     };
 }
 
@@ -46,4 +46,3 @@ macro_rules! result {
         };
     };
 }
-

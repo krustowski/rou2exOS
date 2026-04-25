@@ -20,7 +20,7 @@ mod mem;
 mod net;
 mod task;
 mod time;
-mod tui;
+// TBD
 mod vga;
 
 /// Kernel entrypoint
@@ -44,28 +44,22 @@ pub extern "C" fn kernel_main(_multiboot2_magic: u32, multiboot_ptr: u32) {
 //
 //
 
-// #[lang = "eh_personality"] extern fn eh_personality() {}
-
 use core::panic::PanicInfo;
 
 /// Panic handler for panic fucntion invocations
 #[panic_handler]
 fn panic(info: &PanicInfo) -> ! {
-    use vga::buffer::Color;
-    use vga::write::{newline, number, string};
-
-    let vga_index: &mut isize = &mut 0;
-
-    vga::screen::clear(vga_index);
+    debugln!("kernel panic!");
+    clear_screen!();
+    error!("KERNEL PANIC\n");
 
     if let Some(location) = info.location() {
-        string(vga_index, location.file().as_bytes(), Color::Red);
-        string(vga_index, b":", Color::Red);
-        number(vga_index, location.line() as u64);
-        newline(vga_index);
+        warn!(location.file());
+        warn!(": ");
+        printn!(location.line() as u64);
+        println!();
     } else {
-        string(vga_index, b"No location", Color::Red);
-        newline(vga_index);
+        warn!("no location\n")
     }
 
     unsafe {

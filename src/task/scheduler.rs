@@ -367,6 +367,8 @@ impl Scheduler {
 
 #[no_mangle]
 pub unsafe extern "C" fn scheduler_schedule(mut old: *mut u64) -> *mut u64 {
+    crate::time::acpi::tick();
+
     // Poll the NIC before scheduling — delivers any pending Ethernet frame to
     // the registered userland ETH driver via IPC, waking it if blocked.
     crate::net::netdrv::poll_and_deliver();

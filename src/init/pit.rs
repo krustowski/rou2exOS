@@ -1,13 +1,16 @@
 use crate::input::port::{read, write};
 use crate::video::sysprint::Result;
 
+/// Nominal PIT tick rate.  Must match the argument passed to `init_pit`.
+pub const TICKS_PER_SECOND: u64 = 100;
+
 pub fn init_pit(frequency_hz: u32) {
     if frequency_hz == 0 {
         return;
     }
 
-    //let divisor = 1_193_180 / frequency_hz;
-    let divisor = 1_193_000_000 / frequency_hz;
+    // PIT input clock is 1,193,182 Hz; divisor must fit in 16 bits.
+    let divisor = 1_193_182_u32 / frequency_hz;
 
     // PIT control port
     write(0x43, 0x36);
@@ -80,7 +83,7 @@ pub fn pic_pit_init() -> Result {
     }
 
     debugln!("Starting 100Hz timer");
-    init_pit(100);
+    init_pit(TICKS_PER_SECOND as u32);
 
     Result::Passed
 }

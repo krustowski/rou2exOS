@@ -62,25 +62,27 @@ Please note that these lists are incomplete as listed syscalls have to be implem
 |  `0x1b`|  `0x01`| pointer to the audio file | Play the MIDI audio file. | ✅ |
 |  `0x1f`|  `0x00`|  `0x00`| Stop the player. | ✅ |
 
-#### Filesystem (VFS / FAT12)
+#### Filesystem (VFS / FAT12 / ISO9660)
 
-File name arguments accept either a bare name relative to the current working directory (e.g. `FOO.TXT`) or an absolute VFS path (e.g. `/mnt/fat/FOO.TXT`).  Both forms are resolved through the VFS mount table.
+File name arguments accept either a bare name relative to the current working directory (e.g. `FOO.TXT`) or an absolute VFS path (e.g. `/mnt/fat/FOO.TXT`, `/mnt/iso/grub/grub.cfg`).  Both forms are resolved through the VFS mount table.  ISO9660 is mounted read-only at `/mnt/iso`.
 
 | Syscall No. | Argument 1 | Argument 2 | Purpose/Command | Implemented |
 |-------------|------------|------------|-----------------|-------------|
-|  `0x20`|  pointer to file name string | pointer to buffer | Read a file specified in the first argument and load its contents into the buffer in argument 2. | ✅ |
+|  `0x20`|  pointer to file name string | pointer to buffer | Read a file at the given path and load its contents into the buffer. Dispatches to ISO9660 for `/mnt/iso/…` paths. | ✅ |
 |  `0x21`|  pointer to string data | pointer to buffer | Write the buffer into a file (overwrite it) specified by the first argument. File is created in the current directory if not exists. | ✅ |
 |  `0x22`|  pointer to string data | pointer to string data | Rename the file specified by its name in argument No. 1 to value specified in argument No. 2. | ✅ |
 |  `0x23`|  pointer to string data | `0x00` | Delete the file specified in argument No. 1. Applicable on a file in the current directory. | ✅ |
 |  `0x24`|  cluster No. | pointer to next cluster No. int64 |  Read the FAT table and find next (or first) sector of provided cluster. | ❌ |
 |  `0x25`|  cluster No. | value | Write into given cluster such value provided in the argument No. 2. | ❌ |
 |  `0x26`|  cluster No. | pointer to the Entry structure | Insert an Entry provided via the first argument into the directory with Cluster No. specified in the argument No. 2. | ❌ |
-|  `0x27`|  cluster No. (current directory usually) | pointer to string data | Create a new subdirectory in such parent directory specified by name in argument No. 2. | ✅ |
-|  `0x28`|  cluster No. | pointer to array of entries | List the current directory. | ✅ |
+|  `0x27`|  pointer to parent directory absolute path | pointer to new subdirectory name | Create a subdirectory inside the parent path. Resolves via VFS; ISO9660 paths are rejected (read-only). | ✅ |
+|  `0x28`|  cluster No. | pointer to array of entries | List the FAT12 directory at the given cluster. | ✅ |
 |  `0x29`|  pointer to file name string | pointer to uint64 (PID) | Execute a flat binary executable (.BIN usually). | ❌ |
 |  `0x2a`|  pointer to file name string | pointer to uint64 (PID) | Execute an ELF64 executable (.ELF). Auto-appends `.elf` if no extension given. | ✅ |
 |  `0x2b` | unused | pointer to `FsckReport_T` | Run the FAT12 filesystem check; populates the report struct pointed to by arg2. | ✅ |
-|  `0x2c` | unused | pointer to array of up to 8 `MountInfo_T` | List VFS mount points. Returns the number of active mounts as a u64. `fs_type`: `0`=none, `1`=rootfs, `2`=fat12. | ✅ |
+|  `0x2c` | unused | pointer to array of up to 8 `MountInfo_T` | List VFS mount points. Returns the number of active mounts as a u64. `fs_type`: `0`=none, `1`=rootfs, `2`=fat12, `3`=iso9660. | ✅ |
+|  `0x2d` | pointer to absolute path string | pointer to array of up to 32 `VfsDirEntry_T` | List a directory by VFS path. Works for both FAT12 and ISO9660. Returns entry count. | ✅ |
+|  `0x2e` | pointer to absolute path string | `0x00` | Change working directory. Updates `SYSTEM_CONFIG` path and cluster. Verifies the path is an existing directory. ISO9660 paths set cluster to 0. | ✅ |
 
 #### Port I/O and Networking
 
@@ -231,13 +233,13 @@ Each entry describes one VFS mount point.  The kernel writes up to 8 entries int
 |-------|------|-------------|
 | `path` | `uint8_t[32]` | Mount path, **not** NUL-terminated; use `path_len` |
 | `path_len` | `uint8_t` | Number of valid bytes in `path` |
-| `fs_type` | `uint8_t` | `0`=none, `1`=rootfs, `2`=fat12 |
+| `fs_type` | `uint8_t` | `0`=none, `1`=rootfs, `2`=fat12, `3`=iso9660 |
 
 ```rust
 pub struct MountInfo {
     pub path: [u8; 32],
     pub path_len: u8,
-    pub fs_type: u8,   // 0=none 1=rootfs 2=fat12
+    pub fs_type: u8,   // 0=none 1=rootfs 2=fat12 3=iso9660
 }
 ```
 
@@ -245,6 +247,35 @@ pub struct MountInfo {
 typedef struct {
     uint8_t path[32];
     uint8_t path_len;
-    uint8_t fs_type;   /* 0=none, 1=rootfs, 2=fat12 */
+    uint8_t fs_type;   /* 0=none, 1=rootfs, 2=fat12, 3=iso9660 */
 } __attribute__((packed)) MountInfo_T;
+```
+
+#### VfsDirEntry (syscall `0x2d`)
+
+Each entry describes one item in a directory.  The kernel writes up to 32 entries and returns the count.  `name` is **not** NUL-terminated; use `name_len`.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `name` | `uint8_t[32]` | Entry name, lowercase, **not** NUL-terminated |
+| `name_len` | `uint8_t` | Number of valid bytes in `name` |
+| `is_dir` | `uint8_t` | `1` if directory, `0` if file |
+| `size` | `uint32_t` | File size in bytes (0 for directories) |
+
+```rust
+pub struct VfsDirEntry {
+    pub name: [u8; 32],
+    pub name_len: u8,
+    pub is_dir: u8,
+    pub size: u32,
+}
+```
+
+```c
+typedef struct {
+    uint8_t  name[32];
+    uint8_t  name_len;
+    uint8_t  is_dir;
+    uint32_t size;
+} __attribute__((packed)) VfsDirEntry_T;
 ```

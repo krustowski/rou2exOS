@@ -11,6 +11,7 @@ use crate::{
     },
     init::config::SYSTEM_CONFIG,
     input::{elf, irq},
+    mem::uheap,
     net::{icmp, ipv4, serial, tcp},
     task::{
         queue::Message,
@@ -265,18 +266,36 @@ extern "C" fn syscall_inner(arg1: u64, arg2: u64, syscall_no: u64) -> u64 {
         }
 
         /*
-         *  Syscall 0x0a --- Allocate memory from heap
+         *  Syscall 0x0a --- Allocate memory from the userland heap
          *
-         *  Arg1: pointer to type (*mut _)
-         *  Arg2: size in bytes to allocate
+         *  Arg1: size in bytes to allocate
+         *  Arg2: unused (0x00)
+         *  Returns: virtual address of the allocated block (in 0xC00_000–0xFFF_FFF),
+         *           or 0x00 on failure.  The block is zeroed.
          */
         0x0a => {
-            if !(USERLAND_START..=USERLAND_END).contains(&arg1) {
-                return SyscallReturnCode::InvalidInput as u64;
-            }
+            return uheap::malloc(arg1 as usize);
+        }
 
-            // TODO
-            return SyscallReturnCode::NotImplemented as u64;
+        /*
+         *  Syscall 0x0b --- Reallocate a heap block
+         *
+         *  Arg1: pointer to the existing block (or 0 to allocate fresh)
+         *  Arg2: new size in bytes (0 frees the block and returns 0)
+         *  Returns: virtual address of the (possibly moved) block, or 0 on failure.
+         */
+        0x0b => {
+            return uheap::realloc(arg1, arg2 as usize);
+        }
+
+        /*
+         *  Syscall 0x0f --- Free a heap block
+         *
+         *  Arg1: pointer to the block to free (must be in 0xC00_000–0xFFF_FFF)
+         *  Arg2: 0x00
+         */
+        0x0f => {
+            uheap::free(arg1);
         }
 
         /*

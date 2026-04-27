@@ -3,7 +3,7 @@ cargo-features = ["panic-immediate-abort"]
 [package]
 name = "kernel"
 description = "rou2exOS kernel"
-version = "0.11.2"
+version = "0.11.3"
 edition = "2021"
 authors = ["krusty <krusty@vxn.dev>"]
 

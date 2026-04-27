@@ -3,6 +3,10 @@ use crate::task::{process::Mode, scheduler};
 pub unsafe fn init_processes() {
     // Snapshot the boot-time CR3 before any per-process tables are created.
     crate::mem::pages::save_kernel_cr3();
+    // Map 0xC00_000–0xFFF_FFF as user-accessible and initialise the heap.
+    // Must run after save_kernel_cr3 so create_user_page_table inherits the
+    // updated P2[6/7] entries when it clones the kernel page table.
+    crate::mem::uheap::init();
     setup_processes();
 }
 

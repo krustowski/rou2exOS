@@ -44,9 +44,9 @@ Please note that these lists are incomplete as listed syscalls have to be implem
 |  `0x03`|  `0x01`| pointer to circular buffer | Register a buffer to receive scancodes from IRQ1 | ✅ |
 |        |  `0x02`| pointer to circular buffer | Unregister a buffer to receive scancodes from IRQ1 | ✅ |
 |        |  `0x03`| pointer to circular buffer | Read from the buffer. | ✅ |
-|  `0x0a`|  pointer to type pointer | size in bytes to allocate | Allocate a memory block on heap. The pointer to the allocated block is returned in `RAX`, or is `0x00` if the allocation procedure fails. | ❌ |
-|  `0x0b`|  pointer to type pointer | size in bytes to allocate | Reallocate the memory block on heap. | ❌ |
-|  `0x0f`|  pointer to type pointer | `0x00` | Free the allocated memory on heap. | ❌ |
+|  `0x0a`|  size in bytes | `0x00` | Allocate a block from the userland heap (0xC00\_000–0xFFF\_FFF). Returns the virtual address of the zeroed block in `RAX`, or `0x00` on failure. | ✅ |
+|  `0x0b`|  pointer to existing block (or `0x00`) | new size in bytes | Reallocate a heap block. Tries in-place expansion first; falls back to allocate+copy+free. Returns the (possibly new) address, or `0x00` on failure. | ✅ |
+|  `0x0f`|  pointer to block | `0x00` | Free a heap block. Immediately coalesces adjacent free blocks. | ✅ |
 
 #### Video + Audio Output
 

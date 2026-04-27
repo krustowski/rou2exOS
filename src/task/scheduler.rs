@@ -417,6 +417,41 @@ pub unsafe fn list_processes() {
     }
 }
 
+/// Serialise running tasks into a flat byte buffer for the ScListTasks syscall.
+/// Each entry is 20 bytes: id(1) mode(1) status(1) _pad(1) name(16).
+/// mode:   0=Kernel  1=User
+/// status: 0=Ready 1=Running 2=Idle 3=Blocked 4=Crashed 5=Dead
+/// Returns the number of entries written.
+pub fn list_tasks(buf: *mut u8, max: usize) -> usize {
+    if let Some(sch) = SCHEDULER.try_lock() {
+        let mut count = 0usize;
+        for process in sch.processes.iter() {
+            if count >= max { break; }
+            if let Some(p) = process {
+                let off = count * 20;
+                unsafe {
+                    *buf.add(off)     = p.id as u8;
+                    *buf.add(off + 1) = match p.mode { Mode::Kernel => 0, _ => 1 };
+                    *buf.add(off + 2) = match p.status {
+                        Status::Ready   => 0,
+                        Status::Running => 1,
+                        Status::Idle    => 2,
+                        Status::Blocked => 3,
+                        Status::Crashed => 4,
+                        Status::Dead    => 5,
+                    };
+                    *buf.add(off + 3) = 0;
+                    for i in 0..16 { *buf.add(off + 4 + i) = p.name[i]; }
+                }
+                count += 1;
+            }
+        }
+        count
+    } else {
+        0
+    }
+}
+
 pub unsafe fn new_process(
     name: [u8; 16],
     mode: Mode,

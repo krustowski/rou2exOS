@@ -19,7 +19,7 @@ impl SystemConfig {
             path: *b"/                               ",
             path_len: 1,
             path_cluster: 0,
-            version: *b"v0.11.1         ",
+            version: *b"v0.11.2         ",
         }
     }
 

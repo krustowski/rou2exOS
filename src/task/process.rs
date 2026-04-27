@@ -44,6 +44,8 @@ pub struct Process {
     /// Physical address of this process's P4 page table, or 0 for kernel processes
     /// (which reuse the boot-time KERNEL_CR3).
     pub cr3: u64,
+    /// PIT tick at which a sleeping process should be woken (0 = not sleeping).
+    pub sleep_until: u64,
 }
 
 const STACK_SIZE: usize = 32768;
@@ -91,6 +93,7 @@ impl Process {
             stack_top: process_stack_top,
             kernel_stack: unsafe { &KSTACK_POOL[slot % MAX_PROCESSES] },
             cr3,
+            sleep_until: 0,
             ports: [Port {
                 id: 0,
                 block_msg: None,

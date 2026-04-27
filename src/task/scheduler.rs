@@ -32,6 +32,20 @@ impl Scheduler {
     }
 
     pub unsafe fn schedule(&mut self, old: *mut u64) -> *mut u64 {
+        // Wake any processes whose timed sleep has expired.
+        let now = crate::time::acpi::get_tick_count();
+        for slot in self.processes.iter_mut() {
+            if let Some(proc) = slot {
+                if proc.sleep_until != 0
+                    && proc.status == Status::Blocked
+                    && now >= proc.sleep_until
+                {
+                    proc.status = Status::Ready;
+                    proc.sleep_until = 0;
+                }
+            }
+        }
+
         let mut next = self.current_pid;
         let start = next;
 
@@ -193,6 +207,15 @@ impl Scheduler {
 
         self.set_status(pid, Status::Blocked);
         self.processes[pid].as_mut().unwrap().ports[0].block_msg = Some(msg);
+    }
+
+    pub fn sleep_process(&mut self, slot: usize, until_tick: u64) {
+        if !self.check_pid(slot) {
+            return;
+        }
+        let proc = self.processes[slot].as_mut().unwrap();
+        proc.sleep_until = until_tick;
+        proc.status = Status::Blocked;
     }
 
     pub unsafe fn list_processes(&self) {
@@ -396,6 +419,16 @@ pub unsafe fn block(pid: usize, msg: Message) {
 pub unsafe fn wake(pid: usize) {
     if let Some(mut sch) = SCHEDULER.try_lock() {
         sch.set_status(pid, Status::Ready);
+    }
+}
+
+/// Mark the currently-running process as Blocked until `until_tick` PIT ticks have elapsed.
+/// Getting `current_pid` and setting `sleep_until` happen under the same lock to avoid
+/// a TOCTOU race with PIT preemption between the two operations.
+pub unsafe fn sleep_current(until_tick: u64) {
+    if let Some(mut sch) = SCHEDULER.try_lock() {
+        let slot = sch.current_pid;
+        sch.sleep_process(slot, until_tick);
     }
 }
 

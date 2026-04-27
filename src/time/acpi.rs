@@ -11,3 +11,7 @@ pub fn get_uptime_seconds() -> u64 {
     unsafe { TICK_COUNT / TICKS_PER_SECOND }
 }
 
+pub fn get_tick_count() -> u64 {
+    unsafe { TICK_COUNT }
+}
+

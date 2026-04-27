@@ -266,6 +266,37 @@ extern "C" fn syscall_inner(arg1: u64, arg2: u64, syscall_no: u64) -> u64 {
         }
 
         /*
+         *  Syscall 0x04 --- Get millisecond tick count
+         *
+         *  Arg1: 0x00 (unused)
+         *  Arg2: 0x00 (unused)
+         *  Returns: elapsed milliseconds since boot (10 ms resolution at 100 Hz PIT)
+         */
+        0x04 => {
+            return crate::time::acpi::get_tick_count() * 10;
+        }
+
+        /*
+         *  Syscall 0x05 --- Sleep for N milliseconds
+         *
+         *  Arg1: duration in milliseconds (rounded up to the next 10 ms PIT tick)
+         *  Arg2: 0x00 (unused)
+         *
+         *  Marks the calling process as Blocked until the requested ticks have elapsed.
+         *  The scheduler checks sleep_until on every PIT interrupt and wakes the process
+         *  automatically — no busy-wait in the kernel.
+         */
+        0x05 => {
+            if arg1 > 0 {
+                let ticks = (arg1 + 9) / 10; // ceil(ms / 10)
+                let wake_tick = crate::time::acpi::get_tick_count() + ticks;
+                unsafe {
+                    scheduler::sleep_current(wake_tick);
+                }
+            }
+        }
+
+        /*
          *  Syscall 0x0a --- Allocate memory from the userland heap
          *
          *  Arg1: size in bytes to allocate

@@ -1,0 +1,4 @@
+{
+  "rust-analyzer.cargo.extraArgs": ["-Zjson-target-spec"],
+  "rust-analyzer.check.extraArgs": ["-Zjson-target-spec"]
+}

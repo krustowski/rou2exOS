@@ -851,15 +851,31 @@ impl<'a, D: BlockDevice> Filesystem<'a, D> {
     pub fn find_entry(&self, cluster: u16, name83: &[u8; 11]) -> Option<Entry> {
         let mut found: Option<Entry> = None;
         self.for_each_entry(cluster, |entry| {
-            if found.is_some() { return; }
+            if found.is_some() {
+                return;
+            }
 
-            if entry.name[0] == 0x00 || entry.name[0] == 0xE5 { return; }
-            
-            if entry.attr & 0x08 != 0 { return; }
-            
-            let name_ok = entry.name.iter().zip(name83[..8].iter()).all(|(a, b)| a == b);
-            let ext_ok  = entry.ext.iter().zip(name83[8..11].iter()).all(|(a, b)| a == b);
-            if name_ok && ext_ok { found = Some(*entry); }
+            if entry.name[0] == 0x00 || entry.name[0] == 0xE5 {
+                return;
+            }
+
+            if entry.attr & 0x08 != 0 {
+                return;
+            }
+
+            let name_ok = entry
+                .name
+                .iter()
+                .zip(name83[..8].iter())
+                .all(|(a, b)| a == b);
+            let ext_ok = entry
+                .ext
+                .iter()
+                .zip(name83[8..11].iter())
+                .all(|(a, b)| a == b);
+            if name_ok && ext_ok {
+                found = Some(*entry);
+            }
         });
         found
     }
@@ -867,25 +883,52 @@ impl<'a, D: BlockDevice> Filesystem<'a, D> {
     /// Resolve a slash-separated relative path (e.g. `b"SUBDIR/FILE.EXT"`) from the root of
     /// this filesystem. Returns the matching `Entry`, or `None` if any component is missing.
     /// An empty (or `/`-only) path returns a synthetic directory entry for cluster 0 (root).
-    pub fn resolve_path(&self, path: &[u8]) -> Option<Entry> {
+    /// Walk a slash-separated path starting from `start_cluster`.
+    /// An empty path returns a synthetic directory entry for `start_cluster` itself.
+    /// Handles multi-component paths and skips empty components (double slashes).
+    pub fn resolve_path_from(&self, start_cluster: u16, path: &[u8]) -> Option<Entry> {
         let path = path.strip_prefix(b"/").unwrap_or(path);
         if path.is_empty() {
-            return Some(Entry { attr: 0x10, start_cluster: 0, ..Default::default() });
+            return Some(Entry {
+                attr: 0x10,
+                start_cluster,
+                ..Default::default()
+            });
         }
-        let mut cluster = 0u16;
+        let mut cluster = start_cluster;
         let mut remaining = path;
         loop {
             let (component, rest) = match remaining.iter().position(|&b| b == b'/') {
                 Some(i) => (&remaining[..i], &remaining[i + 1..]),
-                None    => (remaining, &b""[..]),
+                None => (remaining, &b""[..]),
             };
+            if component.is_empty() {
+                if rest.is_empty() {
+                    break;
+                }
+                remaining = rest;
+                continue;
+            }
             let name83 = fat83(component);
             let entry = self.find_entry(cluster, &name83)?;
-            if rest.is_empty() { return Some(entry); }
-            if entry.attr & 0x10 == 0 { return None; }
+            if rest.is_empty() {
+                return Some(entry);
+            }
+            if entry.attr & 0x10 == 0 {
+                return None;
+            }
             cluster = entry.start_cluster;
             remaining = rest;
         }
+        Some(Entry {
+            attr: 0x10,
+            start_cluster: cluster,
+            ..Default::default()
+        })
+    }
+
+    pub fn resolve_path(&self, path: &[u8]) -> Option<Entry> {
+        self.resolve_path_from(0, path)
     }
 }
 
@@ -896,7 +939,7 @@ pub fn fat83(component: &[u8]) -> [u8; 11] {
     let dot = component.iter().position(|&b| b == b'.');
     let (name, ext) = match dot {
         Some(i) => (&component[..i], &component[i + 1..]),
-        None    => (component, &b""[..]),
+        None => (component, &b""[..]),
     };
     for (i, &b) in name.iter().take(8).enumerate() {
         out[i] = if b.is_ascii_lowercase() { b - 32 } else { b };

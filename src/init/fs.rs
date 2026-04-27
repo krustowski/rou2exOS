@@ -1,4 +1,5 @@
 use crate::fs::fat12::{block::Floppy, fs::Filesystem};
+use crate::fs::iso9660::Iso9660;
 use crate::fs::vfs::{self, FsType};
 use crate::init::config::SYSTEM_CONFIG;
 use crate::video::sysprint::Result;
@@ -28,4 +29,9 @@ pub fn vfs_init() {
 
     vfs::mount(b"/mnt/fat", FsType::Fat12);
     rprint!("vfs: /mnt/fat mounted (fat12)\n");
+
+    if Iso9660::probe().is_some() {
+        vfs::mount(b"/mnt/iso", FsType::Iso9660);
+        rprint!("vfs: /mnt/iso mounted (iso9660)\n");
+    }
 }

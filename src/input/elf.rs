@@ -160,6 +160,19 @@ unsafe fn push_user_args(stack_top: u64, args: &[u8]) -> u64 {
 
     sp &= !7u64; // align to 8 bytes before writing pointers
 
+    // _crt0: mov rdi,[rsp]; lea rsi,[rsp+8]; call main
+    // `call` pushes 8 bytes, so main sees rsp = argc_addr - 8.
+    // For main's rsp to be 16-byte aligned: argc_addr % 16 == 8.
+    // We will push: NULL(1) + argc pointers + argc_word(1) = (argc+2) words.
+    // argc_addr = sp - (argc+2)*8.  For argc_addr % 16 == 8:
+    //   sp % 16 must equal (8*(argc+3)) % 16.
+    // Insert any needed gap HERE (in string-data region) so argc and argv[0]
+    // are always contiguous — the gap must never go between them.
+    let target = (8u64 * (argc as u64 + 3)) % 16;
+    if sp % 16 != target {
+        sp -= 8; // alignment gap before the pointer array
+    }
+
     // argv[argc] = NULL terminator.
     sp -= 8;
     *(sp as *mut u64) = 0;
@@ -172,23 +185,16 @@ unsafe fn push_user_args(stack_top: u64, args: &[u8]) -> u64 {
         *(sp as *mut u64) = ptrs[k];
     }
 
-    // Ensure (sp - 8) is 16-byte aligned so that rsp at _start satisfies the
-    // SysV ABI requirement that rsp is 16-byte aligned before `call main`.
-    if sp % 16 != 8 {
-        sp -= 8;
-        *(sp as *mut u64) = 0; // alignment padding
-    }
-
-    // argc.
+    // argc — immediately below argv[0], no gap.
     sp -= 8;
     *(sp as *mut u64) = argc as u64;
 
     sp // caller passes this as stack_top to new_process
 }
 
-pub fn run_elf(filename_input: &[u8], args: &[u8], mode: RunMode) -> bool {
+pub fn run_elf(filename_input: &[u8], args: &[u8], mode: RunMode) -> usize {
     if filename_input.is_empty() || filename_input.len() > 12 {
-        return false;
+        return 0;
     }
 
     // If the caller didn't include an extension, append .elf
@@ -218,7 +224,7 @@ pub fn run_elf(filename_input: &[u8], args: &[u8], mode: RunMode) -> bool {
                     _ => {
                         error!("no such file found");
                         error!();
-                        return false;
+                        return 0;
                     }
                 };
                 let cluster_start = entry.start_cluster;
@@ -233,7 +239,7 @@ pub fn run_elf(filename_input: &[u8], args: &[u8], mode: RunMode) -> bool {
                 if cluster == 0 {
                     error!("no such file found");
                     error!();
-                    return false;
+                    return 0;
                 }
 
                 rprint!("Size: ");
@@ -339,7 +345,7 @@ pub fn run_elf(filename_input: &[u8], args: &[u8], mode: RunMode) -> bool {
                 if pid == 0xff || pid == 0x00 {
                     rprint!("Error starting new process...\n");
                     error!("Error starting new process...\n\n");
-                    return false;
+                    return 0;
                 }
 
                 match mode {
@@ -349,15 +355,16 @@ pub fn run_elf(filename_input: &[u8], args: &[u8], mode: RunMode) -> bool {
                         crate::task::scheduler::idle(0xff);
                     }
                 }
+
+                pid
             }
         }
         Err(e) => {
             error!(e);
             error!();
-            return false;
+            0
         }
     }
-    true
 }
 
 pub type ElfEntry = extern "C" fn() -> u64;

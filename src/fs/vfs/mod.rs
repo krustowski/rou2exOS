@@ -6,7 +6,8 @@ pub const MAX_MOUNTS: usize = 8;
 pub enum FsType {
     None,
     Root,
-    Fat12, // floppy FAT12
+    Fat12,   // floppy FAT12
+    Iso9660, // CD-ROM ISO9660
 }
 
 #[derive(Clone, Copy)]
@@ -146,6 +147,16 @@ pub fn umount(path: &[u8]) -> bool {
 pub fn try_fat12_absolute<'a>(path: &'a [u8]) -> Option<&'a [u8]> {
     if let Some(vfs) = VFS.try_lock() {
         if let Some((FsType::Fat12, rel)) = vfs.resolve(path) {
+            return Some(rel);
+        }
+    }
+    None
+}
+
+/// If `path` is absolute and resolves to an Iso9660 mount, returns the relative sub-path.
+pub fn try_iso9660_absolute<'a>(path: &'a [u8]) -> Option<&'a [u8]> {
+    if let Some(vfs) = VFS.try_lock() {
+        if let Some((FsType::Iso9660, rel)) = vfs.resolve(path) {
             return Some(rel);
         }
     }

@@ -34,9 +34,9 @@ qemu-system-x86_64 -boot d -cdrom r2.iso -fda fat.img
 
 ^ __v0.10.8__ (pre-v0.11): external program `GFXTEST.ELF` to test the VGA/EGA capabilities in text mode
 
-![gfxtest-output](.github/img/r2-memento-hello-task-manager.png)
+![memento-output](.github/img/r2-memento-hello-task-manager.png)
 
-^ __v0.11.3__ (pre-v0.11): external program `MEMENTO.ELF` to test the Memento GUI framework integration with r2 kernel
+^ __v0.11.3__: external program `MEMENTO.ELF` to test the Memento GUI framework integration with r2 kernel
 
 
 ### Legacy

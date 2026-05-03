@@ -191,11 +191,15 @@ extern "C" fn syscall_inner(arg1: u64, arg2: u64, syscall_no: u64) -> u64 {
 
                         (*sysinfo_ptr).system_uptime =
                             crate::time::acpi::get_uptime_seconds() as u32;
+
+                        (*sysinfo_ptr).ip_addr = sc.get_ip();
                     }
                 },
-                0x02 => {
-                    // TODO
-                }
+                0x02 => unsafe {
+                    if let Some(mut sc) = SYSTEM_CONFIG.try_lock() {
+                        sc.set_ip((*sysinfo_ptr).ip_addr);
+                    }
+                },
                 _ => {}
             }
         }
@@ -486,6 +490,117 @@ extern "C" fn syscall_inner(arg1: u64, arg2: u64, syscall_no: u64) -> u64 {
             if mode == 0x03 {
                 crate::video::mode::set_mode_text();
             }
+        }
+
+        /*
+         *  Syscall 0x16 --- Get VESA framebuffer info
+         *
+         *  Arg1: pointer to FBInfo { width: u32, height: u32, pitch: u32, bpp: u32 }
+         *  Arg2: 0x00
+         *  Returns: 0 on success, 1 if no framebuffer is available
+         */
+        0x16 => {
+            if !(USERLAND_START..=USERLAND_END).contains(&arg1) {
+                return SyscallReturnCode::InvalidInput as u64;
+            }
+            unsafe {
+                let fb = &crate::init::check::FRAMEBUFFER_PTR;
+                if fb.addr == 0 {
+                    return 1;
+                }
+                let info = arg1 as *mut FBInfo;
+                (*info).width  = fb.width;
+                (*info).height = fb.height;
+                (*info).pitch  = fb.pitch;
+                (*info).bpp    = fb.bpp as u32;
+            }
+        }
+
+        /*
+         *  Syscall 0x17 --- Blit a 32bpp (0x00RRGGBB) buffer to the VESA framebuffer
+         *
+         *  Arg1: pointer to pixel buffer (fb.width × fb.height × 4 bytes)
+         *  Arg2: 0x00
+         *
+         *  The kernel handles any pitch mismatch between the user buffer and the
+         *  hardware framebuffer.  One call per frame replaces per-pixel writes.
+         */
+        0x17 => {
+            if !(USERLAND_START..=USERLAND_END).contains(&arg1) {
+                return SyscallReturnCode::InvalidInput as u64;
+            }
+            unsafe {
+                let fb = &crate::init::check::FRAMEBUFFER_PTR;
+                if fb.addr == 0 || fb.width == 0 || fb.height == 0 {
+                    return SyscallReturnCode::Ok as u64;
+                }
+                let src_ptr  = arg1 as *const u32;
+                let dst_ptr  = fb.addr as *mut u32;
+                let pitch_px = (fb.pitch / 4) as usize;
+                let dst_w    = fb.width  as usize;
+                let dst_h    = fb.height as usize;
+
+                if arg2 == 0 {
+                    // No scaling: user buffer is fb.width × fb.height
+                    for row in 0..dst_h {
+                        core::ptr::copy_nonoverlapping(
+                            src_ptr.add(row * dst_w),
+                            dst_ptr.add(row * pitch_px),
+                            dst_w,
+                        );
+                    }
+                } else {
+                    // Scaled blit: arg2 = (src_w << 16) | src_h
+                    let src_w = ((arg2 >> 16) & 0xFFFF) as usize;
+                    let src_h = (arg2 & 0xFFFF) as usize;
+                    if src_w == 0 || src_h == 0 {
+                        return SyscallReturnCode::Ok as u64;
+                    }
+                    for dy in 0..dst_h {
+                        let sy = dy * src_h / dst_h;
+                        let dst_row = dst_ptr.add(dy * pitch_px);
+                        let src_row = src_ptr.add(sy * src_w);
+                        for dx in 0..dst_w {
+                            let sx = dx * src_w / dst_w;
+                            *dst_row.add(dx) = *src_row.add(sx);
+                        }
+                    }
+                }
+            }
+        }
+
+        /*
+         *  Syscall 0x18 --- Copy the kernel's embedded PSF1 glyph data to user space
+         *
+         *  Arg1: pointer to output buffer (*mut u8)
+         *  Arg2: buffer capacity in bytes
+         *  Returns: char_size (bytes per glyph = font height), or 0 on error.
+         *
+         *  Glyph n occupies bytes [n*char_size .. (n+1)*char_size].
+         *  Rows are 1 byte each; bit 7 (MSB) is the leftmost pixel (8px wide).
+         */
+        0x18 => {
+            if !(USERLAND_START..=USERLAND_END).contains(&arg1) {
+                return SyscallReturnCode::InvalidInput as u64;
+            }
+            let font = crate::init::font::PSF_FONT;
+            if font.len() < 4 {
+                return 0;
+            }
+            let char_size  = font[3] as usize;
+            let glyph_data = &font[4..];
+            let copy_len   = (arg2 as usize).min(glyph_data.len());
+            if copy_len == 0 || char_size == 0 {
+                return 0;
+            }
+            unsafe {
+                core::ptr::copy_nonoverlapping(
+                    glyph_data.as_ptr(),
+                    arg1 as *mut u8,
+                    copy_len,
+                );
+            }
+            return char_size as u64;
         }
 
         /*
@@ -947,10 +1062,10 @@ extern "C" fn syscall_inner(arg1: u64, arg2: u64, syscall_no: u64) -> u64 {
          *  Syscall 0x2D --- List directory by path (VFS-aware: FAT12 + ISO9660)
          *
          *  Arg1: pointer to NUL-terminated absolute path string (*const u8)
-         *  Arg2: pointer to output buffer (up to 32 × 38-byte VfsDirEntry records)
+         *  Arg2: pointer to output buffer (up to 64 × 38-byte VfsDirEntry records)
          *        Layout per entry: name[32], name_len: u8, is_dir: u8, size: u32 (LE)
-         *  Returns: entry count (0–32) on success; u64::MAX (-1 as int64_t) on any error.
-         *  Callers MUST treat any return value outside [0, 32] as an error.
+         *  Returns: entry count (0–64) on success; u64::MAX (-1 as int64_t) on any error.
+         *  Callers MUST treat any return value outside [0, 64] as an error.
          */
         0x2D => {
             // u64::MAX reads as -1 in C's int64_t — unambiguously not a valid count.
@@ -982,7 +1097,7 @@ extern "C" fn syscall_inner(arg1: u64, arg2: u64, syscall_no: u64) -> u64 {
                                 Some(e)            => e,
                             }
                         };
-                        let mut entries = [crate::fs::iso9660::IsoEntry::default(); 32];
+                        let mut entries = [crate::fs::iso9660::IsoEntry::default(); 64];
                         let count = iso.list_dir(dir.lba, dir.size, &mut entries);
                         for (i, e) in entries[..count].iter().enumerate() {
                             unsafe {
@@ -1015,12 +1130,12 @@ extern "C" fn syscall_inner(arg1: u64, arg2: u64, syscall_no: u64) -> u64 {
                     };
 
                     // Collect FAT12 entries into a local array first.
-                    let mut fat_entries = [crate::fs::fat12::entry::Entry::default(); 32];
+                    let mut fat_entries = [crate::fs::fat12::entry::Entry::default(); 64];
                     let mut kcount = 0usize;
                     fs.for_each_entry(dir_cluster, |entry| {
                         if entry.name[0] == 0x00 || entry.name[0] == 0xE5 { return; }
                         if entry.attr & 0x08 != 0 { return; } // volume label
-                        if kcount < 32 { fat_entries[kcount] = *entry; kcount += 1; }
+                        if kcount < 64 { fat_entries[kcount] = *entry; kcount += 1; }
                     });
 
                     for (i, entry) in fat_entries[..kcount].iter().enumerate() {
@@ -1465,6 +1580,33 @@ extern "C" fn syscall_inner(arg1: u64, arg2: u64, syscall_no: u64) -> u64 {
         },
 
         /*
+         *  Syscall 0x38 --- Query network status (read-only).
+         *
+         *  Arg1: pointer to NetStatus buffer (44 bytes).
+         *  Returns 0 on success, -1 on invalid pointer.
+         *  MAC comes from SYSTEM_CONFIG (cached when ETH driver registers).
+         *  IP comes from SYSTEM_CONFIG (written by ETH driver via syscall 0x01/0x02).
+         *  Port table comes from the kernel port-binding registry.
+         */
+        0x38 => unsafe {
+            if !(USERLAND_START..=USERLAND_END).contains(&arg1) {
+                return SyscallReturnCode::InvalidInput as u64;
+            }
+            let ns = arg1 as *mut NetStatus;
+            if let Some(sc) = SYSTEM_CONFIG.try_lock() {
+                (*ns).mac = sc.get_mac();
+                (*ns).ip  = sc.get_ip();
+            }
+            let drv_pid = crate::net::netdrv::get_driver_pid();
+            (*ns).drv_active = if drv_pid != 0xff { 1 } else { 0 };
+            let mut n_ports = 0u8;
+            let mut ports = [0u16; 16];
+            crate::net::netdrv::fill_port_bindings(&mut n_ports, &mut ports);
+            (*ns).n_ports = n_ports;
+            core::ptr::write_unaligned(core::ptr::addr_of_mut!((*ns).ports), ports);
+        },
+
+        /*
          *  Unknown syscall
          */
         _ => {
@@ -1590,6 +1732,16 @@ pub struct SysInfo {
     pub system_version: [u8; 8],
     pub system_path_cluster: u32,
     pub system_uptime: u32,
+    pub ip_addr: [u8; 4],
+}
+
+#[repr(C, packed)]
+pub struct NetStatus {
+    pub mac: [u8; 6],
+    pub ip: [u8; 4],
+    pub drv_active: u8,
+    pub n_ports: u8,
+    pub ports: [u16; 16],
 }
 
 #[expect(clippy::upper_case_acronyms)]
@@ -1601,6 +1753,14 @@ pub struct RTC {
     pub day: u8,
     pub month: u8,
     pub year: u16,
+}
+
+#[repr(C, packed)]
+pub struct FBInfo {
+    pub width:  u32,
+    pub height: u32,
+    pub pitch:  u32,
+    pub bpp:    u32,
 }
 
 #[repr(C, packed)]

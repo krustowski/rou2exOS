@@ -529,7 +529,7 @@ fn cmd_dir(args: &[u8]) {
                 };
                 if !entry.is_dir { error!("not a directory\n"); return; }
 
-                let mut entries = [crate::fs::iso9660::IsoEntry::default(); 32];
+                let mut entries = [crate::fs::iso9660::IsoEntry::default(); 64];
                 let count = iso.list_dir(entry.lba, entry.size, &mut entries);
                 for e in &entries[..count] {
                     printb!(&e.name[..e.name_len as usize]);

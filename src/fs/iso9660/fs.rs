@@ -38,7 +38,7 @@ impl Iso9660 {
         Some(Self { atapi, root_lba, root_size })
     }
 
-    pub fn list_dir(&self, lba: u32, size: u32, out: &mut [IsoEntry; 32]) -> usize {
+    pub fn list_dir(&self, lba: u32, size: u32, out: &mut [IsoEntry; 64]) -> usize {
         let mut count = 0usize;
         let mut block_lba = lba;
         let mut remaining = size as usize;
@@ -61,7 +61,7 @@ impl Iso9660 {
                     continue;
                 }
 
-                if count >= 32 { break 'outer; }
+                if count >= 64 { break 'outer; }
 
                 let entry_lba  = u32::from_le_bytes([buf[off+2], buf[off+3], buf[off+4], buf[off+5]]);
                 let entry_size = u32::from_le_bytes([buf[off+10], buf[off+11], buf[off+12], buf[off+13]]);

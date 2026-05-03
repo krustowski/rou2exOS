@@ -9,6 +9,8 @@ pub struct SystemConfig {
     pub path_len: usize,
     pub path_cluster: u16,
     pub version: [u8; 16],
+    pub ip_addr: [u8; 4],
+    pub mac_addr: [u8; 6],
 }
 
 impl SystemConfig {
@@ -20,8 +22,15 @@ impl SystemConfig {
             path_len: 1,
             path_cluster: 0,
             version: *b"v0.11.3         ",
+            ip_addr: [0u8; 4],
+            mac_addr: [0u8; 6],
         }
     }
+
+    pub fn set_ip(&mut self, ip: [u8; 4]) { self.ip_addr = ip; }
+    pub fn get_ip(&self) -> [u8; 4] { self.ip_addr }
+    pub fn set_mac(&mut self, mac: [u8; 6]) { self.mac_addr = mac; }
+    pub fn get_mac(&self) -> [u8; 6] { self.mac_addr }
 
     pub fn set_user(&mut self, new_user: &[u8]) {
         let len = new_user.len().min(32);

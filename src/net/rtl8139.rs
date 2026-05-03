@@ -97,6 +97,17 @@ pub fn send_frame(data: &[u8], len: usize) -> Result<(), &'static str> {
 }
 
 
+/// Read the 6-byte MAC address from RTL8139 IDR0-IDR5 registers.
+/// Safe to call any time after rtl8139_init() has set RTL8139_IO_BASE.
+pub unsafe fn read_mac_addr() -> [u8; 6] {
+    let io = RTL8139_IO_BASE;
+    [
+        port::read_u8(io),     port::read_u8(io + 1),
+        port::read_u8(io + 2), port::read_u8(io + 3),
+        port::read_u8(io + 4), port::read_u8(io + 5),
+    ]
+}
+
 pub fn rtl8139_init() {
     // Discover the actual I/O base from PCI BAR0 before touching any registers
     let discovered = pci::find_io_base(PCI_VENDOR_ID_REALTEK, PCI_DEVICE_ID_RTL8139);

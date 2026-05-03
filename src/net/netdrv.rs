@@ -10,6 +10,7 @@
  *  routes it to the right process, and pushes an IPC message that wakes the blocked receive_data().
  */
 
+use crate::init::config::SYSTEM_CONFIG;
 use crate::net::rtl8139;
 use crate::task::queue::Message;
 use crate::task::scheduler;
@@ -26,10 +27,21 @@ static mut NET_DRV_PID: usize = NO_PID;
 static mut PORT_REGISTRY: [(u16, usize); MAX_PORT_BINDINGS] = [(0, NO_PID); MAX_PORT_BINDINGS];
 
 /// Called by syscall 0x37 with arg1 = 0. Stores the calling PID as the global Ethernet driver
-/// process and initialises the RTL8139 hardware.
+/// process and initialises the RTL8139 hardware.  Idempotent: if a driver is already registered
+/// the call is a no-op so that port-specific services (GARN, TNT) can safely call net_register()
+/// before net_bind_port() without displacing an already-running global driver.
 pub unsafe fn register_driver(pid: usize) {
+    if NET_DRV_PID != NO_PID {
+        return;
+    }
     NET_DRV_PID = pid;
     rtl8139::rtl8139_init();
+
+    // Cache MAC in SYSTEM_CONFIG so ScNetStatus can read it without re-probing PCI.
+    let mac = rtl8139::read_mac_addr();
+    if let Some(mut sc) = SYSTEM_CONFIG.try_lock() {
+        sc.set_mac(mac);
+    }
 
     rprint!("netdrv: registered pid=");
     rprintn!(pid as u64);
@@ -60,6 +72,20 @@ pub unsafe fn bind_port(port: u16, pid: usize) {
 
 pub unsafe fn get_driver_pid() -> usize {
     NET_DRV_PID
+}
+
+/// Fill `ports[0..n]` with active TCP port bindings; set `*n_ports` to the count.
+pub unsafe fn fill_port_bindings(n_ports: &mut u8, ports: &mut [u16; 16]) {
+    let mut count = 0u8;
+    for i in 0..MAX_PORT_BINDINGS {
+        if PORT_REGISTRY[i].1 != NO_PID {
+            if (count as usize) < 16 {
+                ports[count as usize] = PORT_REGISTRY[i].0;
+                count += 1;
+            }
+        }
+    }
+    *n_ports = count;
 }
 
 /// Copy a frame from NET_FRAME_BUF to a userland pointer.

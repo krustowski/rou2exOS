@@ -36,7 +36,9 @@ qemu-system-x86_64 -boot d -cdrom r2.iso -fda fat.img
 
 ![memento-output](.github/img/r2-memento-hello-task-manager.png)
 
-^ __v0.11.3__: external program `MEMENTO.ELF` to test the Memento GUI framework integration with r2 kernel
+![memento-output-login](.github/img/r2-memento-hello-login.png)
+
+^ ^^ __v0.11.3__: external program `MEMENTO.ELF` to test the Memento GUI framework integration with r2 kernel
 
 
 ### Legacy

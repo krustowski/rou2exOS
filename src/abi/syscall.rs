@@ -5,7 +5,11 @@ use x86_64::structures::idt::InterruptStackFrame;
 use crate::{
     fs::{
         block::BlockDevice,
-        fat12::{block::Floppy, check, fs::{fat83, Filesystem}},
+        fat12::{
+            block::Floppy,
+            check,
+            fs::{fat83, Filesystem},
+        },
         iso9660::Iso9660,
         vfs,
     },
@@ -504,15 +508,15 @@ extern "C" fn syscall_inner(arg1: u64, arg2: u64, syscall_no: u64) -> u64 {
                 return SyscallReturnCode::InvalidInput as u64;
             }
             unsafe {
-                let fb = &crate::init::check::FRAMEBUFFER_PTR;
-                if fb.addr == 0 {
+                let fb = &raw const crate::init::check::FRAMEBUFFER_PTR;
+                if (*fb).addr == 0 {
                     return 1;
                 }
                 let info = arg1 as *mut FBInfo;
-                (*info).width  = fb.width;
-                (*info).height = fb.height;
-                (*info).pitch  = fb.pitch;
-                (*info).bpp    = fb.bpp as u32;
+                (*info).width = (*fb).width;
+                (*info).height = (*fb).height;
+                (*info).pitch = (*fb).pitch;
+                (*info).bpp = (*fb).bpp as u32;
             }
         }
 
@@ -530,15 +534,15 @@ extern "C" fn syscall_inner(arg1: u64, arg2: u64, syscall_no: u64) -> u64 {
                 return SyscallReturnCode::InvalidInput as u64;
             }
             unsafe {
-                let fb = &crate::init::check::FRAMEBUFFER_PTR;
-                if fb.addr == 0 || fb.width == 0 || fb.height == 0 {
+                let fb = &raw const crate::init::check::FRAMEBUFFER_PTR;
+                if (*fb).addr == 0 || (*fb).width == 0 || (*fb).height == 0 {
                     return SyscallReturnCode::Ok as u64;
                 }
-                let src_ptr  = arg1 as *const u32;
-                let dst_ptr  = fb.addr as *mut u32;
-                let pitch_px = (fb.pitch / 4) as usize;
-                let dst_w    = fb.width  as usize;
-                let dst_h    = fb.height as usize;
+                let src_ptr = arg1 as *const u32;
+                let dst_ptr = (*fb).addr as *mut u32;
+                let pitch_px = ((*fb).pitch / 4) as usize;
+                let dst_w = (*fb).width as usize;
+                let dst_h = (*fb).height as usize;
 
                 if arg2 == 0 {
                     // No scaling: user buffer is fb.width × fb.height
@@ -587,18 +591,14 @@ extern "C" fn syscall_inner(arg1: u64, arg2: u64, syscall_no: u64) -> u64 {
             if font.len() < 4 {
                 return 0;
             }
-            let char_size  = font[3] as usize;
+            let char_size = font[3] as usize;
             let glyph_data = &font[4..];
-            let copy_len   = (arg2 as usize).min(glyph_data.len());
+            let copy_len = (arg2 as usize).min(glyph_data.len());
             if copy_len == 0 || char_size == 0 {
                 return 0;
             }
             unsafe {
-                core::ptr::copy_nonoverlapping(
-                    glyph_data.as_ptr(),
-                    arg1 as *mut u8,
-                    copy_len,
-                );
+                core::ptr::copy_nonoverlapping(glyph_data.as_ptr(), arg1 as *mut u8, copy_len);
             }
             return char_size as u64;
         }
@@ -641,10 +641,15 @@ extern "C" fn syscall_inner(arg1: u64, arg2: u64, syscall_no: u64) -> u64 {
                     match Filesystem::new(&floppy) {
                         Ok(fs) => match fs.find_entry(base, &name83) {
                             None => return SyscallReturnCode::FileNotFound as u64,
-                            Some(entry) => { fs.read_file(entry.start_cluster, &mut buf); }
+                            Some(entry) => {
+                                fs.read_file(entry.start_cluster, &mut buf);
+                            }
                         },
-                        Err(e) => { rprint!(e); rprint!("\n");
-                            return SyscallReturnCode::FilesystemError as u64; }
+                        Err(_e) => {
+                            rprint!(e);
+                            rprint!("\n");
+                            return SyscallReturnCode::FilesystemError as u64;
+                        }
                     }
                     if let Some(midi) = crate::audio::midi::parse_midi_format0(&buf) {
                         crate::audio::midi::play_midi(&midi);
@@ -653,7 +658,9 @@ extern "C" fn syscall_inner(arg1: u64, arg2: u64, syscall_no: u64) -> u64 {
                         return SyscallReturnCode::FilesystemError as u64;
                     }
                 }
-                _ => { return SyscallReturnCode::InvalidInput as u64; }
+                _ => {
+                    return SyscallReturnCode::InvalidInput as u64;
+                }
             }
         }
 
@@ -695,7 +702,9 @@ extern "C" fn syscall_inner(arg1: u64, arg2: u64, syscall_no: u64) -> u64 {
                         Some(e) if e.is_dir => return SyscallReturnCode::InvalidInput as u64,
                         Some(e) => {
                             let buf_ptr = arg2 as *mut u8;
-                            let buf = unsafe { core::slice::from_raw_parts_mut(buf_ptr, e.size as usize) };
+                            let buf = unsafe {
+                                core::slice::from_raw_parts_mut(buf_ptr, e.size as usize)
+                            };
                             iso.read_file(&e, buf);
                             return SyscallReturnCode::Ok as u64;
                         }
@@ -724,12 +733,15 @@ extern "C" fn syscall_inner(arg1: u64, arg2: u64, syscall_no: u64) -> u64 {
                             copy_nonoverlapping(sector.as_ptr(), buf_ptr.add(offset as usize), 512);
                         }
                         cluster = fs.read_fat12_entry(cluster);
-                        if cluster >= 0xFF8 || cluster == 0 { break; }
+                        if cluster >= 0xFF8 || cluster == 0 {
+                            break;
+                        }
                         offset += 512;
                     }
                 }
-                Err(e) => {
-                    rprint!(e); rprint!("\n");
+                Err(_e) => {
+                    rprint!(e);
+                    rprint!("\n");
                     return SyscallReturnCode::FilesystemError as u64;
                 }
             }
@@ -758,9 +770,12 @@ extern "C" fn syscall_inner(arg1: u64, arg2: u64, syscall_no: u64) -> u64 {
             let floppy = Floppy::init();
 
             match Filesystem::new(&floppy) {
-                Ok(fs) => unsafe { fs.write_file(base, &name83, &*buf_ptr); },
-                Err(e) => {
-                    rprint!(e); rprint!("\n");
+                Ok(fs) => unsafe {
+                    fs.write_file(base, &name83, &*buf_ptr);
+                },
+                Err(_e) => {
+                    rprint!(e);
+                    rprint!("\n");
                     return SyscallReturnCode::FilesystemError as u64;
                 }
             }
@@ -796,8 +811,11 @@ extern "C" fn syscall_inner(arg1: u64, arg2: u64, syscall_no: u64) -> u64 {
                     }
                     fs.rename_file(base, &old83, &new83);
                 }
-                Err(e) => { rprint!(e); rprint!("\n");
-                    return SyscallReturnCode::FilesystemError as u64; }
+                Err(_e) => {
+                    rprint!(e);
+                    rprint!("\n");
+                    return SyscallReturnCode::FilesystemError as u64;
+                }
             }
         }
 
@@ -827,8 +845,11 @@ extern "C" fn syscall_inner(arg1: u64, arg2: u64, syscall_no: u64) -> u64 {
                     }
                     fs.delete_file(base, &name83);
                 }
-                Err(e) => { rprint!(e); rprint!("\n");
-                    return SyscallReturnCode::FilesystemError as u64; }
+                Err(_e) => {
+                    rprint!(e);
+                    rprint!("\n");
+                    return SyscallReturnCode::FilesystemError as u64;
+                }
             }
         }
 
@@ -899,13 +920,15 @@ extern "C" fn syscall_inner(arg1: u64, arg2: u64, syscall_no: u64) -> u64 {
                     } else {
                         match fs.resolve_path_from(base, rel) {
                             None => return SyscallReturnCode::FileNotFound as u64,
-                            Some(e) if e.attr & 0x10 == 0 => return SyscallReturnCode::InvalidInput as u64,
+                            Some(e) if e.attr & 0x10 == 0 => {
+                                return SyscallReturnCode::InvalidInput as u64
+                            }
                             Some(e) => e.start_cluster,
                         }
                     };
                     fs.create_subdirectory(&filename, parent_cluster);
                 }
-                Err(e) => {
+                Err(_e) => {
                     rprint!(e);
                     rprint!("\n");
                     return SyscallReturnCode::FilesystemError as u64;
@@ -950,7 +973,7 @@ extern "C" fn syscall_inner(arg1: u64, arg2: u64, syscall_no: u64) -> u64 {
                         core::ptr::copy_nonoverlapping(kentries.as_ptr(), entries, 32);
                     }
                 }
-                Err(e) => {
+                Err(_e) => {
                     rprint!(e);
                     rprint!("\n");
 
@@ -986,7 +1009,8 @@ extern "C" fn syscall_inner(arg1: u64, arg2: u64, syscall_no: u64) -> u64 {
 
             // arg2: optional full args string matching push_user_args convention.
             // If absent or out of range, use the name as the sole argv[0] token.
-            let args_slice: &[u8] = if arg2 != 0 && (USERLAND_START..=USERLAND_END).contains(&arg2) {
+            let args_slice: &[u8] = if arg2 != 0 && (USERLAND_START..=USERLAND_END).contains(&arg2)
+            {
                 unsafe { nul_terminated_slice(arg2 as *const u8, 128) }
             } else {
                 name_slice
@@ -1039,9 +1063,9 @@ extern "C" fn syscall_inner(arg1: u64, arg2: u64, syscall_no: u64) -> u64 {
                 for i in 0..n {
                     if let Some(m) = vfs_table.get(i) {
                         let fs_type_u8: u8 = match m.fs_type {
-                            vfs::FsType::None    => 0,
-                            vfs::FsType::Root    => 1,
-                            vfs::FsType::Fat12   => 2,
+                            vfs::FsType::None => 0,
+                            vfs::FsType::Root => 1,
+                            vfs::FsType::Fat12 => 2,
                             vfs::FsType::Iso9660 => 3,
                         };
                         unsafe {
@@ -1078,7 +1102,7 @@ extern "C" fn syscall_inner(arg1: u64, arg2: u64, syscall_no: u64) -> u64 {
             }
 
             let path = unsafe { nul_terminated_slice(arg1 as *const u8, 64) };
-            let buf  = arg2 as *mut u8;
+            let buf = arg2 as *mut u8;
 
             // ISO9660 branch.
             if let Some(iso_rel) = vfs::try_iso9660_absolute(path) {
@@ -1087,14 +1111,16 @@ extern "C" fn syscall_inner(arg1: u64, arg2: u64, syscall_no: u64) -> u64 {
                     Some(iso) => {
                         let dir = if iso_rel.is_empty() {
                             crate::fs::iso9660::IsoEntry {
-                                is_dir: true, lba: iso.root_lba, size: iso.root_size,
+                                is_dir: true,
+                                lba: iso.root_lba,
+                                size: iso.root_size,
                                 ..Default::default()
                             }
                         } else {
                             match iso.resolve(iso_rel) {
-                                None               => return ERR,
+                                None => return ERR,
                                 Some(e) if !e.is_dir => return ERR,
-                                Some(e)            => e,
+                                Some(e) => e,
                             }
                         };
                         let mut entries = [crate::fs::iso9660::IsoEntry::default(); 64];
@@ -1123,9 +1149,9 @@ extern "C" fn syscall_inner(arg1: u64, arg2: u64, syscall_no: u64) -> u64 {
                         base
                     } else {
                         match fs.resolve_path_from(base, rel) {
-                            None                           => return ERR,
+                            None => return ERR,
                             Some(e) if e.attr & 0x10 == 0 => return ERR,
-                            Some(e)                        => e.start_cluster,
+                            Some(e) => e.start_cluster,
                         }
                     };
 
@@ -1133,9 +1159,16 @@ extern "C" fn syscall_inner(arg1: u64, arg2: u64, syscall_no: u64) -> u64 {
                     let mut fat_entries = [crate::fs::fat12::entry::Entry::default(); 64];
                     let mut kcount = 0usize;
                     fs.for_each_entry(dir_cluster, |entry| {
-                        if entry.name[0] == 0x00 || entry.name[0] == 0xE5 { return; }
-                        if entry.attr & 0x08 != 0 { return; } // volume label
-                        if kcount < 64 { fat_entries[kcount] = *entry; kcount += 1; }
+                        if entry.name[0] == 0x00 || entry.name[0] == 0xE5 {
+                            return;
+                        }
+                        if entry.attr & 0x08 != 0 {
+                            return;
+                        } // volume label
+                        if kcount < 64 {
+                            fat_entries[kcount] = *entry;
+                            kcount += 1;
+                        }
                     });
 
                     for (i, entry) in fat_entries[..kcount].iter().enumerate() {
@@ -1145,19 +1178,34 @@ extern "C" fn syscall_inner(arg1: u64, arg2: u64, syscall_no: u64) -> u64 {
                             let mut name_len = 0usize;
                             // base name (trim trailing spaces)
                             for j in 0..8usize {
-                                if entry.name[j] != b' ' { name_buf[name_len] = entry.name[j]; name_len += 1; }
+                                if entry.name[j] != b' ' {
+                                    name_buf[name_len] = entry.name[j];
+                                    name_len += 1;
+                                }
                             }
                             // extension (files only, trim spaces)
                             if entry.attr & 0x10 == 0 && entry.ext[0] != b' ' {
-                                name_buf[name_len] = b'.'; name_len += 1;
+                                name_buf[name_len] = b'.';
+                                name_len += 1;
                                 for j in 0..3usize {
-                                    if entry.ext[j] != b' ' { name_buf[name_len] = entry.ext[j]; name_len += 1; }
+                                    if entry.ext[j] != b' ' {
+                                        name_buf[name_len] = entry.ext[j];
+                                        name_len += 1;
+                                    }
                                 }
                             }
                             copy_nonoverlapping(name_buf.as_ptr(), out, 32);
                             out.add(32).write_volatile(name_len as u8);
-                            out.add(33).write_volatile(if entry.attr & 0x10 != 0 { 1u8 } else { 0u8 });
-                            copy_nonoverlapping(entry.file_size.to_le_bytes().as_ptr(), out.add(34), 4);
+                            out.add(33).write_volatile(if entry.attr & 0x10 != 0 {
+                                1u8
+                            } else {
+                                0u8
+                            });
+                            copy_nonoverlapping(
+                                entry.file_size.to_le_bytes().as_ptr(),
+                                out.add(34),
+                                4,
+                            );
                         }
                     }
                     return kcount as u64;
@@ -1209,8 +1257,9 @@ extern "C" fn syscall_inner(arg1: u64, arg2: u64, syscall_no: u64) -> u64 {
             let (rel, base) = vfs_resolve_fat12(path);
             let floppy = Floppy::init();
             match Filesystem::new(&floppy) {
-                Err(e) => {
-                    rprint!(e); rprint!("\n");
+                Err(_e) => {
+                    rprint!(e);
+                    rprint!("\n");
                     return SyscallReturnCode::FilesystemError as u64;
                 }
                 Ok(fs) => {
@@ -1219,7 +1268,9 @@ extern "C" fn syscall_inner(arg1: u64, arg2: u64, syscall_no: u64) -> u64 {
                     } else {
                         match fs.resolve_path_from(base, rel) {
                             None => return SyscallReturnCode::FileNotFound as u64,
-                            Some(e) if e.attr & 0x10 == 0 => return SyscallReturnCode::InvalidInput as u64,
+                            Some(e) if e.attr & 0x10 == 0 => {
+                                return SyscallReturnCode::InvalidInput as u64
+                            }
                             Some(e) => e.start_cluster,
                         }
                     };
@@ -1241,7 +1292,11 @@ extern "C" fn syscall_inner(arg1: u64, arg2: u64, syscall_no: u64) -> u64 {
             if !(USERLAND_START..=USERLAND_END).contains(&arg1) {
                 return SyscallReturnCode::InvalidInput as u64;
             }
-            let max = if arg2 > 0 && (arg2 as usize) <= 10 { arg2 as usize } else { 10 };
+            let max = if arg2 > 0 && (arg2 as usize) <= 10 {
+                arg2 as usize
+            } else {
+                10
+            };
             let count = scheduler::list_tasks(arg1 as *mut u8, max);
             return count as u64;
         }
@@ -1513,15 +1568,18 @@ extern "C" fn syscall_inner(arg1: u64, arg2: u64, syscall_no: u64) -> u64 {
         }
 
         /*
-         *  Syscall 0x35 --- Receive data. Try to pop the port queue. Blocking op
+         *  Syscall 0x35 --- Receive data. Try to pop the port queue.
          *
-         *  Arg1: target pid
+         *  Arg1: 0 = non-blocking (return 0 if queue empty),
+         *        non-zero = blocking (suspend until frame arrives, legacy default)
          *  Arg2: pointer to a buffer
          */
         0x35 => {
             if !(USERLAND_START..=USERLAND_END).contains(&arg2) {
                 return SyscallReturnCode::InvalidInput as u64;
             }
+
+            let non_blocking = arg1 == 0;
 
             unsafe {
                 let buf = arg2 as *mut u8;
@@ -1531,6 +1589,8 @@ extern "C" fn syscall_inner(arg1: u64, arg2: u64, syscall_no: u64) -> u64 {
                     let len = if msg.port_id > 0 { msg.port_id } else { 512 };
                     copy_nonoverlapping(msg.buf_addr as *const u8, buf, len);
                     return len as u64;
+                } else if non_blocking {
+                    return 0;
                 } else {
                     scheduler::block(current_pid, Message::new(0, 0xff, current_pid, 512));
                 }
@@ -1595,7 +1655,7 @@ extern "C" fn syscall_inner(arg1: u64, arg2: u64, syscall_no: u64) -> u64 {
             let ns = arg1 as *mut NetStatus;
             if let Some(sc) = SYSTEM_CONFIG.try_lock() {
                 (*ns).mac = sc.get_mac();
-                (*ns).ip  = sc.get_ip();
+                (*ns).ip = sc.get_ip();
             }
             let drv_pid = crate::net::netdrv::get_driver_pid();
             (*ns).drv_active = if drv_pid != 0xff { 1 } else { 0 };
@@ -1757,10 +1817,10 @@ pub struct RTC {
 
 #[repr(C, packed)]
 pub struct FBInfo {
-    pub width:  u32,
+    pub width: u32,
     pub height: u32,
-    pub pitch:  u32,
-    pub bpp:    u32,
+    pub pitch: u32,
+    pub bpp: u32,
 }
 
 #[repr(C, packed)]

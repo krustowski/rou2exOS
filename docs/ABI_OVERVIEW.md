@@ -37,13 +37,15 @@ Please note that these lists are incomplete as listed syscalls have to be implem
 
 | Syscall No. | Argument 1 | Argument 2 | Purpose/Command | Implemented |
 |-------------|------------|------------|-----------------|-------------|
-|  `0x00`|  process ID | program return code | Graceful exit of a program/process/task. | ✅ |
+|  `0x00`|  unused | program return code | Graceful exit of a program/process/task. The kernel resolves the caller's PID internally. | ✅ |
 |  `0x01`|  `0x01`|  pointer to SysInfo struct | Get the system information summary. Pointer in arg. 2 has to be casted to the SysInfo struct provided by a language library. Memory must be already allocated. | ✅ |
-|        |  `0x02`|  pointer to SysInfo struct | Set the system information summary. Pointer in arg, 2 is a pointer to the SysInfo structure with new information items. | ❌ |
+|        |  `0x02`|  pointer to SysInfo struct | Set selected system fields. Currently only `ip_addr` is written back from the struct; all other fields are ignored. | ✅ |
 |  `0x02`|  `0x01`| pointer to RTC struct | Get the Real Time Clock (RTC) data. | ✅ |
 |  `0x03`|  `0x01`| pointer to circular buffer | Register a buffer to receive scancodes from IRQ1 | ✅ |
 |        |  `0x02`| pointer to circular buffer | Unregister a buffer to receive scancodes from IRQ1 | ✅ |
 |        |  `0x03`| pointer to circular buffer | Read from the buffer. | ✅ |
+|  `0x04`|  unused | unused | Get millisecond tick count since boot. Returns elapsed milliseconds in `RAX` (10 ms resolution at 100 Hz PIT). | ✅ |
+|  `0x05`|  duration in milliseconds | unused | Sleep for at least the given number of milliseconds. Rounded up to the next 10 ms PIT tick. Marks the calling process as Blocked; the scheduler wakes it automatically — no busy-wait. | ✅ |
 |  `0x0a`|  size in bytes | `0x00` | Allocate a block from the userland heap (0xC00\_000–0xFFF\_FFF). Returns the virtual address of the zeroed block in `RAX`, or `0x00` on failure. | ✅ |
 |  `0x0b`|  pointer to existing block (or `0x00`) | new size in bytes | Reallocate a heap block. Tries in-place expansion first; falls back to allocate+copy+free. Returns the (possibly new) address, or `0x00` on failure. | ✅ |
 |  `0x0f`|  pointer to block | `0x00` | Free a heap block. Immediately coalesces adjacent free blocks. | ✅ |
@@ -56,8 +58,11 @@ Please note that these lists are incomplete as listed syscalls have to be implem
 |  `0x11`|  `0x00` | `0x00` | Clear the screen. | ✅ |
 |  `0x12`|  encoded position | encoded color | Write a graphical pixel. | ✅ |
 |  `0x13`|  a 320×200 VGA mode-13h palette-indexed buffer | pointer to RGB or default VGA palette | Write a VGA buffer into kernel framebuffer. | ✅ |
-|  `0x14`|  reserved (`0x00`) | reserved (`0x00`) | Maps physical VGA graphics RAM (0xA0000–0xAFFFF) into the calling process at virtual 0xA00_000 with USER+WRITE. Returns the virtual base address on success, 0 on failure.. | ✅ |
+|  `0x14`|  reserved (`0x00`) | pointer to `uint64_t` — receives virtual base address | Maps physical VGA graphics RAM (0xA0000–0xAFFFF) into the calling process at virtual 0xA00\_000 with USER+WRITE. On success writes `0xA00_000` into `*arg2`. Idempotent. | ✅ |
 |  `0x15`|  video mode | reserved (`0x00`) | Programs VGA hardware registers for the given mode. | ✅ |
+|  `0x16`|  pointer to `FBInfo` struct | unused | Get VESA framebuffer geometry. Writes `{ width, height, pitch, bpp }` into the struct pointed to by arg1. Returns `1` if no framebuffer is available, `0` on success. | ✅ |
+|  `0x17`|  pointer to 32bpp pixel buffer | `0x00` for no scaling, or `(src_w << 16) \| src_h` | Blit a 32bpp (0x00RRGGBB) buffer to the VESA framebuffer. The kernel handles pitch mismatch. Scaled blit supported via encoded arg2. | ✅ |
+|  `0x18`|  pointer to output buffer (`*mut u8`) | buffer capacity in bytes | Copy the kernel's embedded PSF1 glyph data to userland. Returns `char_size` (bytes per glyph = font height), or `0` on error. Glyph `n` occupies bytes `[n*char_size .. (n+1)*char_size]`; bit 7 (MSB) is the leftmost pixel. | ✅ |
 |  `0x1a`|  frequency in Hz | length in milliseconds | Play the frequency. | ✅ |
 |  `0x1b`|  `0x01`| pointer to the audio file | Play the MIDI audio file. | ✅ |
 |  `0x1f`|  `0x00`|  `0x00`| Stop the player. | ✅ |
@@ -81,8 +86,9 @@ File name arguments accept either a bare name relative to the current working di
 |  `0x2a`|  pointer to file name string | pointer to uint64 (PID) | Execute an ELF64 executable (.ELF). Auto-appends `.elf` if no extension given. | ✅ |
 |  `0x2b` | unused | pointer to `FsckReport_T` | Run the FAT12 filesystem check; populates the report struct pointed to by arg2. | ✅ |
 |  `0x2c` | unused | pointer to array of up to 8 `MountInfo_T` | List VFS mount points. Returns the number of active mounts as a u64. `fs_type`: `0`=none, `1`=rootfs, `2`=fat12, `3`=iso9660. | ✅ |
-|  `0x2d` | pointer to absolute path string | pointer to array of up to 32 `VfsDirEntry_T` | List a directory by VFS path. Works for both FAT12 and ISO9660. Returns entry count. | ✅ |
+|  `0x2d` | pointer to absolute path string | pointer to array of up to 64 `VfsDirEntry_T` | List a directory by VFS path. Works for both FAT12 and ISO9660. Returns entry count (0–64), or `u64::MAX` (`-1` as `int64_t`) on any error. | ✅ |
 |  `0x2e` | pointer to absolute path string | `0x00` | Change working directory. Updates `SYSTEM_CONFIG` path and cluster. Verifies the path is an existing directory. ISO9660 paths set cluster to 0. | ✅ |
+|  `0x2f` | pointer to output buffer | max entries to write (0 = use default of 10) | List scheduler tasks. Writes up to 10 × 20-byte `TaskInfo` entries. Returns the number of entries written. | ✅ |
 
 #### Port I/O and Networking
 
@@ -96,10 +102,12 @@ File name arguments accept either a bare name relative to the current working di
 |  `0x33`|  `0x01` |  pointer to buffer | Create an IPv4 packet. | ✅ |
 |        |  `0x02` |  pointer to buffer | Create an ICMP packet. | ✅ |
 |        |  `0x03` |  pointer to buffer | Create a TCP packet. | ✅ |
-|  `0x34`|  `0x01` |  pointer to buffer | Send an IPv4 packet.  | ✅ |
-|  `0x35`|  process ID |  pointer to buffer | Socket receive. Blocking op, pops a message form the process' MQ. | ✅  |
-|  `0x36`|  `0x01` |  pointer to buffer | Socket send. Pushes a message to the process' MQ. | ✅  |
-|  `0x37`| port number (0 for global driver) | __unused__ | Ethernet driver registration / port binding. | ✅ |
+|  `0x34`|  `0x01` |  pointer to buffer | Send an IPv4 packet (derives frame length from the IP header). | ✅ |
+|        |  `0x04` |  pointer to raw Ethernet frame | Send a raw Ethernet frame. Length is derived from the EtherType field (`0x0800` = IPv4, `0x0806` = ARP). | ✅ |
+|  `0x35`|  `0x00` = non-blocking, non-zero = blocking |  pointer to buffer | Socket receive. Pops a message from the calling process' MQ. Non-blocking returns `0` immediately if the queue is empty; blocking suspends the process until a frame arrives. | ✅  |
+|  `0x36`|  target process PID |  pointer to buffer | Socket send. Copies 512 bytes from the buffer and pushes a message to the target process' MQ, then wakes the target. | ✅  |
+|  `0x37`| port number (0 for global driver) | unused | Ethernet driver registration / port binding. | ✅ |
+|  `0x38`| pointer to `NetStatus` struct | unused | Query network status (read-only). Writes `{ mac[6], ip[4], drv_active, n_ports, ports[16] }` into the struct. Returns `InvalidInput` on invalid pointer, `Ok` otherwise. | ✅ |
 
 ### Syscall Return Codes
 
@@ -126,6 +134,7 @@ pub struct SysInfo {
     pub system_version: [u8; 8],
     pub system_path_cluster: u32,
     pub system_uptime: u32,  // seconds since boot
+    pub ip_addr: [u8; 4],
 }
 ```
 
@@ -137,6 +146,7 @@ typedef struct {
     uint8_t  system_version[8];
     uint32_t system_path_cluster;
     uint32_t system_uptime;   /* seconds since boot */
+    uint8_t  ip_addr[4];
 } __attribute__((packed)) SysInfo_T;
 ```
 
@@ -251,9 +261,70 @@ typedef struct {
 } __attribute__((packed)) MountInfo_T;
 ```
 
+#### FBInfo (syscall `0x16`)
+
+Describes the active VESA framebuffer geometry.  All fields are in pixels or bytes.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `width` | `uint32_t` | Framebuffer width in pixels |
+| `height` | `uint32_t` | Framebuffer height in pixels |
+| `pitch` | `uint32_t` | Bytes per scanline (may be larger than `width × bpp/8`) |
+| `bpp` | `uint32_t` | Bits per pixel |
+
+```rust
+pub struct FBInfo {
+    pub width: u32,
+    pub height: u32,
+    pub pitch: u32,
+    pub bpp: u32,
+}
+```
+
+```c
+typedef struct {
+    uint32_t width;
+    uint32_t height;
+    uint32_t pitch;
+    uint32_t bpp;
+} __attribute__((packed)) FBInfo_T;
+```
+
+#### NetStatus (syscall `0x38`)
+
+Describes the current network driver state.  All fields are filled by the kernel from `SYSTEM_CONFIG` and the port-binding registry.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `mac` | `uint8_t[6]` | Ethernet MAC address |
+| `ip` | `uint8_t[4]` | IPv4 address |
+| `drv_active` | `uint8_t` | `1` if an Ethernet driver process is registered, `0` otherwise |
+| `n_ports` | `uint8_t` | Number of bound TCP ports |
+| `ports` | `uint16_t[16]` | Array of bound TCP port numbers (`n_ports` entries valid) |
+
+```rust
+pub struct NetStatus {
+    pub mac: [u8; 6],
+    pub ip: [u8; 4],
+    pub drv_active: u8,
+    pub n_ports: u8,
+    pub ports: [u16; 16],
+}
+```
+
+```c
+typedef struct {
+    uint8_t  mac[6];
+    uint8_t  ip[4];
+    uint8_t  drv_active;
+    uint8_t  n_ports;
+    uint16_t ports[16];
+} __attribute__((packed)) NetStatus_T;
+```
+
 #### VfsDirEntry (syscall `0x2d`)
 
-Each entry describes one item in a directory.  The kernel writes up to 32 entries and returns the count.  `name` is **not** NUL-terminated; use `name_len`.
+Each entry describes one item in a directory.  The kernel writes up to 64 entries and returns the count, or `u64::MAX` (`-1` as `int64_t`) on error.  `name` is **not** NUL-terminated; use `name_len`.
 
 | Field | Type | Description |
 |-------|------|-------------|

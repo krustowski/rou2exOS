@@ -8,3 +8,6 @@ bg TNT eth
 cd GARN
 bg GARN --config /mnt/fat/GARN/GARN.CFG
 cd ..
+
+# Start the chatroom server
+bg CHAT s eth

@@ -1561,7 +1561,22 @@ extern "C" fn syscall_inner(arg1: u64, arg2: u64, syscall_no: u64) -> u64 {
                     };
                     if len >= 14 && len <= 1514 {
                         let slice = core::slice::from_raw_parts(packet, len);
-                        let _ = crate::net::rtl8139::send_frame(slice, len);
+                        // Loopback: IPv4 packet where src_ip == dst_ip means both
+                        // endpoints are on the same guest.  Route directly to the
+                        // target process queue instead of sending through the NIC
+                        // (which would require host hairpin routing to come back).
+                        let loopback = ethertype == 0x0800 && len >= 34 && {
+                            let src_ip = [*packet.add(26), *packet.add(27),
+                                         *packet.add(28), *packet.add(29)];
+                            let dst_ip = [*packet.add(30), *packet.add(31),
+                                         *packet.add(32), *packet.add(33)];
+                            src_ip == dst_ip
+                        };
+                        if loopback {
+                            crate::net::netdrv::loopback_deliver(slice, len);
+                        } else {
+                            let _ = crate::net::rtl8139::send_frame(slice, len);
+                        }
                     }
                 }
             }

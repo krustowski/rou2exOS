@@ -4,7 +4,7 @@ unsafe fn outb(port: u16, value: u8) {
     core::arch::asm!("out dx, al", in("dx") port, in("al") value);
 }
 
-unsafe fn inb(port: u16) -> u8 {
+unsafe fn _inb(port: u16) -> u8 {
     let val: u8;
     core::arch::asm!("in al, dx", in("dx") port, out("al") val);
     val
@@ -42,4 +42,3 @@ pub fn stop_beep() {
         );
     }
 }
-

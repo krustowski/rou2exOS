@@ -188,7 +188,7 @@ pub fn install_isrs() {
     };
 
     //unsafe { IDT[0x20].set_handler_fn(timer_handler) };
-    unsafe { IDT[0x20].set_handler_addr(VirtAddr::new(timer_interrupt_stub as u64)) };
+    unsafe { IDT[0x20].set_handler_addr(VirtAddr::new(timer_interrupt_stub as *const () as u64)) };
     unsafe { IDT[0x21].set_handler_fn(keyboard_handler) };
     unsafe { IDT[0x26].set_handler_fn(floppy_drive_handler) };
     /*unsafe {
@@ -198,7 +198,7 @@ pub fn install_isrs() {
     };*/
     unsafe {
         IDT[0x7f]
-            .set_handler_addr(VirtAddr::new(syscall_handler as u64))
+            .set_handler_addr(VirtAddr::new(syscall_handler as *const () as u64))
             .set_privilege_level(x86_64::PrivilegeLevel::Ring3)
     };
     unsafe { IDT[0x80].set_handler_fn(syscall_80h) };

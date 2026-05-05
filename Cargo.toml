@@ -3,7 +3,7 @@ cargo-features = ["panic-immediate-abort"]
 [package]
 name = "kernel"
 description = "rou2exOS kernel"
-version = "0.11.3"
+version = "0.11.4"
 edition = "2021"
 authors = ["krusty <krusty@vxn.dev>"]
 
@@ -20,6 +20,7 @@ kernel_text = []
 kernel_graphics = []
 # Enable rprint!/rprintn!/rprintb! output on COM1. 
 serial_debug = []
+kernel_test = []
 
 
 [profile.dev]
@@ -41,3 +42,8 @@ path = "src/main.rs"
 test = false
 doctest = false
 bench = false
+
+[[test]]
+name = "unit"
+path = "tests/unit/main.rs"
+harness = true

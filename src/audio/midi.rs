@@ -3,8 +3,8 @@ use crate::fs::fat12;
 
 #[derive(Debug, Clone, Copy)]
 pub struct MidiEvent {
-    pub note: u8,      
-    pub duration: u16, 
+    pub note: u8,
+    pub duration: u16,
 }
 
 pub struct MidiFile<'a> {
@@ -31,7 +31,7 @@ pub static MIDI_FREQ_TABLE: [u16; 128] = [
     1175, 1245, 1319, 1397, 1480, 1568, 1661, 1760, 1865, 1976, 2093, 2217, // 84–95
     2349, 2489, 2637, 2794, 2960, 3136, 3322, 3520, 3729, 3951, 4186, 4435, // 96–107
     4699, 4978, 5274, 5588, 5920, 6272, 6645, 7040, 7458, 7902, 8372, 8869, // 108–119
-    9397, 9956, 10548, 11175, 11840, 12544, 13290, 14080 // 120–127
+    9397, 9956, 10548, 11175, 11840, 12544, 13290, 14080, // 120–127
 ];
 
 pub fn midi_note_to_freq(note: u8) -> u16 {
@@ -80,27 +80,41 @@ fn read_varlen(data: &[u8]) -> (u32, usize) {
 }
 
 pub fn parse_midi_format0(data: &'_ [u8]) -> Option<MidiFile<'_>> {
-    if &data[0..4] != b"MThd" { return None; }
+    if &data[0..4] != b"MThd" {
+        return None;
+    }
 
     let header_len = u32::from_be_bytes([data[4], data[5], data[6], data[7]]);
-    if header_len != 6 { return None; }
+    if header_len != 6 {
+        return None;
+    }
 
     let format = u16::from_be_bytes([data[8], data[9]]);
-    if format != 0 { return None; }
+    if format != 0 {
+        return None;
+    }
 
     let num_tracks = u16::from_be_bytes([data[10], data[11]]);
-    if num_tracks != 1 { return None; }
+    if num_tracks != 1 {
+        return None;
+    }
 
     let division = u16::from_be_bytes([data[12], data[13]]);
     let mut pos = 14;
 
-    if &data[pos..pos + 4] != b"MTrk" { return None; }
-    let track_len = u32::from_be_bytes([data[pos+4], data[pos+5], data[pos+6], data[pos+7]]) as usize;
+    if &data[pos..pos + 4] != b"MTrk" {
+        return None;
+    }
+    let track_len =
+        u32::from_be_bytes([data[pos + 4], data[pos + 5], data[pos + 6], data[pos + 7]]) as usize;
     pos += 8;
 
     let track_end = pos + track_len;
     let mut last_status = 0u8;
-    let mut output = [MidiEvent { note: 0, duration: 0 }; 256];
+    let mut output = [MidiEvent {
+        note: 0,
+        duration: 0,
+    }; 256];
     let mut out_idx = 0;
 
     while pos < track_end && out_idx < output.len() {
@@ -190,7 +204,7 @@ fn read_file() -> Option<[u8; 4096]> {
     let mut buf = [0; 4096];
 
     if let Ok(fs) = fat12::fs::Filesystem::new(&floppy) {
-        fs.for_each_entry(0, | entry | {
+        fs.for_each_entry(0, |entry| {
             if entry.ext.starts_with(b"MID") {
                 fs.read_file(entry.start_cluster, &mut buf);
             }
@@ -199,4 +213,3 @@ fn read_file() -> Option<[u8; 4096]> {
 
     Some(buf)
 }
-

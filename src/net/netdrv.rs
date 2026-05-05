@@ -130,6 +130,23 @@ fn lookup_port(port: u16) -> Option<usize> {
     None
 }
 
+/// Deliver a frame directly to a local process without going through the NIC.
+/// Called when src_ip == dst_ip in the IPv4 header (same-guest loopback).
+pub unsafe fn loopback_deliver(frame: &[u8], len: usize) {
+    if NET_DRV_PID == NO_PID {
+        return;
+    }
+    if len > NET_FRAME_BUF.len() {
+        return;
+    }
+    core::ptr::copy_nonoverlapping(frame.as_ptr(), NET_FRAME_BUF.as_mut_ptr(), len);
+    let dest_pid = tcp_dest_port(&NET_FRAME_BUF[..len])
+        .and_then(|port| lookup_port(port))
+        .unwrap_or(NET_DRV_PID);
+    let msg = Message::new(len, 0, dest_pid, NET_FRAME_BUF.as_ptr() as u64);
+    scheduler::push_msg(dest_pid, msg);
+}
+
 /// Called from scheduler_schedule() on every timer tick.
 /// Polls the NIC; if a frame is ready, routes it to the port-specific service that registered
 /// for its TCP destination port, falling back to the global driver for everything else.

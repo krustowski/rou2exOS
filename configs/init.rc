@@ -1,0 +1,10 @@
+# Start network driver
+bg ETH
+
+# Start TNT with config
+bg TNT eth
+
+# Start GARN web server
+cd GARN
+bg GARN --config /mnt/fat/GARN/GARN.CFG
+cd ..

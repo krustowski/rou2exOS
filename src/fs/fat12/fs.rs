@@ -443,7 +443,7 @@ impl<'a, D: BlockDevice> Filesystem<'a, D> {
     }
 
     /// Overwrites the directory entry with new data referenced by filename
-    fn update_dir_entry(&self, dir_cluster: u16, filename: &[u8; 11], updated: &Entry) {
+    fn _update_dir_entry(&self, dir_cluster: u16, filename: &[u8; 11], updated: &Entry) {
         let entry_size = core::mem::size_of::<Entry>();
         let entries_per_sector = 512 / entry_size;
         let mut cluster = dir_cluster;
@@ -769,7 +769,7 @@ impl<'a, D: BlockDevice> Filesystem<'a, D> {
     }
 
     /// Lists all entries of a given directory
-    pub fn list_dir(&self, start_cluster: u16, entry_name: &[u8; 11]) -> isize {
+    pub fn _list_dir(&self, start_cluster: u16, entry_name: &[u8; 11]) -> isize {
         let mut status: isize = 0;
 
         self.for_each_entry(start_cluster, |entry| {
@@ -927,7 +927,7 @@ impl<'a, D: BlockDevice> Filesystem<'a, D> {
         })
     }
 
-    pub fn resolve_path(&self, path: &[u8]) -> Option<Entry> {
+    pub fn _resolve_path(&self, path: &[u8]) -> Option<Entry> {
         self.resolve_path_from(0, path)
     }
 }

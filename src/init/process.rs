@@ -1,4 +1,4 @@
-use crate::input::keyboard::keyboard_loop;
+use crate::input::{cmd, keyboard::keyboard_loop};
 use crate::task::{process::Mode, scheduler};
 pub unsafe fn init_processes() {
     // Snapshot the boot-time CR3 before any per-process tables are created.
@@ -11,15 +11,24 @@ pub unsafe fn init_processes() {
 }
 
 unsafe fn setup_processes() {
-    // Kernel process stacks must not overlap the userland virtual region
-    // 0x600_000–0x7FF_FFF that per-process page tables remap per-slot.
-    // 0x2B0_000 and 0x2D0_000 are in P2[1] (0x200_000–0x3FF_FFF), which is
-    // identity-mapped with kernel-only flags and always safe for ring-0 stacks.
+    // Slot 0 must be a sentinel for the kernel's boot execution context.
+    // The scheduler's current_pid starts at 0; on the very first PIT tick
+    // it saves the kernel's idle RSP into slot 0 before switching away.
+    // Without this sentinel that write would clobber the iretq entry frame
+    // of whichever real process occupies slot 0, preventing it from ever
+    // executing its entry function.
     scheduler::new_process(
-        *b"init            ",
+        *b"kmain           ",
         Mode::Kernel,
-        clock_test as *const () as u64,
-        0x190_000,
+        kernel_idle as *const () as u64,
+        0,
+        0,
+    );
+    scheduler::new_process(
+        *b"init_rc         ",
+        Mode::Kernel,
+        init_rc as *const () as u64,
+        0,
         0,
     );
     scheduler::new_process(
@@ -39,6 +48,63 @@ unsafe fn setup_processes() {
     scheduler::set_shell_pid(shell_pid);
 }
 
+/// Absorbs the kernel's boot RSP on the first PIT tick. Stays resident as an idle hlt loop.
+#[no_mangle]
+extern "C" fn kernel_idle() -> ! {
+    loop {
+        unsafe { core::arch::asm!("hlt"); }
+    }
+}
+
+/// Reads INIT.RC from FAT12 root and executes each line through the shell dispatcher.
+/// After the script finishes the process kills itself — it has no further purpose.
+#[no_mangle]
+extern "C" fn init_rc() -> ! {
+    use crate::fs::fat12::{
+        block::Floppy,
+        fs::{fat83, Filesystem},
+    };
+
+    let mut buf = [0u8; 1024];
+
+    let floppy = Floppy::init();
+    if let Ok(fs) = Filesystem::new(&floppy) {
+        let name83 = fat83(b"INIT.RC");
+        if let Some(entry) = fs.find_entry(0, &name83) {
+            fs.read_file(entry.start_cluster, &mut buf);
+
+            let mut start = 0usize;
+            for i in 0..buf.len() {
+                let ch = buf[i];
+                if ch == b'\n' || ch == b'\0' {
+                    let mut line = &buf[start..i];
+                    // strip trailing CR for files edited on Windows
+                    if line.last() == Some(&b'\r') {
+                        line = &line[..line.len() - 1];
+                    }
+                    if !line.is_empty() && line[0] != b'#' {
+                        cmd::handle(line);
+                    }
+                    if ch == b'\0' {
+                        break;
+                    }
+                    start = i + 1;
+                }
+            }
+        }
+    }
+
+    let pid = unsafe { scheduler::get_current_pid() };
+    unsafe {
+        scheduler::kill(pid);
+    }
+    loop {
+        unsafe {
+            core::arch::asm!("hlt");
+        }
+    }
+}
+
 #[no_mangle]
 extern "C" fn clock_test() -> ! {
     use crate::vga::buffer::Color;
@@ -50,21 +116,16 @@ extern "C" fn clock_test() -> ! {
 
             let (_, _o, _, h, m, s) = crate::time::rtc::read_rtc_full();
 
-            // Hours
             if h < 10 {
                 string(vga_index, b"0", Color::White);
             }
             number(vga_index, h as u64);
             string(vga_index, b":", crate::vga::buffer::Color::White);
-
-            // Minutes
             if m < 10 {
                 string(vga_index, b"0", Color::White);
             }
             number(vga_index, m as u64);
             string(vga_index, b":", Color::White);
-
-            // Seconds
             if s < 10 {
                 string(vga_index, b"0", Color::White);
             }
@@ -72,7 +133,6 @@ extern "C" fn clock_test() -> ! {
             newline(vga_index);
 
             for _ in 0..50_000 {
-                //core::arch::asm!("mov rdx, 0", "int 0x7f", "hlt");
                 core::arch::asm!("pause");
             }
         }

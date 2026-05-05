@@ -68,7 +68,7 @@ impl FatTable {
     }
 
     /// Follow a cluster chain until end-of-chain or loop
-    pub fn follow_chain_array(&self, start: u16) -> (usize, [u16; MAX_CLUSTERS]) {
+    pub fn _follow_chain_array(&self, start: u16) -> (usize, [u16; MAX_CLUSTERS]) {
         let mut result = [0u16; MAX_CLUSTERS];
         let mut len = 0;
         let mut current = start;
@@ -103,7 +103,7 @@ impl FatTable {
         (len, result)
     }
 
-    pub fn total_clusters(&self) -> usize {
+    pub fn _total_clusters(&self) -> usize {
         MAX_CLUSTERS
     }
 

@@ -18,17 +18,17 @@ pub struct BootSector {
 }
 
 #[repr(C, packed)]
-#[derive(Default,Copy,Clone)]
+#[derive(Default, Copy, Clone)]
 pub struct Entry {
-    pub name: [u8; 8],         // "FILE    "
-    pub ext: [u8; 3],          // "TXT"
+    pub name: [u8; 8], // "FILE    "
+    pub ext: [u8; 3],  // "TXT"
     pub attr: u8,
     pub reserved: u8,
     pub create_time_tenths: u8,
     pub create_time: u16,
     pub create_date: u16,
     pub last_access_date: u16,
-    pub high_cluster: u16,     // ignored in FAT16
+    pub high_cluster: u16, // ignored in FAT16
     pub write_time: u16,
     pub write_date: u16,
     pub start_cluster: u16,
@@ -36,7 +36,7 @@ pub struct Entry {
 }
 
 impl Entry {
-    pub fn to_bytes(e: &Entry) -> [u8; 32] {
+    pub fn _to_bytes(e: &Entry) -> [u8; 32] {
         let mut b = [0u8; 32];
 
         b[0..8].copy_from_slice(&e.name);
@@ -47,7 +47,7 @@ impl Entry {
         b[14..16].copy_from_slice(&e.create_time.to_le_bytes());
         b[16..18].copy_from_slice(&e.create_date.to_le_bytes());
         b[18..20].copy_from_slice(&e.last_access_date.to_le_bytes());
-        b[20..22].copy_from_slice(&e.high_cluster.to_le_bytes()); 
+        b[20..22].copy_from_slice(&e.high_cluster.to_le_bytes());
         b[22..24].copy_from_slice(&e.write_time.to_le_bytes());
         b[24..26].copy_from_slice(&e.write_date.to_le_bytes());
         b[26..28].copy_from_slice(&e.start_cluster.to_le_bytes());
@@ -56,4 +56,3 @@ impl Entry {
         b
     }
 }
-

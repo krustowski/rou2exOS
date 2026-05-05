@@ -80,7 +80,7 @@ pub unsafe fn inb(port: u16) -> u8 {
 #[unsafe(link_section = ".dma")]
 pub static mut DMA: [u8; 512] = [0; 512];
 
-static mut DISK_DATA: [u8; 1024 * 512] = [0u8; 1024 * 512]; // 1024 sectors
+static mut _DISK_DATA: [u8; 1024 * 512] = [0u8; 1024 * 512]; // 1024 sectors
 const CMD_WRITE_SECTOR: u8 = 0x45; // 0x40 | 0x05 = write with MFM, multi-track
 
 //#[unsafe(link_section = ".dma")]
@@ -88,12 +88,12 @@ const CMD_WRITE_SECTOR: u8 = 0x45; // 0x40 | 0x05 = write with MFM, multi-track
 //static mut DMA_BUFFER: [u8; 512] = [0u8; 512];
 
 const DOR: u16 = 0x3F2;
-const MSR: u16 = 0x3F4;
-const FIFO: u16 = 0x3F5;
+const _MSR: u16 = 0x3F4;
+const _FIFO: u16 = 0x3F5;
 
 const FDC_DOR: u16 = 0x3F2;
 const FDC_MSR: u16 = 0x3F4;
-const FDC_DATA: u16 = 0x3F5;
+const _FDC_DATA: u16 = 0x3F5;
 
 const FDC_CMD_SEEK: u8 = 0x0F;
 
@@ -161,7 +161,7 @@ impl Floppy {
         }
     }
 
-    fn set_write_mode(&self) {
+    fn _set_write_mode(&self) {
         unsafe {
             // Mode: single transfer, address increment, write, channel 2
             outb(0x0B, 0x52); // 0101_0010

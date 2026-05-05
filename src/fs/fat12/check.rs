@@ -1,4 +1,4 @@
-use crate::fs::fat12::{fs::Filesystem, table::FatTable, block::Floppy}; 
+use crate::fs::fat12::{block::Floppy, fs::Filesystem, table::FatTable};
 
 pub struct CheckReport {
     pub errors: usize,
@@ -21,7 +21,12 @@ pub fn run_check() -> CheckReport {
     scan_directory(0, &fat, &mut used_clusters, &mut report, 0);
 
     // Check the FAT for unreferenced or multiply referenced clusters
-    report.orphan_clusters += used_clusters.iter().zip((0..).map(|cluster| fat.get(cluster))).skip(2).filter_map(|x| if !x.0 { x.1 } else {None}).count();
+    report.orphan_clusters += used_clusters
+        .iter()
+        .zip((0..).map(|cluster| fat.get(cluster)))
+        .skip(2)
+        .filter_map(|x| if !x.0 { x.1 } else { None })
+        .count();
 
     /*print!("Done. Error count: ");
     printn!(report.errors as u64);
@@ -104,11 +109,12 @@ fn scan_directory(
     }
 }
 
-fn is_valid_name(name: &[u8; 11]) -> bool {
+fn _is_valid_name(name: &[u8; 11]) -> bool {
     name.iter().all(|&c| {
-        c.is_ascii_uppercase() ||
-        c.is_ascii_digit() ||
-        c == b' ' || b"!#$%&'()-@^_`{}~".contains(&c)
+        c.is_ascii_uppercase()
+            || c.is_ascii_digit()
+            || c == b' '
+            || b"!#$%&'()-@^_`{}~".contains(&c)
     })
 }
 
@@ -153,4 +159,3 @@ pub fn validate_chain(
         }
     }
 }
-

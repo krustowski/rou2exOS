@@ -21,7 +21,7 @@ impl SystemConfig {
             path: *b"/                               ",
             path_len: 1,
             path_cluster: 0,
-            version: *b"v0.11.3         ",
+            version: *b"v0.11.4         ",
             ip_addr: [0u8; 4],
             mac_addr: [0u8; 6],
         }

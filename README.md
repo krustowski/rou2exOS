@@ -7,8 +7,8 @@ A second iteration of the RoureXOS operating system, rewritten in Rust.
 
 The goal of this project is to make the rou2exOS kernel to follow the microkernel architecture. For purposes of the external program development, there are two key links to consider opening when thinking about extending the system:
 
-+ [ABI specification document](/docs/ABI_OVERVIEW.md)
-+ [Syscall client implementation examples](https://github.com/krustowski/rou2exOS-apps) (aka `rou2exOS` Apps)
++ [ABI specification](/docs/ABI)
++ [Syscall client implementation examples](https://github.com/krustowski/r2apps) (aka `r2` apps)
 
 To run the OS, you can use the attached ISO image from any [Release](https://github.com/krustowski/rou2exOS/releases), and run it in QEMU emulator. The system was also tested on the x86_64 baremetal (booted from the USB flash disk). To enable the filesystem functionalities, attach a IMG file to QEMU as well (in virtual floppy drive A).
 
@@ -47,6 +47,16 @@ qemu-system-x86_64 -boot d -cdrom r2.iso -fda fat.img
 
 ^__v0.10.1__: kernel init process output
 
+
+## Documentation
+
+The documentation itself is (to be) united under the [docs/](/docs) directory. To build and serve the MkDocs live pages run:
+
+```sh
+mkdocs serve
+```
+
+Then navigate to [http://localhost:8000](http://localhost:8000).
 
 ## How to build and run from source
 

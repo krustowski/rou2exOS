@@ -1,0 +1,34 @@
+site_name: rou2exOS Rusted Edition Documentation
+site_url: "https://r2.krusty.space"
+dev_addr: 0.0.0.0:8000
+
+lang: "en"
+
+theme:
+  name: material
+  palette:
+    scheme: slate
+    primary: 0x0000a8
+    accent: 0x0000a8
+  #icon:
+  #  repo: fontawesome/brands/gitlab
+  features:
+  #  - content.action.edit
+    - search.suggest
+    - search.highlight
+
+copyright: "@krusty.space 2026"
+
+extra:
+  homepage: "https://r2.krusty.space"
+  #social:
+  #  - icon: fontawesome/brands/gitlab
+  #    link: "https://gitlab.vxn.dev"
+
+plugins:
+  #- git-revision-date-localized:
+      #enable_creation_date: true
+      #type: date
+  - search
+  #- offline
+

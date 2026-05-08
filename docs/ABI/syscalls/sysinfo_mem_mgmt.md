@@ -22,13 +22,16 @@ The process'/task's ID is resolved by the kernel scheduler automatically.
 | `0x01`   | pointer to `RTC` struct | Read the system time and date. | ✅ |
 | `0x02`   | pointer to `RTC` struct | Write the system time and date. | ❌ |
 
-## 0x03 (IRQ1 Scancodes)
+## 0x03 (Pipe handling)
 
 | Argument 1 | Argument 2 | Meaning | Implemented |
 |------------|------------|-------------|---------|
 | `0x01`   | pointer to circular buffer | Register a buffer to receive scancodes from IRQ1. | ✅ |
-| `0x02`   | pointer to circular buffer | Unregister a buffer from receiving any scancodes. | ✅ |
-| `0x03`   | pointer to circular buffer | Read from the registered buffer. | ✅ |
+| `0x02`   | pointer to circular buffer | Unregister a buffer from receiving any scancodes from IRQ1. | ✅ |
+| `0x03`   | pointer to circular buffer | Read from the registered buffer (IRQ1). | ✅ |
+| `0x04` | *unused* | Register current process to receive mouse packets (IRQ12). | ✅ |
+| `0x04` | pointer to circular buffer | Drains up to 5 complete 3-byte packets (15 bytes) from the mouse ring buffer into the caller's buffer. Returns: bytes written (always a multiple of 3). | ✅ |
+| `0x06` | *unused* | Unregister current process from receiving mouse packets (IRQ12). | ✅ |
 
 ## 0x04 (Tick count in milliseconds)
 

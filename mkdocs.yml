@@ -17,13 +17,13 @@ theme:
     - search.suggest
     - search.highlight
 
-copyright: "@krusty.space 2026"
+copyright: "@krusty.space 2026 --- Note: Some portions of this documentation have been generated from the original source code by AI."
 
 extra:
   homepage: "https://r2.krusty.space"
-  #social:
-  #  - icon: fontawesome/brands/gitlab
-  #    link: "https://gitlab.vxn.dev"
+  social:
+    - icon: fontawesome/brands/github
+      link: "https://github.com/krustowski/rou2exOS"
 
 plugins:
   #- git-revision-date-localized:

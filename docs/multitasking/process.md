@@ -20,8 +20,8 @@ struct Process {
 ## Status Transitions
 
 ```
-            ┌──────────────────────────────────────────┐
-            │                                          ▼
+              ┌────────────────────────────────────────────────┐
+              │                                                ▼
   (new) ──► Ready ◄──── push_msg / wake ──── Blocked ──────► Ready
               │                                  ▲
               │  scheduler picks it              │

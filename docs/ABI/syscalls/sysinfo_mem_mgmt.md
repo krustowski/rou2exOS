@@ -6,7 +6,7 @@ The process'/task's ID is resolved by the kernel scheduler automatically.
 
 | Argument 1 | Argument 2 | Implemented |
 |------------|------------|-------------|
-| *unused*   | program return code | ✅ |
+| *unused*  | program return code | ✅ |
 
 ## 0x01 (System Information)
 
@@ -30,7 +30,7 @@ The process'/task's ID is resolved by the kernel scheduler automatically.
 | `0x02`   | pointer to circular buffer | Unregister a buffer from receiving any scancodes from IRQ1. | ✅ |
 | `0x03`   | pointer to circular buffer | Read from the registered buffer (IRQ1). | ✅ |
 | `0x04` | *unused* | Register current process to receive mouse packets (IRQ12). | ✅ |
-| `0x04` | pointer to circular buffer | Drains up to 5 complete 3-byte packets (15 bytes) from the mouse ring buffer into the caller's buffer. Returns: bytes written (always a multiple of 3). | ✅ |
+| `0x05` | pointer to output buffer | Drain up to 5 complete 3-byte packets (15 bytes) from the mouse ring buffer into the caller's buffer. Returns bytes written (always a multiple of 3). | ✅ |
 | `0x06` | *unused* | Unregister current process from receiving mouse packets (IRQ12). | ✅ |
 
 ## 0x04 (Tick count in milliseconds)

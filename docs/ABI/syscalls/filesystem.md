@@ -84,11 +84,11 @@ Execute a flat binary executable (`.BIN` usually).
 
 ## 0x2a (Execute ELF64 executable)
 
-Execute an ELF64 executable (`.ELF`). Auto-appends `.elf`/`.ELF` if no extension given.
+Execute an ELF64 executable (`.ELF`). Auto-appends `.elf`/`.ELF` if no extension given. Returns the new process PID on success, `0` on failure.
 
 | Argument 1 | Argument 2 | Implemented |
 |------------|------------|-------------|
-| pointer to file name string | pointer to uint64 (PID) | ✅ |
+| pointer to NUL-terminated file name | pointer to NUL-terminated args string (space-delimited; `0` = use file name as sole argv[0]) | ✅ |
 
 ## 0x2b (Run FAT12 filesystem check)
 

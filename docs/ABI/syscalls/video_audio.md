@@ -18,19 +18,19 @@ Effectively clear the text mode screen.
 
 ## 0x12 (Write graphical pixel)
 
-Write a graphical pixel to the kernel framebuffer.
+Write a graphical pixel to the VESA framebuffer.
 
 | Argument 1 | Argument 2 | Implemented |
 |------------|------------|-------------|
-| encoded position | encoded color | ✅ |
+| `(x << 16) \| y` — pixel coordinates | `0x00RRGGBB` — 24-bit RGB color | ✅ |
 
 ## 0x13 (Write VGA buffer)
 
-Write a VGA buffer into kernel framebuffer.
+Blit a 320×200 palette-indexed buffer into the VESA framebuffer. Each pixel is expanded to 32bpp using the supplied palette, or the default VGA 256-color palette if none is given.
 
 | Argument 1 | Argument 2 | Implemented |
 |------------|------------|-------------|
-|  a 320×200 VGA mode-13h palette-indexed buffer | pointer to RGB or default VGA palette | ✅ |
+| pointer to 64000-byte palette-indexed buffer (320×200, 1 byte per pixel) | pointer to 768-byte palette (256 × RGB triplets), or `0` to use the default VGA palette | ✅ |
 
 ## 0x14 (Map VGA graphics RAM)
 
@@ -86,11 +86,11 @@ Play given frequency in Hz for given time in milliseconds.
 
 ## 0x1b (Play MIDI file)
 
-Play the MIDI audio file.
+Play the MIDI audio file from the filesystem.
 
 | Argument 1 | Argument 2 | Implemented |
 |------------|------------|-------------|
-| `0x01` | pointer to the audio file | ✅ |
+| `0x01` (MIDI format 0) | pointer to NUL-terminated file name | ✅ |
 
 ## 0x1f (Stop audio player)
 

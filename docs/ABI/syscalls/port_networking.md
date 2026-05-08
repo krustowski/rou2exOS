@@ -2,19 +2,19 @@
 
 ## 0x30 (Send value to port)
 
-Send a value to a port specified in `arg1`.
+Write one byte to a hardware I/O port. Both args are pointers — the kernel dereferences them.
 
 | Argument 1 | Argument 2 | Implemented |
 |------------|------------|-------------|
-| port identificator (ID) | pointer to value (uint64) | ✅ |
+| pointer to port number (`*const u16`) | pointer to value (`*const u32`; low byte written) | ✅ |
 
 ## 0x31 (Receive value from port)
 
-Receive a value from a port specified in `arg1`.
+Read a 32-bit value from a hardware I/O port. Both args are pointers — the kernel dereferences them.
 
 | Argument 1 | Argument 2 | Implemented |
 |------------|------------|-------------|
-| port identificator (ID) | pointer to value (uint64) | ✅ |
+| pointer to port number (`*const u16`) | pointer to output (`*mut u32`; receives the result) | ✅ |
 
 ## 0x32 (Serial port)
 

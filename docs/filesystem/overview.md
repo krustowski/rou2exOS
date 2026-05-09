@@ -6,7 +6,7 @@
 Userland (syscalls 0x20–0x2E)
     │
     ▼
-fs/vfs          — mount table, path dispatch
+fs/vfs — mount table, path dispatch
     ├── fs/fat12    — floppy FAT12 (read/write)
     └── fs/iso9660  — CD-ROM ISO9660 (read-only)
          │               │

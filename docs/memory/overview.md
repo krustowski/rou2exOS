@@ -12,30 +12,22 @@ The Multiboot2 memory map tag (type 6) is parsed at boot and reports usable RAM 
 
 All addresses are 64-bit (x86-64) but the kernel only uses the lower 4 GiB. The page table is a 4-level (PML4) structure; P2 entries use 2 MiB huge pages everywhere except the VGA VRAM window (which uses 4 KiB P1 entries).
 
-```
-Virtual address            Size      Description
-──────────────────────────────────────────────────────────────────────
-0x000_000 – 0x0FF_FFF      1 MiB     Real-mode legacy (not used at runtime)
-0x100_000 – ~               varies    Kernel image: .text .rodata .data .bss
-                                      placed by linker at 0x100_000
-  __stack_bottom – __stack_top  64 KiB   Boot stack (inside kernel image)
-  __heap_start  – __heap_end    64 KiB   Kernel linked-list heap (legacy)
-  p4_table / p3_fb_table         8 KiB   Static page tables in .data
-0x400_000 – 0x5FF_FFF      2 MiB     (unused / reserved)
-0x600_000 – 0x7FF_FFF      2 MiB     ELF userland load region
-                                      Each slot's private 2 MiB physical frame
-                                      is identity-mapped here by create_user_page_table
-0x800_000 – 0x8FF_FFF      1 MiB     User stacks (10 slots × 128 KiB spacing)
-0x900_000 – 0x9FF_FFF      1 MiB     (unused userland headroom)
-0xA00_000 – 0xAFF_FFF     64 KiB     VGA graphics RAM window (mapped on demand
-                                      by syscall 0x14 / map_vram)
-0xB00_000 – 0xBFF_FFF      1 MiB     (unmapped; sits between VGA and heap)
-0xC00_000 – 0xFFF_FFF      4 MiB     Userland heap (shared, uheap)
-0x1000_000 – 0x1FFF_FFF+   varies    Per-process ELF physical frames
-                                      slot 0 → 0x1000_000, slot 1 → 0x1200_000, …
-PAGE_TABLE_POOL                256 KiB  Static pool for dynamically allocated
-  (inside kernel .bss)                  P4/P3/P2/P1 tables
-```
+| Virtual address   ||        Size   |   Description |
+|-------------------||--------------|---------------|
+| `0x000_000` | `0x0FF_FFF` |     1 MiB  |   Real-mode legacy (not used at runtime) |
+| `0x100_000` | ~            |   varies  |  Kernel image: `.text` `.rodata` `.data` `.bss`; placed by linker at `0x100_000` |
+|  `__stack_bottom` | `__stack_top` |  64 KiB |  Boot stack (inside kernel image) |
+|  `__heap_start`  | `__heap_end`   | 64 KiB |  Kernel linked-list heap (legacy) |
+| `p4_table` / `p3_fb_table` ||    8 KiB  |  Static page tables in `.data` |
+| `0x400_000` | `0x5FF_FFF`  |    2 MiB  |   (unused / reserved) |
+| `0x600_000` | `0x7FF_FFF`  |    2 MiB  |   ELF userland load region. Each slot's private 2 MiB physical frame is identity-mapped here by `create_user_page_table` |
+| `0x800_000` | `0x8FF_FFF` |     1 MiB  |   User stacks (10 slots × 128 KiB spacing) |
+| `0x900_000` | `0x9FF_FFF` |     1 MiB  |   (unused userland headroom) |
+| `0xA00_000` | `0xAFF_FFF` |    64 KiB  |   VGA graphics RAM window (mapped on demand by syscall `0x14` / `map_vram`). |
+| `0xB00_000` | `0xBFF_FFF` |      1 MiB  |   (unmapped; sits between VGA and heap) |
+| `0xC00_000` | `0xFFF_FFF` |      4 MiB   |  Userland heap (shared, uheap) |
+| `0x1000_000` | `0x1FFF_FFF+` |   varies |   Per-process ELF physical frames: slot 0 → |0x1000_000, slot 1 → 0x1200_000, ... |
+| `PAGE_TABLE_POOL` (`.bss`) ||    256 KiB | Static pool for dynamically allocated P4/P3/P2/P1 tables |
 
 ---
 
@@ -64,13 +56,14 @@ P4[0] → P3       (kernel P3, shared by all processes)
 At `init_processes`, `save_kernel_cr3()` snapshots the current CR3 as `KERNEL_CR3`. This is the reference from which all per-process tables are cloned.
 
 `create_user_page_table(slot)` allocates new P4/P3/P2 tables from `PAGE_TABLE_POOL`, copies all 512 entries from the kernel tables, then overrides P2[3] to point at the slot's private 2 MiB physical frame (`0x1000_000 + slot * 0x200_000`). The result is a process that sees:
+
 - its own ELF code/data at virtual `0x600_000` (private frame)
 - all kernel mappings everywhere else (shared read-only-ish)
 - the shared userland heap at `0xC00_000–0xFFF_FFF` (U/S + R/W, inherited from kernel P2[6/7])
 
 ### TLB management
 
-CR3 is written on every context switch in the scheduler. Writing CR3 always flushes the entire TLB, so no explicit `invlpg` is needed. The `flush_tlb()` helper reloads CR3 with its own current value for cases where only the active process's mappings changed (e.g. after `map_vram`).
+CR3 is written on every context switch in the scheduler. Writing CR3 always flushes the entire TLB (Translation Lookaside Buffer), so no explicit `invlpg` is needed. The `flush_tlb()` helper reloads CR3 with its own current value for cases where only the active process's mappings changed (e.g. after `map_vram`).
 
 ---
 

@@ -2,20 +2,26 @@
 
 The kernel shell is the interactive command-line interface running as task slot 3 (`keyboard_loop` in `src/input/keyboard.rs`). It is started during `init::process::setup_processes` and runs for the lifetime of the kernel.
 
+Thu purpose to have the kernel shell is to have a diagnostic command-line interface (CLI) when the system needs to be looked at. It is not intended to use the kernel shell as the main system shell: usage of the `SH.ELF` shell or a remote `TNT.ELF` shell instead is encouraged.
+
 ---
 
 ## Shell Loop
 
 `keyboard_loop()` runs in an infinite loop:
 
-1. Print the prompt via `config::get_prompt()` → `user@host:path > `.
-2. Read characters from `SCANCODE_BUF` (Set 1 scancodes, translated to ASCII). Buffer capacity: 128 bytes.
-3. Special keys handled inline:
-   - **Enter** — dispatch the accumulated input to `cmd::handle(input)`, then clear the buffer.
-   - **Backspace** — remove the last character from the buffer and erase it from the display.
-   - **Tab** — attempt FAT12 prefix completion (see below).
-   - **Ctrl+L** — clear the screen (`clear_screen!()`).
-4. Printable characters are echoed and appended to the input buffer.
++ Print the prompt via `config::get_prompt()`
+```
+user@host:path >
+```
++ Read characters from `SCANCODE_BUF` (Set 1 scancodes, translated to ASCII). Buffer capacity: 128 bytes.
++ Special keys handled inline:
+      - **Enter** — dispatch the accumulated input to `cmd::handle(input)`, then clear the buffer.
+      - **Backspace** — remove the last character from the buffer and erase it from the display.
+      - **Tab** — attempt FAT12 prefix completion (see below).
+      - **Ctrl+L** — clear the screen (`clear_screen!()`).
+
++ Printable characters are echoed and appended to the input buffer.
 
 The shell never exits; a foreground process (`fg`) causes the shell task to yield (via `scheduler::idle`) until the child signals completion via syscall `0x00`.
 

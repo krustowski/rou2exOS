@@ -124,7 +124,7 @@ sti                                    enable interrupts
 
 The framebuffer tag (type 8) is the only one that produces a side-effect beyond logging: it fills `FRAMEBUFFER_PTR`, which is subsequently used by all video syscalls.
 
-### `FramebufferTag` struct (`#[repr(C, packed)]`)
+### `FramebufferTag` struct
 
 | Field | Type | Description |
 |-------|------|-------------|
@@ -173,6 +173,7 @@ Populates the VFS mount table with three entries:
 ## Video Init (`init/video.rs`)
 
 `video::print_result(fb)` calls `video::mode::init_video(fb)`:
+
 - If `fb.addr != 0`: sets `VIDEO_MODE = Some(VideoMode::Framebuffer { ... })`.
 - Otherwise: sets `VIDEO_MODE = Some(VideoMode::TextMode)`.
 

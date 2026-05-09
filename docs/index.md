@@ -17,6 +17,18 @@ Userland programs are flat ELF binaries loaded into a fixed region (`0x600_000â€
 
 Fig. 1: External userspace program demo called `MEMENTO.ELF`. Login window in the foreground, a wallpaper in the background.
 
+## Releases
+
+To run the latest release of the kernel (`r2.iso`) and the aux floppy image (`fat.img`), just visit link below and download both files to your machine.
+
++ [Releases on github.com](https://github.com/krustowski/rou2exOS/releases)
+
+Please consult the [Build & Run](/build/) page to see options on how to run the system in QEMU locally.
+
+```
+qemu-system-x86_64 -boot d -cdrom r2.iso -fda fat.img
+```
+
 ## Blog posts
 
 + [Original RoureXOS project (krusty.space)](https://krusty.space/projects/rourexos/), June 6, 2024

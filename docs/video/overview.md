@@ -111,10 +111,10 @@ pub enum Result {
 Each subsystem check (heap, processes, network, etc.) prints a line using `print_result(name, result)`. Output format:
 
 ```
-[ OK    ]  kernel heap
-[ FAIL  ]  some subsystem
-[ SKIP  ]  optional feature
-[ UNKNWN]  unverified
+[  OK  ]  kernel heap
+[ FAIL ]  some subsystem
+[ SKIP ]  optional feature
+[UNKNWN]  unverified
 ```
 
 Colors are applied per `Result` variant using VGA attribute bytes.

@@ -1,6 +1,7 @@
 # FAT12
 
 FAT12 is the primary read/write filesystem, stored on a 1.44 MB floppy disk. It is accessible as:
+
 - Absolute paths under `/mnt/fat/`
 - Bare filenames relative to the current working directory (cluster stored in `SYSTEM_CONFIG`)
 
@@ -170,6 +171,7 @@ value = (byte[fat_offset] >> 4) | (byte[fat_offset+1] << 4)
 ### Read File (`read_file`)
 
 Follows the cluster chain starting from `start_cluster`:
+
 1. Convert cluster → LBA.
 2. Read 512-byte sector into the caller's buffer at offset `count × 512`.
 3. Advance to `read_fat12_entry(cluster)`.

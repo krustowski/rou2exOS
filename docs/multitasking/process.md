@@ -23,11 +23,13 @@ struct Process {
               ┌────────────────────────────────────────────────┐
               │                                                ▼
   (new) ──► Ready ◄──── push_msg / wake ──── Blocked ──────► Ready
-              │                                  ▲
-              │  scheduler picks it              │
-              ▼                                  │
-           Running ──── blocking syscall ────────┘
-              │
+              │                                  ▲             ▲
+              │  scheduler picks it              │             |
+              ▼                                  │             |
+           Running ──── blocking syscall ────────┘             |
+              │                                                |
+              ├────────────────────────────────────────────────┘
+              |
               ├── kill()  ──────────────────────► Dead  (slot reaped)
               ├── crash() ──────────────────────► Crashed (stays, not scheduled)
               └── idle()  ──────────────────────► Idle  (stays, not scheduled)

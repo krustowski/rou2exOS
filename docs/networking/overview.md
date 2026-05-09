@@ -6,23 +6,23 @@
   Userland process
        │  syscalls 0x33–0x37
        ▼
-  ┌─────────────────────────────────┐
-  │  Syscall dispatcher (abi/syscall.rs) │
-  └───────────────┬─────────────────┘
+  ┌───────────────────────────────────────┐
+  │  Syscall dispatcher (abi/syscall.rs)  │
+  └───────────────┬───────────────────────┘
                   │
        ┌──────────▼──────────┐
-       │   netdrv.rs          │  routing table, driver/port registry
+       │   netdrv.rs         │  routing table, driver/port registry
        └──────────┬──────────┘
                   │                        ┌──────────┐
         ┌─────────▼──────────┐             │  serial  │
-        │   rtl8139.rs        │  PCI NIC   │  + SLIP  │  UART path
+        │   rtl8139.rs       │  PCI NIC    │  + SLIP  │  UART path
         └─────────┬──────────┘             └──────────┘
                   │
-        ┌─────────▼────────────────────────────────────┐
-        │  Protocol helpers (stateless, no global state) │
-        │   ethernet.rs  arp.rs  ipv4.rs                │
-        │   icmp.rs  tcp.rs  udp.rs                     │
-        └────────────────────────────────────────────────┘
+        ┌─────────▼───────────────────────────────────────┐
+        │  Protocol helpers (stateless, no global state)  │
+        │   ethernet.rs  arp.rs  ipv4.rs                  │
+        │   icmp.rs  tcp.rs  udp.rs                       │
+        └─────────────────────────────────────────────────┘
 ```
 
 There are two independent paths:
@@ -32,7 +32,7 @@ There are two independent paths:
 | **Ethernet** | RTL8139 PCI NIC | Ethernet II → IPv4/ARP | TX and RX |
 | **Serial/SLIP** | UART COM1 | SLIP-framed IPv4 | TX only (active), RX (loop-based) |
 
-![network-frame-routing](../r2-network-frame-routing.png)
+![network-frame-routing](/assets/r2-network-frame-routing.png)
 
 ---
 

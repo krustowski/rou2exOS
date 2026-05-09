@@ -4,10 +4,11 @@ A second iteration of the RoureXOS operating system, rewritten in Rust.
 
 + [Original RoureXOS (a blog post)](https://krusty.space/projects/rourexos/)
 + [rou2exOS Rusted Edition (a blog post)](https://blog.vxn.dev/rou2exos-rusted-edition)
++ [rou2exOS Documentation](https://r2.krusty.space/)
 
 The goal of this project is to make the rou2exOS kernel to follow the microkernel architecture. For purposes of the external program development, there are two key links to consider opening when thinking about extending the system:
 
-+ [ABI specification](/docs/ABI)
++ [ABI specification](https://r2.krusty.space/abi/syscall_specification/)
 + [Syscall client implementation examples](https://github.com/krustowski/r2apps) (aka `r2` apps)
 
 To run the OS, you can use the attached ISO image from any [Release](https://github.com/krustowski/rou2exOS/releases), and run it in QEMU emulator. The system was also tested on the x86_64 baremetal (booted from the USB flash disk). To enable the filesystem functionalities, attach a IMG file to QEMU as well (in virtual floppy drive A).

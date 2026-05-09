@@ -29,6 +29,12 @@ Please consult the [Build & Run](/build/) page to see options on how to run the 
 qemu-system-x86_64 -boot d -cdrom r2.iso -fda fat.img
 ```
 
+## Repositories
+
++ [rou2exOS kernel](https://github.com/krustowski/rou2exOS)
++ [r2apps](https://github.com/krustowski/r2apps)
+
+
 ## Blog posts
 
 + [Original RoureXOS project (krusty.space)](https://krusty.space/projects/rourexos/), June 6, 2024
@@ -37,11 +43,6 @@ qemu-system-x86_64 -boot d -cdrom r2.iso -fda fat.img
 + [rou2exOS: a DOS-like hobby operating system written in Rust (osnews.com)](https://www.osnews.com/story/142612/rou2exos-a-dos-like-hobby-operating-system-written-in-rust/), June 20, 2025
 + [Developer Creates Rust-Based DOS-Like Operating System with Modern Networking Stack (finance.biggo.com)](https://finance.biggo.com/news/202506201922_Rust_DOS-Like_OS), June 20, 2025
 + [rou2exOS - Rust와 x86 어셈블리어로 작성된 Dos-like 취미 OS (news.hada.io)](https://news.hada.io/topic?id=21622), June 24, 2025
-
-## Repositories
-
-+ [rou2exOS kernel](https://github.com/krustowski/rou2exOS)
-+ [r2apps](https://github.com/krustowski/r2apps)
 
 ---
 

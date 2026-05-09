@@ -32,12 +32,12 @@ When an app wants to run over Ethernet, the default `ETH` driver must be run bef
 
 | App name | Language | Description |
 |----------|----------|-------------|
-| `CHAT` | C | A chatroom server over TCP/9000 and HTTP (TCP/8080). Can run on SLIP, or Ethernet. |
-| `ETH` | C | An Ethernet networking driver. ARP + ICMP responder and DHCP client. Dafualt `r2` driver for Ethernet. |
-| `FSCK` | C | The FAT12 filesystem scanning and diagnostic tool. |
-| `GARN` |  C | A very simple HTTP/1.0 server. It enables a file sharing over HTTP. It can be configured using a special configuration file. |
-| `GFXTEST` | C | A demo implementation of VGA mode 13h graphical capabilities (video test). |
-| `MEMENTO` | C++ | A demo app integrating the Memento GUI framework with `libcr2` into a functional graphical user interface (GUI). |
-| `R2SH`/`SH` | C | A userland shell providing a simple command set. |
-| `THEM` | C | A 16-bit x86 CPU emulator. Enables running old MS-DOS games and tools. |
-| `TNT` | C | A TELNET server and remote shell. The application can run over SLIP, or Ethernet. It exposes port TCP/23 for the host's IP. |
+| [`CHAT`](https://github.com/krustowski/r2apps/tree/master/c/chat) | C | A chatroom server over TCP/9000 and HTTP (TCP/8080). Can run on SLIP, or Ethernet. |
+| [`ETH`](https://github.com/krustowski/r2apps/tree/master/c/eth) | C | An Ethernet networking driver. ARP + ICMP responder and DHCP client. Dafualt `r2` driver for Ethernet. |
+| [`FSCK`](https://github.com/krustowski/r2apps/tree/master/c/fsck) | C | The FAT12 filesystem scanning and diagnostic tool. |
+| [`GARN`](https://github.com/krustowski/r2apps/tree/master/c/garn) |  C | A very simple HTTP/1.0 server. It enables a file sharing over HTTP. It can be configured using a special configuration file. |
+| [`GFXTEST`](https://github.com/krustowski/r2apps/tree/master/c/gfxtest) | C | A demo implementation of VGA mode 13h graphical capabilities (video test). |
+| [`MEMENTO`](https://github.com/krustowski/r2apps/tree/master/cpp/memento-hello) | C++ | A demo app integrating the Memento GUI framework with `libcr2` into a functional graphical user interface (GUI). |
+| [`R2SH`/`SH`](https://github.com/krustowski/r2apps/tree/master/c/r2sh) | C | A userland shell providing a simple command set. |
+| [`THEM`](https://github.com/krustowski/r2apps/tree/master/c/them) | C | A 16-bit x86 CPU emulator. Enables running old MS-DOS games and tools. |
+| [`TNT`](https://github.com/krustowski/r2apps/tree/master/c/tnt) | C | A TELNET server and remote shell. The application can run over SLIP, or Ethernet. It exposes port TCP/23 for the host's IP. |

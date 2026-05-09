@@ -27,7 +27,7 @@ All addresses are 64-bit (x86-64) but the kernel only uses the lower 4 GiB. The 
 | `0xB00_000` | `0xBFF_FFF` |      1 MiB  |   (unmapped; sits between VGA and heap) |
 | `0xC00_000` | `0xFFF_FFF` |      4 MiB   |  Userland heap (shared, uheap) |
 | `0x1000_000` | `0x1FFF_FFF+` |   varies |   Per-process ELF physical frames: slot 0 → |0x1000_000, slot 1 → 0x1200_000, ... |
-| `PAGE_TABLE_POOL` (`.bss`) ||    256 KiB | Static pool for dynamically allocated P4/P3/P2/P1 tables |
+| `PAGE_TABLE_POOL` (`.bss`) ||    512 KiB | Static pool for dynamically allocated P4/P3/P2/P1 tables |
 
 ---
 
@@ -69,9 +69,18 @@ CR3 is written on every context switch in the scheduler. Writing CR3 always flus
 
 ## Page Table Pool
 
-`PAGE_TABLE_POOL` is a 256 KiB zero-initialised static array in kernel `.bss`. `alloc_page()` carves 4 KiB chunks from it sequentially using `NEXT_FREE_PAGE`. There is no free function — page table pages are never reclaimed. This allows a maximum of 64 new page tables before the pool is exhausted.
+`PAGE_TABLE_POOL` is a 512 KiB zero-initialised static array in kernel `.bss`, giving a maximum of 128 × 4 KiB pages. `alloc_page()` serves requests from two sources in order:
 
-Each call to `create_user_page_table` consumes 3 pages (P4 + P3 + P2). `map_vram` consumes 1 additional page per process that calls syscall `0x14` (but only once per process — the P1 is reused on repeated calls).
+1. **Free list** (`FREE_LIST` / `FREE_COUNT`) — a fixed-size stack of pointers to pages that were previously returned by `free_page()`. Recycled pages are zeroed before reuse so stale page table entries from the previous owner cannot be followed.
+2. **Bump allocator** — if the free list is empty, `NEXT_FREE_PAGE` is advanced and a fresh page is carved from the pool. This pointer only ever increases.
+
+`free_page(p)` pushes a pointer back onto `FREE_LIST`. The list is sized to `PAGE_TABLE_MEMORY_SIZE / 4096` (128 entries) so it can never overflow as long as only genuinely allocated pages are freed.
+
+`free_user_page_table(cr3)` is the public reclamation entry point. It walks the P4 → P3 → P2 chain that `create_user_page_table` built and calls `free_page` for each of the three tables. It also checks P2[5] for a fine-grained P1 table that `map_vram` may have installed; if found (indicated by `PAGE_PS` being clear on a present entry), that page is freed too.
+
+`Scheduler::kill()` calls `free_user_page_table(proc.cr3)` before marking the process `Dead`, then zeros `proc.cr3` to prevent a second call from walking freed memory. Kernel processes (`cr3 == 0`) are skipped automatically.
+
+Each call to `create_user_page_table` consumes 3 pages (P4 + P3 + P2); those pages are returned to the free list when the process exits. `map_vram` consumes 1 additional page per process (but only once — repeated calls reuse the existing P1).
 
 ---
 

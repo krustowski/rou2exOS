@@ -1,8 +1,10 @@
 # Kernel Shell
 
-The kernel shell is the interactive command-line interface running as task slot 3 (`keyboard_loop` in `src/input/keyboard.rs`). It is started during `init::process::setup_processes` and runs for the lifetime of the kernel.
+The kernel shell is the interactive command-line interface running as task slot 3 (`keyboard_loop` in `src/input/keyboard.rs`). It is started during `init::process::setup_processes` and runs for the lifetime of the kernel (or till killed).
 
-Thu purpose to have the kernel shell is to have a diagnostic command-line interface (CLI) when the system needs to be looked at. It is not intended to use the kernel shell as the main system shell: usage of the `SH.ELF` shell or a remote `TNT.ELF` shell instead is encouraged.
+The purpose of having the kernel shell present is to provide a diagnostic command-line interface (CLI) when the system's state needs to be looked at. It is not intended to use the kernel shell as the main system shell: usage of the `SH.ELF` shell or a remote `TNT.ELF` shell instead is encouraged (see [SDK & apps](/sdk) page for more info).
+
+**The kernel shell should be considered to be the system rescue shell primarily**. 
 
 ---
 
@@ -232,4 +234,4 @@ Falls back to `$ ` if the config lock is contended.
 4. `Foreground`: the shell task yields (`scheduler::idle`) until the child exits.
 5. `Background`: returns immediately; the shell stays interactive.
 
-Userland processes communicate with the kernel via interrupt `0x7F` (syscall gate). See [docs/ABI/syscall_specification.md](ABI/syscall_specification.md) for the full syscall interface.
+Userland processes communicate with the kernel via interrupt `0x7F` (syscall gate). See [Syscall specification](/abi/syscall_specification) for the full syscall interface.

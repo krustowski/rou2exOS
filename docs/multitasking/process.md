@@ -42,7 +42,7 @@ struct Process {
 | `Blocked` | no | Waiting for a message or timer |
 | `Idle` | no | Voluntarily suspended (kernel processes only) |
 | `Crashed` | no | Faulted; not rescheduled but slot preserved for diagnostics |
-| `Dead` | no | Exited; slot is reclaimed on next scheduler pass |
+| `Dead` | no | Exited; page tables freed immediately in `kill()`, slot reclaimed on next scheduler pass |
 
 ## Privilege Modes
 
@@ -82,5 +82,11 @@ User processes get a dedicated P4 page table created by `elf::create_user_page_t
 - `0xC00_000–0xFFF_FFF` — shared userland heap (4 MiB, mapped at `uheap::init`)
 
 Kernel processes set `cr3 = 0`; the scheduler falls back to `KERNEL_CR3`.
+
+### Page table reclamation
+
+When `kill(pid)` is called, the scheduler calls `mem::pages::free_user_page_table(proc.cr3)` before marking the process `Dead`. This returns the P4, P3, and P2 pages (and any VGA P1 installed by `map_vram`) to the free list inside `PAGE_TABLE_POOL`, making them available for the next `create_user_page_table` call. `proc.cr3` is zeroed immediately after to prevent a double-free if `kill()` is called again for the same slot.
+
+Crashed processes (`Status::Crashed`) are not reclaimed — their slot and page tables are preserved for potential post-mortem inspection and are never scheduled again.
 
 ---

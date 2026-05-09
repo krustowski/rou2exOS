@@ -32,3 +32,45 @@ plugins:
   - search
   #- offline
 
+extra_javascript:
+  - assets/js/umami.js
+
+nav:
+  - Intro: index.md
+  - Build & Run: build.md
+  - Shell (Text Mode): shell.md
+  - SDK: sdk.md
+  - Kernel Internals:
+    - Boot / Init:
+      - Overview: init/overview.md
+      - Subsystems: init/subsystems.md
+    - Multitasking:
+      - Scheduler: multitasking/scheduler.md
+      - Processes: multitasking/process.md
+      - IPC: multitasking/IPC.md
+    - Memory:
+      - Overview: memory/overview.md
+      - Allocators: memory/allocators.md
+    - Filesystems:
+      - Overview: filesystem/overview.md
+      - FAT12: filesystem/fat12.md
+      - ISO9660: filesystem/iso9660.md
+    - Networking:
+      - Overview: networking/overview.md
+      - Hardware: networking/hardware.md
+      - Protocols: networking/protocols.md
+    - Video:
+      - Overview: video/overview.md
+      - VGA: video/vga.md
+    - Input:
+      - Overview: input/overview.md
+      - Keyboard: input/keyboard.md
+      - Mouse: input/mouse.md
+  - ABI / Syscalls:
+    - Specification: abi/syscall_specification.md
+    - Type Definitions: abi/type_definitions.md
+    - Syscalls:
+      - Sysinfo & Memory: abi/syscalls/sysinfo_mem_mgmt.md
+      - Video & Audio: abi/syscalls/video_audio.md
+      - Filesystem: abi/syscalls/filesystem.md
+      - Ports & Networking: abi/syscalls/port_networking.md

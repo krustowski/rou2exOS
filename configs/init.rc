@@ -4,10 +4,13 @@ bg ETH
 # Start TNT with config
 bg TNT eth
 
-# Start GARN web server
-cd GARN
-bg GARN --config /mnt/fat/GARN/GARN.CFG
-cd ..
-
 # Start the chatroom server
 bg CHAT s eth
+
+# Start GARN web server
+bg GARN --config /mnt/fat/GARN/GARN.CFG
+
+echo INIT.RC done
+
+cd /mnt/fat/GFX
+fg MEMENTO

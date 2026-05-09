@@ -13,9 +13,11 @@ The kernel speaks directly to the hardware:
 
 Userland programs are flat ELF binaries loaded into a fixed region (`0x600_000–0xA00_000`) and call into the kernel via interrupt `0x7F`.
 
-![memento](r2-memento-hello-login.png)
+![memento-welcome](/assets/r2-memento-hello-splash-start.png)
 
-Fig. 1: External userspace program demo called `MEMENTO.ELF`. Login window in the foreground, a wallpaper in the background.
+![memento-login](r2-memento-hello-login.png)
+
+Fig. 1: External userspace program demo called `MEMENTO.ELF`. Login window in the foreground, a wallpaper in the background in the second subfigure.
 
 ## Releases
 
@@ -23,11 +25,12 @@ To run the latest release of the kernel (`r2.iso`) and the aux floppy image (`fa
 
 + [Releases on github.com](https://github.com/krustowski/rou2exOS/releases)
 
-Please consult the [Build & Run](/build/) page to see options on how to run the system in QEMU locally.
 
 ```
 qemu-system-x86_64 -boot d -cdrom r2.iso -fda fat.img
 ```
+
+Please consult the [Build & Run](/build/) page to see options on how to run the system in QEMU locally.
 
 ## Repositories
 

@@ -167,6 +167,10 @@ read /mnt/fat/GARN/INDEX.HTM
 read /mnt/iso/readme.txt
 ```
 
+### `reset`
+
+Force resets the VGA video mode to `0x03` (text mode).
+
 ### `rm <filename>`
 
 Deletes a file from the current FAT12 directory. Marks the directory entry as `0xE5` (deleted). Clusters are not immediately freed; they are reclaimed on the next `write_file` call to the same name.

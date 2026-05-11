@@ -14,7 +14,7 @@ nasm -f elf64 -o _crt0.o c/libcr2/_crt0.asm
 
 As already mentioned, an application targeted for the `r2` kernel needs to be statically linked against `libcr2`, bacause only this library provides the fundamental bindings to system calls implementations.
 
-The statically linkable file can be compiled in the `c/` directory of the `r2apps` repository using:
+The statically linkable archive can be compiled in the `c/` directory of the `r2apps` repository using:
 
 ```
 make libcr2

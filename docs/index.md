@@ -16,7 +16,7 @@
 
 *Fig. 3: External userspace program demo called `MEMENTO.ELF`. Login window in the foreground, a wallpaper in the background.*
 
-![memento-clock](/assets/r2-memento-clock-window.png)
+![memento-clock](/assets/r2-memento-clock-window-v0.11.5.png)
 
 *Fig. 4: The Clock window in the `MEMENTO` GUI experiment.*
 

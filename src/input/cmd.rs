@@ -1,7 +1,11 @@
 use crate::acpi;
 use crate::audio;
 use crate::debug;
-use crate::fs::fat12::{block::Floppy, check::run_check, fs::{fat83, Filesystem}};
+use crate::fs::fat12::{
+    block::Floppy,
+    check::run_check,
+    fs::{fat83, Filesystem},
+};
 use crate::fs::iso9660::Iso9660;
 use crate::fs::vfs;
 use crate::init::config;
@@ -119,6 +123,12 @@ static COMMANDS: &[Command] = &[
         name: b"read",
         description: b"prints the output of a file",
         function: cmd_read,
+        hidden: false,
+    },
+    Command {
+        name: b"reset",
+        description: b"resets the VGA text mode",
+        function: cmd_reset,
         hidden: false,
     },
     Command {
@@ -340,25 +350,36 @@ fn cmd_fg(args: &[u8]) {
 
 fn cmd_cd(args: &[u8]) {
     let (name_input, _) = keyboard::split_cmd(args);
-    if name_input.is_empty() { return; }
+    if name_input.is_empty() {
+        return;
+    }
 
     // Reset to VFS root.
     if name_input == b"/" {
-        if let Some(mut c) = config::SYSTEM_CONFIG.try_lock() { c.set_path(b"/", 0); }
+        if let Some(mut c) = config::SYSTEM_CONFIG.try_lock() {
+            c.set_path(b"/", 0);
+        }
         return;
     }
 
     let floppy = Floppy::init();
     let fs = match Filesystem::new(&floppy) {
         Ok(f) => f,
-        Err(e) => { error!(e); error!(); return; }
+        Err(e) => {
+            error!(e);
+            error!();
+            return;
+        }
     };
 
     // Snapshot current state without holding the lock across I/O.
     let (cur_path_buf, cur_len, cwd) = {
         let c = match config::SYSTEM_CONFIG.try_lock() {
             Some(c) => c,
-            None => { error!("cd: config lock unavailable\n"); return; }
+            None => {
+                error!("cd: config lock unavailable\n");
+                return;
+            }
         };
         let mut buf = [0u8; 32];
         let p = c.get_path();
@@ -371,7 +392,10 @@ fn cmd_cd(args: &[u8]) {
     if name_input.starts_with(b"/") {
         if let Some(iso_rel) = vfs::try_iso9660_absolute(name_input) {
             match Iso9660::probe() {
-                None => { error!("iso: device not available\n"); return; }
+                None => {
+                    error!("iso: device not available\n");
+                    return;
+                }
                 Some(iso) => {
                     let ok = if iso_rel.is_empty() {
                         true // mount root always exists
@@ -381,7 +405,10 @@ fn cmd_cd(args: &[u8]) {
                             None => false,
                         }
                     };
-                    if !ok { error!("no such directory\n"); return; }
+                    if !ok {
+                        error!("no such directory\n");
+                        return;
+                    }
                     let n = name_input.len().min(32);
                     if let Some(mut c) = config::SYSTEM_CONFIG.try_lock() {
                         c.set_path(&name_input[..n], 0);
@@ -397,7 +424,7 @@ fn cmd_cd(args: &[u8]) {
         if vfs::try_iso9660_absolute(cur_path).is_some() {
             let new_path: &[u8] = match cur_path.iter().rposition(|&b| b == b'/') {
                 Some(0) | None => b"/",
-                Some(i)        => &cur_path[..i],
+                Some(i) => &cur_path[..i],
             };
             if let Some(mut c) = config::SYSTEM_CONFIG.try_lock() {
                 c.set_path(new_path, 0);
@@ -408,12 +435,15 @@ fn cmd_cd(args: &[u8]) {
 
     // `cd ..` — follow the FAT12 '..' entry and trim the display path.
     if name_input == b".." {
-        if cur_path == b"/" { return; }
-        let parent_cluster = fs.find_entry(cwd, &fat83(b".."))
+        if cur_path == b"/" {
+            return;
+        }
+        let parent_cluster = fs
+            .find_entry(cwd, &fat83(b".."))
             .map_or(0, |e| e.start_cluster);
         let new_path: &[u8] = match cur_path.iter().rposition(|&b| b == b'/') {
             Some(0) | None => b"/",
-            Some(i)        => &cur_path[..i],
+            Some(i) => &cur_path[..i],
         };
         if let Some(mut c) = config::SYSTEM_CONFIG.try_lock() {
             c.set_path(new_path, parent_cluster);
@@ -425,7 +455,10 @@ fn cmd_cd(args: &[u8]) {
     let (rel, base_cluster) = if name_input.starts_with(b"/") {
         match vfs::try_fat12_absolute(name_input) {
             Some(rel) => (rel, 0u16),
-            None => { error!("cd: not a known mount point\n"); return; }
+            None => {
+                error!("cd: not a known mount point\n");
+                return;
+            }
         }
     } else {
         (name_input, cwd)
@@ -434,7 +467,10 @@ fn cmd_cd(args: &[u8]) {
     // Walk multi-component path (handles "foo", "foo/bar", etc.).
     let entry = match fs.resolve_path_from(base_cluster, rel) {
         Some(e) => e,
-        None    => { error!("no such directory\n"); return; }
+        None => {
+            error!("no such directory\n");
+            return;
+        }
     };
     if entry.attr & 0x10 == 0 {
         error!("not a directory\n");
@@ -451,10 +487,17 @@ fn cmd_cd(args: &[u8]) {
         // Append component(s) to the current path.
         let base: &[u8] = if cur_path == b"/" { b"" } else { cur_path };
         let mut w = 0usize;
-        for &b in base.iter().take(32) { new_path_buf[w] = b; w += 1; }
-        if w < 32 { new_path_buf[w] = b'/'; w += 1; }
+        for &b in base.iter().take(32) {
+            new_path_buf[w] = b;
+            w += 1;
+        }
+        if w < 32 {
+            new_path_buf[w] = b'/';
+            w += 1;
+        }
         for &b in name_input.iter().take(32usize.saturating_sub(w)) {
-            new_path_buf[w] = b; w += 1;
+            new_path_buf[w] = b;
+            w += 1;
         }
         w
     };
@@ -489,7 +532,11 @@ fn cmd_dir(args: &[u8]) {
                 buf[..len].copy_from_slice(&p[..len]);
                 (buf, len, c.get_path_cluster())
             }
-            None => { let mut b = [0u8; 64]; b[0] = b'/'; (b, 1, 0) }
+            None => {
+                let mut b = [0u8; 64];
+                b[0] = b'/';
+                (b, 1, 0)
+            }
         }
     };
     let cur_path = &cur_path_buf[..cur_path_len];
@@ -504,36 +551,61 @@ fn cmd_dir(args: &[u8]) {
         // Relative: append component(s) to current path.
         let base: &[u8] = if cur_path == b"/" { b"" } else { cur_path };
         let mut w = 0usize;
-        for &b in base { if w < 64 { abs_buf[w] = b; w += 1; } }
-        if w < 64 { abs_buf[w] = b'/'; w += 1; }
-        for &b in path_arg { if w < 64 { abs_buf[w] = b; w += 1; } }
+        for &b in base {
+            if w < 64 {
+                abs_buf[w] = b;
+                w += 1;
+            }
+        }
+        if w < 64 {
+            abs_buf[w] = b'/';
+            w += 1;
+        }
+        for &b in path_arg {
+            if w < 64 {
+                abs_buf[w] = b;
+                w += 1;
+            }
+        }
         &abs_buf[..w]
     };
 
     // Dispatch to ISO9660 if the resolved mount is iso9660.
     if let Some(iso_rel) = vfs::try_iso9660_absolute(abs_path) {
         match Iso9660::probe() {
-            None => { error!("iso: device not available\n"); }
+            None => {
+                error!("iso: device not available\n");
+            }
             Some(iso) => {
                 let entry = if iso_rel.is_empty() {
                     // Root of the ISO mount
                     crate::fs::iso9660::IsoEntry {
-                        is_dir: true, lba: iso.root_lba, size: iso.root_size,
+                        is_dir: true,
+                        lba: iso.root_lba,
+                        size: iso.root_size,
                         ..Default::default()
                     }
                 } else {
                     match iso.resolve(iso_rel) {
                         Some(e) => e,
-                        None => { error!("no such directory\n"); return; }
+                        None => {
+                            error!("no such directory\n");
+                            return;
+                        }
                     }
                 };
-                if !entry.is_dir { error!("not a directory\n"); return; }
+                if !entry.is_dir {
+                    error!("not a directory\n");
+                    return;
+                }
 
                 let mut entries = [crate::fs::iso9660::IsoEntry::default(); 64];
                 let count = iso.list_dir(entry.lba, entry.size, &mut entries);
                 for e in &entries[..count] {
                     printb!(&e.name[..e.name_len as usize]);
-                    if e.is_dir { print!("/"); }
+                    if e.is_dir {
+                        print!("/");
+                    }
                     println!();
                 }
             }
@@ -550,26 +622,36 @@ fn cmd_dir(args: &[u8]) {
             Some(rel) => {
                 let floppy = Floppy;
                 match Filesystem::new(&floppy) {
-                    Ok(fs) => {
-                        match fs.resolve_path_from(0, rel) {
-                            Some(e) if e.attr & 0x10 != 0 => e.start_cluster,
-                            _ => { error!("no such directory\n"); return; }
+                    Ok(fs) => match fs.resolve_path_from(0, rel) {
+                        Some(e) if e.attr & 0x10 != 0 => e.start_cluster,
+                        _ => {
+                            error!("no such directory\n");
+                            return;
                         }
+                    },
+                    Err(e) => {
+                        error!(e);
+                        error!();
+                        return;
                     }
-                    Err(e) => { error!(e); error!(); return; }
                 }
             }
             None => {
                 // Relative FAT12 path.
                 let floppy = Floppy;
                 match Filesystem::new(&floppy) {
-                    Ok(fs) => {
-                        match fs.resolve_path_from(cwd_cluster, path_arg) {
-                            Some(e) if e.attr & 0x10 != 0 => e.start_cluster,
-                            _ => { error!("no such directory\n"); return; }
+                    Ok(fs) => match fs.resolve_path_from(cwd_cluster, path_arg) {
+                        Some(e) if e.attr & 0x10 != 0 => e.start_cluster,
+                        _ => {
+                            error!("no such directory\n");
+                            return;
                         }
+                    },
+                    Err(e) => {
+                        error!(e);
+                        error!();
+                        return;
                     }
-                    Err(e) => { error!(e); error!(); return; }
                 }
             }
         }
@@ -585,7 +667,10 @@ fn cmd_dir(args: &[u8]) {
                 fs.print_name(entry);
             });
         },
-        Err(e) => { error!(e); error!(); }
+        Err(e) => {
+            error!(e);
+            error!();
+        }
     }
 }
 
@@ -748,10 +833,10 @@ fn cmd_mount(_args: &[u8]) {
             if let Some(m) = vfs_table.get(i) {
                 let path = &m.path[..m.path_len];
                 let fstype: &[u8] = match m.fs_type {
-                    vfs::FsType::Root    => b"rootfs",
-                    vfs::FsType::Fat12   => b"fat12",
+                    vfs::FsType::Root => b"rootfs",
+                    vfs::FsType::Fat12 => b"fat12",
                     vfs::FsType::Iso9660 => b"iso9660",
-                    vfs::FsType::None    => b"none",
+                    vfs::FsType::None => b"none",
                 };
                 printb!(path);
                 print!(" (");
@@ -775,13 +860,18 @@ fn cmd_mv(args: &[u8]) {
         warn!("Usage: mv <old> <new>\n");
         return;
     }
-    let cwd = config::SYSTEM_CONFIG.try_lock().map_or(0, |c| c.get_path_cluster());
+    let cwd = config::SYSTEM_CONFIG
+        .try_lock()
+        .map_or(0, |c| c.get_path_cluster());
     let floppy = Floppy::init();
     match Filesystem::new(&floppy) {
         Ok(fs) => {
             fs.rename_file(cwd, &fat83(old), &fat83(new));
         }
-        Err(e) => { error!(e); error!(); }
+        Err(e) => {
+            error!(e);
+            error!();
+        }
     }
 }
 
@@ -803,7 +893,11 @@ fn cmd_read(args: &[u8]) {
                 buf[..len].copy_from_slice(&p[..len]);
                 (buf, len)
             }
-            None => { let mut b = [0u8; 64]; b[0] = b'/'; (b, 1) }
+            None => {
+                let mut b = [0u8; 64];
+                b[0] = b'/';
+                (b, 1)
+            }
         }
     };
     let cur_path = &cur_path_buf[..cur_path_len];
@@ -814,20 +908,39 @@ fn cmd_read(args: &[u8]) {
     } else {
         let base: &[u8] = if cur_path == b"/" { b"" } else { cur_path };
         let mut w = 0usize;
-        for &b in base { if w < 64 { abs_buf[w] = b; w += 1; } }
-        if w < 64 { abs_buf[w] = b'/'; w += 1; }
-        for &b in name_input { if w < 64 { abs_buf[w] = b; w += 1; } }
+        for &b in base {
+            if w < 64 {
+                abs_buf[w] = b;
+                w += 1;
+            }
+        }
+        if w < 64 {
+            abs_buf[w] = b'/';
+            w += 1;
+        }
+        for &b in name_input {
+            if w < 64 {
+                abs_buf[w] = b;
+                w += 1;
+            }
+        }
         &abs_buf[..w]
     };
 
     // ISO9660 dispatch.
     if let Some(iso_rel) = vfs::try_iso9660_absolute(abs_path) {
         match Iso9660::probe() {
-            None => { error!("iso: device not available\n"); }
+            None => {
+                error!("iso: device not available\n");
+            }
             Some(iso) => {
                 match iso.resolve(iso_rel) {
-                    None => { error!("no such file\n"); }
-                    Some(e) if e.is_dir => { error!("not a file\n"); }
+                    None => {
+                        error!("no such file\n");
+                    }
+                    Some(e) if e.is_dir => {
+                        error!("not a file\n");
+                    }
                     Some(e) => {
                         // Read up to 4096 bytes (kernel stack limit — use a reasonable cap).
                         let mut buf = [0u8; 4096];
@@ -845,7 +958,12 @@ fn cmd_read(args: &[u8]) {
     // FAT12 dispatch.
     let (rel, cwd) = match vfs::try_fat12_absolute(name_input) {
         Some(rel) => (rel, 0u16),
-        None      => (name_input, config::SYSTEM_CONFIG.try_lock().map_or(0, |c| c.get_path_cluster())),
+        None => (
+            name_input,
+            config::SYSTEM_CONFIG
+                .try_lock()
+                .map_or(0, |c| c.get_path_cluster()),
+        ),
     };
     let floppy = Floppy::init();
     match Filesystem::new(&floppy) {
@@ -860,12 +978,30 @@ fn cmd_read(args: &[u8]) {
                     printb!(&buf[..len]);
                     println!();
                 }
-                Some(_) => { error!("not a file\n"); }
-                None     => { error!("no such file\n"); }
+                Some(_) => {
+                    error!("not a file\n");
+                }
+                None => {
+                    error!("no such file\n");
+                }
             }
         }
-        Err(e) => { error!(e); error!(); }
+        Err(e) => {
+            error!(e);
+            error!();
+        }
     }
+}
+
+fn cmd_reset(_args: &[u8]) {
+    let ok = unsafe { crate::video::vga_hw::set_video_mode(0x03) };
+
+    if !ok {
+        error!("Cannot reset to VGA text mode");
+        return;
+    }
+
+    crate::video::mode::set_mode_text();
 }
 
 /// Removes a file in the current directory according to the input.
@@ -877,12 +1013,22 @@ fn cmd_rm(args: &[u8]) {
     let (name_input, _) = keyboard::split_cmd(args);
     let (rel, cwd) = match vfs::try_fat12_absolute(name_input) {
         Some(rel) => (rel, 0u16),
-        None      => (name_input, config::SYSTEM_CONFIG.try_lock().map_or(0, |c| c.get_path_cluster())),
+        None => (
+            name_input,
+            config::SYSTEM_CONFIG
+                .try_lock()
+                .map_or(0, |c| c.get_path_cluster()),
+        ),
     };
     let floppy = Floppy::init();
     match Filesystem::new(&floppy) {
-        Ok(fs) => { fs.delete_file(cwd, &fat83(rel)); }
-        Err(e) => { error!(e); error!(); }
+        Ok(fs) => {
+            fs.delete_file(cwd, &fat83(rel));
+        }
+        Err(e) => {
+            error!(e);
+            error!();
+        }
     }
 }
 
@@ -962,15 +1108,21 @@ fn cmd_uptime(_args: &[u8]) {
     print!("Uptime: ");
     printn!(h);
     print!(" hour");
-    if h != 1 { print!("s"); }
+    if h != 1 {
+        print!("s");
+    }
     print!(" ");
     printn!(m);
     print!(" minute");
-    if m != 1 { print!("s"); }
+    if m != 1 {
+        print!("s");
+    }
     print!(" ");
     printn!(s);
     print!(" second");
-    if s != 1 { print!("s"); }
+    if s != 1 {
+        print!("s");
+    }
     println!();
 }
 

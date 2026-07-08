@@ -119,7 +119,7 @@ Now you should be able to ping the machine from your machine
 ping 10.3.3.2
 ```
 
-## Hot to test ICMP/Ethernet
+## How to test ICMP/Ethernet
 
 Prepare the "bridge" interface on host:
 

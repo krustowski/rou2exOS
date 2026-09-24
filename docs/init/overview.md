@@ -22,7 +22,7 @@ Steps execute in this exact order:
 | 3 | `cpu::check()` | `init/cpu.rs` | Enable SSE (CR4/CR0), set up SYSCALL/SYSRET MSRs |
 | 4 | `idt::idt_isrs_init()` | `init/idt.rs` | Install ISRs, reload GDT, init TSS, load IDT |
 | 5 | `mouse::init()` | `input/mouse.rs` | Enable PS/2 aux port and IRQ12 |
-| 6 | `parser::parse_info(m2_ptr, ...)` | `init/parser.rs` | Parse Multiboot2 tags; fill `FRAMEBUFFER_PTR` |
+| 6 | `parser::parse_info(m2_ptr, ...)` | `init/parser.rs` | Parse Multiboot2 tags; fill `FRAMEBUFFER_PTR`; sum usable RAM (`total_ram_bytes`) |
 | 7 | `heap::pmm_heap_init()` | `init/heap.rs` | Init kernel linked-list heap; run smoke test |
 | 8 | `video::print_result(...)` | `init/video.rs` | Call `init_video(fb)` to set `VIDEO_MODE` |
 | 9 | `fs::floppy_check_init()` | `init/fs.rs` | Probe FAT12 floppy; set cwd to `/` |
@@ -30,9 +30,9 @@ Steps execute in this exact order:
 | 11 | `color::color_demo()` | `init/color.rs` | Print 16-color swatch to console |
 | 12 | `ascii::ascii_art()` | `init/ascii.rs` | Print kernel splash text |
 | 13 | `process::init_processes()` | `init/process.rs` | Save CR3, init userland heap, create initial tasks |
-| 14 | `pit::pic_pit_init()` | `init/pit.rs` | Remap 8259A PIC; start PIT at 100 Hz; `sti` |
+| 14 | `pit::pic_pit_init()` | `init/pit.rs` | Remap 8259A PIC; start PIT at 1000 Hz; `sti` |
 
-Step 14 (`sti`) is the point of no return — from here the PIT fires every 10 ms and the scheduler takes over. `init` never runs again.
+Step 14 (`sti`) is the point of no return — from here the PIT fires every 1 ms and the scheduler takes over. `init` never runs again.
 
 ---
 
@@ -58,11 +58,11 @@ Step 14 (`sti`) is the point of no return — from here the PIT fires every 10 m
 | `parser.rs` | Thin `Result`-returning wrapper around `boot::parse_multiboot2_info` |
 | `cpu.rs` | SSE enable, SYSCALL/SYSRET MSR setup |
 | `idt.rs` | GDT reload, TSS init, IDT load |
-| `pit.rs` | 8259A PIC remap, PIT 100 Hz init |
+| `pit.rs` | 8259A PIC remap, PIT init at `TICKS_PER_SECOND` (1000 Hz) |
 | `heap.rs` | Kernel heap init + smoke test |
 | `fs.rs` | Floppy probe, VFS mount table init |
 | `video.rs` | `init_video()`, optional VESA P1 mapping |
-| `process.rs` | Initial task creation (kmain, init_rc, clock, shell) |
+| `process.rs` | Initial task creation (kmain, init_rc, kclock, kshell) |
 | `config.rs` | `SYSTEM_CONFIG` global, `get_prompt()` |
 | `font.rs` | PSF1/PSF2 font parser, `PSF_FONT` static, glyph renderer |
 | `ascii.rs` | Splash screen text |

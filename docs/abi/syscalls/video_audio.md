@@ -86,11 +86,13 @@ Play given frequency in Hz for given time in milliseconds.
 
 ## 0x1b (Play MIDI file)
 
-Play the MIDI audio file from the filesystem.
+Play a Standard MIDI File from the filesystem on the PC speaker. The call blocks until the song ends.
+
+Formats 0, 1 and 2 are accepted (format 1 tracks are merged by time, format 2 patterns play back to back), including tempo changes and SMPTE time divisions. The speaker is monophonic, so the highest note held at any moment is the one voiced; channel 10 (percussion) is ignored. Files are read into a 4 KiB buffer, so longer files play truncated. Returns `InvalidInput` when the file is not a valid MIDI file.
 
 | Argument 1 | Argument 2 | Implemented |
 |------------|------------|-------------|
-| `0x01` (MIDI format 0) | pointer to NUL-terminated file name | ✅ |
+| `0x01` (Standard MIDI File, format 0/1/2) | pointer to NUL-terminated file name | ✅ |
 
 ## 0x1f (Stop audio player)
 

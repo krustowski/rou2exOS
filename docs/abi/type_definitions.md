@@ -2,7 +2,7 @@
 
 ## SysInfo
 
-`system_uptime` holds the number of seconds since boot, derived from the PIT tick counter (100 Hz).
+`system_uptime` holds the number of seconds since boot, derived from the PIT tick counter (`TICKS_PER_SECOND`, currently 1000 Hz). `system_path` holds the working directory and is NUL-terminated when shorter than 32 bytes; a working directory can never be longer than 32 bytes (`PATH_MAX`).
 
 ```rust
 pub struct SysInfo {
@@ -227,4 +227,55 @@ typedef struct {
     uint8_t  is_dir;
     uint32_t size;
 } __attribute__((packed)) VfsDirEntry_T;
+```
+
+## TaskInfo (syscall `0x2f`)
+
+One entry per live scheduler slot, 28 bytes each.
+
+| Offset | Field | Type | Description |
+|--------|-------|------|-------------|
+| 0 | `id` | `uint8_t` | PID (the value `0x3b` and the shell's `kill` take) |
+| 1 | `mode` | `uint8_t` | `0` = kernel, `1` = user |
+| 2 | `status` | `uint8_t` | `0` = Ready, `1` = Running, `2` = Idle, `3` = Blocked, `4` = Crashed, `5` = Dead |
+| 3 | `_pad` | `uint8_t` | |
+| 4 | `name` | `uint8_t[16]` | Process name, space-padded |
+| 20 | `rip` | `uint64_t` | Where the process was last interrupted, read from its saved frame; `0` for the calling process. A process that keeps reporting the same `rip` is spinning there. |
+
+```c
+typedef struct {
+    uint8_t  id;
+    uint8_t  mode;
+    uint8_t  status;
+    uint8_t  _pad;
+    uint8_t  name[16];
+    uint64_t rip;
+} __attribute__((packed)) TaskInfo_T;
+```
+
+## ReadRange, WriteRange (syscalls `0x39`, `0x3a`)
+
+Passed by pointer so that the syscall keeps its two-argument shape. Fields are read unaligned.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `buffer` | `uint64_t` | Address of the destination (read) or source (write); `buffer..buffer+length` must lie in `0x600_000..=0xA00_000` |
+| `offset` | `uint64_t` | Byte offset into the file |
+| `length` | `uint64_t` | Number of bytes to transfer |
+
+```rust
+#[repr(C)]
+struct ReadRange {
+    buffer: u64,
+    offset: u64,
+    length: u64,
+}
+```
+
+```c
+typedef struct {
+    uint64_t buffer;
+    uint64_t offset;
+    uint64_t length;
+} __attribute__((packed)) ReadRange_T, WriteRange_T;
 ```

@@ -77,7 +77,7 @@ Set up by `init::fs::vfs_init()`:
 
 `VfsTable::resolve(path)` returns `(FsType, relative_sub_path)` using **longest-prefix matching**:
 
-1. Iterate all mounts; check if `path` starts with the mount path.
+1. Iterate all mounts; check if `path` starts with the mount path, compared case-insensitively (FAT folds names to upper case, so a program handing back a path in another case must still hit the mount).
 2. Require exact match or that the next character after the prefix is `/`.
 3. The mount with the longest matching prefix wins.
 4. Returns the sub-path after stripping the mount prefix (and a leading `/`).
@@ -93,7 +93,7 @@ Example: path `b"/mnt/fat/SUBDIR/FILE.TXT"` → `(Fat12, b"SUBDIR/FILE.TXT")`.
 | `mount(path, fs_type)` | Add a mount entry |
 | `umount(path)` | Remove a mount entry by path |
 
-These are the primary VFS entry points used by syscall handlers in `abi/syscall.rs`.
+These are the primary VFS entry points used by syscall handlers in `abi/syscall.rs`. Both wait (bounded spin) for the mount table lock instead of giving up at the first contention: a missed lock used to make an absolute path look relative and be resolved in the wrong directory.
 
 ### Syscall Dispatch Pattern
 
@@ -118,7 +118,18 @@ The current working directory is stored in `SYSTEM_CONFIG` (`init/config.rs`) as
 | `path` | `[u8; 32]` | String representation (e.g. `/mnt/fat/SUBDIR`) |
 | `path_cluster` | `u16` | FAT12 cluster for the directory (0 = root, 0 for ISO9660) |
 
-Changed by syscall `0x2E` (chdir), which validates that the target exists as a directory before updating.
+Changed by syscall `0x2E` (chdir) and the shell's `cd`, which validate that the target exists as a directory before updating.
+
+### Path Normalisation (`fs/vfs/path.rs`)
+
+`vfs::normalize_path(cur, arg, out)` builds the absolute path the shell's `cd` and `dir` work with:
+
+- A relative `arg` is joined onto `cur`; an absolute one replaces it.
+- Empty components (`//`, trailing `/`) and `.` are dropped; `..` pops a component, and `..` at the root stays at the root.
+- The walk is purely textual. Neither filesystem has symlinks, and it is the only way to honour `..` on ISO9660, whose directory lookups skip the `.`/`..` records.
+- It returns `None` when the result does not fit in `PATH_MAX` (32 bytes), which is also the size of `SysInfo.system_path`; callers report the error instead of storing a truncated path.
+
+The module depends on nothing else in the kernel so the host unit tests (`tests/unit/path.rs`) can include it directly.
 
 ---
 

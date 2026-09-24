@@ -4,7 +4,7 @@
 
 The kernel runs at ring 0 with a largely identity-mapped address space (virtual == physical for most addresses). The boot-time page tables are set up by the assembly stage in `boot.asm`; Rust code then adjusts them as needed during `init`.
 
-The Multiboot2 memory map tag (type 6) is parsed at boot and reports usable RAM regions. The kernel does not maintain a physical frame allocator — allocations are handled entirely through pre-reserved static regions described in the linker script and in the page-table pool.
+The Multiboot2 memory map tag (type 6) is parsed at boot and reports usable RAM regions. The sum of all usable (type 1) regions is kept as `init::boot::total_ram_bytes()` and printed by the shell's `meminfo` command. The kernel does not maintain a physical frame allocator — allocations are handled entirely through pre-reserved static regions described in the linker script and in the page-table pool.
 
 ---
 
@@ -114,7 +114,9 @@ Virtual 0x8x0_000               user stack top (slot-indexed, see table below)
 | 8 | `0x7F0_000` |
 | 9 | `0x7D0_000` |
 
-Stack slots are assigned by `STACK_NO`, which increments each time `run_elf` is called and wraps modulo 10.
+The stack, like the 2 MiB frame, belongs to the scheduler slot the program is about to occupy (`scheduler::next_free_slot()`). It used to come from a counter that wrapped modulo 10, so the eleventh program started took the first one's frame and stack while it was still running.
+
+Slots 8 and 9 have their initial stack inside the `0x600_000–0x7FF_FFF` window. Runtimes switch to a private stack in `.bss` straight away, and the Go target leaves the top 256 KiB of the frame unused for this reason.
 
 ---
 

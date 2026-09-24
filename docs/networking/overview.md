@@ -32,13 +32,13 @@ There are two independent paths:
 | **Ethernet** | RTL8139 PCI NIC | Ethernet II → IPv4/ARP | TX and RX |
 | **Serial/SLIP** | UART COM1 | SLIP-framed IPv4 | TX only (active), RX (loop-based) |
 
-![network-frame-routing](/assets/r2-network-frame-routing.png)
+![network-frame-routing](../assets/r2-network-frame-routing.png)
 
 ---
 
 ## Receive Path (Ethernet)
 
-Frames arrive via polling, not IRQ. On every PIT tick (100 Hz) the scheduler calls `netdrv::poll_and_deliver()` before selecting the next runnable process:
+Frames arrive via polling, not IRQ. On every PIT tick (1000 Hz) the scheduler calls `netdrv::poll_and_deliver()` before selecting the next runnable process:
 
 ```
 PIT tick
@@ -114,4 +114,4 @@ On each incoming frame `poll_and_deliver` calls `tcp_dest_port(frame)` to extrac
 | Max port bindings | 16 |
 | SLIP encode/decode buffer | 4 KiB |
 | Serial baud rate | 38 400 (COM1, divisor 3) |
-| Poll rate | 100 Hz (one frame per PIT tick) |
+| Poll rate | 1000 Hz (one frame per PIT tick) |

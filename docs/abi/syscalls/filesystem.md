@@ -2,9 +2,13 @@
 
 File name arguments accept either a bare name relative to the current working directory (e.g. `FOO.TXT`) or an absolute VFS path (e.g. `/mnt/fat/FOO.TXT`, `/mnt/iso/grub/grub.cfg`). Both forms are resolved through the VFS mount table. ISO9660 is mounted read-only at `/mnt/iso`.
 
+Relative names may reach into subdirectories (`GFX/19.IMG`): every component is walked, not just the working directory. Mount prefixes are matched case-insensitively, and names below a FAT12 mount are folded to 8.3 upper case.
+
 ## 0x20 (Read file to buffer)
 
-Read a file at the given path and load its contents into the buffer. Dispatches to ISO9660 for `/mnt/iso/...` paths.
+Read a file at the given path and load its whole contents into the buffer. Dispatches to ISO9660 for `/mnt/iso/...` paths.
+
+The kernel is never told the size of the buffer, so the caller must be able to hold the largest file it may meet. Prefer [`0x39`](#0x39-read-part-of-a-file) for anything whose size is not known in advance.
 
 | Argument 1 | Argument 2 | Implemented |
 |------------|------------|-------------|
@@ -12,7 +16,9 @@ Read a file at the given path and load its contents into the buffer. Dispatches 
 
 ## 0x21 (Write buffer to file)
 
-Write the buffer into a file (overwrite it) specified by the first argument. File is created in the current directory if not exists.
+Write the buffer into a file (overwrite it) specified by the first argument. The file is created where the path says (in the working directory for a bare name, or in the named subdirectory) if it does not exist. Returns `FileNotFound` when a directory along the path is missing.
+
+Exactly 512 bytes are read from the buffer, so the resulting file is always one sector long. Use [`0x3a`](#0x3a-write-part-of-a-file) to write files of any size or to append.
 
 | Argument 1 | Argument 2 | Implemented |
 |------------|------------|-------------|
@@ -28,7 +34,7 @@ Rename the file specified by its name in `arg1` to value specified in `arg2`.
 
 ## 0x23 (Delete file)
 
-Delete the file specified in `arg1`. Applicable on a file in the working directory. 
+Delete the file specified in `arg1`. Applicable on a file in the working directory. The file's cluster chain is returned to the FAT before the directory entry is marked deleted. A directory of the same name is never matched. Returns `FileNotFound` when nothing was deleted.
 
 | Argument 1 | Argument 2 | Implemented |
 |------------|------------|-------------|
@@ -86,6 +92,8 @@ Execute a flat binary executable (`.BIN` usually).
 
 Execute an ELF64 executable (`.ELF`). Auto-appends `.elf`/`.ELF` if no extension given. Returns the new process PID on success, `0` on failure.
 
+The file is looked up in the caller's working directory (FAT12, or ISO9660 when the working directory is under `/mnt/iso`), then in `/mnt/iso/bin`. The program is started in the background; it fails when all ten process slots are held by live processes.
+
 | Argument 1 | Argument 2 | Implemented |
 |------------|------------|-------------|
 | pointer to NUL-terminated file name | pointer to NUL-terminated args string (space-delimited; `0` = use file name as sole argv[0]) | ✅ |
@@ -129,8 +137,28 @@ Change working directory. Updates `SYSTEM_CONFIG` path and cluster. Verifies the
 
 ## 0x2f (List scheduler tasks)
 
-List scheduler tasks. Writes up to 10 × 20-byte `TaskInfo` entries. Returns the number of entries written.
+List scheduler tasks. Writes up to 10 × 28-byte [`TaskInfo`](../type_definitions.md#taskinfo-syscall-0x2f) entries. Returns the number of entries written.
 
 | Argument 1 | Argument 2 | Implemented |
 |------------|------------|-------------|
 | pointer to output buffer | max entries to write (0 = use default of 10) | ✅ |
+
+## 0x39 (Read part of a file)
+
+Read at most `length` bytes starting `offset` bytes into a file, on FAT12 or ISO9660. Returns the number of bytes read, which is short at the end of the file and `0` when `offset` is past it, or `u64::MAX` on error (missing file, directory, invalid pointer).
+
+Unlike `0x20`, the kernel is told the size of the destination and checks the whole `buffer..buffer+length` range, so a caller can work through a file it could never hold at once. On FAT12 the cluster chain is walked from the start of the file on each call.
+
+| Argument 1 | Argument 2 | Implemented |
+|------------|------------|-------------|
+| pointer to NUL-terminated file name | pointer to [`ReadRange`](../type_definitions.md#readrange-writerange-syscalls-0x39-0x3a) | ✅ |
+
+## 0x3a (Write part of a file)
+
+Write `length` bytes at byte `offset` of a FAT12 file, leaving the bytes before it intact and growing the file and its cluster chain as needed. A missing file is created. A gap between the old end of the file and `offset` reads back as zeros.
+
+Returns the number of bytes written, which is short if the disk fills up, or `u64::MAX` on error. ISO9660 paths are refused.
+
+| Argument 1 | Argument 2 | Implemented |
+|------------|------------|-------------|
+| pointer to NUL-terminated file name | pointer to [`WriteRange`](../type_definitions.md#readrange-writerange-syscalls-0x39-0x3a) | ✅ |

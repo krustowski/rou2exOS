@@ -95,13 +95,13 @@ Programs the 8253/8254 Programmable Interval Timer channel 0 in mode 3 (square w
 
 ```
 port 0x43 ← 0x36      channel 0, lobyte/hibyte, mode 3, binary
-divisor = 1_193_182 / frequency_hz    (= 11931 for 100 Hz)
+divisor = 1_193_182 / frequency_hz    (= 1193 for 1000 Hz)
 port 0x40 ← divisor & 0xFF            low byte
 port 0x40 ← (divisor >> 8) & 0xFF    high byte
 sti                                    enable interrupts
 ```
 
-`TICKS_PER_SECOND = 100` (10 ms per tick). The tick counter is maintained in `time/acpi.rs`.
+`TICKS_PER_SECOND = 1000` (1 ms per tick). Anything that converts between ticks and time (syscalls `0x04`/`0x05`, uptime) uses this constant rather than a hard-coded 10 ms. The tick counter is maintained in `time/acpi.rs`.
 
 ---
 
@@ -194,8 +194,8 @@ init_processes()
   └── setup_processes()
         ├── new_process("kmain",  kernel_idle,  ...)   slot 0 — boot RSP sentinel
         ├── new_process("init_rc", init_rc,     ...)   slot 1 — startup script
-        ├── new_process("clock",  clock_test,   ...)   slot 2 — RTC clock display
-        └── new_process("shell",  keyboard_loop, ...)  slot 3 — interactive shell
+        ├── new_process("kclock", clock_test,   ...)   slot 2 — RTC clock display
+        └── new_process("kshell", keyboard_loop, ...)  slot 3 — interactive shell
               set_shell_pid(shell_pid)
 ```
 
@@ -205,9 +205,9 @@ init_processes()
 
 **`init_rc` (slot 1):** Reads `INIT.RC` from FAT12 root directory. Parses it line by line (NUL or `\n` terminated; strips trailing `\r`; ignores blank lines and lines starting with `#`). Each non-comment line is dispatched through `cmd::handle()` — the same function used by the interactive shell. After the file is fully processed the task kills itself and loops on `hlt`.
 
-**`clock_test` (slot 2):** Reads the RTC (`h:m:s`) in a tight poll loop and renders the time to a fixed VGA text position. Uses the legacy `vga/write.rs` module (separate from `video/vga.rs`).
+**`kclock` (slot 2):** Reads the RTC (`h:m:s`) in a tight poll loop and renders the time to a fixed VGA text position. Uses the legacy `vga/write.rs` module (separate from `video/vga.rs`).
 
-**`shell` (slot 3):** Runs `keyboard_loop()` — the interactive kernel shell. This task runs for the lifetime of the kernel. Its PID is saved in the scheduler via `set_shell_pid` so that `syscall 0x00` (exit) can wake it when a child process terminates.
+**`kshell` (slot 3):** Runs `keyboard_loop()` — the interactive kernel shell. This task runs for the lifetime of the kernel. Its PID is saved in the scheduler via `set_shell_pid`. When it starts a program with `fg` it is recorded as that program's waiter and woken when the program ends (see [Scheduler](../multitasking/scheduler.md#foreground-processes-and-waiters)); `init_rc` is parked and woken the same way for `fg` lines in `INIT.RC`.
 
 ---
 

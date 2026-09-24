@@ -36,6 +36,17 @@ The `DMA` buffer is placed in a `.dma` link section so its physical address is k
 
 The floppy disk geometry assumed throughout: 80 cylinders, 2 heads, 18 sectors/track = 1440 sectors × 512 bytes = 1.44 MB.
 
+### Track Cache
+
+Reads do not go to the drive one sector at a time. `BlockDevice::read_sector` serves the sector from an 8-slot, LRU **track cache** (`CACHE` in `block.rs`):
+
+- A miss reads the whole track (18 sectors, 9216 bytes) with one READ DATA command, straight into the cache slot. Each slot is 16 KiB-aligned so an ISA DMA transfer never crosses a 64 KiB physical boundary.
+- Several slots are needed because FAT12 alternates between the FAT (track 0), the root directory (track 1) and the data area.
+- The cache is flushed when the FDC's disk-change line (DIR bit 7) is set, and a written sector's track is invalidated before the write.
+- If the drive rejects a multi-sector transfer (after one recalibrate and retry), the cache stops asking and falls back to single-sector reads through the `.dma` buffer described above.
+
+Every request runs with interrupts disabled: the FDC is driven by a multi-byte command handshake, and a preemption between two command bytes would leave the controller mid-command for the next task. Every handshake step has a spin budget, so a missing or unresponsive drive fails a read rather than hanging.
+
 ### Write Sector (`write_sector`)
 
 1. Seeks to the target cylinder/head using FDC SEEK command (0x0F).
@@ -131,7 +142,7 @@ Each directory entry is 32 bytes (`#[repr(C, packed)]`):
 
 | Value | Meaning |
 |-------|---------|
-| `0x00` | End of directory (no more entries) |
+| `0x00` | Free; by the FAT spec the end of the directory, but lookups keep scanning (see [Directory Search](#directory-search)) |
 | `0xE5` | Deleted entry (slot is reusable) |
 | `0xFF` | Unused (treated as invalid) |
 
@@ -164,6 +175,8 @@ value = (byte[fat_offset] >> 4) | (byte[fat_offset+1] << 4)
 
 `FatTable` reads all 9 FAT sectors (4608 bytes) into a single `[u8; 4608]` for batch inspection. `Filesystem::read_fat12_entry` reads individual sectors on demand, handling the cross-sector boundary case (when `fat_offset == 511`).
 
+`write_fat12_entry` updates **every** FAT copy (`fat_count`), not just the first, so a checker comparing them does not report the volume as damaged. `allocate_cluster` scans the FAT one sector at a time (one read per FAT sector, not per cluster) and returns `0` when the FAT is full.
+
 ---
 
 ## Operations
@@ -184,9 +197,24 @@ Follows the cluster chain starting from `start_cluster`:
 3. Write each 512-byte sector of `data` into allocated clusters; `write_fat12_entry(cluster, next)` to chain them; mark the last cluster `0xFFF`.
 4. `write_dir_entry()`: scan the directory for a free slot (`0x00` or `0xE5`), write the 32-byte entry (name, attr `0x20`, cluster, file_size).
 
+### Write at Offset (`write_file_at`)
+
+The write half of a ranged read, exposed as syscall `0x3a`. Writes `data` at byte `offset` without touching the bytes before it:
+
+1. A file that does not exist gets an entry and one cluster; an entry with no cluster gets one.
+2. The cluster chain is walked to the cluster holding `offset`, allocating and linking new clusters (`chain_next_or_grow`) when the file is shorter. A gap reads back as zeros.
+3. Data is copied a sector at a time; a sector the write starts or ends inside is read first so the surrounding bytes survive.
+4. The directory entry's size is updated last. If the disk fills up, the write stops and the size reflects what was actually written.
+
 ### Delete File (`delete_file`)
 
-Marks the first byte of the directory entry as `0xE5`. Does not free clusters (no garbage collection; on overwrite, `write_file` calls `free_cluster_chain` first).
+Finds the entry by its full 8.3 name (name *and* extension, so `THEM.LOG` never matches a directory `THEM`), skips directories, returns the cluster chain to the FAT, then marks the first byte of the entry `0xE5`. Returns `false` when there was no such file.
+
+### Directory Search
+
+Lookups (`find_entry`, `for_each_entry`, `resolve_path_from`) walk the whole directory: every sector of the root directory, and the full cluster chain of a subdirectory. On a floppy one cluster is one sector (16 entries), so stopping at the first cluster hid everything past the 16th entry, and `write_file` would then add a duplicate. The walk is bounded by the number of clusters on the volume, so a FAT that loops ends the search. A free slot (`0x00`) is skipped rather than treated as the end, because mtools can leave entries after one.
+
+`resolve_path_from(base, path)` resolves a multi-component relative path one name at a time, stopping at the first match in each directory.
 
 ### Rename File (`rename_file`)
 

@@ -87,7 +87,7 @@ The bump allocator is appropriate for the kernel because most kernel-level Rust 
 
 **Region:** `0xC00_000 – 0xFFF_FFF` (4 MiB, virtual == physical, identity-mapped)
 
-**Purpose:** Dynamic heap for userland processes. Exposed as syscalls `0x0a` (malloc), `0x0b` (realloc), `0x0f` (free). All processes share one physical heap — there is no per-process isolation.
+**Purpose:** Dynamic heap for userland processes. Exposed as syscalls `0x0a` (malloc), `0x0b` (realloc), `0x0f` (free). All processes share one physical heap — there is no per-process isolation, but every block records its owner and is reclaimed when the owner dies.
 
 **Mapping:** `uheap::init()` is called from `init_processes()` after `save_kernel_cr3()`. It sets P2[6] (`0xC00_000`) and P2[7] (`0xE00_000`) to USER+WRITE 2 MiB huge pages in the current page table. Because `create_user_page_table` clones the kernel P2, every subsequent user process inherits these entries automatically.
 
@@ -101,13 +101,18 @@ The bump allocator is appropriate for the kernel because most kernel-level Rust 
  └────────────────────────────────────┘
 ```
 
-`flags` bit 0: `1` = free, `0` = used. No other bits are used.
+| `flags` bits | Meaning |
+|--------------|---------|
+| 0 | `1` = free, `0` = used |
+| 8–15 | owning scheduler slot + 1 (`0` = untagged) |
+
+The syscall layer reads the caller's slot (`scheduler::get_current_pid()`) *before* entering the heap and passes it as `owner`, so the scheduler lock is never taken underneath the heap lock. `NO_OWNER` (`0xFF`) marks a block that belongs to no process and is never swept. `realloc` keeps the owner a block was allocated with.
 
 At `init()`, a single free block spanning `HEAP_SIZE − 8` bytes is written at `HEAP_START`.
 
 ### Allocation (`malloc`)
 
-1. Acquire `LOCK` (spin mutex).
+1. Acquire `LOCK` (see [Locking](#locking)) and drain any pending owner sweeps.
 2. Linear scan from `HEAP_START`: skip blocks where `flags & FLAG_FREE == 0` or `data_size < size`.
 3. On finding a suitable free block:
    - If `remainder = data_size − size ≥ HDR + MIN_SPLIT (16)`: split — write a new free header at `addr + HDR + size`, mark the found block used with `data_size = size`.
@@ -134,9 +139,24 @@ Special cases: `ptr == 0` → `malloc(new_size)`; `new_size == 0` → `free(ptr)
 3. `set_free(ptr − HDR)`: write `FLAG_FREE` to the header flags field.
 4. `coalesce()`: single linear pass that merges any pair of adjacent free blocks by summing `[size + HDR + next_size]` into the left block's header.
 
+### Reclaiming a dead process's blocks (`free_owned`)
+
+When the scheduler kills a process or marks it crashed, it calls `free_owned(slot)` after releasing its own lock. The slot's bit is first published in `PENDING`; if the heap lock can be taken, every used block tagged with that slot is freed and coalesced, otherwise the next `malloc` performs the sweep. A busy lock therefore delays reclamation instead of leaking the blocks.
+
 ### Locking
 
-`static LOCK: Mutex<()>` (spin). All public functions (`malloc`, `realloc`, `free`) acquire the lock before calling the inner `unsafe` helpers. The lock is released when the guard drops at the end of the function. Because the kernel re-enables interrupts (`sti`) at the top of `syscall_inner`, a PIT tick can preempt a syscall; `SCHEDULER.try_lock()` in the scheduler handles this by skipping the tick.
+`static LOCK: Mutex<()>` (spin). All public functions acquire it through `lock_heap()`:
+
+- The lock is spun for with interrupts **on**, so its holder can still be scheduled and release it.
+- Once taken, interrupts are turned **off** for as long as it is held, so the holder cannot be preempted — and then killed — inside the allocator.
+- The holder's slot is recorded in `LOCK_HOLDER` (`lock_holder()` reads it without the lock).
+- On release the lock is dropped first, then the holder is forgotten, then interrupts are restored.
+
+If a process dies holding the lock anyway, `free_owned` takes it back (`reclaim_from`) before sweeping, since a killed or crashed process never returns to the allocator.
+
+### Statistics
+
+`stats()` reports used and free bytes, the largest free block (what decides whether a large `malloc` can succeed), block counts, and used bytes per owning slot. The shell's `heap` command prints it, or the slot holding the lock when the heap is busy.
 
 ### Constants
 

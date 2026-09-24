@@ -1,6 +1,6 @@
 site_name: rou2exOS Rusted Edition Documentation
 site_url: "https://r2.krusty.space"
-dev_addr: 0.0.0.0:8000
+dev_addr: 0.0.0.0:8009
 
 lang: "en"
 
@@ -39,7 +39,12 @@ nav:
   - Intro: index.md
   - Build & Run: build.md
   - Shell (Text Mode): shell.md
-  - SDK: sdk.md
+  - SDK:
+    - Overview: sdk/index.md
+    - C (libcr2): sdk/libcr2.md
+    - C++ (libc++r2): sdk/libcxxr2.md
+    - Go (libgor2): sdk/libgor2.md
+    - Application Suite: sdk/apps.md
   - Kernel Internals:
     - Boot / Init:
       - Overview: init/overview.md
@@ -70,7 +75,7 @@ nav:
     - Specification: abi/syscall_specification.md
     - Type Definitions: abi/type_definitions.md
     - Syscalls:
-      - Sysinfo & Memory: abi/syscalls/sysinfo_mem_mgmt.md
+      - System, Processes & Memory: abi/syscalls/sysinfo_mem_mgmt.md
       - Video & Audio: abi/syscalls/video_audio.md
       - Filesystem: abi/syscalls/filesystem.md
       - Ports & Networking: abi/syscalls/port_networking.md

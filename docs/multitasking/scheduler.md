@@ -1,6 +1,6 @@
 # Scheduler
 
-rou2exOS uses a cooperative/preemptive round-robin scheduler driven by the PIT (Programmable Interval Timer) at 100 Hz (IRQ 0 → interrupt `0x20`). Each PIT tick fires `scheduler_schedule`, which saves the interrupted process's RSP, picks the next runnable process, loads its RSP, and switches CR3 to its page table. The running process can also voluntarily yield by entering a blocking syscall.
+rou2exOS uses a cooperative/preemptive round-robin scheduler driven by the PIT (Programmable Interval Timer) at 1000 Hz (IRQ 0 → interrupt `0x20`). Each PIT tick fires `scheduler_schedule`, which saves the interrupted process's RSP, picks the next runnable process, loads its RSP, and switches CR3 to its page table. The running process can also voluntarily yield by entering a blocking syscall.
 
 ## Data Structures
 
@@ -28,13 +28,36 @@ On every PIT tick:
 
 ## Tick and Sleep
 
-The tick counter is maintained by `crate::time::acpi::tick()` / `get_tick_count()`, incremented once per PIT interrupt. It has 10 ms resolution.
+The tick counter is maintained by `crate::time::acpi::tick()` / `get_tick_count()`, incremented once per PIT interrupt. At `TICKS_PER_SECOND = 1000` it has 1 ms resolution.
 
 `sleep_current(until_tick)` marks the calling process `Blocked`, stores `until_tick` in `process.sleep_until`, and executes `hlt`. The scheduler wakes the process automatically on the first tick at or after `until_tick`. The `hlt` also yields host CPU time to QEMU's event loop so PS/2 input is not starved.
 
 ## PID vs Slot
 
-PIDs are assigned by a monotonically-incrementing counter (`next_free_pid`). Slots (`processes[0..MAX_PROCESSES]`) are reused — a slot can hold processes with different PIDs over time. The kernel stack is pinned to a slot (not a PID) via `KSTACK_POOL[slot]` so each slot always has a dedicated 32 KiB kernel stack.
+PIDs are assigned by a monotonically-incrementing counter (`next_free_pid`). Slots (`processes[0..MAX_PROCESSES]`) are reused — a slot can hold processes with different PIDs over time. The kernel stack is pinned to a slot (not a PID) via `KSTACK_POOL[slot]` so each slot always has a dedicated 32 KiB kernel stack. The userland frame and initial user stack of an ELF process are pinned to the slot too (see [Memory Overview](../memory/overview.md#elf-process-memory-layout-per-slot)).
+
+Anything that takes a number from a user goes through the PID: the shell's `ts` prints PIDs, and `kill` and syscall `0x3b` resolve a PID to its slot with `kill_by_id`. Internally, `kill`, `crash` and the rest of the scheduler index by slot.
+
+The running slot is also mirrored in an atomic (`CURRENT_SLOT`), so `get_current_pid()` can answer without waiting for the scheduler lock. That answer is what tags heap blocks with their owner and records who holds the heap lock.
+
+### Slot allocation
+
+`new_process` takes the lowest free slot. If every slot is taken, the oldest `Crashed` process gives way (its page tables have already been returned). `run_elf` first asks `next_free_slot()` which slot the program will occupy, so it can load the ELF into that slot's frame; it refuses to start a program when no slot is available.
+
+## Foreground Processes and Waiters
+
+A process started with `fg` records its launcher in `Process::waiter` (slot plus PID, since slots are reused). The launcher is marked `Idle` inside `new_process`, under the same lock, so the child cannot exit before the launcher has parked itself.
+
+When the child is killed or crashes, `wake_waiter` sets the launcher back to `Ready` (only if it is still `Idle` and still the same PID) and clears the link. A background process has no waiter, and its exit no longer wakes the kernel shell.
+
+## Termination
+
+| Path | Effect |
+|------|--------|
+| `kill(pid)` | Moves the CPU to the kernel's page tables if the victim is the running process, frees its page tables, marks it `Dead`, wakes its waiter, then — after dropping the scheduler lock — frees every heap block it owns (`uheap::free_owned`). |
+| `crash(pid)` | Same release of page tables, waiter and heap blocks, but the slot stays `Crashed` so `ts` can still show it. |
+
+The heap sweep runs outside the scheduler lock on purpose: a process preempted inside the allocator can only release the heap lock by being scheduled.
 
 ## Special Processes
 
@@ -42,8 +65,8 @@ PIDs are assigned by a monotonically-incrementing counter (`next_free_pid`). Slo
 |------|------|------|---------|
 | 0 | `kmain` | Kernel | Sentinel/idle — absorbs the boot RSP on the first PIT tick, then loops on `hlt` |
 | 1 | `init_rc` | Kernel | Reads `INIT.RC` from FAT12 root and dispatches each line through the shell command handler; exits when done |
-| 2 | `clock` | Kernel | Renders a live HH:MM:SS clock in the top-left VGA text buffer corner |
-| 3 | `shell` | Kernel | Kernel interactive shell; keyboard input loop; PID stored in `SHELL_PID` |
+| 2 | `kclock` | Kernel | Renders a live HH:MM:SS clock in the top-left VGA text buffer corner |
+| 3 | `kshell` | Kernel | Kernel interactive shell; keyboard input loop; PID stored in `SHELL_PID` |
 | 4+ | *(userland)* | User | ELF processes spawned via `run_elf` / syscall `0x2A` |
 
 ---
@@ -57,5 +80,5 @@ PIDs are assigned by a monotonically-incrementing counter (`next_free_pid`). Slo
 | Message queue depth | 10 messages |
 | `MSG_BUF` payload size | 512 bytes |
 | Pipe buffer size | ~14 KiB |
-| Scheduler tick rate | 100 Hz (10 ms resolution) |
+| Scheduler tick rate | 1000 Hz (1 ms resolution) |
 | PID namespace | monotonic `usize`, never reused |

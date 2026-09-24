@@ -33,7 +33,7 @@ This is a blocking, single-message-at-a-time rendezvous. There is no non-blockin
 
 The NIC driver polls for incoming Ethernet frames in `scheduler_schedule` (before the round-robin pick, once per PIT tick via `netdrv::poll_and_deliver`). When a frame arrives it is placed in the registered driver process's message queue using the same `push_msg` mechanism, waking the driver if it was blocked on `receive_data`.
 
-![network-frame-routing](/assets/r2-network-frame-routing.png)
+![network-frame-routing](../assets/r2-network-frame-routing.png)
 
 ## Keyboard Pipe (IRQ 1 → userland)
 

@@ -45,6 +45,7 @@ nav:
     - C++ (libc++r2): sdk/libcxxr2.md
     - Go (libgor2): sdk/libgor2.md
     - Application Suite: sdk/apps.md
+    - Memento (GUI): sdk/memento.md
   - Kernel Internals:
     - Boot / Init:
       - Overview: init/overview.md

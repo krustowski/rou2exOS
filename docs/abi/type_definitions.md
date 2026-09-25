@@ -259,7 +259,7 @@ Passed by pointer so that the syscall keeps its two-argument shape. Fields are r
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `buffer` | `uint64_t` | Address of the destination (read) or source (write); `buffer..buffer+length` must lie in `0x600_000..=0xA00_000` |
+| `buffer` | `uint64_t` | Address of the destination (read) or source (write); `buffer..buffer+length` must lie wholly in `0x600_000..0xA00_000` or wholly in the user heap `0xC00_000..0x1000_000` |
 | `offset` | `uint64_t` | Byte offset into the file |
 | `length` | `uint64_t` | Number of bytes to transfer |
 
@@ -278,4 +278,42 @@ typedef struct {
     uint64_t offset;
     uint64_t length;
 } __attribute__((packed)) ReadRange_T, WriteRange_T;
+```
+
+## MemInfo (syscall `0x3c`)
+
+Every field is a `uint64_t` byte count unless it says otherwise. Written unaligned.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `version` | `uint64_t` | `1` |
+| `total_ram` | `uint64_t` | Usable RAM the boot loader reported |
+| `heap_start`, `heap_size` | `uint64_t` | The user heap: `0xC00_000`, 4 MiB |
+| `heap_used`, `heap_free` | `uint64_t` | Payload bytes in used and in free blocks |
+| `heap_largest_free` | `uint64_t` | The largest block one allocation can still get |
+| `heap_blocks`, `heap_free_blocks` | `uint64_t` | Blocks in the heap, and how many are free |
+| `heap_by_slot` | `uint64_t[17]` | Used bytes by process slot; `[16]` is untagged (kernel staging, blocks allocated with no owner) |
+| `frame_base`, `frame_size` | `uint64_t` | Slot *n*'s private frame is physical `frame_base + n * frame_size` |
+| `frame_virt` | `uint64_t` | Where each process sees its frame: `0x600_000` |
+| `slots` | `uint64_t` | Process slots (10) |
+| `slot_task` | `uint8_t[16]` | The task id (as `0x2f` reports it) in each slot, `0xFF` when free |
+
+```c
+typedef struct {
+    uint64_t version;
+    uint64_t total_ram;
+    uint64_t heap_start;
+    uint64_t heap_size;
+    uint64_t heap_used;
+    uint64_t heap_free;
+    uint64_t heap_largest_free;
+    uint64_t heap_blocks;
+    uint64_t heap_free_blocks;
+    uint64_t heap_by_slot[17];
+    uint64_t frame_base;
+    uint64_t frame_size;
+    uint64_t frame_virt;
+    uint64_t slots;
+    uint8_t  slot_task[16];
+} __attribute__((packed)) MemInfo_T;
 ```

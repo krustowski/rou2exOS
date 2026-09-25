@@ -63,13 +63,13 @@ Copy `examples/hello/.clangd` next to a new program too: without it clangd parse
 | `r2/coroutine.hpp` | `coroutine_handle` and friends, plus `generator<T>` |
 | `r2/compare.hpp`, `r2/concepts.hpp`, `r2/tuple.hpp`, `r2/initializer_list.hpp` | What `<=>`, concepts, structured bindings and brace-init need from `std::` |
 | `r2/io.hpp` | `print`, `println`, `printf("{}")`, `format`, `concat` — type-safe, no varargs |
-| `r2/heap.hpp` | The arena allocator and its statistics |
+| `r2/heap.hpp` | The arena allocator, its statistics, `validate()`, and the kernel's user heap |
 | `r2/syscall.hpp` | The raw ABI: syscall numbers, kernel structures, `raw_syscall` |
-| `r2/fs.hpp` | Files and directories |
+| `r2/fs.hpp` | Files and directories, including `write_at` (syscall `0x3a`) and `remove_dir` |
 | `r2/gfx.hpp` | `Canvas`, `Font`, the VESA framebuffer, VGA mode 13h |
-| `r2/input.hpp` | Keyboard and mouse |
+| `r2/input.hpp` | Keyboard and mouse, with `Mouse::set_speed()` |
 | `r2/time.hpp` | Ticks, sleep, the RTC, `Stopwatch`, `FrameTimer` |
-| `r2/process.hpp` | Arguments, `exit`, sysinfo, the task table, `spawn` |
+| `r2/process.hpp` | Arguments, `exit`, sysinfo, the task table, `spawn`, `kill` (`0x3b`), `meminfo` (`0x3c`) |
 | `r2/net.hpp` | Addresses, byte order, frames, port binding |
 | `r2/audio.hpp` | PC speaker |
 | `r2/math.hpp` | `sqrt`, `sin`, `cos`, `floor`, `fmod`, … (there is no libm) |
@@ -113,7 +113,17 @@ Both sizes are build-time settings (`make ARENA_BYTES=262144 STACK_BYTES=262144`
 R2_HEAP_ARENA(1024 * 1024)      // at file scope, in exactly one .cpp
 ```
 
-The heap is an arena in `.bss`, not the kernel heap (syscall `0x0a`), because only memory inside `0x600_000–0xA00_000` can be passed back to a syscall. The arena is a first-fit free list with boundary tags that coalesces on free; `r2::heap::stats()` reports use, free space and the largest block available. The kernel heap is still reachable via `r2::heap::kernel_allocate()` for scratch buffers that never cross the ABI.
+By default the arena is in `.bss`. The default lives in its own translation unit (`heap_arena.cpp`), so a program that declares its own arena does not also pay for the default one. Two other placements put the arena on the kernel's user heap (syscall `0x0a`), which syscalls accept just as they accept buffers in the image:
+
+| Macro | Arena | When it is full |
+|-------|-------|-----------------|
+| `R2_HEAP_ARENA(bytes)` | In `.bss` | Allocation fails |
+| `R2_HEAP_ARENA_KERNEL(bytes)` | On the user heap. If the heap cannot supply `bytes`, it halves the request, down to 64 KiB. The image carries no arena. | Grows onto the user heap |
+| `R2_HEAP_ARENA_GROWING(bytes)` | In `.bss` | Grows onto the user heap |
+
+A growing arena takes a new region of at least `R2_HEAP_GROW_BYTES` (256 KiB) from the user heap when nothing on its free list fits. It keeps each region until the process exits. `r2::heap::stats().regions` says how many regions the arena has. The user heap is 4 MiB for all processes together, so `GROWING` is the better choice for a program that usually fits in its image: it leaves the shared heap to other processes until it needs it. [Memento](memento.md) uses `R2_HEAP_ARENA_GROWING(768 * 1024)`. In a growing arena, `largest_free_block` does not say whether a larger allocation will succeed, so try the allocation.
+
+The arena is a first-fit free list with boundary tags that coalesces on free; `r2::heap::stats()` reports use, free space and the largest block available. `r2::heap::validate()` walks the block chain and the free list and returns the first inconsistency it finds, together with the block's address. Nothing calls it automatically. Call it after each step you suspect of overrunning an allocation to find the step that corrupts the heap. The symptom is usually a null vtable pointer in an object that was valid a moment earlier. The kernel heap is also reachable directly via `r2::heap::kernel_allocate()`; the kernel frees a process's blocks when the process exits.
 
 ---
 
@@ -128,7 +138,9 @@ The heap is an arena in `.bss`, not the kernel heap (syscall `0x0a`), because on
 
 ## Syscalls
 
-`r2::raw_syscall` loads the syscall number into both `RAX` and `RDX` and declares `R9` clobbered, which matches what the kernel's entry stub actually does (see [Syscall Specification](../abi/syscall_specification.md)).
+`r2::raw_syscall` loads the syscall number into both `RAX` and `RDX` and declares `R9` clobbered, which matches what the kernel's entry stub actually does (see [Syscall Specification](../abi/syscall_specification.md)). The `R9` clobber was missing in earlier versions. Its absence caused a real bug: GCC kept a VGA register value in `R9` across a syscall, and Memento's display came up as a single scan line in one build but not in another.
+
+The structures in `r2/syscall.hpp` follow the current kernel layout: `TaskInfo` is 28 bytes and carries the task's last `rip`, and `MemInfo` is the 256-byte report from syscall `0x3c`. A program built against the old 20-byte `TaskInfo` reads every entry after the first from the wrong offset.
 
 ---
 
@@ -153,25 +165,27 @@ EXTRA_LIBS := $(abspath ../../../c/libcr2.a)
 include ../../Makefile.tmpl
 ```
 
-Put `libc++r2.a` first (both define `memcpy`; `libcr2`'s truncates at 64 KiB). Memory from `libcr2`'s `malloc` lives on the kernel heap and cannot be passed back to a syscall.
+Put `libc++r2.a` first (both define `memcpy`; `libcr2`'s truncates at 64 KiB). Memory from `libcr2`'s `malloc` lives on the kernel heap; it can be passed to syscalls like any other buffer.
 
-**Host libstdc++** (the `memento-hello` case): link `libc++r2compat.a` after `-lstdc++`. It supplies the glibc symbols libstdc++ references but never calls on this target, `malloc`/`free` onto the arena, and `_Unwind_*` stubs.
+**`libc++r2compat.a`** adds the C allocation names (`malloc`, `free`, …, on the arena) and `snprintf`, for code written against a C library. [Memento](memento.md) links it after `libc++r2.a` and builds entirely freestanding. A program that links the host's libstdc++ also needs it after `-lstdc++`, because it supplies the glibc symbols libstdc++ references but never calls on this target and the `_Unwind_*` stubs:
 
 ```
 g++ ... $(OBJS) libc++r2.a -lstdc++ libc++r2compat.a -lgcc ...
 ```
 
+**Class hierarchies.** Under `-fno-rtti` the compiler still emits references to the `__cxxabiv1` type-info vtables for any class with virtual functions. libc++r2 defines them, so ordinary class hierarchies link. They panic if reached, which cannot happen without RTTI.
+
 ---
 
 ## Tests
 
-- `make check` runs host-side suites natively: containers, string, `sort`, number formatting and the allocator (built as C++17), the arena override, and the C++20/23 facilities (built as C++23).
+- `make check` runs host-side suites natively: containers, string, `sort`, number formatting and the allocator (built as C++17), the arena override, arena growth, and the C++20/23 facilities (built as C++23).
 - `tests/target/` builds `SELFTEST.ELF`, which runs on `r2` and writes its result to `CXXTEST.TXT` on the floppy.
 
 ## Known Rough Edges
 
 - `sleep()` is best-effort; use `ticks()` or `FrameTimer` for timing.
-- `fs::write` writes a single 512-byte sector (syscall `0x21`), with no append.
+- `fs::write` writes a single 512-byte sector (syscall `0x21`). Use `fs::write_at` for larger files and for appending.
 - `fs::size_of()` lists the directory, since there is no stat syscall.
 - `sin`, `cos` and `atan` are approximations.
 - No `shared_ptr`, no `map`, no iostreams.

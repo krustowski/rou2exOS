@@ -44,13 +44,19 @@ Frames arrive via polling, not IRQ. On every PIT tick (1000 Hz) the scheduler ca
 PIT tick
   → scheduler_schedule()
     → netdrv::poll_and_deliver()
-      → rtl8139::receive_frame()      read one frame from RX ring
-      → tcp_dest_port()               extract TCP dest port (if IPv4/TCP)
-      → lookup_port()                 find registered service pid
-      → scheduler::push_msg(pid, msg) wake the target process
+      → rtl8139::peek_frame()             the frame at the front of the RX ring, left there
+      → tcp_dest_port() / lookup_port()   whose it is: a bound service, else the driver
+      → a free FRAME_BUF slot             the frame is copied into a buffer of its own
+      → scheduler::try_push_msg(pid, msg) queued, and the target woken
+      → rtl8139::consume_frame()          only now taken off the ring
+    (repeated for up to 16 frames a tick)
 ```
 
-The frame is copied into `NET_FRAME_BUF` (2 KiB kernel static). The `Message` carries `buf_addr = NET_FRAME_BUF.as_ptr()` and `port_id = frame_len`. The receiving userland process calls syscall `0x35` which copies from `NET_FRAME_BUF` into a userland buffer. Because `NET_FRAME_BUF` is a single shared slot, only one frame is buffered at a time — the userland driver must consume each frame before the next tick.
+Each queued frame has a 2 KiB buffer of its own, one of the 64 in `FRAME_BUF`, held for the receiving process until it copies the frame out with syscall `0x35`, which then frees it (so does the process's death, `release_frames_of`). The `Message` carries the buffer's address in `buf_addr` and the frame length in `port_id`. Up to 16 frames are delivered per tick.
+
+A frame that cannot be queued --- no free buffer, the receiver's 64-message queue full, the scheduler locked by the syscall the tick interrupted --- stays at the front of the NIC's ring and is tried again next tick, so nothing is lost between the NIC and the receiver: when anything is dropped, it is by the NIC, once its own ring is full. A frame whose receiver takes nothing for 200 ticks is dropped, so that one process that has stopped reading cannot hold up the traffic for the others. `NETDRV_COUNTERS` counts delivered, held-back and dropped frames and the NIC's missed-packet counter.
+
+Until v0.11 there was one shared 2 KiB buffer, `NET_FRAME_BUF`, and one frame per tick: the next frame overwrote the last whether or not it had been read, so a receiver that was busy for a few milliseconds lost every frame of a burst but the last, and TCP receivers had to keep their windows to a segment or two. Memento's browser took over two minutes for a 700 KiB page on QEMU's user networking; it now receives it in under a tenth of a second.
 
 ## Transmit Path (Ethernet)
 
@@ -79,7 +85,7 @@ This path is legacy/fallback; the RTL8139 path is preferred for QEMU guests.
 
 ## Same-Host Loopback
 
-When `ipv4::send_packet` detects `src_ip == dst_ip` (same-guest delivery) it calls `netdrv::loopback_deliver` instead of going through the NIC. This copies the frame into `NET_FRAME_BUF` and pushes it to the target process's message queue directly, bypassing the serial encoder and the NIC TX/RX cycle.
+When `ipv4::send_packet` detects `src_ip == dst_ip` (same-guest delivery) it calls `netdrv::loopback_deliver` instead of going through the NIC. This copies the frame into a `FRAME_BUF` slot and pushes it to the target process's message queue directly (a frame that cannot be queued is lost, as there is no ring to leave it in), bypassing the serial encoder and the NIC TX/RX cycle.
 
 ---
 
@@ -107,11 +113,12 @@ On each incoming frame `poll_and_deliver` calls `tcp_dest_port(frame)` to extrac
 
 | Resource | Value |
 |----------|-------|
-| RX ring buffer | 8 KiB + 1500-byte overrun guard |
+| RX ring buffer | 32 KiB (RCR RBLEN = 10) + 1500-byte overrun guard |
 | TX descriptors | 4 (round-robin) |
 | TX buffer per descriptor | 2 KiB |
-| Shared kernel frame buffer (`NET_FRAME_BUF`) | 2 KiB |
+| Queued-frame buffers (`FRAME_BUF`) | 64 x 2 KiB |
+| Messages queued per process | 64 |
 | Max port bindings | 16 |
 | SLIP encode/decode buffer | 4 KiB |
 | Serial baud rate | 38 400 (COM1, divisor 3) |
-| Poll rate | 1000 Hz (one frame per PIT tick) |
+| Poll rate | 1000 Hz, up to 16 frames per PIT tick |

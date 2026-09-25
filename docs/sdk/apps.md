@@ -23,17 +23,17 @@ Programs that use Ethernet need the [`ETH`](#networking) driver running first, s
 
 | App | Language | Description |
 |-----|----------|-------------|
-| [`SH`](https://github.com/krustowski/rou2exOS-apps/tree/master/c/r2sh) | C | Userland shell with a simple command set; the intended everyday shell rather than the [kernel shell](../shell.md). |
+| [`SH`](https://github.com/krustowski/rou2exOS-apps/tree/master/c/r2sh) | C | Userland shell with a simple command set; the intended everyday shell rather than the [kernel shell](../shell.md). With `--host` it runs as the terminal of Memento's Shell window. |
 | [`FSCK`](https://github.com/krustowski/rou2exOS-apps/tree/master/c/fsck) | C | FAT12 filesystem scan and diagnostic report (syscall `0x2b`). |
 | [`HELLOFS`](https://github.com/krustowski/rou2exOS-apps/tree/master/c/hello-fs) | C | Example of the filesystem syscalls. |
-| [`THEM`](https://github.com/krustowski/rou2exOS-apps/tree/master/c/them) | C | 16-bit x86 (8086/80186) emulator with the BIOS and DOS services, PIC, PIT and keyboard a DOS program expects. Runs old MS-DOS games and tools, e.g. from `/mnt/iso/games`. |
+| [`THEM`](https://github.com/krustowski/rou2exOS-apps/tree/master/c/them) | C | 16-bit x86 (8086/80186) emulator with the BIOS and DOS services, PIC, PIT and keyboard a DOS program expects. Runs `.COM` and `MZ` `.EXE` programs (a bare name tries `.COM`, then `.EXE`), e.g. old MS-DOS games from `/mnt/iso/games`. `debug` traces to the screen; `log` writes a periodic record with a heartbeat to `/mnt/fat/THEM.LOG`. |
 
 ## Networking
 
 | App | Language | Description |
 |-----|----------|-------------|
 | [`ETH`](https://github.com/krustowski/rou2exOS-apps/tree/master/c/eth) | C | The default Ethernet driver: registers the RTL8139, answers ARP and ICMP, obtains an address by DHCP (or `--ip <addr>`). |
-| [`GARN`](https://github.com/krustowski/rou2exOS-apps/tree/master/c/garn) | C | Small HTTP/1.0 server for sharing files; configured with `--config /mnt/fat/GARN/GARN.CFG`. |
+| [`GARN`](https://github.com/krustowski/rou2exOS-apps/tree/master/c/garn) | C | Small HTTP/1.0 server for sharing files; configured with `--config /mnt/fat/GARN/GARN.CFG`, where `ip` sets a static address (otherwise `ETH`/DHCP manages it). |
 | [`TNT`](https://github.com/krustowski/rou2exOS-apps/tree/master/c/tnt) | C | TELNET server and remote shell on TCP/23, over SLIP or Ethernet. |
 | [`CHAT`](https://github.com/krustowski/rou2exOS-apps/tree/master/c/chat) | C | Chatroom server on TCP/9000 with an HTTP front end on TCP/8080. |
 | [`NSK`](https://github.com/krustowski/rou2exOS-apps/tree/master/c/nsk) | C | Network swiss knife: sweeps a subnet given in CIDR notation and lists live hosts. |
@@ -44,7 +44,7 @@ Programs that use Ethernet need the [`ETH`](#networking) driver running first, s
 
 | App | Language | Description |
 |-----|----------|-------------|
-| [`MEMENTO`](https://github.com/krustowski/rou2exOS-apps/tree/master/cpp/memento-hello) | C++ | The Memento GUI framework running on `r2`: windows, wallpaper, mouse. |
+| [`MEMENTO`](memento.md) | C++ | Windowed desktop on the Memento UI toolkit: file manager, task and memory monitor, shell, clock, chat, IRC, MIDI player, web browser, Snake, Minesweeper, and Turbo C++ in a window. See [Memento (GUI)](memento.md). |
 | [`SNAKE`](https://github.com/krustowski/rou2exOS-apps/tree/master/cpp/libc++r2/examples/snake) | C++ | Snake, built on libc++r2; keeps the score on the floppy. |
 | [`CUBE`](https://github.com/krustowski/rou2exOS-apps/tree/master/c/cube) | C | Rotating 3D cube in VGA mode 13h. |
 | [`GFXTEST`](https://github.com/krustowski/rou2exOS-apps/tree/master/c/gfxtest) | C | VGA mode 13h test. |

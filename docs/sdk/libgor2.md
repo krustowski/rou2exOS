@@ -104,14 +104,31 @@ import "github.com/krustowski/rou2exOS-apps/go/libgor2"
 | `types.go` | Kernel structures, with compile-time size assertions |
 | `system.go` | Exit, sysinfo, RTC, ticks, sleep, tasks, `Args` |
 | `console.go` | Print, clear, flush |
-| `fs.go` | Files, directories, mounts, `Chdir`, fsck |
+| `fs.go` | Files, directories (`Mkdir`, `RemoveDir`), mounts, `Chdir`, fsck |
 | `video.go` | Framebuffer, VGA modes, blitting, the kernel font |
 | `audio.go` | Speaker and MIDI |
 | `net.go` | Ports, serial, packets, driver registration |
 | `input.go` | Keyboard and mouse pipes |
-| `mem.go` | The kernel's shared heap (`KMalloc` returns a `uintptr`: it is invisible to the collector and must be freed by hand) |
+| `mem.go` | The kernel's shared heap (`KMalloc`, `KBytes`) and the memory report (`ReadMemInfo`, syscall `0x3c`) |
+
+### Memory outside the collector
+
+`KMalloc` returns a `uintptr` for a block on the kernel's 4 MiB user heap. The collector does not see the block, so it is never scanned or freed by the collector. Free it with `KFree`; otherwise the kernel frees it when the process exits. Syscalls accept user-heap buffers, and `KBytes` turns a block into a `[]byte` that any call in the package takes. Use it for anything too large for the ~1.5 MiB Go heap:
+
+```go
+addr := libgor2.KMalloc(1 << 20)
+defer libgor2.KFree(addr)
+
+n, err := libgor2.ReadFileAt("/mnt/fat/BIG.DAT", libgor2.KBytes(addr, 1<<20), 0)
+```
+
+The slice is valid only until `KFree` or `KRealloc`, which may move the block. The collector does not scan it, so a Go pointer stored in it does not keep its target alive. The kernel checks that a buffer lies inside a valid region, not that it fits the slice: a slice shorter than what a syscall writes is overrun.
+
+### Errors and structures
 
 A failing syscall returns an `Errno`, which implements `error` (`libgor2.EFileNotFound`, `libgor2.EInvalidInput`, …). Calls that answer with a count or handle (`Ticks`, `ListTasks`, `Run`, `Receive`) return it directly.
+
+`ReadSysInfo` and `ReadMemInfo` return `EBusy` when the kernel was holding a lock; ask again. `Send` always transmits 512 bytes, padding a shorter buffer with zeroes, and `NewPacket` refuses a buffer shorter than 512 bytes. Give `Receive` a 2048-byte buffer, because the kernel copies the whole frame without being told the buffer's size.
 
 Go has no `packed`, so the three ABI structures with a wide field at an odd offset (`RTC.Year`, `VfsDirEntry.Size`, `TaskInfo.RIP`) hold that field as bytes behind an accessor. Each structure's size is asserted at compile time.
 
@@ -143,7 +160,7 @@ On Ethernet, `Open` checks whether a driver is already registered (syscall `0x37
 | No driver | Registers as the global driver | TCP, ICMP, UDP, DNS, and answering ARP for the machine |
 | A driver (`ETH`, `GARN`) | Binds the TCP ports it needs | TCP and HTTP only |
 
-The registration is never released, not even on exit. TCP is a client with one outstanding segment, exponential backoff and no reassembly; on an out-of-order segment it sends three duplicate ACKs at once to trigger fast retransmit, because the kernel delivers at most one frame per tick and loses them in bursts. There is no TLS: `Do` refuses `https://` with `ErrTLS`. Everything runs from one goroutine.
+The registration is never released, not even on exit. TCP is a client with one outstanding segment, exponential backoff, no reassembly and an MSS of 1460. The kernel queues up to 64 frames per process, each in its own 2 KiB buffer, so frames are no longer lost when a process reads them late. Each turn of the stack's loop empties the queue and sleeps for a tick only when the queue was empty. An out-of-order segment gets one duplicate ACK, as RFC 5681 specifies. There is no TLS: `Do` refuses `https://` with `ErrTLS`. Everything runs from one goroutine.
 
 ---
 

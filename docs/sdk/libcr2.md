@@ -6,8 +6,8 @@
 
 | Header | Covers |
 |--------|--------|
-| `syscall.h` | Syscall numbers (`SyscallNo_T`), the raw `syscall()` entry, and one wrapper per syscall |
-| `types.h` | Structures the kernel reads and writes: `SysInfo_T`, `RTC_T`, `Entry_T`, `VfsDirEntry_T`, `MountInfo_T`, `TaskInfo_T`, `FBInfo_T`, `FsckReport_T`, `MousePacket_T`, … |
+| `syscall.h` | Syscall numbers (`SyscallNo_T`), the raw `syscall()` entry, one wrapper per syscall, and the structures of the newer calls (`WriteRange_T`, `MemInfo_T`) |
+| `types.h` | Structures the kernel reads and writes: `SysInfo_T`, `RTC_T`, `Entry_T`, `VfsDirEntry_T`, `MountInfo_T`, `TaskInfo_T`, `FBInfo_T`, `FsckReport_T`, `MousePacket_T`, … `TaskInfo_T` is 28 bytes and includes the task's last `rip`. |
 | `printf.h` | `printf` with a minimal set of conversions |
 | `string.h`, `mem.h`, `bytes.h` | `strlen`, `memcmp`, `memcpy`, byte-order helpers |
 | `args.h` | Argument parsing helpers |
@@ -41,7 +41,7 @@ Each program lives in its own directory under `c/` with a Makefile that compiles
 
 ```make
 compile:
-	@cd ${BUILD_DIR} && gcc -c -O2 -m64 -static -nostdlib -nostdinc \
+	@cd ${BUILD_DIR} && gcc -c -O2 -flto -m64 -static -nostdlib -nostdinc \
 		-mno-red-zone -ffreestanding -I .. -I ../../libcr2/ ${SOURCE_FILES}
 
 link:
@@ -71,7 +71,7 @@ int main(int argc, char **argv) {
 | Area | Functions |
 |------|-----------|
 | Process | `exit`, `run_elf`, `list_tasks`, `kill_task` |
-| System | `read_sysinfo`, `write_sysinfo`, `read_rtc`, `get_ticks`, `sleep_ms` |
+| System | `read_sysinfo`, `write_sysinfo`, `read_rtc`, `get_ticks`, `sleep_ms`, `read_meminfo` |
 | Console | `print`, `printf`, `clear_screen` |
 | Input | `pipe_subscribe`, `pipe_read`, `pipe_unsubscribe` (keyboard); `pipe_mouse_subscribe`, `pipe_mouse_read`, `pipe_mouse_unsubscribe` |
 | Graphics | `get_fb_info`, `write_pixel`, `write_vga`, `blit_buffer`, `blit_buffer_scaled`, `map_vram`, `set_video_mode`, `get_kernel_font` |
@@ -89,6 +89,8 @@ For bigger files, prefer `read_file_at` / `write_file_at` (syscalls `0x39` / `0x
 
 `net.c` implements, on top of the raw packet syscalls, everything a server needs: SLIP decoding for the serial link, ARP, ICMP echo, a DHCP client and a passive TCP socket pool. The [`ETH`](apps.md) driver uses it to register as the machine's Ethernet driver and obtain an address; [`GARN`](apps.md), [`TNT`](apps.md) and [`CHAT`](apps.md) bind TCP ports on top of it.
 
+By default the Ethernet driver reads frames from the process's kernel queue (syscall `0x35`). A process has only one queue, so a program that runs a second network stack next to libcr2's cannot let both read it: each would take and discard the other's frames. Such a program reads the queue itself and passes libcr2 its frames through `net_set_frame_source(fn)`. The callback fills a buffer with one frame and returns its length, or 0 when no frame is waiting; a blocking call waits for one. Passing `NULL` returns libcr2 to the kernel queue. [Memento](memento.md) does this so that its web browser and its Chat and IRC windows can share one queue. libcr2's frame buffer is 1518 bytes, because the kernel delivers frames with the card's 4-byte CRC still attached.
+
 The kernel-side model (driver registration, port binding, per-tick frame delivery) is described in [Networking Overview](../networking/overview.md).
 
 ---
@@ -96,7 +98,6 @@ The kernel-side model (driver registration, port binding, per-tick frame deliver
 ## Known Issues
 
 - **The syscall number is loaded into `RDX` only.** The kernel reads it from `RAX` (`syscall_handler` does `mov rdx, rax` before the dispatcher). A call therefore works only when `RAX` happens to hold the number already. libc++r2 and libgor2 load `RAX`; a fix in `libcr2` is to add `"a"(number)` to the inline assembly in `syscall.c`.
-- **`R9` is not in the clobber list.** Every syscall destroys `R9`; a caller whose compiler keeps a live value there across `int 0x7f` gets the previous return value instead.
+- **`R9` is not in the clobber list.** Every syscall destroys `R9`; a caller whose compiler keeps a live value there across `int 0x7f` gets the previous return value instead. libc++r2 hit this in practice (see [libc++r2](libcxxr2.md#syscalls)); the fix here is to add `"r9"` to the clobbers.
 - **The third argument never reaches the kernel.** `syscall()` has a four-argument prototype, but the dispatcher takes two.
 - **`memcpy` takes a `uint16_t` length** and silently truncates copies over 65535 bytes.
-- **`malloc` returns kernel-heap memory** (`0xC00_000+`), which cannot be passed back to a syscall; see [SDK Overview](index.md#pointers-passed-to-syscalls).

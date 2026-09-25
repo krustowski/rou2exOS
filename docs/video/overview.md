@@ -135,7 +135,7 @@ Colors are applied per `Result` variant using VGA attribute bytes.
 
 ### Pointer Constraints
 
-Userland pointers passed to video syscalls must fall in the validated range `0x600_000 – 0xA00_000`. Heap pointers (`0xC00_000+`) are rejected. Userland programs must stage data in their statically-allocated BSS or stack buffers.
+Buffers passed to video syscalls must lie wholly inside the program image (`0x600_000 – 0xA00_000`) or wholly inside the userland heap (`0xC00_000 – 0xFFF_FFF`). The whole buffer is checked: 64000 bytes for `0x13`, `width × height × 4` for `0x17`.
 
 The exception is `map_vram` (0x14), which maps `0xA00_000` into the calling process's page table using a P1 (4 KiB) sub-table allocated from `PAGE_TABLE_POOL`. After `map_vram`, the process can write to VGA VRAM directly at that virtual address without going through a syscall.
 

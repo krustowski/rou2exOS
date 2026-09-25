@@ -83,7 +83,7 @@ See [Memory Overview](../memory/overview.md) for how the frame is backed physica
 
 ### Pointers passed to syscalls
 
-Every syscall that takes a pointer checks it against `0x600_000–0xA00_000` and returns `InvalidInput` (`0xfc`) otherwise. Memory from the kernel heap (syscall `0x0a`, `0xC00_000+`) is **outside** that range: a buffer allocated there can be filled and read by the program, but never handed back to a syscall. This is why libc++r2 and the Go runtime keep their heaps inside the process image.
+Every syscall that takes a pointer checks the whole buffer it will touch. The buffer must lie wholly inside the process image (`0x600_000–0xA00_000`) or wholly inside the kernel's user heap (syscall `0x0a`, `0xC00_000–0xFFF_FFF`); otherwise the call returns `InvalidInput` (`0xfc`). Heap memory can be handed to syscalls directly, so a program too large to keep its heap in the image can move it to the user heap (libc++r2's `R2_HEAP_ARENA_KERNEL` and `R2_HEAP_ARENA_GROWING`; [Memento](memento.md) uses the latter), and Go can hand a `KMalloc` block to any syscall through `libgor2.KBytes`. Kernels before this check accepted only the image, and such a program will not run on them.
 
 ### Calling convention
 

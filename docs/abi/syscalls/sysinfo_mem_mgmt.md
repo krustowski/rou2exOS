@@ -55,7 +55,7 @@ Allocate a block from the userland heap (`0xc00000`-`0xffffff`). Returns the vir
 
 The heap is shared by all processes. Each block is tagged with the slot of the process that allocated it and is freed automatically when that process exits, is killed or crashes.
 
-Heap addresses lie outside the range syscalls accept for pointer arguments, so a heap block cannot be passed to e.g. `0x10` or `0x20` directly; see [Pointer Arguments](../syscall_specification.md#pointer-arguments).
+A heap block can be passed to any syscall that takes a pointer, as long as the buffer the call uses fits inside the block's region; see [Pointer Arguments](../syscall_specification.md#pointer-arguments).
 
 | Argument 1 | Argument 2 | Implemented |
 |------------|------------|-------------|
@@ -86,3 +86,13 @@ Returns `0x00` on success, or `FileNotFound` (`0xfe`) when no live process has t
 | Argument 1 | Argument 2 | Implemented |
 |------------|------------|-------------|
 | PID | *unused* | ✅ |
+
+## 0x3c (Memory information)
+
+Fills a [`MemInfo`](../type_definitions.md#meminfo-syscall-0x3c) with the usable RAM, the layout of the per-process frames, and the user heap (`0x0a`) added up block by block --- including how many bytes each process slot holds, and which task id sits in each slot, so the figures can be put next to `0x2f`'s list. The same numbers the kernel shell's `heap` and `meminfo` print.
+
+Returns `0x00`, `InvalidInput` (`0xfc`) for a pointer outside the user regions, or `Busy` (`0xfa`) when the heap or the scheduler is locked at that moment; ask again.
+
+| Argument 1 | Argument 2 | Implemented |
+|------------|------------|-------------|
+| pointer to `MemInfo` | *unused* | ✅ |

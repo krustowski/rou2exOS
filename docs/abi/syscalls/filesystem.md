@@ -32,13 +32,13 @@ Rename the file specified by its name in `arg1` to value specified in `arg2`.
 |------------|------------|-------------|
 | pointer to string data | pointer to string data | ✅ |
 
-## 0x23 (Delete file)
+## 0x23 (Delete file or empty directory)
 
-Delete the file specified in `arg1`. Applicable on a file in the working directory. The file's cluster chain is returned to the FAT before the directory entry is marked deleted. A directory of the same name is never matched. Returns `FileNotFound` when nothing was deleted.
+Delete the file specified in `arg1`, or with `arg2` = `0x01` the directory. Applicable on an entry in the working directory. The entry's cluster chain is returned to the FAT before the directory entry is marked deleted. A file and a directory of the same name are told apart by `arg2`: each only matches its own kind. A directory is deleted only when it holds nothing but `.` and `..`; its contents are never taken along. Returns `FileNotFound` when nothing was deleted (missing, the wrong kind, or a directory that is not empty).
 
 | Argument 1 | Argument 2 | Implemented |
 |------------|------------|-------------|
-| pointer to string data | `0x00` | ✅ |
+| pointer to string data | `0x00` file, `0x01` empty directory | ✅ |
 
 ## 0x24 (Read FAT table)
 

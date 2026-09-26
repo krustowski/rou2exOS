@@ -92,7 +92,7 @@ Execute a flat binary executable (`.BIN` usually).
 
 Execute an ELF64 executable (`.ELF`). Auto-appends `.elf`/`.ELF` if no extension given. Returns the new process PID on success, `0` on failure.
 
-The file is looked up in the caller's working directory (FAT12, or ISO9660 when the working directory is under `/mnt/iso`), then in `/mnt/iso/bin`. The program is started in the background; it fails when all ten process slots are held by live processes.
+The file is looked up in the caller's working directory (FAT12, or ISO9660 when the working directory is under `/mnt/iso`), then in `/mnt/usb/bin` and `/mnt/iso/bin`. The program is started in the background; it fails when all ten process slots are held by live processes.
 
 | Argument 1 | Argument 2 | Implemented |
 |------------|------------|-------------|
@@ -113,7 +113,8 @@ List VFS mount points. Returns the number of active mounts as a u64. `fs_type`:
 + `0` = none
 + `1` = rootfs
 + `2` = fat12
-+ `3` = iso9660.
++ `3` = iso9660
++ `4` = tar (the boot medium archive at `/mnt/usb`).
 
 | Argument 1 | Argument 2 | Implemented |
 |------------|------------|-------------|

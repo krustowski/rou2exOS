@@ -56,7 +56,7 @@ Plays the built-in MIDI melody via the PC speaker (`audio::midi::play_melody`), 
 
 ### `bg <binary>`
 
-Loads and runs an ELF binary in the **background** (shell remains interactive). The binary name must be ≤ 8 characters; `.elf` is appended when no extension is given. The binary is looked up in the current working directory first (the FAT12 floppy, or the ISO when the cwd is under `/mnt/iso`), then in `/mnt/iso/bin`, so the programs shipped on the ISO image can be started from anywhere.
+Loads and runs an ELF binary in the **background** (shell remains interactive). The binary name must be ≤ 8 characters; `.elf` is appended when no extension is given. The binary is looked up in the current working directory first (the FAT12 floppy, or the ISO when the cwd is under `/mnt/iso`), then in `/mnt/usb/bin` and `/mnt/iso/bin`, so the programs shipped on the boot medium can be started from anywhere.
 
 ```
 bg eth
@@ -278,7 +278,7 @@ Falls back to `$ ` if the config lock is contended.
 `bg` and `fg` both delegate to `input::elf::run_elf(filename, args, mode)`:
 
 1. Asks the scheduler which slot the program will occupy (`next_free_slot`); fails with `no free process slot` when all ten are held by live processes.
-2. Finds the ELF file — current working directory first (FAT12, or ISO9660 when the cwd is under `/mnt/iso`), then `/mnt/iso/bin` — and stages it at a per-slot scratch address.
+2. Finds the ELF file — current working directory first (FAT12, or ISO9660 when the cwd is under `/mnt/iso`), then `/mnt/usb/bin`, then `/mnt/iso/bin` — and stages it at a per-slot scratch address.
 3. Copies the `PT_LOAD` segments into the slot's private 2 MiB physical frame and builds a page table that maps it at `0x600_000`.
 4. Pushes the argv frame onto the slot's initial user stack and creates the scheduler task at the ELF entry point.
 5. `Foreground`: the launcher (the shell, or `init_rc`) is recorded as the child's waiter and parked until the child ends.

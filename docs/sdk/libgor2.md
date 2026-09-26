@@ -160,7 +160,7 @@ On Ethernet, `Open` checks whether a driver is already registered (syscall `0x37
 | No driver | Registers as the global driver | TCP, ICMP, UDP, DNS, and answering ARP for the machine |
 | A driver (`ETH`, `GARN`) | Binds the TCP ports it needs | TCP and HTTP only |
 
-The registration is never released, not even on exit. TCP is a client with one outstanding segment, exponential backoff, no reassembly and an MSS of 1460. The kernel queues up to 64 frames per process, each in its own 2 KiB buffer, so frames are no longer lost when a process reads them late. Each turn of the stack's loop empties the queue and sleeps for a tick only when the queue was empty. An out-of-order segment gets one duplicate ACK, as RFC 5681 specifies. There is no TLS: `Do` refuses `https://` with `ErrTLS`. Everything runs from one goroutine.
+The kernel releases the registration when the process exits, is killed or crashes. TCP is a client with one outstanding segment, exponential backoff, no reassembly and an MSS of 1460. The kernel queues up to 64 frames per process, each in its own 2 KiB buffer, so frames are no longer lost when a process reads them late. Each turn of the stack's loop empties the queue and sleeps for a tick only when the queue was empty. An out-of-order segment gets one duplicate ACK, as RFC 5681 specifies. There is no TLS: `Do` refuses `https://` with `ErrTLS`. Everything runs from one goroutine.
 
 ---
 

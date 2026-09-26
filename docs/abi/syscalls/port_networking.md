@@ -59,7 +59,7 @@ Copies 512 bytes from the buffer and pushes a message to the target process' MQ,
 
 ## 0x37 (Register Ethernet driver, bind TCP port)
 
-Ethernet driver registration, or port binding.
+Ethernet driver registration, or port binding. Both are released when the calling process exits, is killed or crashes.
 
 | Argument 1 | Argument 2 | Implemented |
 |------------|------------|-------------|
@@ -74,3 +74,17 @@ Returns `InvalidInput` on invalid pointer, `Ok` otherwise.
 | Argument 1 | Argument 2 | Implemented |
 |------------|------------|-------------|
 | pointer to `NetStatus` struct | *unused* | ✅ |
+
+## 0x3d (Network configuration)
+
+The machine's network configuration: IPv4 address, netmask, gateway, the gateway's MAC, DNS and the card's MAC, as the global Ethernet driver (`eth`) got them by DHCP or was given them. Every network stack reads it rather than assuming addresses of its own. The gateway's MAC matters most: a process that is not the global driver cannot ARP for it, because the replies go to the driver.
+
+With Argument 1 `0x01` the kernel fills the [`NetConfig`](../type_definitions.md#netconfig-syscall-0x3d) at Argument 2; the IP and MAC come from the system configuration (the same ones `0x01` and `0x38` report), the rest is what the driver last set. Unset fields are zero.
+
+With Argument 1 `0x02` the calling process sets it from the struct at Argument 2. Only the registered global driver (`0x37` with port 0) may; anyone else gets `InvalidInput`. The IP is stored as `0x01`/`0x02` would store it; the MAC is the card's and is ignored. `Busy` means the system configuration was locked that instant: try again.
+
+Returns `InvalidInput` on an invalid pointer or Argument 1, `Ok` otherwise.
+
+| Argument 1 | Argument 2 | Implemented |
+|------------|------------|-------------|
+| `0x01` read, `0x02` set | pointer to `NetConfig` struct | ✅ |

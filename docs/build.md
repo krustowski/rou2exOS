@@ -105,7 +105,7 @@ The kernel is linked starting at physical address `0x100000` (1 MiB).
 | `.user_task` | `0x650000` | Unused user-task section placeholder |
 | `.dma` (DMA buffer) | `0x80000` (512-byte aligned) | Physical DMA target for ISA DMA channel 2 |
 
-The `p2_table`, `p3_table`, `ist0/ist1_stack`, `tss64`, `multiboot_ptr`, and `debug_flag` symbols all live in assembly `.bss` in `boot.asm`.
+The `p2_table`, `p2_high_tables`, `p3_table`, `ist0/ist1_stack` (16 KiB each: the double fault runs on `ist0_stack` via TSS `ist1`, the page fault on `ist1_stack` via `ist2`), `tss64`, `multiboot_ptr`, and `debug_flag` symbols all live in assembly `.bss` in `boot.asm`.
 
 ---
 
@@ -121,7 +121,8 @@ _start  (boot.asm, 32-bit protected mode)
   ├── loads P4 table address into CR3
   ├── set_up_page_tables()
   │     identity-maps 1 GiB via P2 (512 × 2 MiB huge pages)
-  │     maps P3[1..5] → 4 × 1 GiB (addresses 1–4 GiB)
+  │     identity-maps 1–4 GiB via 3 more P2 tables (p2_high_tables, 2 MiB pages;
+  │     not 1 GiB pages, which need the optional pdpe1gb CPU feature)
   │     marks P2[2..4] USER+WRITE (0x400000–0xA00000, userland range)
   ├── load_gdt()    — lgdt from gdt_descriptor
   ├── load_idt()    — lidt (empty; real IDT installed by init later)
@@ -205,7 +206,7 @@ bg garn --config /mnt/fat/GARN/GARN.CFG
 echo INIT.RC done
 ```
 
-Binary names are resolved like in the shell: working directory first, then `/mnt/iso/bin`, so `bg eth` works without the program being on the floppy. A `fg` line parks `init_rc` until that program exits.
+Binary names are resolved like in the shell: working directory first, then `/mnt/usb/bin` and `/mnt/iso/bin`, so `bg eth` works without the program being on the floppy. A `fg` line parks `init_rc` until that program exits.
 
 Lines starting with `#` are ignored. Trailing `\r` is stripped (DOS line endings tolerated).
 

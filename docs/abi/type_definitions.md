@@ -121,13 +121,13 @@ Each entry describes one VFS mount point.  The kernel writes up to 8 entries int
 |-------|------|-------------|
 | `path` | `uint8_t[32]` | Mount path, **not** NUL-terminated; use `path_len` |
 | `path_len` | `uint8_t` | Number of valid bytes in `path` |
-| `fs_type` | `uint8_t` | `0`=none, `1`=rootfs, `2`=fat12, `3`=iso9660 |
+| `fs_type` | `uint8_t` | `0`=none, `1`=rootfs, `2`=fat12, `3`=iso9660, `4`=tar |
 
 ```rust
 pub struct MountInfo {
     pub path: [u8; 32],
     pub path_len: u8,
-    pub fs_type: u8,   // 0=none 1=rootfs 2=fat12 3=iso9660
+    pub fs_type: u8,   // 0=none 1=rootfs 2=fat12 3=iso9660 4=tar
 }
 ```
 
@@ -135,7 +135,7 @@ pub struct MountInfo {
 typedef struct {
     uint8_t path[32];
     uint8_t path_len;
-    uint8_t fs_type;   /* 0=none, 1=rootfs, 2=fat12, 3=iso9660 */
+    uint8_t fs_type;   /* 0=none, 1=rootfs, 2=fat12, 3=iso9660, 4=tar */
 } __attribute__((packed)) MountInfo_T;
 ```
 
@@ -198,6 +198,47 @@ typedef struct {
     uint8_t  n_ports;
     uint16_t ports[16];
 } __attribute__((packed)) NetStatus_T;
+```
+
+## NetConfig (syscall `0x3d`)
+
+The network configuration the global Ethernet driver publishes; 30 bytes, packed. Unset fields are zero.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `ip` | `uint8_t[4]` | IPv4 address |
+| `netmask` | `uint8_t[4]` | Netmask of the local network |
+| `gateway` | `uint8_t[4]` | Gateway for destinations off the local network |
+| `dns` | `uint8_t[4]` | DNS server |
+| `mac` | `uint8_t[6]` | The network card's MAC (read only) |
+| `gateway_mac` | `uint8_t[6]` | The gateway's MAC, as the driver resolved it by ARP |
+| `source` | `uint8_t` | `0` not set, `1` static, `2` DHCP, `3` fallback (no DHCP answer yet) |
+| `_reserved` | `uint8_t` | Zero |
+
+```rust
+pub struct NetConfig {
+    pub ip: [u8; 4],
+    pub netmask: [u8; 4],
+    pub gateway: [u8; 4],
+    pub dns: [u8; 4],
+    pub mac: [u8; 6],
+    pub gateway_mac: [u8; 6],
+    pub source: u8,
+    pub _reserved: u8,
+}
+```
+
+```c
+typedef struct {
+    uint8_t ip[4];
+    uint8_t netmask[4];
+    uint8_t gateway[4];
+    uint8_t dns[4];
+    uint8_t mac[6];
+    uint8_t gateway_mac[6];
+    uint8_t source;
+    uint8_t _reserved;
+} __attribute__((packed)) NetConfig_T;
 ```
 
 ## VfsDirEntry (syscall `0x2d`)

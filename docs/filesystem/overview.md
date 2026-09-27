@@ -63,7 +63,7 @@ pub struct VfsMount {
 | `Root` | Root mountpoint (`/`) |
 | `Fat12` | FAT12 floppy at `/mnt/fat` |
 | `Iso9660` | ISO9660 CD-ROM at `/mnt/iso` |
-| `Tar` | ustar archive loaded by GRUB, at `/mnt/usb` |
+| `Tar` | ustar archive loaded by GRUB, at `/mnt/tar` |
 
 ### Mounts at Boot
 
@@ -74,7 +74,7 @@ Set up by `init::fs::vfs_init()`:
 | `/` | `Root` | Always |
 | `/mnt/fat` | `Fat12` | Always |
 | `/mnt/iso` | `Iso9660` | Only if `Iso9660::probe()` succeeds |
-| `/mnt/usb` | `Tar` | Only if GRUB loaded a tar archive as a module |
+| `/mnt/tar` | `Tar` | Only if GRUB loaded a tar archive as a module |
 
 ### Path Resolution
 
@@ -159,7 +159,7 @@ The module depends on nothing else in the kernel so the host unit tests (`tests/
 
 ---
 
-## Boot Medium Archive (`/mnt/usb`)
+## Boot Medium Archive (`/mnt/tar`)
 
 Booted from a USB stick, the kernel has no driver to read the medium it came from. Instead, `make build_iso` packs everything in `iso/` except `boot/` into `iso/boot/usb.tar` (ustar format), and `grub.cfg` loads it next to the kernel with `module2 /boot/usb.tar usb`. GRUB reads it through the firmware, so it works on any medium GRUB can boot from.
 

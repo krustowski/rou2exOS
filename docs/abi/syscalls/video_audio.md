@@ -66,6 +66,29 @@ Blit a 32bpp (`0x00RRGGBB`;) buffer to the VESA framebuffer. The kernel handles 
 |------------|------------|-------------|
 | pointer to 32bpp pixel buffer | `0x00` for no scaling, or `(src_w << 16) | src_h` | ✅ |
 
+## 0x19 (Blit an 8-bit indexed frame)
+
+Draw a frame of palette indices, one byte a pixel, scaled by the largest whole number that fits and centred on the framebuffer, converting to the framebuffer's own format (32, 24 or 16 bpp) on the way. The palette is 256 `(r, g, b)` byte triples. Only rows `first_row .. first_row + rows` are sent, so a program can update a band of the screen.
+
+`arg1` points to:
+
+```c
+struct IndexedFrame {       /* packed */
+    uint64_t pixels;        /* width * height palette indices */
+    uint64_t palette;       /* 256 * 3 bytes */
+    uint32_t width, height; /* at most the framebuffer's size */
+    uint32_t first_row, rows;
+};
+```
+
+With `arg1 = 0` the call only answers whether there is anything to draw on: `0` when GRUB set up an RGB framebuffer (the graphics kernel), `1` when not (the text kernel, whose "framebuffer" is the text console). Otherwise returns `0` on success, `1` without an RGB framebuffer, or `InvalidInput` for a frame that does not fit or buffers that are not the caller's. `arg2 = 1` clears the whole screen to black first.
+
+Memento's r2 backend uses this on the graphics kernel: its screen is already one byte a pixel, so it shows 256 colours without keeping a 32-bit copy of the screen.
+
+| Argument 1 | Argument 2 | Implemented |
+|------------|------------|-------------|
+| pointer to `IndexedFrame`, or `0` to ask | `1` to clear first, else `0` | ✅ |
+
 ## 0x18 (Copy kernel font)
 
 Copy the kernel's embedded PSF1 glyph data to userland. 
@@ -88,7 +111,7 @@ Play given frequency in Hz for given time in milliseconds.
 
 Play a Standard MIDI File from the filesystem on the PC speaker. The call blocks until the song ends.
 
-Formats 0, 1 and 2 are accepted (format 1 tracks are merged by time, format 2 patterns play back to back), including tempo changes and SMPTE time divisions. The speaker is monophonic, so the highest note held at any moment is the one voiced; channel 10 (percussion) is ignored. Files are read into a 4 KiB buffer, so longer files play truncated. Returns `InvalidInput` when the file is not a valid MIDI file.
+Formats 0, 1 and 2 are accepted (format 1 tracks are merged by time, format 2 patterns play back to back), including tempo changes and SMPTE time divisions. The speaker is monophonic, so the highest note held at any moment is the one voiced; channel 10 (percussion) is ignored. The name is an absolute path or one relative to the working directory, on the floppy or on a read-only mount (`/mnt/iso`, `/mnt/tar`). Files are read into a 4 KiB buffer: from the floppy a longer file plays truncated, from a read-only mount it is refused with `InvalidInput`. Returns `InvalidInput` also when the file is not a valid MIDI file.
 
 | Argument 1 | Argument 2 | Implemented |
 |------------|------------|-------------|

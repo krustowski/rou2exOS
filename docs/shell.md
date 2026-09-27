@@ -56,7 +56,7 @@ Plays the built-in MIDI melody via the PC speaker (`audio::midi::play_melody`), 
 
 ### `bg <binary>`
 
-Loads and runs an ELF binary in the **background** (shell remains interactive). The binary name must be ≤ 8 characters; `.elf` is appended when no extension is given. The binary is looked up in the current working directory first (the FAT12 floppy, or the ISO when the cwd is under `/mnt/iso`), then in `/mnt/usb/bin` and `/mnt/iso/bin`, so the programs shipped on the boot medium can be started from anywhere.
+Loads and runs an ELF binary in the **background** (shell remains interactive). The binary name must be ≤ 8 characters; `.elf` is appended when no extension is given. The binary is looked up in the current working directory first (the FAT12 floppy, or the ISO when the cwd is under `/mnt/iso`), then in `/mnt/tar/bin` and `/mnt/iso/bin`, so the programs shipped on the boot medium can be started from anywhere.
 
 ```
 bg eth
@@ -150,7 +150,15 @@ Userland heap (4 MiB at 0xC00000)
 
 ### `hlt`
 
-Initiates system shutdown. Prints a shutdown message with a short delay, then calls `acpi::shutdown::shutdown()`. Falls back to a halt loop if ACPI shutdown is unavailable.
+Powers the machine off (ACPI S5). The sleep type comes from the `\_S5_` package in the DSDT and goes to the PM1a/PM1b control ports the FADT names; if the firmware has not switched to ACPI mode yet, the kernel asks it to first (`SMI_CMD` ← `ACPI_ENABLE`). Without usable tables it falls back to the fixed QEMU/Bochs ports, then halts. See `src/acpi/`.
+
+### `reboot`
+
+Restarts the machine: the FADT's reset register when the firmware has one, then the chipset's reset control port (`0xCF9`), then the keyboard controller (`0x64` ← `0xFE`), and last a triple fault.
+
+### `acpi`
+
+Shows what `hlt` and `reboot` will use on this machine: the root table GRUB passed, the PM1 control ports, the ACPI mode switch, the `\_S5_` sleep types and the reset register. Useful to photograph when power-off or restart does not work on a particular board.
 
 ### `kill <pid>`
 
@@ -278,7 +286,7 @@ Falls back to `$ ` if the config lock is contended.
 `bg` and `fg` both delegate to `input::elf::run_elf(filename, args, mode)`:
 
 1. Asks the scheduler which slot the program will occupy (`next_free_slot`); fails with `no free process slot` when all ten are held by live processes.
-2. Finds the ELF file — current working directory first (FAT12, or ISO9660 when the cwd is under `/mnt/iso`), then `/mnt/usb/bin`, then `/mnt/iso/bin` — and stages it at a per-slot scratch address.
+2. Finds the ELF file — current working directory first (FAT12, or ISO9660 when the cwd is under `/mnt/iso`), then `/mnt/tar/bin`, then `/mnt/iso/bin` — and stages it at a per-slot scratch address.
 3. Copies the `PT_LOAD` segments into the slot's private 2 MiB physical frame and builds a page table that maps it at `0x600_000`.
 4. Pushes the argv frame onto the slot's initial user stack and creates the scheduler task at the ELF entry point.
 5. `Foreground`: the launcher (the shell, or `init_rc`) is recorded as the child's waiter and parked until the child ends.

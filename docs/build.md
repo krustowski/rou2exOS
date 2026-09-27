@@ -34,6 +34,8 @@ Produces `r2.iso`. Internally runs two cargo invocations (with `-Z build-std=cor
 | `kernel_text` | `iso/boot/kernel_text.elf` | VGA text-mode path |
 | `kernel_graphics` | `iso/boot/kernel_graphics.elf` | VESA framebuffer path |
 
+The two are the same kernel apart from the multiboot header: the graphics one asks GRUB for a 32-bit framebuffer of no particular size, so GRUB takes its own choice (with the BIOS VBE driver, the monitor's preferred mode from its EDID). The framebuffer is mapped write-combining at boot (`src/video/wc.rs`); uncached, as the firmware leaves it, drawing on it on real hardware cost a bus transaction per pixel. The kernel's console still writes to VGA text memory, which is not shown in a framebuffer mode, so the graphics kernel's desktop is Memento instead: once `INIT.RC` has run, `init_rc` starts `fg memento`. The graphics kernel starts no kernel shell (`kshell`): nothing it prints could be seen, and it reads the same keys as the programs do, so what was typed into Memento would have been run as commands too. Its `INIT.RC` comes from the floppy when there is one, and otherwise from `/mnt/tar/opt/init.rc` (then `/mnt/iso/opt/init.rc`), which `build_iso` copies from `configs/init.rc`: booted from a USB stick there is no floppy, and that is where `bg eth` comes from. On either kernel only the file's own length is run, not the stale bytes after it in its last cluster. Memento fills the screen: its desktop is the framebuffer's size divided by the largest whole number that leaves at least 640x400 (1920x1080 is a 960x540 desktop drawn at 2x), in 256 colours, and only the rows that changed are sent (syscall [`0x19`](abi/syscalls/video_audio.md#0x19-blit-an-8-bit-indexed-frame)). If GRUB picks a mode other than the monitor's own, name it in `grub.cfg`'s graphics entry, before `multiboot2`: `set gfxpayload=1920x1080x32`. When Memento ends (Esc on its first screen) the machine restarts, by ACPI (see [`reboot`](shell.md#reboot)); a Memento that ran for less than five seconds, one that could not start, does not restart it. Leave `fg memento` out of `INIT.RC` for this boot, or it starts twice. The text kernel is unchanged: its shell, and Memento in 640x400x16 on the VGA.
+
 Both ELFs are placed inside `iso/boot/`. `build_iso` then copies the userland binaries from the [apps repository](sdk/index.md) (expected at `../r2_app`) into `iso/bin/`, and `grub2-mkrescue` assembles the `iso/` tree into `r2.iso` with the modules `multiboot2 video video_bochs video_cirrus gfxterm all_video`.
 
 The resulting ISO is mounted at `/mnt/iso` at boot:
@@ -206,7 +208,7 @@ bg garn --config /mnt/fat/GARN/GARN.CFG
 echo INIT.RC done
 ```
 
-Binary names are resolved like in the shell: working directory first, then `/mnt/usb/bin` and `/mnt/iso/bin`, so `bg eth` works without the program being on the floppy. A `fg` line parks `init_rc` until that program exits.
+Binary names are resolved like in the shell: working directory first, then `/mnt/tar/bin` and `/mnt/iso/bin`, so `bg eth` works without the program being on the floppy. A `fg` line parks `init_rc` until that program exits.
 
 Lines starting with `#` are ignored. Trailing `\r` is stripped (DOS line endings tolerated).
 

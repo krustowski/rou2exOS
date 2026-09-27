@@ -7,13 +7,15 @@ Userland (syscalls 0x20–0x2E)
     │
     ▼
 fs/vfs — mount table, path dispatch
-    ├── fs/fat12    — floppy FAT12 (read/write)
+    ├── fs/fat12    — FAT12 (read/write)            behind fs/fatdev::FatDev
+    │     ├── on the floppy   (/mnt/fat)
+    │     └── on the RAM disk (/mnt/tmp)
     ├── fs/iso9660  — CD-ROM ISO9660 (read-only)  ┐ behind fs/rofs::RoFs
     └── fs/ustar    — tar archive in RAM (read-only) ┘
-         │               │
-    fat12/block.rs   iso9660/block.rs
-    (Floppy/ISA DMA)  (Atapi/PIO)
-         │               │
+         │                              │
+    fat12/block.rs  memdisk/block.rs  iso9660/block.rs
+    (Floppy/ISA DMA) (MemDisk/RAM)    (Atapi/PIO)
+         │                              │
     BlockDevice trait (fs/block.rs)
 ```
 
@@ -64,6 +66,7 @@ pub struct VfsMount {
 | `Fat12` | FAT12 floppy at `/mnt/fat` |
 | `Iso9660` | ISO9660 CD-ROM at `/mnt/iso` |
 | `Tar` | ustar archive loaded by GRUB, at `/mnt/tar` |
+| `MemDisk` | FAT12 volume in RAM at `/mnt/tmp` |
 
 ### Mounts at Boot
 
@@ -73,6 +76,7 @@ Set up by `init::fs::vfs_init()`:
 |------|--------|-----------|
 | `/` | `Root` | Always |
 | `/mnt/fat` | `Fat12` | Always |
+| `/mnt/tmp` | `MemDisk` | Always (formatted empty at every boot) |
 | `/mnt/iso` | `Iso9660` | Only if `Iso9660::probe()` succeeds |
 | `/mnt/tar` | `Tar` | Only if GRUB loaded a tar archive as a module |
 
@@ -93,6 +97,7 @@ Example: path `b"/mnt/fat/SUBDIR/FILE.TXT"` → `(Fat12, b"SUBDIR/FILE.TXT")`.
 |----------|-------------|
 | `try_fat12_absolute(path)` | Returns `Some(rel)` if `path` resolves under the Fat12 mount |
 | `try_iso9660_absolute(path)` | Returns `Some(rel)` if `path` resolves under the Iso9660 mount |
+| `try_fat_absolute(path)` | Returns `Some((fs_type, rel))` if `path` resolves under a writable FAT12 mount (Fat12 or MemDisk) |
 | `try_readonly_absolute(path)` | Returns `Some((fs_type, rel))` if `path` resolves under a read-only mount (Iso9660 or Tar) |
 | `mount(path, fs_type)` | Add a mount entry |
 | `umount(path)` | Remove a mount entry by path |
@@ -106,12 +111,25 @@ Every filesystem syscall uses the same two-step dispatch:
 ```
 path → try_readonly_absolute(path)
          Some((fs_type, rel)) → RoFs::probe(fs_type)?.resolve(rel)  [read-only]
-         None                 → vfs_resolve_fat12(path) → Filesystem::new(&floppy)
+         None                 → vfs_resolve_fat12(path) → Filesystem::new(&dev)
 ```
 
 `RoFs` (`fs/rofs.rs`) is an enum over `Iso9660` and `Tar`; both hand out `IsoEntry`, so a handler treats the two alike. Writes to either are refused.
 
-`vfs_resolve_fat12(path)` strips the `/mnt/fat/` prefix if present, or falls back to the current working directory cluster from `SYSTEM_CONFIG`.
+`vfs_resolve_fat12(path)` answers `(rel, base_cluster, dev)`. A path under `/mnt/fat` or `/mnt/tmp` is stripped of its mount prefix and starts at that volume's root; anything else is resolved from the working directory's cluster, on the volume the working directory is on (`FatDev::cwd()`).
+
+### `FatDev` (`fs/fatdev.rs`)
+
+The floppy and the RAM disk run the same `fat12::Filesystem`, which is generic over `BlockDevice`. `FatDev` is an enum (`Floppy`, `Mem`) that implements `BlockDevice` by forwarding to one or the other, so every FAT12 code path opens `Filesystem::new(&dev)` and does not care which disk it has.
+
+| Function | Description |
+|----------|-------------|
+| `FatDev::of(fs_type)` | The device behind a `Fat12` or `MemDisk` mount |
+| `FatDev::for_path(abs)` | The volume an absolute path lies on, and the path below the mount |
+| `FatDev::for_dir(abs)` | Like `for_path`, but a path under no FAT mount is the floppy's (a bare path under `/` has always named the floppy) |
+| `FatDev::cwd()` | The working directory's volume and cluster |
+
+A FAT cluster number alone no longer identifies a directory: cluster 5 on the floppy and cluster 5 on the RAM disk are different places. The volume is always taken from the path next to it; for the working directory that is `SYSTEM_CONFIG.path`, which is why `chdir` (syscall `0x2E`) stores the normalized absolute path.
 
 ---
 
@@ -122,7 +140,7 @@ The current working directory is stored in `SYSTEM_CONFIG` (`init/config.rs`) as
 | Field | Type | Description |
 |-------|------|-------------|
 | `path` | `[u8; 32]` | String representation (e.g. `/mnt/fat/SUBDIR`) |
-| `path_cluster` | `u16` | FAT12 cluster for the directory (0 = root, 0 for ISO9660) |
+| `path_cluster` | `u16` | FAT12 cluster for the directory on the volume `path` lies on (0 = root, 0 for ISO9660) |
 
 Changed by syscall `0x2E` (chdir) and the shell's `cd`, which validate that the target exists as a directory before updating.
 
@@ -139,9 +157,15 @@ The module depends on nothing else in the kernel so the host unit tests (`tests/
 
 ---
 
-## MemDisk (`fs/memdisk/block.rs`)
+## RAM Disk (`/mnt/tmp`, `fs/memdisk/`)
 
-`MemDisk` wraps a `&'static mut [u8]` as a `BlockDevice`. `read_sector` copies 512 bytes from the slice. `write_sector` is a no-op. Intended for in-memory disk images but not currently wired into any live code path.
+`MemDisk` (`memdisk/block.rs`) is a writable `BlockDevice` over a `&'static Mutex<[u8]>`. Each sector is copied with interrupts off, so a task preempted mid-copy cannot leave the lock held. A sector number past the end reads back as zeros and is dropped on write, so a bad cluster number read from a damaged directory cannot index out of bounds.
+
+`memdisk::TMP` is the disk behind `/mnt/tmp`: a 512 KiB (`TMP_SIZE`) static buffer in the kernel's `.bss`. At boot, `vfs_init()` calls `memdisk::format_tmp()`, which lays an empty FAT12 volume onto it with `fat12::format::format()`, and then mounts it. From then on it behaves exactly like the floppy: files, subdirectories, `rename`, `delete`, `write_file_at` and ELF loading from the working directory all work there. Nothing on it survives a reboot.
+
+`fat12::format::format(dev, sectors, label)` is a small, generic mkfs. It writes one reserved sector, two FATs sized to cover the data area, a 224-entry root directory, one sector per cluster, and media byte `0xF8`. The extended boot record carries the `FAT12` type string that `Filesystem::new` looks for. It refuses volumes too small for any data or too large for FAT12 (4085 clusters or more, about 2 MiB at one sector per cluster).
+
+**Size limit.** The buffer counts toward the kernel image, and the whole image has to end below `0x600000`, where every process's page table maps its private frame instead. With 512 KiB, the release kernel ends near `0x372000` and the debug one near `0x3D9000`. The zeroed buffer also lands in the ELF file, because `.gdt`/`.idt` follow `.bss` in the same loaded segment.
 
 ---
 
@@ -156,6 +180,7 @@ The module depends on nothing else in the kernel so the host unit tests (`tests/
 | Max directory entries returned (syscall 0x28) | 32 |
 | Max directory entries returned (syscall 0x2D) | 64 |
 | Max VFS mounts listed (syscall 0x2C) | 8 × 34-byte entries |
+| `/mnt/tmp` RAM disk size | 512 KiB (1003 one-sector clusters) |
 
 ---
 

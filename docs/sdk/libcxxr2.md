@@ -69,7 +69,7 @@ Copy `examples/hello/.clangd` next to a new program too: without it clangd parse
 | `r2/gfx.hpp` | `Canvas`, `Font`, the VESA framebuffer, VGA mode 13h |
 | `r2/input.hpp` | Keyboard and mouse, with `Mouse::set_speed()` |
 | `r2/time.hpp` | Ticks, sleep, the RTC, `Stopwatch`, `FrameTimer` |
-| `r2/process.hpp` | Arguments, `exit`, sysinfo, the task table, `spawn`, `kill` (`0x3b`), `meminfo` (`0x3c`) |
+| `r2/process.hpp` | Arguments, `exit`, sysinfo, the task table, `spawn`, `kill` (`0x3b`), `meminfo` (`0x3c`), `reboot` and `power_off` (`0x3e`) |
 | `r2/net.hpp` | Addresses, byte order, frames, port binding |
 | `r2/audio.hpp` | PC speaker |
 | `r2/math.hpp` | `sqrt`, `sin`, `cos`, `floor`, `fmod`, … (there is no libm) |

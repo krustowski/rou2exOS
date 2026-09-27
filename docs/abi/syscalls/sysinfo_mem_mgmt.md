@@ -53,6 +53,8 @@ Sleep for at least the given number of milliseconds. Rounded up to the next PIT 
 
 Allocate a block from the userland heap (`0xc00000`-`0xffffff`). Returns the virtual address of the zeroed block in `RAX` as response, or `0x00` on failure.
 
+When the 4 MiB are full, the heap grows once: an extension of an eighth of the RAM (at least 2 MiB, below 1 GiB) is added at `0xa000000`, or past the tar archive when that lies there, mapped user-accessible in every process, and the allocation is served from it. A block can therefore come from either region; both are memory like any other to the caller. See [Allocators](../../memory/allocators.md#growing-the-extension) for the details, and `0x3c` for where the heap stands.
+
 The heap is shared by all processes. Each block is tagged with the slot of the process that allocated it and is freed automatically when that process exits, is killed or crashes.
 
 A heap block can be passed to any syscall that takes a pointer, as long as the buffer the call uses fits inside the block's region; see [Pointer Arguments](../syscall_specification.md#pointer-arguments).
@@ -96,3 +98,13 @@ Returns `0x00`, `InvalidInput` (`0xfc`) for a pointer outside the user regions, 
 | Argument 1 | Argument 2 | Implemented |
 |------------|------------|-------------|
 | pointer to `MemInfo` | *unused* | ✅ |
+
+## 0x3e (Power)
+
+Restarts or switches off the machine. Neither comes back: `acpi::shutdown` tries the reset register or sleep state the ACPI tables name first, and then the chipset's reset control (`0xcf9`), the keyboard controller and a triple fault. Anything else in Argument 1 returns `InvalidInput` (`0xfc`); a kernel older than the call returns `InvalidSyscall` (`0xff`), which is how a caller tells that it is still running because the call is not there.
+
+Memento uses it when its login dialog is left: that is the end of the session on the graphics kernel, where there is no shell to go back to.
+
+| Argument 1 | Argument 2 | Implemented |
+|------------|------------|-------------|
+| `0x01` restart, `0x02` power off | *unused* | ✅ |

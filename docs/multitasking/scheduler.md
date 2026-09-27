@@ -65,8 +65,10 @@ The heap sweep runs outside the scheduler lock on purpose: a process preempted i
 |------|------|------|---------|
 | 0 | `kmain` | Kernel | Sentinel/idle — absorbs the boot RSP on the first PIT tick, then loops on `hlt` |
 | 1 | `init_rc` | Kernel | Reads `INIT.RC` from FAT12 root and dispatches each line through the shell command handler; exits when done |
-| 2 | `kclock` | Kernel | Renders a live HH:MM:SS clock in the top-left VGA text buffer corner |
-| 3 | `kshell` | Kernel | Kernel interactive shell; keyboard input loop; PID stored in `SHELL_PID` |
+| 2 | `kclock` | Kernel | Renders a live HH:MM:SS clock in the top-left VGA text buffer corner (text screens only) |
+| 3 | `kshell` | Kernel | Kernel interactive shell; keyboard input loop; PID stored in `SHELL_PID` (text screens only) |
+
+On the graphics kernel with a framebuffer, neither `kclock` nor `kshell` is started: nothing either of them writes into VGA text memory can be seen there, and the shell would read the same keys as the programs. Memento is the session there, and its taskbar has a clock of its own. The first user process then takes slot 2.
 | 4+ | *(userland)* | User | ELF processes spawned via `run_elf` / syscall `0x2A` |
 
 ---

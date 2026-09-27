@@ -194,6 +194,7 @@ init_processes()
   └── setup_processes()
         ├── new_process("kmain",  kernel_idle,  ...)   slot 0 — boot RSP sentinel
         ├── new_process("init_rc", init_rc,     ...)   slot 1 — startup script
+        │   (the graphics kernel on a framebuffer stops here: no clock, no shell)
         ├── new_process("kclock", clock_test,   ...)   slot 2 — RTC clock display
         └── new_process("kshell", keyboard_loop, ...)  slot 3 — interactive shell
               set_shell_pid(shell_pid)
@@ -205,9 +206,9 @@ init_processes()
 
 **`init_rc` (slot 1):** Reads `INIT.RC` from FAT12 root directory. Parses it line by line (NUL or `\n` terminated; strips trailing `\r`; ignores blank lines and lines starting with `#`). Each non-comment line is dispatched through `cmd::handle()` — the same function used by the interactive shell. After the file is fully processed the task kills itself and loops on `hlt`.
 
-**`kclock` (slot 2):** Reads the RTC (`h:m:s`) in a tight poll loop and renders the time to a fixed VGA text position. Uses the legacy `vga/write.rs` module (separate from `video/vga.rs`).
+**`kclock` (slot 2):** Reads the RTC (`h:m:s`) in a tight poll loop and renders the time to a fixed VGA text position. Uses the legacy `vga/write.rs` module (separate from `video/vga.rs`). Not started by the graphics kernel on a framebuffer, where VGA text memory is not what is on the screen; Memento's taskbar shows the time there.
 
-**`kshell` (slot 3):** Runs `keyboard_loop()` — the interactive kernel shell. This task runs for the lifetime of the kernel. Its PID is saved in the scheduler via `set_shell_pid`. When it starts a program with `fg` it is recorded as that program's waiter and woken when the program ends (see [Scheduler](../multitasking/scheduler.md#foreground-processes-and-waiters)); `init_rc` is parked and woken the same way for `fg` lines in `INIT.RC`.
+**`kshell` (slot 3):** Runs `keyboard_loop()` — the interactive kernel shell. Not started by the graphics kernel on a framebuffer either: `init_rc` starts Memento there, and when Memento's session ends the machine restarts. This task runs for the lifetime of the kernel. Its PID is saved in the scheduler via `set_shell_pid`. When it starts a program with `fg` it is recorded as that program's waiter and woken when the program ends (see [Scheduler](../multitasking/scheduler.md#foreground-processes-and-waiters)); `init_rc` is parked and woken the same way for `fg` lines in `INIT.RC`.
 
 ---
 

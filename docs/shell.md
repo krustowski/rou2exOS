@@ -83,6 +83,7 @@ filesystem the working directory sits on.
 - `cd ..` — go to parent; at the root it stays at the root.
 - `cd <name>` — relative to the current directory, on FAT12 or ISO9660.
 - `cd /mnt/fat/<path>` — absolute FAT12 path.
+- `cd /mnt/tmp/<path>` — absolute path on the FAT12 RAM disk.
 - `cd /mnt/iso/<path>` — absolute ISO9660 path (validates directory exists).
 
 Multi-component paths (`foo/bar`, `../bar`) are supported.
@@ -191,7 +192,9 @@ Lists all active VFS mount table entries. Output: one line per mount, format `<p
 ```
 / (rootfs)
 /mnt/fat (fat12)
+/mnt/tmp (memdisk)
 /mnt/iso (iso9660)
+/mnt/tar (tar)
 ```
 
 ### `mv <old> <new>`
@@ -209,6 +212,7 @@ Prints the contents of a file. Supports both FAT12 (relative or absolute) and IS
 ```
 read HELLO.TXT
 read /mnt/fat/GARN/INDEX.HTM
+read /mnt/tmp/SUB/NOTE.TXT
 read /mnt/iso/readme.txt
 ```
 
@@ -263,6 +267,16 @@ Prints the kernel version string.
 
 ```
 Version: 0.11.0
+```
+
+### `write <name> <text>`
+
+Writes `<text>` to `<NAME>.TXT` in the current FAT12 directory, replacing the file if it exists. The name is at most 8 characters, and `.TXT` is always appended. It works on the floppy and on the RAM disk at `/mnt/tmp`.
+
+```
+cd /mnt/tmp
+write notes hello from ram
+read NOTES.TXT
 ```
 
 ---

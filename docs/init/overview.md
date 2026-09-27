@@ -62,7 +62,7 @@ Step 14 (`sti`) is the point of no return — from here the PIT fires every 1 ms
 | `heap.rs` | Kernel heap init + smoke test |
 | `fs.rs` | Floppy probe, VFS mount table init |
 | `video.rs` | `init_video()`, optional VESA P1 mapping |
-| `process.rs` | Initial task creation (kmain, init_rc, kclock, kshell) |
+| `process.rs` | Initial task creation (kmain, init_rc, kclock, kshell; the last two not on a framebuffer) |
 | `config.rs` | `SYSTEM_CONFIG` global, `get_prompt()` |
 | `font.rs` | PSF1/PSF2 font parser, `PSF_FONT` static, glyph renderer |
 | `ascii.rs` | Splash screen text |

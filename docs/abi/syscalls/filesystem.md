@@ -1,6 +1,8 @@
 # Filesystem (VFS / FAT12 / ISO9660)
 
-File name arguments accept either a bare name relative to the current working directory (e.g. `FOO.TXT`) or an absolute VFS path (e.g. `/mnt/fat/FOO.TXT`, `/mnt/iso/grub/grub.cfg`). Both forms are resolved through the VFS mount table. ISO9660 is mounted read-only at `/mnt/iso`.
+File name arguments accept either a bare name relative to the current working directory (e.g. `FOO.TXT`) or an absolute VFS path (e.g. `/mnt/fat/FOO.TXT`, `/mnt/tmp/FOO.TXT`, `/mnt/iso/grub/grub.cfg`). Both forms are resolved through the VFS mount table. ISO9660 is mounted read-only at `/mnt/iso`.
+
+`/mnt/tmp` is a FAT12 RAM disk (512 KiB, empty at every boot). Every FAT12 syscall below works on it exactly as on the floppy at `/mnt/fat`, which makes it the scratch space for programs booted without a floppy. A bare name goes to whichever of the two volumes the working directory is on.
 
 Relative names may reach into subdirectories (`GFX/19.IMG`): every component is walked, not just the working directory. Mount prefixes are matched case-insensitively, and names below a FAT12 mount are folded to 8.3 upper case.
 
@@ -114,7 +116,8 @@ List VFS mount points. Returns the number of active mounts as a u64. `fs_type`:
 + `1` = rootfs
 + `2` = fat12
 + `3` = iso9660
-+ `4` = tar (the boot medium archive at `/mnt/tar`).
++ `4` = tar (the boot medium archive at `/mnt/tar`)
++ `5` = memdisk (the FAT12 RAM disk at `/mnt/tmp`).
 
 | Argument 1 | Argument 2 | Implemented |
 |------------|------------|-------------|

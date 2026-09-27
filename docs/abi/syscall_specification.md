@@ -54,7 +54,7 @@ Consequences for callers:
 
 ### Pointer Arguments
 
-Every syscall that takes a pointer checks the whole buffer it will touch, not just its first byte. The buffer must lie wholly inside one user region, either the program image and stack (`0x600_000..0xA00_000`) or the userland heap (`0xC00_000..0x1000_000`, handed out by syscall `0x0a`). Otherwise the call fails with `InvalidInput` (or the call's own error value). A buffer may not straddle the gap between the two regions. NUL-terminated strings are read up to the end of the region they start in.
+Every syscall that takes a pointer checks the whole buffer it will touch, not just its first byte. The buffer must lie wholly inside one user region: the program image and stack (`0x600_000..0xA00_000`), the userland heap (`0xC00_000..0x1000_000`, handed out by syscall `0x0a`), or the heap's extension once the heap has grown into it (from `0xA000_000`; see [`0x0a`](syscalls/sysinfo_mem_mgmt.md#0x0a-allocate-memory-on-heap)). Otherwise the call fails with `InvalidInput` (or the call's own error value). A buffer may not straddle the gap between two regions. NUL-terminated strings are read up to the end of the region they start in.
 
 ### Syscall Return Codes
 
@@ -74,7 +74,7 @@ Most syscalls return one of these codes. Syscalls that return a count, an addres
 
 | Range | Group | Page |
 |-------|-------|------|
-| `0x00`–`0x0f` | Exit, system information, pipes, time, heap, kill (`0x3b`), memory information (`0x3c`) | [System, Processes & Memory](syscalls/sysinfo_mem_mgmt.md) |
+| `0x00`–`0x0f` | Exit, system information, pipes, time, heap, kill (`0x3b`), memory information (`0x3c`), power (`0x3e`) | [System, Processes & Memory](syscalls/sysinfo_mem_mgmt.md) |
 | `0x10`–`0x1f` | Console, graphics, audio | [Video & Audio](syscalls/video_audio.md) |
 | `0x20`–`0x2f`, `0x39`–`0x3a` | Files, directories, VFS, program execution, task list | [Filesystem](syscalls/filesystem.md) |
 | `0x30`–`0x38`, `0x3d` | I/O ports, serial, packets, IPC, networking, network configuration (`0x3d`) | [Ports & Networking](syscalls/port_networking.md) |

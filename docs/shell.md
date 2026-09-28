@@ -129,6 +129,10 @@ echo hello world
 
 Runs the FAT12 filesystem check (`fs::fat12::check::run_check`). Prints a report with error count, orphaned clusters, cross-linked clusters, and invalid entries.
 
+### `hda`
+
+What the HD Audio driver found: the controller's PCI address and ids, whether commands go through CORB/RIRB or the immediate registers, the codec, its audio function group, and the DACs and output pins in use (line out, speaker, headphones); while a stream plays, its rate and how much has been played, is queued, and how often it ran dry. `hda tone` plays a second of 440 Hz, which is the quickest way to hear whether sound works on a machine. See [HD Audio](audio/hda.md).
+
 ### `help`
 
 Lists all non-hidden commands with their one-line descriptions.

@@ -71,7 +71,7 @@ Copy `examples/hello/.clangd` next to a new program too: without it clangd parse
 | `r2/time.hpp` | Ticks, sleep, the RTC, `Stopwatch`, `FrameTimer` |
 | `r2/process.hpp` | Arguments, `exit`, sysinfo, the task table, `spawn`, `kill` (`0x3b`), `meminfo` (`0x3c`), `reboot` and `power_off` (`0x3e`) |
 | `r2/net.hpp` | Addresses, byte order, frames, port binding |
-| `r2/audio.hpp` | PC speaker |
+| `r2/audio.hpp` | PC speaker, and PCM through HD Audio (`0x3f`: `open`, `write`, `queued`, `pause`, `resume`, `close`) |
 | `r2/math.hpp` | `sqrt`, `sin`, `cos`, `floor`, `fmod`, … (there is no libm) |
 | `r2/panic.hpp`, `r2/source_location.hpp` | `panic`, `R2_ASSERT` |
 

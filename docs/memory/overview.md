@@ -29,6 +29,7 @@ All addresses are 64-bit (x86-64) but the kernel only uses the lower 4 GiB. The 
 | `0x1000_000` | `0x1FFF_FFF+` |   varies |   Per-process ELF physical frames: slot 0 → |0x1000_000, slot 1 → 0x1200_000, ... |
 | `0xA00_0000` | + RAM/8 |   varies |   Userland heap extension, mapped USER+WRITE only once the 4 MiB are full (past the tar archive if that is here; see allocators.md) |
 | `PAGE_TABLE_POOL` (`.bss`) ||    512 KiB | Static pool for dynamically allocated P4/P3/P2/P1 tables |
+| HD Audio ring, CORB, RIRB (`.bss`) ||    131 KiB | The PCM ring the controller plays (128 KiB) and the codec command rings (`audio/hda.rs`) |
 | `TMP_DATA` (`.bss`) ||    512 KiB | The `/mnt/tmp` RAM disk: a FAT12 volume formatted at boot, gone at power-off (`fs/memdisk`). With it the release kernel ends near `0x372_000`; everything in the image has to end below `0x600_000` |
 
 A drawing of all of this is in [memory-map.pdf](memory-map.pdf).

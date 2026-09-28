@@ -109,6 +109,8 @@ Registrations last as long as the process. When it exits, is killed or crashes, 
 
 On each incoming frame `poll_and_deliver` calls `tcp_dest_port(frame)` to extract the TCP destination port (or `None` if not IPv4/TCP). It then calls `lookup_port(port)` against `PORT_REGISTRY`. If a match is found the frame goes to that service's PID; everything else (ARP, ICMP, unregistered ports) goes to `NET_DRV_PID`.
 
+ARP replies are the exception to one destination: besides the driver, every other process with a TCP port bound gets a copy (once per process, best effort: a copy that finds no free frame buffer is not made). Those processes run TCP/IP stacks of their own, like Memento's browser, video player and chat, and ARP for hosts on the local network themselves. Without the copy they could reach the gateway, whose MAC the driver publishes (syscall `0x3d`), but never a machine beside them on the LAN.
+
 ---
 
 ## Limits

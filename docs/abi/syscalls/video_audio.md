@@ -124,3 +124,18 @@ Stop the player.
 | Argument 1 | Argument 2 | Implemented |
 |------------|------------|-------------|
 | `0x00`| `0x00`| ✅ |
+
+## 0x3f (HD Audio PCM)
+
+Sound through the Intel HD Audio controller: 16-bit signed stereo PCM, left then right, into a 128 KiB ring the kernel plays round and round (about 0.68 s at 48 kHz). Nothing waits: a write takes as many whole samples as there is room for. A stream that runs dry plays silence. See [HD Audio](../../audio/hda.md) for the driver.
+
+| Argument 1 | Argument 2 | Returns |
+|------------|------------|---------|
+| `0x01` open | rate in Hz: 8000, 11025, 16000, 22050, 24000, 32000, 44100, 48000, 88200 or 96000 | `0x00`; `NotImplemented` without a controller; `InvalidInput` for another rate. Takes the stream over from whoever had it |
+| `0x02` write | pointer to `{ buffer: u64, length: u64 }` | the bytes taken (0 when the ring is full or nothing is open); `u64::MAX` for a pointer outside the user regions |
+| `0x03` queued | *unused* | bytes queued and not yet played |
+| `0x04` close | *unused* | `0x00` (only the program that opened it closes it) |
+| `0x05` pause | *unused* | `0x00`: the DMA stops, the ring and the position stay |
+| `0x06` resume | *unused* | `0x00` |
+
+libc++r2 wraps it in `r2/audio.hpp` (`r2::audio::open`, `write`, `queued`, `close`, `pause`, `resume`).

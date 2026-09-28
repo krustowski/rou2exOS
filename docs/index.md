@@ -62,7 +62,7 @@ qemu-system-x86_64 -boot d -cdrom r2.iso -fda fat.img
 | Use the kernel shell | [Shell](shell.md) |
 | Write a program for `r2` | [SDK Overview](sdk/index.md) |
 | Call the kernel directly | [Syscall Specification](abi/syscall_specification.md) |
-| Understand the kernel | [Boot / Init](init/overview.md), [Scheduler](multitasking/scheduler.md), [Memory](memory/overview.md) |
+| Understand the kernel | [Boot / Init](init/overview.md), [Scheduler](multitasking/scheduler.md), [Memory](memory/overview.md), [HD Audio](audio/hda.md) |
 
 
 ## Blog posts

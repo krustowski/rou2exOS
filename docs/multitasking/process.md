@@ -76,6 +76,8 @@ Kernel processes use the same kernel stack as their run stack. User processes ca
  low address
 ```
 
+Below `last_rsp`, the word at `last_rsp - 8` points to a separate 16-byte-aligned, 512-byte FXSAVE area. `new_process` zeroes it and sets the x87 control word to `0x037f` and MXCSR to `0x1f80` (masked exceptions, round to nearest). This preserves the general-register and interrupt-frame offsets while giving each task its own x87/MMX/XMM state.
+
 When the scheduler switches to a new process for the first time, it loads this RSP and the naked ISR exits via `iretq`, which pops RIP/CS/RFLAGS/RSP/SS and jumps to the entry point.
 
 ## Page Tables (CR3)

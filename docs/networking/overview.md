@@ -15,7 +15,7 @@
        └──────────┬──────────┘
                   │                        ┌──────────┐
         ┌─────────▼──────────┐             │  serial  │
-        │   rtl8139.rs       │  PCI NIC    │  + SLIP  │  UART path
+        │   nic.rs           │  RTL8139 / Intel PCI NIC    │  + SLIP  │  UART path
         └─────────┬──────────┘             └──────────┘
                   │
         ┌─────────▼───────────────────────────────────────┐
@@ -29,7 +29,7 @@ There are two independent paths:
 
 | Path | Hardware | Protocol | Direction |
 |------|----------|----------|-----------|
-| **Ethernet** | RTL8139 PCI NIC | Ethernet II → IPv4/ARP | TX and RX |
+| **Ethernet** | RTL8139 or supported Intel PCI NIC | Ethernet II → IPv4/ARP | TX and RX |
 | **Serial/SLIP** | UART COM1 | SLIP-framed IPv4 | TX only (active), RX (loop-based) |
 
 ![network-frame-routing](../assets/r2-network-frame-routing.png)
@@ -44,11 +44,11 @@ Frames arrive via polling, not IRQ. On every PIT tick (1000 Hz) the scheduler ca
 PIT tick
   → scheduler_schedule()
     → netdrv::poll_and_deliver()
-      → rtl8139::peek_frame()             the frame at the front of the RX ring, left there
+      → nic::peek_frame()             the frame at the front of the RX ring, left there
       → tcp_dest_port() / lookup_port()   whose it is: a bound service, else the driver
       → a free FRAME_BUF slot             the frame is copied into a buffer of its own
       → scheduler::try_push_msg(pid, msg) queued, and the target woken
-      → rtl8139::consume_frame()          only now taken off the ring
+      → nic::consume_frame()          only now taken off the ring
     (repeated for up to 16 frames a tick)
 ```
 
@@ -65,7 +65,9 @@ Userland calls syscall `0x34` with arg1 `0x04` (raw Ethernet) or `0x01` (IPv4):
 ```
 syscall 0x34
   → derive frame length from EtherType / IP total_length field
-  → rtl8139::send_frame(data, len)
+  → nic::send_frame(data, len)
+    → selected RTL8139 or Intel backend
+    (RTL8139 continues below)
     → copy into TX_BUFFERS[TX_INDEX]
     → write physical buffer address to TxAddr register
     → write send_len to TxStatus register
@@ -91,7 +93,7 @@ When `ipv4::send_packet` detects `src_ip == dst_ip` (same-guest delivery) it cal
 
 ## Driver and Port Registry
 
-`netdrv.rs` maintains two static tables (no `Mutex` — both are written only at init time and read under the PIT tick):
+`netdrv.rs` maintains two static tables (no `Mutex` — updated during registration and process cleanup, and read during polling):
 
 | Table | Size | Contents |
 |-------|------|----------|
@@ -100,7 +102,7 @@ When `ipv4::send_packet` detects `src_ip == dst_ip` (same-guest delivery) it cal
 
 ### Registration (syscall `0x37`)
 
-- `arg1 = 0`: register as global driver. Initialises the RTL8139, reads and caches the MAC address in `SYSTEM_CONFIG`. Idempotent — no-op if a driver is already registered.
+- `arg1 = 0`: register as global driver. Probes RTL8139 first, then supported Intel controllers through `nic::init`, and reads and caches the MAC address in `SYSTEM_CONFIG`. Idempotent — no-op if a driver is already registered.
 - `arg1 = N > 0`: bind TCP destination port `N` to the calling process. If an entry for that port already exists it is updated (to support restart/handover). If the table is full, slot 0 is overwritten.
 
 Registrations last as long as the process. When it exits, is killed or crashes, `scheduler::kill`/`crash` call `netdrv::release_process(slot)`: the global driver slot is freed if the process held it, its port bindings are dropped, and so are the buffers of frames still queued to it. The next process to register becomes the driver; the NIC stays initialised. Until then, frames for bound ports are still delivered, and frames nobody is registered for are dropped.
@@ -117,8 +119,9 @@ ARP replies are the exception to one destination: besides the driver, every othe
 
 | Resource | Value |
 |----------|-------|
-| RX ring buffer | 32 KiB (RCR RBLEN = 10) + 1500-byte overrun guard |
-| TX descriptors | 4 (round-robin) |
+| RTL8139 RX ring buffer | 32 KiB (RCR RBLEN = 10) + 1500-byte overrun guard |
+| RTL8139 TX descriptors | 4 (round-robin) |
+| Intel RX / TX descriptors | 32 / 64 (2 KiB buffers) |
 | TX buffer per descriptor | 2 KiB |
 | Queued-frame buffers (`FRAME_BUF`) | 64 x 2 KiB |
 | Messages queued per process | 64 |

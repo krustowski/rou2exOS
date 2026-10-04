@@ -12,7 +12,7 @@ struct Scheduler {
 }
 ```
 
-The scheduler is a global `spin::Mutex<Scheduler>`, accessed as `SCHEDULER`. All mutations go through `try_lock`; if the lock is already held (e.g., a PIT tick fires during a syscall that already holds it), the tick is silently skipped and the current process continues.
+The scheduler is a global `spin::Mutex<Scheduler>`, accessed as `SCHEDULER`. All mutations go through `try_lock`; if the lock is already held (e.g., a PIT tick fires during a syscall that already holds it), the context switch is skipped and the current process continues. Tick counting, audio servicing, NIC polling and the PIC acknowledgement still run.
 
 ## Scheduling Algorithm
 
@@ -28,9 +28,11 @@ On every PIT tick:
 
 ## Tick and Sleep
 
-The tick counter is maintained by `crate::time::acpi::tick()` / `get_tick_count()`, incremented once per PIT interrupt. At `TICKS_PER_SECOND = 1000` it has 1 ms resolution.
+The tick counter is maintained by `crate::time::acpi::tick()` / `get_tick_count()`, incremented on every entry to `scheduler_schedule`. The hardware PIT rate is `TICKS_PER_SECOND = 1000` (nominally 1 ms per tick). Software yields also use `int 0x20`, so they increment this counter too; it is not a strictly hardware-only measure of elapsed milliseconds.
 
 `sleep_current(until_tick)` marks the calling process `Blocked`, stores `until_tick` in `process.sleep_until`, and executes `hlt`. The scheduler wakes the process automatically on the first tick at or after `until_tick`. The `hlt` also yields host CPU time to QEMU's event loop so PS/2 input is not starved.
+
+The timer stub saves x87/MMX/XMM state with `fxsave64` before calling Rust and restores the selected process with `fxrstor64` before returning. The 512-byte save area is 16-byte aligned below the general-register frame, with its pointer stored at `last_rsp - 8`. New tasks receive a clean floating-point state.
 
 ## PID vs Slot
 
@@ -59,6 +61,8 @@ When the child is killed or crashes, `wake_waiter` sets the launcher back to `Re
 
 The heap sweep runs outside the scheduler lock on purpose: a process preempted inside the allocator can only release the heap lock by being scheduled.
 
+Termination also releases network driver/port registrations and queued frame buffers, and abandons any framebuffer presentation or capture leases owned by the slot. A crashed reader cannot keep a snapshot buffer pinned.
+
 ## Special Processes
 
 | Slot | Name | Mode | Purpose |
@@ -67,9 +71,9 @@ The heap sweep runs outside the scheduler lock on purpose: a process preempted i
 | 1 | `init_rc` | Kernel | Reads `INIT.RC` from FAT12 root and dispatches each line through the shell command handler; exits when done |
 | 2 | `kclock` | Kernel | Renders a live HH:MM:SS clock in the top-left VGA text buffer corner (text screens only) |
 | 3 | `kshell` | Kernel | Kernel interactive shell; keyboard input loop; PID stored in `SHELL_PID` (text screens only) |
+| 4+ | *(userland)* | User | ELF processes on the text kernel; user processes start at slot 2 on the graphics kernel |
 
 On the graphics kernel with a framebuffer, neither `kclock` nor `kshell` is started: nothing either of them writes into VGA text memory can be seen there, and the shell would read the same keys as the programs. Memento is the session there, and its taskbar has a clock of its own. The first user process then takes slot 2.
-| 4+ | *(userland)* | User | ELF processes spawned via `run_elf` / syscall `0x2A` |
 
 ---
 
@@ -79,7 +83,7 @@ On the graphics kernel with a framebuffer, neither `kclock` nor `kshell` is star
 |----------|-------|
 | Max concurrent processes | 10 |
 | Kernel stack per process | 32 KiB |
-| Message queue depth | 10 messages |
+| Message queue depth | 64 messages |
 | `MSG_BUF` payload size | 512 bytes |
 | Pipe buffer size | ~14 KiB |
 | Scheduler tick rate | 1000 Hz (1 ms resolution) |

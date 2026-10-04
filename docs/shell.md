@@ -161,6 +161,23 @@ Powers the machine off (ACPI S5). The sleep type comes from the `\_S5_` package 
 
 Restarts the machine: the FADT's reset register when the firmware has one, then the chipset's reset control port (`0xCF9`), then the keyboard controller (`0x64` ← `0xFE`), and last a triple fault.
 
+### `nic`
+
+Shows the selected NIC, register base, MAC and registered driver slot, plus delivered, held, dropped and missed-frame counters. Intel cards also report link speed/duplex, PHY state, hardware counters and descriptor-ring positions. Start `eth` first to register the driver.
+
+Intel diagnostics accept decimal numbers or hexadecimal with `0x`:
+
+```sh
+nic reset             # reinitialise the card
+nic reset phy         # also reset the PHY; link recovery takes time
+nic tx                # queue one test frame and show descriptor progress
+nic reg <offset> [value]
+nic phy <page> <register> [value]
+nic nvm <word>        # read a PCH flash NVM word
+```
+
+`reg` and `phy` read when no value is supplied, or write and read back when one is supplied. These operations, including reset and test transmission, require the Intel backend; RTL8139 still has the basic card and routing-counter display.
+
 ### `acpi`
 
 Shows what `hlt` and `reboot` will use on this machine: the root table GRUB passed, the PM1 control ports, the ACPI mode switch, the `\_S5_` sleep types and the reset register. Useful to photograph when power-off or restart does not work on a particular board.

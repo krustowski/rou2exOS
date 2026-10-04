@@ -37,7 +37,7 @@ The process'/task's ID is resolved by the kernel scheduler automatically. The pr
 
 ## 0x04 (Tick count in milliseconds)
 
-Get millisecond tick count since boot. Returns elapsed milliseconds in `RAX`. The resolution is one PIT tick, which is 1 ms at the current 1000 Hz rate (`TICKS_PER_SECOND`).
+Get millisecond tick count since boot. Returns elapsed milliseconds in `RAX`. The nominal resolution is 1 ms at the current 1000 Hz PIT rate (`TICKS_PER_SECOND`). The current implementation also advances the counter for software yields through `int 0x20`, so it can run ahead of wall time.
 
 No argument is used. The syscall is implemented.
 

@@ -233,7 +233,7 @@ Standard run with networking:
 make run_iso_net
 ```
 
-QEMU network setup assumes `tap0` is already created on the host. The kernel RTL8139 driver auto-detects the NIC via PCI scan.
+QEMU network setup assumes `tap0` is already created on the host. The kernel probes RTL8139 first, then supported Intel controllers via PCI scan. To test Intel in QEMU, replace the target's `-device rtl8139,netdev=net0` with `-device e1000,netdev=net0` or `-device e1000e,netdev=net0`; see [Hardware Layer](networking/hardware.md#nic-selection-and-intel-driver-nicrs-e1000rs).
 
 ```
 sudo ip tuntap add dev tap0 mode tap

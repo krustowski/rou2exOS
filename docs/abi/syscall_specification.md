@@ -35,11 +35,13 @@ All values passed into a syscall are 64-bit.
 The interrupt gate for `0x7f` is a naked stub (`syscall_handler` in `src/abi/syscall.rs`) that saves the general-purpose registers, calls the dispatcher `syscall_inner(arg1, arg2, syscall_no)` and returns with `iretq`:
 
 ```
-mov rcx, rdx         ; (legacy)
+cld                 ; Rust expects forward string operations
 push rax ... r15     ; every GPR except R9
+sub rsp, 8          ; align the stack for the Rust call
 mov rdx, rax         ; syscall number becomes the 3rd C argument
 call syscall_inner
 mov r9, rax          ; keep the result across the pops
+add rsp, 8
 pop r15 ... rax
 mov rax, r9          ; result into RAX
 iretq
@@ -75,6 +77,6 @@ Most syscalls return one of these codes. Syscalls that return a count, an addres
 | Range | Group | Page |
 |-------|-------|------|
 | `0x00`–`0x0f` | Exit, system information, pipes, time, heap, kill (`0x3b`), memory information (`0x3c`), power (`0x3e`) | [System, Processes & Memory](syscalls/sysinfo_mem_mgmt.md) |
-| `0x10`–`0x1f`, `0x3f` | Console, graphics, audio (HD Audio PCM `0x3f`) | [Video & Audio](syscalls/video_audio.md) |
+| `0x10`–`0x1f`, `0x3f` | Console, graphics, framebuffer capture (`0x1c`, `0x1d`), audio (HD Audio PCM `0x3f`) | [Video & Audio](syscalls/video_audio.md) |
 | `0x20`–`0x2f`, `0x39`–`0x3a` | Files, directories, VFS, program execution, task list | [Filesystem](syscalls/filesystem.md) |
 | `0x30`–`0x38`, `0x3d` | I/O ports, serial, packets, IPC, networking, network configuration (`0x3d`) | [Ports & Networking](syscalls/port_networking.md) |

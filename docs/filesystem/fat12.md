@@ -1,8 +1,8 @@
 # FAT12
 
-FAT12 is the primary read/write filesystem, stored on a 1.44 MB floppy disk. It is accessible as:
+FAT12 is the read/write filesystem used on both the 1.44 MB floppy and the RAM disk at `/mnt/tmp`. `FatDev` selects the device from the mount or working directory, so directory clusters are interpreted on the correct volume. It is accessible as:
 
-- Absolute paths under `/mnt/fat/`
+- Absolute paths under `/mnt/fat/` or `/mnt/tmp/`
 - Bare filenames relative to the current working directory (cluster stored in `SYSTEM_CONFIG`)
 
 ---
@@ -13,7 +13,7 @@ FAT12 is the primary read/write filesystem, stored on a 1.44 MB floppy disk. It 
 
 ### DMA Setup (`Floppy::init`)
 
-Called before every read. Programs ISA DMA channel 2 to transfer one sector (512 bytes) from the floppy controller into the static `DMA: [u8; 512]` buffer:
+Initialises ISA DMA channel 2. Single-sector fallback reads transfer one sector into the static `.dma` buffer; track reads program DMA directly to a cache slot. The single-sector setup programs ISA DMA channel 2 to transfer one sector (512 bytes) from the floppy controller into the static `DMA: [u8; 512]` buffer:
 
 ```
 port 0x0A ← 0x06   Mask channels 2+0
@@ -31,10 +31,10 @@ The `DMA` buffer is placed in a `.dma` link section so its physical address is k
 1. Convert LBA → CHS: `C = LBA / (18 × 2)`, `H = (LBA % 36) / 18`, `S = (LBA % 18) + 1`.
 2. Set DMA read mode (`port 0x0B ← 0x56`): single transfer, address increment, read, channel 2.
 3. Send FDC READ DATA command (0x46) with head/cylinder/head/sector/byte-size/18/GAP3/DTL.
-4. Wait for IRQ6 by polling `port 0x3F4` MSR bit 7, then send Sense Interrupt (0x08) and drain 7 result bytes.
+4. Poll the MSR until the result phase opens, then read the seven result bytes and validate status. Seek/recalibrate completion uses Sense Interrupt separately.
 5. `copy_nonoverlapping(DMA, buffer, 512)`.
 
-The floppy disk geometry assumed throughout: 80 cylinders, 2 heads, 18 sectors/track = 1440 sectors × 512 bytes = 1.44 MB.
+The floppy disk geometry assumed throughout: 80 cylinders, 2 heads, 18 sectors/track = 2880 sectors × 512 bytes = 1.44 MB.
 
 ### Track Cache
 

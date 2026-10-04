@@ -89,6 +89,22 @@ Memento's r2 backend uses this on the graphics kernel: its screen is already one
 |------------|------------|-------------|
 | pointer to `IndexedFrame`, or `0` to ask | `1` to clear first, else `0` | ✅ |
 
+### Whole-presentation transactions
+
+A desktop updating several dirty row bands can bracket them so capture does not return a partially presented screen:
+
+| Argument 1 | Argument 2 | Meaning / return |
+|------------|------------|------------------|
+| `0` | `4` | Probe transaction support: `1` on a supported RGB framebuffer |
+| `0` | `2` | Begin presentation: `0`, or `Busy` if another process owns it |
+| pointer to `IndexedFrame` | `0` or `1` | Draw row bands as usual |
+| pointer to the complete composed `IndexedFrame` | `3` | Publish a completed snapshot and end presentation; requires ownership |
+| `0` | `3` | End presentation without publishing a snapshot |
+
+The end request describes the whole source image, including unchanged rows. The kernel builds a 640×480 RGB24 snapshot in RAM, retaining the screen's scaling, centring and black borders. Two buffers let a capturer read the previous completed frame while the next is presented. Snapshot allocation or a busy buffer can leave the previous snapshot in place; ending a transaction does not guarantee a new snapshot was published. Exit or crash releases presentation ownership and capture leases.
+
+The probe is meaningful after checking framebuffer availability with `(arg1, arg2) = (0, 0)`: an unavailable framebuffer also returns `1`.
+
 ## 0x18 (Copy kernel font)
 
 Copy the kernel's embedded PSF1 glyph data to userland. 
@@ -116,6 +132,24 @@ Formats 0, 1 and 2 are accepted (format 1 tracks are merged by time, format 2 pa
 | Argument 1 | Argument 2 | Implemented |
 |------------|------------|-------------|
 | `0x01` (Standard MIDI File, format 0/1/2) | pointer to NUL-terminated file name | ✅ |
+
+## 0x1c (Capture framebuffer)
+
+Copies framebuffer rows into a tightly packed `width × height` array of 32-bit pixels. The current implementation reads VRAM as 32-bit `0x00RRGGBB` pixels and uses the framebuffer pitch to skip row padding; use it with a matching 32-bpp framebuffer.
+
+| Argument 1 | Argument 2 | Returns |
+|------------|------------|---------|
+| pointer to `width × height × 4` output bytes | unused | `0` on success; `1` without a framebuffer; `InvalidInput` for an invalid buffer; `Busy` if drawing overlaps capture |
+
+## 0x1d (Capture and scale to RGB24)
+
+Captures the screen into tightly packed RGB bytes (`R, G, B`), scaled by nearest neighbour to the requested dimensions.
+
+| Argument 1 | Argument 2 | Returns |
+|------------|------------|---------|
+| pointer to `dst_width × dst_height × 3` output bytes | `(dst_width << 16) \| dst_height` | `0` on success; `1` without a framebuffer; `InvalidInput` for zero dimensions or an invalid buffer; `Busy` for overlapping drawing |
+
+At 640×480, a published snapshot from `0x19` is preferred and remains readable during the next presentation. Otherwise the kernel reads VRAM directly, currently assuming 32-bit `0x00RRGGBB` pixels. A direct capture checks for drawing both before and after copying; discard the output and retry when it returns `Busy`. This coordination covers kernel drawing syscalls, not direct writes through mapped VGA memory.
 
 ## 0x1f (Stop audio player)
 

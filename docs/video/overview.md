@@ -132,10 +132,15 @@ Colors are applied per `Result` variant using VGA attribute bytes.
 | `get_fb_info` | `0x16` | Copy `FRAMEBUFFER_PTR` fields into userland-supplied buffer |
 | `blit_buffer` | `0x17` | Copy userland pixel buffer into VESA framebuffer |
 | `get_kernel_font` | `0x18` | Copy the embedded 8×16 CP850 font bitmap into userland buffer |
+| `blit_indexed` | `0x19` | Scale palette-indexed frames, update row bands and publish completed presentations |
+| `capture` | `0x1c` | Copy framebuffer rows to a packed 32-bit pixel buffer |
+| `capture_rgb24` | `0x1d` | Capture and scale to tightly packed RGB24, using a completed snapshot at 640×480 when available |
+
+See [Video and Audio syscalls](../abi/syscalls/video_audio.md) for request layouts, presentation transactions and capture retry rules.
 
 ### Pointer Constraints
 
-Buffers passed to video syscalls must lie wholly inside the program image (`0x600_000 – 0xA00_000`) or wholly inside the userland heap (`0xC00_000 – 0xFFF_FFF`). The whole buffer is checked: 64000 bytes for `0x13`, `width × height × 4` for `0x17`.
+Buffers passed to video syscalls must lie wholly inside the program image (`0x600_000 – 0xA00_000`) or wholly inside the userland heap (`0xC00_000 – 0xFFF_FFF`) or its allocated extension. See [Pointer Arguments](../abi/syscall_specification.md#pointer-arguments). The whole buffer is checked: 64000 bytes for `0x13`, `width × height × 4` for `0x17`.
 
 The exception is `map_vram` (0x14), which maps `0xA00_000` into the calling process's page table using a P1 (4 KiB) sub-table allocated from `PAGE_TABLE_POOL`. After `map_vram`, the process can write to VGA VRAM directly at that virtual address without going through a syscall.
 

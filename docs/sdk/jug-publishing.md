@@ -61,6 +61,15 @@ Pass one or more freshly built ELF files. Other programs stay listed:
   ../r2_app/cpp/memento-hello/memento-hello.elf
 ```
 
+Memento can be published and installed like the other programs. On a system
+booted with the updated graphics kernel and Memento, hosted Jug offers a
+coordinated relaunch after installation. Confirm with **Y** after saving work:
+the desktop closes its windows and hosted children, then the kernel launches
+the downloaded version without rebooting. `SESSION.CFG` and the downloaded
+programs remain on the RAM disk; log in again with the existing credentials.
+For the first deployment of this support, boot the rebuilt image once. See
+[Jug](jug.md) for compatibility and relaunch behavior.
+
 Each program must be a statically linked r2 ELF64 x86-64 executable, at most
 4 MiB, with loadable segments inside r2's process window. Program names are
 case-insensitive, at most eight characters, using letters, digits, `_`, or `-`.

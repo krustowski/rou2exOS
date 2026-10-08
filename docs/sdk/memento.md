@@ -51,6 +51,14 @@ The program goes through three full-screen stages:
 
 The lock screen is the login dialog titled *Locked*, over the whole screen and the taskbar. Every key and click goes to it, the window manager's own keys included, while the windows under it keep running (downloads, chats, music). The session's login and password and Unlock give it back as it was; Esc only clears the fields, and Restart and Power off restart or switch off the computer, which ends the session.
 
+After [Jug](jug.md) updates Memento, its **Y / N** confirmation can relaunch
+the desktop without rebooting. All windows close and their hosted processes
+stop; save unsaved work first. The graphics kernel starts the downloaded
+Memento with `--relaunch`, skipping Hello and opening Login. The existing
+`/mnt/tmp/SESSION.CFG` stays on the RAM disk and supplies the credentials again.
+A relaunch requested while the session is locked waits until it is unlocked.
+The first deployment of this feature requires booting the updated image once.
+
 ![memento-login](../r2-memento-hello-login.png)
 
 *Fig. 2: The login dialog over the wallpaper.*
@@ -85,7 +93,7 @@ One clipboard serves every window: a line of text, or the last screenshot, which
 | IRC | IRC | IRC client | libcr2 TCP/IP |
 | Music | Music | Plays `.MID` files from `/mnt/fat/SOUND` | PIT and speaker ports, `0x30` |
 | Web | Web | HTTP/1.1 and HTTPS (TLS 1.2) browser with pictures (PNG, JPEG, GIF, BMP) and no JavaScript; also opens files from the disks (`/mnt/...` in the address bar) | Its own TCP/IP, BearSSL, stb_image |
-| Jug | [Jug](jug.md) | CDN program catalog with timestamp, size, SHA-256 and running PIDs; downloads verified ELF updates to `/mnt/tmp/jug` and restarts instances with their saved arguments | hosted `jug.elf`, `0x2A`, `0x2F`, `0x3B`, `0x41` |
+| Jug | [Jug](jug.md) | CDN program catalog with timestamp, size, SHA-256 and running PIDs; downloads verified ELF updates to `/mnt/tmp/jug`, restarts programs with saved arguments, and coordinates Memento's own relaunch | hosted `jug.elf`, `0x2A`, `0x2F`, `0x3B`, `0x41`, `0x42` |
 | Editor | Editor | Turbo C++ 23 (`tcpp.elf`) in a window | spawn `0x2A`, shared user-heap block |
 | Snake | Snake | libc++r2's snake example in a window, sharing its rules (`examples/snake/game.hpp`) and its high score (`/mnt/fat/SNAKE.HSC`) | PC speaker beeps, file `0x21` |
 | Mines | Minesweeper | Beginner, intermediate and expert boards (1/2/3); a safe first click, flags on the right button or F, chording on open numbers, best times in `/mnt/fat/MINES.HSC` | PC speaker beeps, file `0x21` |

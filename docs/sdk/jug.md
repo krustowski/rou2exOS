@@ -33,8 +33,24 @@ size and checksum. The RAM disk and downloaded updates are reset at reboot.
 Updates affect subsequent launches. **Restart** stops every running instance
 and starts it with its original arguments, obtained through syscall `0x41`.
 Jug leaves an instance running if its command line cannot be recovered and
-protects Jug itself and its Memento host. **Remove** restores the shipped copy
+protects Jug itself. **Remove** restores the shipped copy
 for subsequent launches.
+
+Memento uses a coordinated relaunch instead of the ordinary instance restart.
+After downloading its update, Jug offers **Y / N** to relaunch it; **Restart/R**
+offers the same confirmation later. Save work first: all Memento windows close,
+and their hosted processes stop before the desktop exits. The graphics kernel's
+session launcher then starts `/mnt/tmp/jug/MEMENTO.ELF`, preserving its arguments
+and adding `--relaunch`. The RAM disk, Jug registry, downloads and
+`/mnt/tmp/SESSION.CFG` survive; the replacement reads those credentials and
+returns to login. Open windows and unsaved buffers are not restored. Other
+background services continue running, and `INIT.RC` is not run again.
+
+This requires the updated graphics kernel and a running Memento that supports
+syscall `0x42`. Boot the new image once to enable it. Older kernels or Memento
+versions reject the request without stopping the desktop. Jug rechecks the
+installed download's size and full SHA-256 before requesting a relaunch.
+`fg jug restart memento` requests the same handoff from the console.
 
 In the window, **Tab** cycles between the program list and the six bottom
 buttons; **Shift+Tab** goes backward. The focused button is highlighted.

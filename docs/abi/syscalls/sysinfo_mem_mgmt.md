@@ -14,8 +14,9 @@ The process'/task's ID is resolved by the kernel scheduler automatically. The pr
 |------------|------------|-------------|---------|
 | `0x01`   | pointer to `SysInfo` struct | Read the system information summary. | ✅ |
 | `0x02`   | pointer to `SysInfo` struct | Write the system information summary. (Currently, only `ip_addr` fields is written back from the struct; all other fields are ignored.) | ✅ |
+| `0x03`   | pointer to `SysInfo` struct | Set the system user from `system_user`, up to its NUL or all 32 bytes; every other field is ignored. The name must be one word of printable ASCII (`0x21`–`0x7e`), or the call returns `InvalidInput`. Memento sets it from its login. | ✅ |
 
-`system_path` is NUL-terminated after the working directory. The call returns `Busy` (`0xfa`) instead of an untouched buffer when the system configuration lock cannot be taken.
+`system_path` and `system_user` are NUL-terminated after their text. The call returns `Busy` (`0xfa`) instead of an untouched buffer when the system configuration lock cannot be taken.
 
 ## 0x02 (Real-Time Clock)
 

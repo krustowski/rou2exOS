@@ -46,8 +46,10 @@ Esc on the desktop logs out to the login dialog, and leaving the login dialog re
 The program goes through three full-screen stages:
 
 1. **Hello**: the landing screen.
-2. **Login**: a username and password dialog drawn over the wallpaper. Esc, Cancel or its close box restarts the computer (the dialog says so under it); on a kernel without syscall `0x3e` the program ends instead.
-3. **Desktop**: the launcher. It stays at the bottom of the window stack until it is closed. Esc on it (when it has the keyboard: everything minimised, or after Alt+D) logs out --- every window closes as its close box would close it, and the login dialog comes back.
+2. **Login**: a username and password dialog drawn over the wallpaper. Esc, Cancel or its close box restarts the computer (the dialog says so under it); on a kernel without syscall `0x3e` the program ends instead. The first login since boot sets the session's credentials: a salted SHA-256 hash of the pair goes to `/mnt/tmp/SESSION.CFG` (the RAM disk, so it lasts until the next restart), and every later login and unlock has to match it. An accepted login also becomes the system user (syscall `0x01`, `0x03`), so `sysinfo` and the shells' prompts show it; spaces in it become `_`, and an empty login leaves the user as it was. Empty fields are a pair like any other, and give a lock screen that only asks for Enter.
+3. **Desktop**: the launcher. It stays at the bottom of the window stack until it is closed. Esc on it (when it has the keyboard: everything minimised, or after Alt+D) locks the session, as Alt+L does from any window. Only when there is no memory for the lock screen does Esc log out instead --- every window closes as its close box would close it, and the login dialog comes back.
+
+The lock screen is the login dialog titled *Locked*, over the whole screen and the taskbar. Every key and click goes to it, the window manager's own keys included, while the windows under it keep running (downloads, chats, music). The session's login and password give it back as it was; Esc only clears the fields, and Restart restarts the computer, which ends the session.
 
 ![memento-login](../r2-memento-hello-login.png)
 
@@ -59,6 +61,7 @@ Everything opened from the desktop is a floating window over it, with a frame, a
 |------|--------------|
 | Alt+Tab | Cycles through the open windows |
 | Alt+D | Puts every window away to show the desktop; again brings them back |
+| Alt+L | Locks the session (see above) |
 | Alt+F | Makes the window in front as large as the screen allows, and back. A window that says it cannot be maximised keeps Alt+F (the Editor, whose Turbo C++ opens its File menu with it) |
 | PrintScreen (or Alt+PrintScreen) | Copies the screen, without the pointer, to Memento's clipboard. The taskbar then asks whether to save it as a file too: Y saves it as `SCRnnnnn.PNG` in `/mnt/tmp` (or on the floppy when that will not take it), N or Esc does not |
 

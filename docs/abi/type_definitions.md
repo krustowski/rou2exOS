@@ -368,11 +368,11 @@ Every field is a `uint64_t` byte count unless it says otherwise. Written unalign
 | `heap_used`, `heap_free` | `uint64_t` | Payload bytes in used and in free blocks |
 | `heap_largest_free` | `uint64_t` | The largest block one allocation can still get |
 | `heap_blocks`, `heap_free_blocks` | `uint64_t` | Blocks in the heap, and how many are free |
-| `heap_by_slot` | `uint64_t[17]` | Used bytes by process slot; `[16]` is untagged (kernel staging, blocks allocated with no owner) |
+| `heap_by_slot` | `uint64_t[17]` | Used bytes by process slot; `[16]` is untagged (kernel staging, blocks allocated with no owner), and slots 16 and up |
 | `frame_base`, `frame_size` | `uint64_t` | Slot *n*'s private frame is physical `frame_base + n * frame_size` |
 | `frame_virt` | `uint64_t` | Where each process sees its frame: `0x600_000` |
-| `slots` | `uint64_t` | Process slots (10) |
-| `slot_task` | `uint8_t[16]` | The task id (as `0x2f` reports it) in each slot, `0xFF` when free |
+| `slots` | `uint64_t` | Process slots (32; only the first 16 are in `slot_task`) |
+| `slot_task` | `uint8_t[16]` | The task id (as `0x2f` reports it) in each of slots 0–15, `0xFF` when free |
 
 ```c
 typedef struct {
@@ -392,4 +392,34 @@ typedef struct {
     uint64_t slots;
     uint8_t  slot_task[16];
 } __attribute__((packed)) MemInfo_T;
+```
+
+## MemInfo2 (syscall `0x3c`, version 2)
+
+Asked for with `2` in Argument 2. The same fields as `MemInfo`, with room for 32 slots; `version` is `2`. 400 bytes.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `heap_by_slot` | `uint64_t[33]` | Used bytes by process slot; `[32]` is untagged |
+| `slots` | `uint64_t` | Process slots (32) |
+| `slot_task` | `uint8_t[32]` | The task id in each slot, `0xFF` when free |
+
+```c
+typedef struct {
+    uint64_t version;
+    uint64_t total_ram;
+    uint64_t heap_start;
+    uint64_t heap_size;
+    uint64_t heap_used;
+    uint64_t heap_free;
+    uint64_t heap_largest_free;
+    uint64_t heap_blocks;
+    uint64_t heap_free_blocks;
+    uint64_t heap_by_slot[33];
+    uint64_t frame_base;
+    uint64_t frame_size;
+    uint64_t frame_virt;
+    uint64_t slots;
+    uint8_t  slot_task[32];
+} __attribute__((packed)) MemInfo2_T;
 ```

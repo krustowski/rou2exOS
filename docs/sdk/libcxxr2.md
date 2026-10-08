@@ -140,7 +140,7 @@ The arena is a first-fit free list with boundary tags that coalesces on free; `r
 
 `r2::raw_syscall` loads the syscall number into both `RAX` and `RDX` and declares `R9` clobbered, which matches what the kernel's entry stub actually does (see [Syscall Specification](../abi/syscall_specification.md)). The `R9` clobber was missing in earlier versions. Its absence caused a real bug: GCC kept a VGA register value in `R9` across a syscall, and Memento's display came up as a single scan line in one build but not in another.
 
-The structures in `r2/syscall.hpp` follow the current kernel layout: `TaskInfo` is 28 bytes and carries the task's last `rip`, and `MemInfo` is the 256-byte report from syscall `0x3c`. A program built against the old 20-byte `TaskInfo` reads every entry after the first from the wrong offset.
+The structures in `r2/syscall.hpp` follow the current kernel layout: `TaskInfo` is 28 bytes and carries the task's last `rip`, and `MemInfo` is the 400-byte version-2 report from syscall `0x3c`, with room for `r2::MaxSlots` (32) slots. `meminfo()` asks for version 2 and puts a kernel-from-before-32-slots' 256-byte version-1 answer into the same layout; `tasks()` asks for up to 32 entries. A program built against the old 20-byte `TaskInfo` reads every entry after the first from the wrong offset.
 
 ---
 

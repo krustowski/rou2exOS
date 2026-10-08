@@ -85,7 +85,7 @@ When the scheduler switches to a new process for the first time, it loads this R
 User processes get a dedicated P4 page table created by `elf::create_user_page_table`, which clones the kernel mappings and adds user-accessible entries for:
 
 - `0x600_000–0x7FF_FFF` — ELF load region
-- `0x7D0_000–0x8FF_FFF` — initial user stacks (one per slot, see [Memory Overview](../memory/overview.md#user-stack-tops-by-slot))
+- `0x400_000–0x5FF_FFF` and `0x800_000–0x9FF_FFF` — initial user stacks, 128 KiB per slot (slots 16–31 and 0–15, see [Memory Overview](../memory/overview.md#user-stack-tops-by-slot))
 - `0xA00_000–0xAFF_FFF` — optional VGA window (mapped on demand by syscall `0x14`)
 - `0xC00_000–0xFFF_FFF` — shared userland heap (4 MiB, mapped at `uheap::init`)
 

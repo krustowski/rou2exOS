@@ -88,7 +88,7 @@ Console output is flushed at each newline and on exit; `libgor2.Flush()` forces 
 0x800000  end of the frame
 ```
 
-The top 256 KiB of the frame is left unused because the kernel's initial-stack table puts slots 8 and 9 at `0x7F0000` and `0x7D0000`, inside the frame. There is no guard page: a stack overflow runs into the top of the heap.
+The top 256 KiB of the frame is left unused because the kernel's initial-stack table used to put slots 8 and 9 at `0x7F0000` and `0x7D0000`, inside the frame. Since the move to 32 slots no stack is there, so the room could be taken back. There is no guard page: a stack overflow runs into the top of the heap.
 
 ---
 

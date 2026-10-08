@@ -6,7 +6,7 @@ rou2exOS uses a cooperative/preemptive round-robin scheduler driven by the PIT (
 
 ```rust
 struct Scheduler {
-    processes: [Option<Process>; MAX_PROCESSES],  // up to 10 slots
+    processes: [Option<Process>; MAX_PROCESSES],  // 32 slots
     current_pid: usize,
     next_free_pid: usize,
 }

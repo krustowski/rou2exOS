@@ -138,11 +138,13 @@ Returns `0x00` on success, or `FileNotFound` (`0xfe`) when no live process has t
 
 Fills a [`MemInfo`](../type_definitions.md#meminfo-syscall-0x3c) with the usable RAM, the layout of the per-process frames, and the user heap (`0x0a`) added up block by block --- including how many bytes each process slot holds, and which task id sits in each slot, so the figures can be put next to `0x2f`'s list. The same numbers the kernel shell's `heap` and `meminfo` print.
 
-Returns `0x00`, `InvalidInput` (`0xfc`) for a pointer outside the user regions, or `Busy` (`0xfa`) when the heap or the scheduler is locked at that moment; ask again.
+Argument 2 picks the layout. `0` or `1` fills a `MemInfo`, which has room for 16 slots: what every program built before there were 32 slots passes. The heap held by slots 16 and up is counted in its untagged entry, so the figures still add up. `2` fills a [`MemInfo2`](../type_definitions.md#meminfo2-syscall-0x3c-version-2) with room for all 32.
+
+Returns `0x00`, `InvalidInput` (`0xfc`) for a pointer outside the user regions or an unknown version, or `Busy` (`0xfa`) when the heap or the scheduler is locked at that moment; ask again.
 
 | Argument 1 | Argument 2 | Implemented |
 |------------|------------|-------------|
-| pointer to `MemInfo` | *unused* | ✅ |
+| pointer to `MemInfo` or `MemInfo2` | version: `0`/`1` or `2` | ✅ |
 
 ## 0x3e (Power)
 

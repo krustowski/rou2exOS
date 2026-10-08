@@ -97,7 +97,7 @@ Execute a flat binary executable (`.BIN` usually).
 
 Execute an ELF64 executable (`.ELF`). Auto-appends `.elf`/`.ELF` if no extension given. Returns the new process PID on success, `0` on failure.
 
-The file is looked up in `/mnt/tmp/jug` first, then in the caller's working directory (on FAT, ISO9660 or the archive), then in `/mnt/tar/bin` and `/mnt/iso/bin`. Jug's downloaded updates therefore take precedence even when the working directory holds a shipped copy. The program is started in the background; it fails when all ten process slots are held by live processes.
+The file is looked up in `/mnt/tmp/jug` first, then in the caller's working directory (on FAT, ISO9660 or the archive), then in `/mnt/tar/bin` and `/mnt/iso/bin`. Jug's downloaded updates therefore take precedence even when the working directory holds a shipped copy. The program is started in the background; it fails when all 32 process slots are held by live processes.
 
 | Argument 1 | Argument 2 | Implemented |
 |------------|------------|-------------|
@@ -161,11 +161,11 @@ Returns `Ok`; `FileNotFound` when no mount holds the path; `FilesystemError` whe
 
 ## 0x2f (List scheduler tasks)
 
-List scheduler tasks. Writes up to 10 × 28-byte [`TaskInfo`](../type_definitions.md#taskinfo-syscall-0x2f) entries. Returns the number of entries written.
+List scheduler tasks. Writes up to 32 (one per slot) 28-byte [`TaskInfo`](../type_definitions.md#taskinfo-syscall-0x2f) entries, no more than Argument 2 asks for. Returns the number of entries written.
 
 | Argument 1 | Argument 2 | Implemented |
 |------------|------------|-------------|
-| pointer to output buffer | max entries to write (0 = use default of 10) | ✅ |
+| pointer to output buffer | max entries to write (0 = 10, the most there used to be) | ✅ |
 
 ## 0x39 (Read part of a file)
 

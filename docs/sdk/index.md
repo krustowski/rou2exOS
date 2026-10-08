@@ -100,7 +100,7 @@ The kernel's dispatcher takes exactly two arguments. See the [Syscall Specificat
 
 - **8.3 file names.** The shell's `bg`/`fg` take a name of at most 8 characters without the extension. Files on the floppy use FAT 8.3 names.
 - **Floating point is not saved across a context switch.** The timer interrupt saves the fifteen general-purpose registers and nothing else (no `fxsave`), so two processes using SSE or x87 at the same time corrupt each other. `gcc -O2` emits SSE too.
-- **At most ten processes** exist at once, including the kernel's own tasks (`kmain`, `kclock`, `kshell`, and `init_rc` while it runs; the graphics kernel on a framebuffer starts neither `kclock` nor `kshell`).
+- **At most 32 processes** exist at once, including the kernel's own tasks (`kmain`, `kclock`, `kshell`, and `init_rc` while it runs; the graphics kernel on a framebuffer starts neither `kclock` nor `kshell`).
 - **No threads, no signals, no `mmap`, no file descriptors.**
 
 ---

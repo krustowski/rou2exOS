@@ -2,7 +2,7 @@
 
 File name arguments accept either a bare name relative to the current working directory (e.g. `FOO.TXT`) or an absolute VFS path (e.g. `/mnt/fat/FOO.TXT`, `/mnt/tmp/FOO.TXT`, `/mnt/iso/grub/grub.cfg`). Both forms are resolved through the VFS mount table. ISO9660 is mounted read-only at `/mnt/iso`.
 
-`/mnt/tmp` is a FAT16 RAM disk (a sixteenth of the RAM, 126 MiB under QEMU's 2 GiB; FAT12 when that comes to only 2 MiB; empty at every boot but for the kernel's `KERNDBG.LOG`). Every FAT12 syscall below works on it exactly as on the floppy at `/mnt/fat`, which makes it the scratch space for programs booted without a floppy: `/mnt/fat` is mounted only when a FAT12 floppy is found at boot. A bare name goes to whichever of the two volumes the working directory is on. A working directory on neither (`/`, `/mnt`) still sends it to the floppy's root, unlike the kernel shell, where `/` is only the root of the mount table.
+`/mnt/tmp` is a FAT16 RAM disk (a sixteenth of the RAM, 126 MiB under QEMU's 2 GiB; FAT12 when that comes to only 2 MiB; empty at every boot but for the kernel's `KERNDBG.LOG`). Every FAT12 syscall below works on it exactly as on the floppy at `/mnt/fat`, which makes it the scratch space for programs booted without a floppy: `/mnt/fat` is mounted only when a FAT12 floppy is found at boot. A bare name goes to whichever of the two volumes the working directory is on. `/` is the root of the mount table, as in the kernel shell: it and `/mnt` only lead to the mounts and hold no files, so a bare name in either, or an absolute path under no mount (`/FOO.TXT`), names nothing and the call reports `FileNotFound`.
 
 Relative names may reach into subdirectories (`GFX/19.IMG`): every component is walked, not just the working directory. Mount prefixes are matched case-insensitively, and names below a FAT12 mount are folded to 8.3 upper case.
 
@@ -79,7 +79,7 @@ Create a subdirectory inside the parent path. Resolves via VFS; ISO9660 paths ar
 
 ## 0x28 (List FAT12 directory)
 
-List the FAT12 directory at the given cluster.
+List the FAT12 directory at the given cluster, on the volume the working directory is on. Returns `FileNotFound` when the working directory is on no FAT volume (`/`, `/mnt`, the ISO, the archive).
 
 | Argument 1 | Argument 2 | Implemented |
 |------------|------------|-------------|
@@ -130,13 +130,15 @@ List VFS mount points. Returns the number of active mounts as a u64. `fs_type`:
 
 List a directory by VFS path. Works for both FAT12 and ISO9660. Returns entry count (0–64), or `u64::MAX` (`-1` as `int64_t`) on any error.
 
+`/` and the directories on the way to the mounts list the mount table, as the shell's `dir` does: `/` holds `mnt`, and `/mnt` holds `fat`, `tmp`, `iso` and `tar`, each a directory entry of size 0. The path may also be relative to the working directory.
+
 | Argument 1 | Argument 2 | Implemented |
 |------------|------------|-------------|
 | pointer to absolute path string | pointer to array of up to 64 `VfsDirEntry_T` | ✅ |
 
 ## 0x2e (Change working directory)
 
-Change working directory. Updates `SYSTEM_CONFIG` path and cluster. Verifies the path is an existing directory. ISO9660 paths set cluster to 0. 
+Change working directory. Updates `SYSTEM_CONFIG` path and cluster. Verifies the path is an existing directory. ISO9660 paths, `/` and `/mnt` set cluster to 0.
 
 | Argument 1 | Argument 2 | Implemented |
 |------------|------------|-------------|

@@ -65,6 +65,7 @@ Userland calls syscall `0x34` with arg1 `0x04` (raw Ethernet) or `0x01` (IPv4):
 ```
 syscall 0x34
   → derive frame length from EtherType / IP total_length field
+  → loopback::transmit(data, pid)   (frames for this machine stop here)
   → nic::send_frame(data, len)
     → selected RTL8139 or Intel backend
     (RTL8139 continues below)
@@ -85,9 +86,21 @@ Userland calls `ipv4::send_packet`, which:
 
 This path is legacy/fallback; the RTL8139 path is preferred for QEMU guests.
 
-## Same-Host Loopback
+## Loopback Device
 
-When `ipv4::send_packet` detects `src_ip == dst_ip` (same-guest delivery) it calls `netdrv::loopback_deliver` instead of going through the NIC. This copies the frame into a `FRAME_BUF` slot and pushes it to the target process's message queue directly (a frame that cannot be queued is lost, as there is no ring to leave it in), bypassing the serial encoder and the NIC TX/RX cycle.
+A frame a process sends to this machine itself never reaches the NIC, which would not hear it anyway: `loopback.rs` takes it in syscall `0x34` and queues it to the process it is for, routed as frames off the NIC are (`netdrv::deliver`: by TCP destination port, else the global driver). So r2web, Memento or any other stack can reach GARN, TNT or Chat on the same machine, at `127.0.0.1` or at the address DHCP gave it.
+
+| Sent | What happens |
+|------|--------------|
+| IPv4 to `127.0.0.0/8`, to the machine's address, or with `src == dst` | Queued locally, with the source MAC `00:00:00:00:00:00` (as Linux's `lo`) and the card's MAC as destination. |
+| ICMP echo request to one of those | Answered by the kernel, to the sender. |
+| ARP request for one of those (sender not `0.0.0.0`) | Answered by the kernel, to the asker, with the MAC `00:00:00:00:00:00`. Still sent out too, unless it is for `127.x`. |
+
+The machine's address is the one in `SYSTEM_CONFIG` (set by the ETH driver through syscall `0x01`/`0x3D`); `SystemConfig::set_ip` keeps a lock-free copy for the loopback check.
+
+The zero source MAC matters: the stacks drop frames from their own (the card's) MAC as echoes of their own broadcasts. With it they take a looped reply, learn that their own address is at `00:00:00:00:00:00`, and send there next time, which comes back through the loopback device because of the IP. A looped frame that cannot be queued (no free buffer, the receiver's queue full) is lost, as on a wire; TCP sends it again.
+
+GARN and the other `libcr2` servers answer from the machine's address whatever address they were asked on, so a client must connect to that address for the replies to match: the browser stack (`web/net_r2.cpp`) resolves `localhost` to `127.0.0.1` and connects to its own address for anything in `127.0.0.0/8`.
 
 ---
 

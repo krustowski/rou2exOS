@@ -155,3 +155,13 @@ Memento uses it when its login dialog is left: that is the end of the session on
 | Argument 1 | Argument 2 | Implemented |
 |------------|------------|-------------|
 | `0x01` restart, `0x02` power off | *unused* | ✅ |
+
+## `0x43` — Check a shared heap range
+
+`arg1` is the address and `arg2` is a nonzero length in bytes. Returns `1`
+when the entire range lies within one currently mapped shared user heap region,
+including the heap extension; otherwise returns `0`. The check does not read or
+write the memory and does not check allocation ownership or lifetime. It rejects
+private image/stack addresses, gaps between regions, and ranges crossing a region
+boundary. Older kernels return `InvalidSyscall` (`0xff`); callers can then check
+only the original `[0xC00000, 0x1000000)` heap region.

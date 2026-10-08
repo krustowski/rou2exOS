@@ -39,7 +39,7 @@ UART port COM1.
 | Argument 1 | Argument 2 | Meaning | Implemented |
 |------------|------------|-------------|---------|
 | `0x01` | pointer to buffer | Send an IPv4 packet (derives frame length from the IP header). | ✅ |
-| `0x04` | pointer to raw Ethernet frame | Send a raw Ethernet frame. Length is derived from the EtherType field (`0x0800` = IPv4, `0x0806` = ARP). | ✅ |
+| `0x04` | pointer to raw Ethernet frame | Send a raw Ethernet frame. Length is derived from the EtherType field (`0x0800` = IPv4, `0x0806` = ARP). A frame for this machine itself (`127.x`, its own address) goes through the loopback device instead of the NIC; see [Networking](../../networking/overview.md#loopback-device). | ✅ |
 
 ## 0x35 (Socket receive)
 

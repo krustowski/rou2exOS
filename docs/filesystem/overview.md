@@ -130,11 +130,14 @@ Every filesystem syscall uses the same two-step dispatch:
 path → try_readonly_absolute(path)
          Some((fs_type, rel)) → RoFs::probe(fs_type)?.resolve(rel)  [read-only]
          None                 → vfs_resolve_fat12(path) → Filesystem::new(&dev)
+                                  None → FileNotFound            [`/`, `/mnt`, outside every mount]
 ```
 
 `RoFs` (`fs/rofs.rs`) is an enum over `Iso9660` and `Tar`; both hand out `IsoEntry`, so a handler treats the two alike. Writes to either are refused.
 
-`vfs_resolve_fat12(path)` answers `(rel, base_cluster, dev)`. A path under `/mnt/fat` or `/mnt/tmp` is stripped of its mount prefix and starts at that volume's root; anything else is resolved from the working directory's cluster, on the volume the working directory is on (`FatDev::cwd()`). A working directory on no FAT mount (`/`, `/mnt`) still sends such a name to the floppy's root, as it always has; the kernel shell, which goes by `FatDev::cwd_mounted()`, does not.
+`vfs_resolve_fat12(path)` answers `(dev, rel)`: the name is made absolute first (a relative one joined onto the working directory, `.` and `..` collapsed), then a path under `/mnt/fat` or `/mnt/tmp` is stripped of its mount prefix and walked from that volume's root. Anything else answers `None` and the syscall reports the file missing: `/` and `/mnt` only lead to the mounts and hold no files, and nothing lies outside them. A name means the same to every syscall, to the kernel shell and to the program loader; `/` is never the floppy, whatever the working directory.
+
+Syscall `0x2D` lists `/` and `/mnt` from the mount table (`vfs::mount_dir`), syscall `0x2E` accepts them as working directories, and syscall `0x40` answers for `/mnt` as for `/`.
 
 ### `FatDev` (`fs/fatdev.rs`)
 
@@ -144,9 +147,7 @@ The floppy and the RAM disk run the same `fat12::Filesystem`, which is generic o
 |----------|-------------|
 | `FatDev::of(fs_type)` | The device behind a `Fat12` or `MemDisk` mount |
 | `FatDev::for_path(abs)` | The volume an absolute path lies on, and the path below the mount |
-| `FatDev::for_dir(abs)` | Like `for_path`, but a path under no FAT mount is the floppy's (a bare path under `/` has always named the floppy to the syscalls) |
-| `FatDev::cwd()` | The working directory's volume and cluster, by `for_dir`: the syscalls' view |
-| `FatDev::cwd_mounted()` | The same, or `None` when the working directory is on no FAT volume (`/`, `/mnt`, the ISO, the archive): the kernel shell's view |
+| `FatDev::cwd_mounted()` | The working directory's volume and cluster, or `None` when it is on no FAT volume (`/`, `/mnt`, the ISO, the archive) |
 
 A FAT cluster number alone no longer identifies a directory: cluster 5 on the floppy and cluster 5 on the RAM disk are different places. The volume is always taken from the path next to it; for the working directory that is `SYSTEM_CONFIG.path`, which is why `chdir` (syscall `0x2E`) stores the normalized absolute path.
 

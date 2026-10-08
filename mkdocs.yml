@@ -46,6 +46,8 @@ nav:
     - Go (libgor2): sdk/libgor2.md
     - Application Suite: sdk/apps.md
     - Memento (GUI): sdk/memento.md
+    - Jug (program manager): sdk/jug.md
+    - Publishing Jug programs: sdk/jug-publishing.md
   - Kernel Internals:
     - Boot / Init:
       - Overview: init/overview.md

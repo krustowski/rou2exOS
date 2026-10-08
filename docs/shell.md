@@ -357,7 +357,7 @@ Falls back to `$ ` if the config lock is contended.
 `bg` and `fg` both delegate to `input::elf::run_elf(filename, args, mode)`:
 
 1. Asks the scheduler which slot the program will occupy (`next_free_slot`); fails with `no free process slot` when all ten are held by live processes.
-2. Finds the ELF file — current working directory first (when it is on FAT12, ISO9660 or the archive; at `/` and `/mnt` the floppy is no longer probed), then `/mnt/tar/bin`, then `/mnt/iso/bin` — and stages it at a per-slot scratch address.
+2. Finds the ELF file — `/mnt/tmp/jug` first for [Jug](sdk/jug.md) downloads, then the current working directory (on FAT, ISO9660 or the archive), then `/mnt/tar/bin` and `/mnt/iso/bin` — and stages it in a temporary user-heap buffer.
 3. Copies the `PT_LOAD` segments into the slot's private 2 MiB physical frame and builds a page table that maps it at `0x600_000`.
 4. Pushes the argv frame onto the slot's initial user stack and creates the scheduler task at the ELF entry point.
 5. `Foreground`: the launcher (the shell, or `init_rc`) is recorded as the child's waiter and parked until the child ends.

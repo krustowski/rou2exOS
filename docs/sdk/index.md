@@ -107,10 +107,11 @@ The kernel's dispatcher takes exactly two arguments. See the [Syscall Specificat
 
 ## Getting a Program Onto the Machine
 
-There are two places the kernel looks for a binary. `bg <name>` / `fg <name>` search:
+`bg <name>` / `fg <name>` search:
 
-1. the shell's working directory (on the FAT12 floppy, or on the ISO when the working directory is under `/mnt/iso`),
-2. `/mnt/tar/bin`, then `/mnt/iso/bin`.
+1. `/mnt/tmp/jug`, where [Jug](jug.md) installs downloaded updates,
+2. the shell's working directory (on a FAT volume, ISO, or tar archive),
+3. `/mnt/tar/bin`, then `/mnt/iso/bin`.
 
 So a program can either be copied onto the floppy image:
 

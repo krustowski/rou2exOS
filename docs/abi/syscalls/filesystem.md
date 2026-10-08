@@ -28,7 +28,10 @@ Exactly 512 bytes are read from the buffer, so the resulting file is always one 
 
 ## 0x22 (Rename file)
 
-Rename the file specified by its name in `arg1` to value specified in `arg2`.
+Rename the entry specified by `arg1` to `arg2`. Both may be paths into a FAT
+subdirectory; a bare destination names the source's own directory. Cross-volume
+or cross-directory moves and an existing destination are refused. Jug uses
+this operation to publish a verified download while retaining its old copy.
 
 | Argument 1 | Argument 2 | Implemented |
 |------------|------------|-------------|
@@ -94,7 +97,7 @@ Execute a flat binary executable (`.BIN` usually).
 
 Execute an ELF64 executable (`.ELF`). Auto-appends `.elf`/`.ELF` if no extension given. Returns the new process PID on success, `0` on failure.
 
-The file is looked up in the caller's working directory (when that is on FAT12 under `/mnt/fat` or `/mnt/tmp`, or on ISO9660 or the archive; at `/` and `/mnt` nothing is looked up there), then in `/mnt/tar/bin` and `/mnt/iso/bin`. The program is started in the background; it fails when all ten process slots are held by live processes.
+The file is looked up in `/mnt/tmp/jug` first, then in the caller's working directory (on FAT, ISO9660 or the archive), then in `/mnt/tar/bin` and `/mnt/iso/bin`. Jug's downloaded updates therefore take precedence even when the working directory holds a shipped copy. The program is started in the background; it fails when all ten process slots are held by live processes.
 
 | Argument 1 | Argument 2 | Implemented |
 |------------|------------|-------------|

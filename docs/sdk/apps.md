@@ -45,6 +45,7 @@ Programs that use Ethernet need the [`ETH`](#networking) driver running first, s
 | App | Language | Description |
 |-----|----------|-------------|
 | [`MEMENTO`](memento.md) | C++ | Windowed desktop on the Memento UI toolkit: file manager, task and memory monitor, shell, clock, chat, IRC, MIDI player, web browser, Snake, Minesweeper, and Turbo C++ in a window. See [Memento (GUI)](memento.md). |
+| [`JUG`](jug.md) | C++ | Program manager with a hosted Memento window and console commands: CDN catalog, verified ELF downloads, checksum registry, updates and instance restarts. |
 | [`SNAKE`](https://github.com/krustowski/rou2exOS-apps/tree/master/cpp/libc++r2/examples/snake) | C++ | Snake, built on libc++r2; keeps the score on the floppy. |
 | [`CUBE`](https://github.com/krustowski/rou2exOS-apps/tree/master/c/cube) | C | Rotating 3D cube in VGA mode 13h. |
 | [`GFXTEST`](https://github.com/krustowski/rou2exOS-apps/tree/master/c/gfxtest) | C | VGA mode 13h test. |

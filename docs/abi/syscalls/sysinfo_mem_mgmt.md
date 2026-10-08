@@ -1,5 +1,19 @@
 # System, Processes and Memory Management
 
+## 0x41 (Process command line)
+
+Returns the saved command line of a process, including `argv[0]`. Jug uses it
+to restart every instance with its original arguments. Kernel tasks have an
+empty command line.
+
+| Argument 1 | Argument 2 | Implemented |
+|------------|------------|-------------|
+| PID from `0x2f` | pointer to a 128-byte output buffer | ✅ |
+
+The return value is the byte length (`0..128`); the output is not
+NUL-terminated. Returns `FileNotFound` (`0xfe`) for an unknown PID, `Busy`
+(`0xfa`) when the scheduler is locked, or `InvalidInput` for an invalid buffer.
+
 ## 0x00 (Graceful Program Exit)
 
 The process'/task's ID is resolved by the kernel scheduler automatically. The process is killed, its page tables and any heap blocks it still owns are released, and a launcher waiting on it (`fg`) is woken.

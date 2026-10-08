@@ -85,6 +85,7 @@ One clipboard serves every window: a line of text, or the last screenshot, which
 | IRC | IRC | IRC client | libcr2 TCP/IP |
 | Music | Music | Plays `.MID` files from `/mnt/fat/SOUND` | PIT and speaker ports, `0x30` |
 | Web | Web | HTTP/1.1 and HTTPS (TLS 1.2) browser with pictures (PNG, JPEG, GIF, BMP) and no JavaScript; also opens files from the disks (`/mnt/...` in the address bar) | Its own TCP/IP, BearSSL, stb_image |
+| Jug | [Jug](jug.md) | CDN program catalog with timestamp, size, SHA-256 and running PIDs; downloads verified ELF updates to `/mnt/tmp/jug` and restarts instances with their saved arguments | hosted `jug.elf`, `0x2A`, `0x2F`, `0x3B`, `0x41` |
 | Editor | Editor | Turbo C++ 23 (`tcpp.elf`) in a window | spawn `0x2A`, shared user-heap block |
 | Snake | Snake | libc++r2's snake example in a window, sharing its rules (`examples/snake/game.hpp`) and its high score (`/mnt/fat/SNAKE.HSC`) | PC speaker beeps, file `0x21` |
 | Mines | Minesweeper | Beginner, intermediate and expert boards (1/2/3); a safe first click, flags on the right button or F, chording on open numbers, best times in `/mnt/fat/MINES.HSC` | PC speaker beeps, file `0x21` |

@@ -208,7 +208,7 @@ bg garn --config /mnt/fat/GARN/GARN.CFG
 echo INIT.RC done
 ```
 
-Binary names are resolved like in the shell: working directory first, then `/mnt/tar/bin` and `/mnt/iso/bin`, so `bg eth` works without the program being on the floppy. `init_rc` starts at `/`, which holds no files, so until a `cd` it takes them from the bin directories. A `fg` line parks `init_rc` until that program exits.
+Binary names are resolved like in the shell: `/mnt/tmp/jug` first for downloaded updates, then the working directory, then `/mnt/tar/bin` and `/mnt/iso/bin`, so `bg eth` works without the program being on the floppy. `init_rc` starts at `/`, which holds no files, so until a `cd` it takes shipped programs from the bin directories. A `fg` line parks `init_rc` until that program exits.
 
 Lines starting with `#` are ignored. Trailing `\r` is stripped (DOS line endings tolerated).
 

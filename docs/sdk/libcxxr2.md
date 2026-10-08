@@ -65,7 +65,7 @@ Copy `examples/hello/.clangd` next to a new program too: without it clangd parse
 | `r2/io.hpp` | `print`, `println`, `printf("{}")`, `format`, `concat` — type-safe, no varargs |
 | `r2/heap.hpp` | The arena allocator, its statistics, `validate()`, and the kernel's user heap |
 | `r2/syscall.hpp` | The raw ABI: syscall numbers, kernel structures, `raw_syscall` |
-| `r2/fs.hpp` | Files and directories, including `write_at` (syscall `0x3a`) and `remove_dir` |
+| `r2/fs.hpp` | Files and directories, including `write_at` (syscall `0x3a`) and `remove_dir`; `mounts()`, and `usage(path)` for the size, free space and format (`FsFormat`: `Fat12`, `Fat16`, …) of the filesystem a path is on (syscall `0x40`) |
 | `r2/gfx.hpp` | `Canvas`, `Font`, the VESA framebuffer, VGA mode 13h |
 | `r2/input.hpp` | Keyboard and mouse, with `Mouse::set_speed()` |
 | `r2/time.hpp` | Ticks, sleep, the RTC, `Stopwatch`, `FrameTimer` |

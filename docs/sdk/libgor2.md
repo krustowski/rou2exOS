@@ -104,7 +104,7 @@ import "github.com/krustowski/rou2exOS-apps/go/libgor2"
 | `types.go` | Kernel structures, with compile-time size assertions |
 | `system.go` | Exit, sysinfo, RTC, ticks, sleep, tasks, `Args` |
 | `console.go` | Print, clear, flush |
-| `fs.go` | Files, directories (`Mkdir`, `RemoveDir`), mounts, `Chdir`, fsck |
+| `fs.go` | Files, directories (`Mkdir`, `RemoveDir`), mounts (`ListMounts`, and `FsUsage` for a mount's size, free space and format, syscall `0x40`; the `Fs*` and `Format*` constants in `types.go`, `FsMemDisk` and `FormatFat16` among them), `Chdir`, fsck |
 | `video.go` | Framebuffer, VGA modes, blitting, the kernel font |
 | `audio.go` | Speaker and MIDI |
 | `net.go` | Ports, serial, packets, driver registration |

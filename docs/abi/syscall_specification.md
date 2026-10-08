@@ -78,5 +78,5 @@ Most syscalls return one of these codes. Syscalls that return a count, an addres
 |-------|-------|------|
 | `0x00`–`0x0f` | Exit, system information, pipes, time, heap, kill (`0x3b`), memory information (`0x3c`), power (`0x3e`) | [System, Processes & Memory](syscalls/sysinfo_mem_mgmt.md) |
 | `0x10`–`0x1f`, `0x3f` | Console, graphics, framebuffer capture (`0x1c`, `0x1d`), audio (HD Audio PCM `0x3f`) | [Video & Audio](syscalls/video_audio.md) |
-| `0x20`–`0x2f`, `0x39`–`0x3a` | Files, directories, VFS, program execution, task list | [Filesystem](syscalls/filesystem.md) |
+| `0x20`–`0x2f`, `0x39`–`0x3a`, `0x40` | Files, directories, VFS, program execution, task list, mount sizes (`0x40`) | [Filesystem](syscalls/filesystem.md) |
 | `0x30`–`0x38`, `0x3d` | I/O ports, serial, packets, IPC, networking, network configuration (`0x3d`) | [Ports & Networking](syscalls/port_networking.md) |

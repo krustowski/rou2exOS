@@ -19,7 +19,7 @@ All addresses are 64-bit (x86-64) but the kernel only uses the lower 4 GiB. The 
 |  `__stack_bottom` | `__stack_top` |  64 KiB |  Boot stack (inside kernel image) |
 |  `__heap_start`  | `__heap_end`   | 64 KiB |  Kernel linked-list heap (legacy) |
 | `p4_table` / `p3_fb_table` ||    8 KiB  |  Static page tables in `.data` |
-| `0x400_000` | `0x5FF_FFF`  |    2 MiB  |   (unused / reserved) |
+| `0x400_000` | `0x5FF_FFF`  |    2 MiB  |   (unused / reserved). Mapped user-accessible in every process (`boot.asm` P2[2]), so the kernel image has to end below `0x400_000`: anything of the kernel's here could be read and written by any program. The release kernel ends near `0x31C_000` |
 | `0x600_000` | `0x7FF_FFF`  |    2 MiB  |   ELF userland load region. Each slot's private 2 MiB physical frame is identity-mapped here by `create_user_page_table` |
 | `0x800_000` | `0x8FF_FFF` |     1 MiB  |   User stacks (10 slots × 128 KiB spacing) |
 | `0x900_000` | `0x9FF_FFF` |     1 MiB  |   (unused userland headroom) |
@@ -30,7 +30,7 @@ All addresses are 64-bit (x86-64) but the kernel only uses the lower 4 GiB. The 
 | `0xA00_0000` | + RAM/8 |   varies |   Userland heap extension, mapped USER+WRITE only once the 4 MiB are full (past the tar archive if that is here; see allocators.md) |
 | `PAGE_TABLE_POOL` (`.bss`) ||    512 KiB | Static pool for dynamically allocated P4/P3/P2/P1 tables |
 | HD Audio ring, CORB, RIRB (`.bss`) ||    131 KiB | The PCM ring the controller plays (128 KiB) and the codec command rings (`audio/hda.rs`) |
-| `TMP_DATA` (`.bss`) ||    512 KiB | The `/mnt/tmp` RAM disk: a FAT12 volume formatted at boot, gone at power-off (`fs/memdisk`). With it the release kernel ends near `0x372_000`; everything in the image has to end below `0x600_000` |
+| top of usable RAM below 4 GiB || RAM/16 | The `/mnt/tmp` RAM disk: a FAT16 volume formatted at boot, gone at power-off (`fs/memdisk`). Placed at boot, clear of everything below `0x2400_000` and of the boot archive; 126 MiB at `0x7800_0000` under QEMU's 2 GiB. Kernel-only, like all of the identity map outside the user windows. See [RAM Disk](../filesystem/overview.md#ram-disk-mnttmp-fsmemdisk) |
 
 A drawing of all of this is in [memory-map.pdf](memory-map.pdf).
 

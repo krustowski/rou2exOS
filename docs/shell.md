@@ -55,7 +55,7 @@ Nothing is completed while the working directory is on no FAT12 volume: `/`, `/m
 | Path | Filesystem | Mounted |
 |------|------------|---------|
 | `/mnt/fat` | the FAT12 floppy | only when a FAT12 floppy was found at boot |
-| `/mnt/tmp` | the FAT12 RAM disk | always (empty at every boot) |
+| `/mnt/tmp` | the RAM disk, FAT16, a sixteenth of the RAM | always (empty at every boot) |
 | `/mnt/iso` | the CD, ISO9660, read-only | when a CD is found |
 | `/mnt/tar` | the boot medium archive, read-only | when GRUB loaded one |
 
@@ -101,7 +101,7 @@ filesystem the working directory sits on.
 - `cd ..` — go to parent; at the root it stays at the root.
 - `cd <name>` — relative to the current directory: a mount point, or a directory on FAT12 or ISO9660.
 - `cd /mnt/fat/<path>` — absolute FAT12 path (only with a FAT12 floppy).
-- `cd /mnt/tmp/<path>` — absolute path on the FAT12 RAM disk.
+- `cd /mnt/tmp/<path>` — absolute path on the FAT16 RAM disk.
 - `cd /mnt/iso/<path>` — absolute ISO9660 path (validates directory exists).
 
 Multi-component paths (`foo/bar`, `../bar`) are supported. A path that is neither `/`, nor on the way to a mount, nor on a mounted filesystem is refused with `no such directory`.
@@ -244,14 +244,14 @@ mkdir MYDIR
 
 ### `mount`
 
-Lists all active VFS mount table entries. Output: one line per mount, format `<path> (<fstype>)`. `/mnt/fat` is there only when a FAT12 floppy was found at boot.
+Lists all active VFS mount table entries, one line per mount: `<path> (<fstype>[, <format>][, <size>][, <free> free])`. The format is there when it says more than the type (the RAM disk is a `memdisk` and `fat16`); the size is the whole volume, and the free space is shown on the writable ones. Sizes are in whole MiB from 10 MiB, in KiB from 10 KiB. See [Mount Sizes](filesystem/overview.md#mount-sizes-fsusage-syscall-0x40). `/mnt/fat` is there only when a FAT12 floppy was found at boot.
 
 ```
 / (rootfs)
-/mnt/fat (fat12)
-/mnt/tmp (memdisk)
-/mnt/iso (iso9660)
-/mnt/tar (tar)
+/mnt/fat (fat12, 1440 KiB, 1338 KiB free)
+/mnt/tmp (memdisk, fat16, 126 MiB, 125 MiB free)
+/mnt/iso (iso9660, 112 MiB)
+/mnt/tar (tar, 48 MiB)
 ```
 
 ### `mv <old> <new>`

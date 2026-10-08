@@ -268,7 +268,9 @@ Tests in `src/ktest.rs`:
 | `test_path_normalize` | joining, `..` and relative paths in `vfs::normalize_path` |
 | `test_mount_dir` | `/` lists `mnt`, `/mnt` lists the mount points with their types, and a mount or a path leading nowhere is no mount directory |
 | `test_kerndbg_log` | init left its debug log in `/mnt/tmp/KERNDBG.LOG` |
-| `test_memdisk` | the RAM disk at `/mnt/tmp`: files across clusters, subdirectories, `write_file_at`, delete, and a full disk that keeps earlier files intact |
+| `test_memdisk_place` | the RAM disk is a sixteenth of the RAM in 2 MiB pages, in usable memory below 4 GiB, clear of the fixed regions and the archive |
+| `test_memdisk` | the RAM disk at `/mnt/tmp` is FAT16 (with clusters of several sectors from 64 MiB): a file over three clusters read whole and from inside its second, a subdirectory grown past its first cluster, `write_file_at` appending and leaving a gap that reads back as zeros, delete |
+| `test_small_disks` | disks carved out of the RAM disk's memory: FAT12 at 2 MiB, FAT16 at 4 MiB; a file across the FAT12 entry that straddles two FAT sectors, and a full disk that keeps earlier files intact |
 
 ### Host unit tests
 

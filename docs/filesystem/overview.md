@@ -3,13 +3,13 @@
 ## Filesystem Stack
 
 ```
-Userland (syscalls 0x20–0x2E)
+Userland (syscalls 0x20–0x2E, 0x39, 0x3A, 0x40)
     │
     ▼
 fs/vfs — mount table, path dispatch
-    ├── fs/fat12    — FAT12 (read/write)            behind fs/fatdev::FatDev
-    │     ├── on the floppy   (/mnt/fat)
-    │     └── on the RAM disk (/mnt/tmp)
+    ├── fs/fat12    — FAT12/FAT16 (read/write)      behind fs/fatdev::FatDev
+    │     ├── on the floppy   (/mnt/fat, FAT12)
+    │     └── on the RAM disk (/mnt/tmp, FAT16)
     ├── fs/iso9660  — CD-ROM ISO9660 (read-only)  ┐ behind fs/rofs::RoFs
     └── fs/ustar    — tar archive in RAM (read-only) ┘
          │                              │
@@ -66,7 +66,7 @@ pub struct VfsMount {
 | `Fat12` | FAT12 floppy at `/mnt/fat` |
 | `Iso9660` | ISO9660 CD-ROM at `/mnt/iso` |
 | `Tar` | ustar archive loaded by GRUB, at `/mnt/tar` |
-| `MemDisk` | FAT12 volume in RAM at `/mnt/tmp` |
+| `MemDisk` | The RAM disk at `/mnt/tmp`: FAT16 (FAT12 when it is only 2 MiB) |
 
 ### Mounts at Boot
 
@@ -76,7 +76,7 @@ Set up by `init::fs::vfs_init()`:
 |------|--------|-----------|
 | `/` | `Root` | Always |
 | `/mnt/fat` | `Fat12` | Only if `floppy_check_init()` found a FAT12 volume; an empty mount would answer everything below it with a disk error |
-| `/mnt/tmp` | `MemDisk` | Always (formatted empty at every boot) |
+| `/mnt/tmp` | `MemDisk` | When `memdisk::place_tmp()` finds it memory, which takes 2 MiB of free RAM; formatted empty at every boot |
 | `/mnt/iso` | `Iso9660` | Only if `Iso9660::probe()` succeeds |
 | `/mnt/tar` | `Tar` | Only if GRUB loaded a tar archive as a module |
 
@@ -102,6 +102,8 @@ Example: path `b"/mnt/fat/SUBDIR/FILE.TXT"` → `(Fat12, b"SUBDIR/FILE.TXT")`.
 | `mount_dir(dir)` | Returns the names directly below `dir` when it is `/` or on the way to a mount (see below) |
 | `mount(path, fs_type)` | Add a mount entry |
 | `umount(path)` | Remove a mount entry by path |
+
+`type_of(path)` answers the type of the mount a path lies on.
 
 These are the primary VFS entry points used by syscall handlers in `abi/syscall.rs`. Both wait (bounded spin) for the mount table lock instead of giving up at the first contention: a missed lock used to make an absolute path look relative and be resolved in the wrong directory.
 
@@ -176,15 +178,33 @@ The module depends on nothing else in the kernel so the host unit tests (`tests/
 
 ## RAM Disk (`/mnt/tmp`, `fs/memdisk/`)
 
-`MemDisk` (`memdisk/block.rs`) is a writable `BlockDevice` over a `&'static Mutex<[u8]>`. Each sector is copied with interrupts off, so a task preempted mid-copy cannot leave the lock held. A sector number past the end reads back as zeros and is dropped on write, so a bad cluster number read from a damaged directory cannot index out of bounds.
+`MemDisk` (`memdisk/block.rs`) is a writable `BlockDevice` over memory given to it at boot (`attach(base, len)`; before that it is a disk of no sectors). Each sector is copied with interrupts off and the disk's lock held, so a task preempted mid-copy cannot leave the lock held and a sector is never read half written. A sector number past the end reads back as zeros and is dropped on write, so a bad cluster number read from a damaged directory cannot index out of bounds.
 
-`memdisk::TMP` is the disk behind `/mnt/tmp`: a 512 KiB (`TMP_SIZE`) static buffer in the kernel's `.bss`. At boot, `vfs_init()` calls `memdisk::format_tmp()`, which lays an empty FAT12 volume onto it with `fat12::format::format()`, and then mounts it. From then on it behaves exactly like the floppy: files, subdirectories, `rename`, `delete`, `write_file_at` and ELF loading from the working directory all work there. Nothing on it survives a reboot.
+`memdisk::TMP` is the disk behind `/mnt/tmp`. At boot, `vfs_init()` calls:
+
+1. `memdisk::place_tmp()`, which gives it a sixteenth of the usable RAM, in whole 2 MiB pages (126 MiB under QEMU's 2 GiB, 16 MiB under 256 MiB), at the top of the highest usable region of the Multiboot2 memory map below 4 GiB (`boot::usable_top`). It keeps clear of everything below the last process frame (`0x2400000`: the kernel, the user windows and heap, the ten frames) and of the boot archive. With no room for that much it halves the size down to 2 MiB, and with none for 2 MiB there is no `/mnt/tmp`.
+2. `memdisk::format_tmp()`, which lays an empty volume onto it with `fat12::format::format()`: FAT16, with 2 KiB clusters at 128 MiB (FAT12 at 2 MiB; see [Formatting](fat12.md#formatting-fsfat12formatrs)).
+
+It is then mounted, and behaves exactly like the floppy: files, subdirectories, `rename`, `delete`, `write_file_at` and ELF loading from the working directory all work there. Nothing on it survives a reboot.
+
+**Why there.** The identity map `boot.asm` sets up covers 0–4 GiB in every process: the first GiB is copied into each process's page table and the rest is shared by them, all of it for the kernel only, outside the few user windows. So a syscall reaches the disk whatever process is running, and no program can touch it. Top-down, it stays out of the way of what is placed from below: the archive, and the user heap's extension, which also checks that it does not run into the disk (on a machine of a few hundred MiB the two come close). The disk used to be 512 KiB of the kernel's `.bss`, and could not grow there: the image has to end below `0x400000`, which every process maps as user memory.
 
 The first file on it is `KERNDBG.LOG`, the kernel's debug log as it stood at the end of init; the shell's `debug` command rewrites it with the log as it is now. See [Debug Log](../init/overview.md#debug-log).
 
-`fat12::format::format(dev, sectors, label)` is a small, generic mkfs. It writes one reserved sector, two FATs sized to cover the data area, a 224-entry root directory, one sector per cluster, and media byte `0xF8`. The extended boot record carries the `FAT12` type string that `Filesystem::new` looks for. It refuses volumes too small for any data or too large for FAT12 (4085 clusters or more, about 2 MiB at one sector per cluster).
+---
 
-**Size limit.** The buffer counts toward the kernel image, and the whole image has to end below `0x600000`, where every process's page table maps its private frame instead. With 512 KiB, the release kernel ends near `0x372000` and the debug one near `0x3D9000`. The zeroed buffer also lands in the ELF file, because `.gdt`/`.idt` follow `.bss` in the same loaded segment.
+## Mount Sizes (`fs::usage`, syscall `0x40`)
+
+`fs::usage(fs_type)` answers how big a mounted filesystem is, how much of it is free, and its format on the medium (`fs::Format`: none, fat12, fat16, iso9660, tar), which says more than the mount type for the RAM disk:
+
+| Mount | Size | Free |
+|-------|------|------|
+| `/` | 0: no filesystem, the way to the mounts | 0 |
+| `/mnt/fat`, `/mnt/tmp` | the whole volume, from the boot sector | the free clusters, counted in one pass over the FAT |
+| `/mnt/iso` | the volume space size in the primary volume descriptor, read once with the root | 0 |
+| `/mnt/tar` | the archive's length | 0 |
+
+The kernel shell's `mount`, syscall [`0x40`](../abi/syscalls/filesystem.md#0x40-size-of-the-filesystem-a-path-is-on) and through it bsh's `mount` and Memento's Files window show them. Each mount's medium is read with the mount table already let go: the floppy can take a while, and every path lookup waits on that lock.
 
 ---
 
@@ -194,12 +214,13 @@ The first file on it is `KERNDBG.LOG`, the kernel's debug log as it stood at the
 |----------|-------|
 | Max VFS mounts | 8 |
 | Max mount path length | 31 bytes |
-| FAT12 sector size | 512 bytes |
+| FAT sector size | 512 bytes |
 | ISO9660 block size | 2048 bytes |
 | Max directory entries returned (syscall 0x28) | 32 |
 | Max directory entries returned (syscall 0x2D) | 64 |
 | Max VFS mounts listed (syscall 0x2C) | 8 × 34-byte entries |
-| `/mnt/tmp` RAM disk size | 512 KiB (1003 one-sector clusters) |
+| `/mnt/tmp` RAM disk size | a sixteenth of the usable RAM in 2 MiB pages, at least 2 MiB |
+| FAT16 volume | fewer than 65525 clusters of up to 32 KiB: about 2 GiB |
 
 ---
 

@@ -26,7 +26,7 @@ Steps execute in this exact order:
 | 7 | `heap::pmm_heap_init()` | `init/heap.rs` | Init kernel linked-list heap; run smoke test |
 | 8 | `video::print_result(...)` | `init/video.rs` | Call `init_video(fb)` to set `VIDEO_MODE` |
 | 9 | `fs::floppy_check_init()` | `init/fs.rs` | Probe FAT12 floppy; set cwd to `/` |
-| 10 | `fs::vfs_init(fat12)` | `init/fs.rs` | Mount `/`, `/mnt/fat` (only if step 9 found a FAT12 volume), `/mnt/tmp`, `/mnt/iso` (if CD present), `/mnt/tar` (if GRUB loaded the archive) |
+| 10 | `fs::vfs_init(fat12)` | `init/fs.rs` | Mount `/`, `/mnt/fat` (only if step 9 found a FAT12 volume), `/mnt/tmp` (the RAM disk, placed in high memory and formatted FAT16), `/mnt/iso` (if CD present), `/mnt/tar` (if GRUB loaded the archive) |
 | 11 | `color::color_demo()` | `init/color.rs` | Print 16-color swatch to console |
 | 12 | `ascii::ascii_art()` | `init/ascii.rs` | Print kernel splash text |
 | 13 | `process::init_processes()` | `init/process.rs` | Save CR3, init userland heap, create initial tasks |

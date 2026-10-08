@@ -7,7 +7,7 @@
 | Header | Covers |
 |--------|--------|
 | `syscall.h` | Syscall numbers (`SyscallNo_T`), the raw `syscall()` entry, one wrapper per syscall, and the structures of the newer calls (`WriteRange_T`, `MemInfo_T`) |
-| `types.h` | Structures the kernel reads and writes: `SysInfo_T`, `RTC_T`, `Entry_T`, `VfsDirEntry_T`, `MountInfo_T`, `TaskInfo_T`, `FBInfo_T`, `FsckReport_T`, `MousePacket_T`, … `TaskInfo_T` is 28 bytes and includes the task's last `rip`. |
+| `types.h` | Structures the kernel reads and writes: `SysInfo_T`, `RTC_T`, `Entry_T`, `VfsDirEntry_T`, `MountInfo_T`, `FsStat_T`, `TaskInfo_T`, `FBInfo_T`, `FsckReport_T`, `MousePacket_T`, … `TaskInfo_T` is 28 bytes and includes the task's last `rip`. |
 | `printf.h` | `printf` with a minimal set of conversions |
 | `string.h`, `mem.h`, `bytes.h` | `strlen`, `memcmp`, `memcpy`, byte-order helpers |
 | `args.h` | Argument parsing helpers |
@@ -76,7 +76,7 @@ int main(int argc, char **argv) {
 | Input | `pipe_subscribe`, `pipe_read`, `pipe_unsubscribe` (keyboard); `pipe_mouse_subscribe`, `pipe_mouse_read`, `pipe_mouse_unsubscribe` |
 | Graphics | `get_fb_info`, `write_pixel`, `write_vga`, `blit_buffer`, `blit_buffer_scaled`, `map_vram`, `set_video_mode`, `get_kernel_font` |
 | Audio | `play_freq`, `play_midi_file`, `stop_speaker` |
-| Files | `read_file`, `read_file_at`, `write_file`, `write_file_at`, `rename_file`, `delete_file`, `write_subdir`, `chdir`, `list_dir`, `list_dir_path`, `list_mounts`, `run_fs_check` |
+| Files | `read_file`, `read_file_at`, `write_file`, `write_file_at`, `rename_file`, `delete_file`, `write_subdir`, `chdir`, `list_dir`, `list_dir_path`, `list_mounts`, `fs_stat` (a mount's size and format, syscall `0x40`; the `FS_TYPE_*` and `FS_FORMAT_*` constants name what it returns), `run_fs_check` |
 | Memory | `malloc`, `realloc`, `free` — on the kernel's shared userland heap |
 | Ports, serial | `read_port`, `write_port`, `serial_init`, `serial_read`, `serial_write` |
 | Networking | `new_packet`, `send_packet`, `net_*`, `bind`, `listen`, `read`, `write`, `close`, `on_tcp_packet` |

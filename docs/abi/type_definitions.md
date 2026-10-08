@@ -139,6 +139,41 @@ typedef struct {
 } __attribute__((packed)) MountInfo_T;
 ```
 
+`5`=memdisk is the RAM disk at `/mnt/tmp` whatever its format; `FsStat.format` tells FAT16 from FAT12.
+
+## FsStat (syscall `0x40`)
+
+The size of the filesystem a path is on. 24 bytes, packed.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `total_bytes` | `uint64_t` | The whole volume; 0 for the root |
+| `free_bytes` | `uint64_t` | Bytes free for files; 0 on the read-only mounts |
+| `fs_type` | `uint8_t` | The mount's type, numbered as `MountInfo.fs_type` |
+| `format` | `uint8_t` | The format on the medium: `0`=none, `1`=fat12, `2`=fat16, `3`=iso9660, `4`=tar |
+| `reserved` | `uint8_t[6]` | 0 |
+
+```rust
+#[repr(C, packed)]
+pub struct FsStat {
+    pub total_bytes: u64,
+    pub free_bytes: u64,
+    pub fs_type: u8,
+    pub format: u8,    // 0=none 1=fat12 2=fat16 3=iso9660 4=tar
+    pub reserved: [u8; 6],
+}
+```
+
+```c
+typedef struct {
+    uint64_t total_bytes;
+    uint64_t free_bytes;
+    uint8_t fs_type;   /* FS_TYPE_* */
+    uint8_t format;    /* FS_FORMAT_*: 0=none, 1=fat12, 2=fat16, 3=iso9660, 4=tar */
+    uint8_t reserved[6];
+} __attribute__((packed)) FsStat_T;
+```
+
 ## FBInfo (syscall `0x16`)
 
 Describes the active VESA framebuffer geometry.  All fields are in pixels or bytes.

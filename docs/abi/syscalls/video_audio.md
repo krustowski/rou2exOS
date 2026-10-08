@@ -8,6 +8,12 @@ Print provided string to terminal.
 |------------|------------|-------------|
 | pointer to char buffer | string length | ✅ |
 
+ANSI colour sequences in the text are understood, not printed: ESC `[`, numbers split by `;`, and
+`m` (SGR).  `0` resets to white on black, `1` brightens the foreground and `22` undoes it, `30`-`37`
+and `90`-`97` set the foreground, `40`-`47` and `100`-`107` the background, `39` and `49` the
+defaults.  Any other escape sequence is swallowed.  r2sh started with `--color` colours its prompt
+so (bsh's `color`).
+
 ## 0x11 (Clear the screen)
 
 Effectively clear the text mode screen.

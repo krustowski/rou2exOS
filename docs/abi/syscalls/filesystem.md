@@ -2,7 +2,7 @@
 
 File name arguments accept either a bare name relative to the current working directory (e.g. `FOO.TXT`) or an absolute VFS path (e.g. `/mnt/fat/FOO.TXT`, `/mnt/tmp/FOO.TXT`, `/mnt/iso/grub/grub.cfg`). Both forms are resolved through the VFS mount table. ISO9660 is mounted read-only at `/mnt/iso`.
 
-`/mnt/tmp` is a FAT12 RAM disk (512 KiB, empty at every boot but for the kernel's `KERNDBG.LOG`). Every FAT12 syscall below works on it exactly as on the floppy at `/mnt/fat`, which makes it the scratch space for programs booted without a floppy: `/mnt/fat` is mounted only when a FAT12 floppy is found at boot. A bare name goes to whichever of the two volumes the working directory is on. A working directory on neither (`/`, `/mnt`) still sends it to the floppy's root, unlike the kernel shell, where `/` is only the root of the mount table.
+`/mnt/tmp` is a FAT16 RAM disk (a sixteenth of the RAM, 126 MiB under QEMU's 2 GiB; FAT12 when that comes to only 2 MiB; empty at every boot but for the kernel's `KERNDBG.LOG`). Every FAT12 syscall below works on it exactly as on the floppy at `/mnt/fat`, which makes it the scratch space for programs booted without a floppy: `/mnt/fat` is mounted only when a FAT12 floppy is found at boot. A bare name goes to whichever of the two volumes the working directory is on. A working directory on neither (`/`, `/mnt`) still sends it to the floppy's root, unlike the kernel shell, where `/` is only the root of the mount table.
 
 Relative names may reach into subdirectories (`GFX/19.IMG`): every component is walked, not just the working directory. Mount prefixes are matched case-insensitively, and names below a FAT12 mount are folded to 8.3 upper case.
 
@@ -117,7 +117,7 @@ List VFS mount points. Returns the number of active mounts as a u64. `fs_type`:
 + `2` = fat12
 + `3` = iso9660
 + `4` = tar (the boot medium archive at `/mnt/tar`)
-+ `5` = memdisk (the FAT12 RAM disk at `/mnt/tmp`).
++ `5` = memdisk (the RAM disk at `/mnt/tmp`: FAT16, or FAT12 when it is only 2 MiB; [`0x40`](#0x40-size-of-the-filesystem-a-path-is-on) says which).
 
 | Argument 1 | Argument 2 | Implemented |
 |------------|------------|-------------|
@@ -138,6 +138,23 @@ Change working directory. Updates `SYSTEM_CONFIG` path and cluster. Verifies the
 | Argument 1 | Argument 2 | Implemented |
 |------------|------------|-------------|
 | pointer to absolute path string | `0x00` | ✅ |
+
+## 0x40 (Size of the filesystem a path is on)
+
+Fills an [`FsStat_T`](../type_definitions.md#fsstat-syscall-0x40) with the size of the filesystem the path is on: the whole volume and the bytes still free for files, the mount's type (numbered as [`0x2c`](#0x2c-list-vfs-mounts) numbers it) and the format on the medium (`0` none, `1` fat12, `2` fat16, `3` iso9660, `4` tar). The path is absolute or relative to the working directory. The root is no filesystem: everything is 0. On the read-only mounts the free bytes are 0.
+
+| Mount | `total_bytes` | `free_bytes` |
+|-------|---------------|--------------|
+| `/` | 0 | 0 |
+| `/mnt/fat`, `/mnt/tmp` | the whole volume | the free clusters |
+| `/mnt/iso` | the volume space size from the primary volume descriptor | 0 |
+| `/mnt/tar` | the archive's length | 0 |
+
+Returns `Ok`; `FileNotFound` when no mount holds the path; `FilesystemError` when the medium cannot be read. A kernel from before this call answers `InvalidSyscall` (`0xff`), which is how a program tells it has no sizes to show.
+
+| Argument 1 | Argument 2 | Implemented |
+|------------|------------|-------------|
+| pointer to NUL-terminated path | pointer to `FsStat_T` | ✅ |
 
 ## 0x2f (List scheduler tasks)
 

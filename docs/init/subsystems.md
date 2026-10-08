@@ -168,7 +168,7 @@ Populates the VFS mount table:
 |------|---------|-------|
 | `/` | `Root` | Always mounted |
 | `/mnt/fat` | `Fat12` | Mounted only if `fat12` is set, i.e. `floppy_check_init()` found a FAT12 volume; with no floppy there is no `/mnt/fat` at all |
-| `/mnt/tmp` | `MemDisk` | Always mounted, once `memdisk::format_tmp()` has laid an empty FAT12 volume onto the RAM disk |
+| `/mnt/tmp` | `MemDisk` | Mounted once `memdisk::place_tmp()` has given the RAM disk a sixteenth of the RAM at the top of memory below 4 GiB and `memdisk::format_tmp()` has laid an empty FAT16 volume onto it (FAT12 when it is only 2 MiB); not mounted on a machine without 2 MiB free for it |
 | `/mnt/iso` | `Iso9660` | Mounted only if `Iso9660::probe()` succeeds (CD present) |
 | `/mnt/tar` | `Tar` | Mounted only if GRUB loaded the boot medium archive as a module |
 

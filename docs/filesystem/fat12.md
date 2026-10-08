@@ -1,9 +1,11 @@
-# FAT12
+# FAT12 and FAT16
 
-FAT12 is the read/write filesystem used on both the 1.44 MB floppy and the RAM disk at `/mnt/tmp`. `FatDev` selects the device from the mount or working directory, so directory clusters are interpreted on the correct volume. It is accessible as:
+FAT is the read/write filesystem: FAT12 on the 1.44 MB floppy, FAT16 on the RAM disk at `/mnt/tmp` (FAT12 too when the RAM disk is only 2 MiB; see [RAM Disk](overview.md#ram-disk-mnttmp-fsmemdisk)). One driver, `fs/fat12`, reads and writes both, with clusters of one sector or of several. `FatDev` selects the device from the mount or working directory, so directory clusters are interpreted on the correct volume. It is accessible as:
 
 - Absolute paths under `/mnt/fat/` (mounted only when a FAT12 floppy is found at boot) or `/mnt/tmp/`
 - Bare filenames relative to the current working directory (cluster stored in `SYSTEM_CONFIG`)
+
+The module keeps the name `fat12` from when that was all it read.
 
 ---
 
@@ -76,6 +78,9 @@ Every request runs with interrupts disabled: the FDC is driven by a multi-byte c
 | `root_dir_start_lba` | LBA of root directory region |
 | `data_start_lba` | LBA of first data cluster |
 | `sectors_per_cluster` | Sectors per cluster from BPB |
+| `kind` | `FatKind::Fat12` or `FatKind::Fat16` |
+| `cluster_count` | Clusters in the data area, numbered from 2; also the bound on every walk along a chain, so a FAT that loops ends the walk |
+| `total_sectors` | Sectors on the whole volume, from the 16-bit count or, when that is 0, the 32-bit one |
 
 ### Boot Sector / BPB (`fs/fat12/entry.rs`)
 
@@ -90,10 +95,11 @@ Every request runs with interrupts disabled: the FDC is driven by a multi-byte c
 | 14 | `reserved_sectors` | Sectors before the FAT (usually 1) |
 | 16 | `fat_count` | Number of FAT copies (usually 2) |
 | 17 | `root_entry_count` | Max root directory entries (usually 224) |
-| 19 | `total_sectors_16` | Total sectors on disk |
+| 19 | `total_sectors_16` | Total sectors on disk; 0 when there are more than 65535 |
 | 22 | `fat_size_16` | Sectors per FAT copy (usually 9) |
+| 32 | `total_sectors_32` | Total sectors when `total_sectors_16` is 0 |
 
-Detection: `Filesystem::new` scans the boot sector for the 5-byte string `"FAT12"`. If not found, returns `Err`.
+Detection: `Filesystem::new` scans the boot sector for the 5-byte string `"FAT12"` or `"FAT16"`. If neither is there, it returns `Err`. Which of the two the volume is follows from its cluster count, as the FAT specification has it, not from the string: fewer than 4085 clusters is FAT12 (`FAT12_MAX_CLUSTERS`), fewer than 65525 FAT16 (`FAT16_MAX_CLUSTERS`).
 
 ### Layout Arithmetic
 
@@ -150,6 +156,8 @@ Each directory entry is 32 bytes (`#[repr(C, packed)]`):
 
 ## FAT Table Encoding (`fs/fat12/table.rs`, `fs/fat12/fs.rs`)
 
+FAT16 keeps each entry in two bytes, little-endian, at byte offset `N * 2`; an entry never straddles two sectors.
+
 FAT12 encodes each cluster entry in 12 bits. Two cluster numbers share 3 bytes, packed as follows:
 
 For an even cluster N at byte offset `fat_offset = (N * 3) / 2`:
@@ -173,29 +181,38 @@ value = (byte[fat_offset] >> 4) | (byte[fat_offset+1] << 4)
 | `0xFF7` | Bad sector |
 | `0xFF8–0xFFF` | End of chain (EOF) |
 
-`FatTable` reads all 9 FAT sectors (4608 bytes) into a single `[u8; 4608]` for batch inspection. `Filesystem::read_fat12_entry` reads individual sectors on demand, handling the cross-sector boundary case (when `fat_offset == 511`).
+FAT16 has the same values sixteen bits wide: `0xFFF7` bad, `0xFFF8–0xFFFF` end of chain, data clusters up to `0xFFF6`.
 
-`write_fat12_entry` updates **every** FAT copy (`fat_count`), not just the first, so a checker comparing them does not report the volume as damaged. `allocate_cluster` scans the FAT one sector at a time (one read per FAT sector, not per cluster) and returns `0` when the FAT is full.
+### One numbering for both
+
+`Filesystem::read_fat_entry` answers in FAT16's numbering on either kind of volume: a FAT12 value from `0xFF7` up is widened by four bits, so FAT12's bad cluster and ends of chain come back as `0xFFF7` and `0xFFF8–0xFFFF`. Everything that walks a chain compares against `fs::CHAIN_END` (`0xFFF8`), or asks `fs::is_data_cluster(c)` (2 up to `CHAIN_END`), instead of FAT12's `0xFF8`: a FAT16 volume has data clusters numbered past `0xFF8`. A chain's last entry is written as `0xFFFF`, of which FAT12 keeps `0xFFF`.
+
+`FatTable` reads all 9 FAT sectors (4608 bytes) into a single `[u8; 4608]` for batch inspection; it and `fsck` are for the floppy, and FAT12, only. `Filesystem::read_fat_entry` reads individual sectors on demand, handling the FAT12 cross-sector case (an entry starting at `fat_offset % 512 == 511`).
+
+`write_fat_entry` updates **every** FAT copy (`fat_count`), not just the first, so a checker comparing them does not report the volume as damaged. A FAT12 entry that straddles two sectors is written to both. Its second byte used to be written to the first byte of the *same* sector, over another cluster's entry, and its own high bits never at all; on the floppy that was clusters 341, 682, 1023 and every 341 or 342 after.
+
+### Allocation
+
+`allocate_cluster_near(c)` claims the first free cluster after `c`, wrapping round to cluster 2, and marks it as the end of a chain; `allocate_cluster()` searches from the start. A chain being written (`write_file`, `write_file_at`, a directory growing) asks near its own last cluster, so filling a file is one pass over the FAT rather than a scan from the front for every cluster: on a large RAM disk the front can be tens of thousands of clusters long. The scan reads each FAT sector once (`find_in_fat`) and returns `0` when the FAT is full. `free_clusters()` counts the free entries the same way, for the mount sizes of syscall [`0x40`](../abi/syscalls/filesystem.md#0x40-size-of-the-filesystem-a-path-is-on).
+
+A cluster that is handed out keeps what it held: a deleted file's bytes, or on the RAM disk what the memory held at boot, `format` clearing only the FAT and the root. So `zero_cluster` empties every cluster that becomes a directory or is added by `write_file_at`, whose gaps read back as zeros.
 
 ---
 
 ## Operations
 
-### Read File (`read_file`)
+### Read File (`read_file`, `read_range`)
 
-Follows the cluster chain starting from `start_cluster`:
+`read_file(start_cluster, buf)` follows the cluster chain and reads every sector of every cluster into `buf`, whole sectors, stopping at the end of the chain or when the buffer is full; a file longer than the buffer is cut short at its end. It used to read one sector per cluster, which is a whole cluster on the floppy alone, and to loop forever once the buffer was full, so the shell's `read` hung on any file over 4 KiB.
 
-1. Convert cluster → LBA.
-2. Read 512-byte sector into the caller's buffer at offset `count × 512`.
-3. Advance to `read_fat12_entry(cluster)`.
-4. Stop when chain entry ≥ `0xFF8` or the buffer is full; a file longer than the buffer is cut short at its end. (It used to loop forever there instead, so the shell's `read` hung on any file over 4 KiB.)
+`read_range(entry, offset, length, dst)` copies exactly `length` bytes from `offset` into the file, skipping the clusters before it, and returns how many it copied (short at the end of the file). It is what syscalls `0x20` and `0x39` and the ELF loader read with, so none of them copies past the file's size.
 
 ### Write File (`write_file`)
 
 1. If a file with the same name exists: `free_cluster_chain` its old clusters, mark its directory entry `0xE5`.
-2. `allocate_cluster()`: scan FAT entries for `0x000` (free), mark it `0xFFF`, return its index.
-3. Write each 512-byte sector of `data` into allocated clusters; `write_fat12_entry(cluster, next)` to chain them; mark the last cluster `0xFFF`.
-4. `write_dir_entry()`: scan the directory for a free slot (`0x00` or `0xE5`), write the 32-byte entry (name, attr `0x20`, cluster, file_size).
+2. Allocate as many clusters as the data takes, a cluster's worth at a time (not a sector's: a volume of larger clusters got a chain of empty ones), each near the last; chain them with `write_fat_entry` and end the chain.
+3. Write each 512-byte sector of `data` into them.
+4. `write_dir_entry()` adds the 32-byte entry (name, attr `0x20`, cluster, file_size) through `insert_directory_entry`, at the first free slot (`0x00` or `0xE5`) of the directory: anywhere in the root, or anywhere along a subdirectory's chain, which grows by an emptied cluster when it is full. Only the root's first sector used to be looked at, so a root with sixteen files took no more.
 
 ### Write at Offset (`write_file_at`)
 
@@ -224,9 +241,9 @@ Overwrites the 11 name bytes in the directory entry. Does not change cluster cha
 
 1. `allocate_cluster()` for the new directory.
 2. Write a directory entry with `attr = 0x10`, `file_size = 0`.
-3. Zero the cluster's sector.
+3. Zero every sector of the cluster: what was there before would read as entries.
 4. Write `.` (self-pointer) and `..` (parent-pointer) entries into the new cluster.
-5. Mark the new cluster as end-of-chain (`0xFFF`) in the FAT.
+5. Mark the new cluster as end-of-chain in the FAT.
 
 ### Directory Traversal (`for_each_entry`)
 
@@ -279,3 +296,19 @@ Exposed via syscall `0x2B`. Returns four `u64` values written to a userland `Fsc
 | FAT copy sectors | 9 sectors per copy, 2 copies |
 | Max file size | Limited by available clusters × 512 B |
 | Max directory depth (fsck) | 64 |
+
+---
+
+## Formatting (`fs/fat12/format.rs`)
+
+`format(dev, sectors, label)` lays an empty volume onto a block device, choosing the kind from the size:
+
+| Size | Kind | Cluster | Root entries |
+|------|------|---------|--------------|
+| up to about 2 MiB (fewer than 4085 clusters at one sector each) | FAT12 | 512 B | 224 |
+| from there to 32 MiB | FAT16 | 512 B | 512 |
+| larger | FAT16 | the smallest power-of-two number of sectors, up to 64 (32 KiB), that keeps the count below 65525: 2 KiB for 128 MiB | 512 |
+
+One reserved sector, two FATs sized to cover the data area they describe, media byte `0xF8`, and the `"FAT12"` or `"FAT16"` type string at offset 54 that `Filesystem::new` looks for; a volume of more than 65535 sectors keeps its size in the 32-bit field. It refuses a device too small for any data or too large for FAT16 (about 2 GiB), and the narrow band of sizes just past FAT12 that FAT16 at 512 B clusters cannot take.
+
+Only the boot sector, the FATs and the root directory are cleared. The data area is left as it is: no cluster in it is reachable until the FAT hands it out, and whatever takes one clears what it needs to. Clearing it all took as long as writing every sector of the disk, a long pause at every boot on a RAM disk of a sixteenth of the memory.

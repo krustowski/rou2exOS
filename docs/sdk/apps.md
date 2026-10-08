@@ -34,7 +34,7 @@ Programs that use Ethernet need the [`ETH`](#networking) driver running first, s
 |-----|----------|-------------|
 | [`ETH`](https://github.com/krustowski/rou2exOS-apps/tree/master/c/eth) | C | The default Ethernet driver: registers the RTL8139, answers ARP and ICMP, obtains an address by DHCP (or `--ip <addr>`). |
 | [`GARN`](https://github.com/krustowski/rou2exOS-apps/tree/master/c/garn) | C | Small HTTP/1.0 server for sharing files; configured with `--config /mnt/fat/GARN/GARN.CFG`, where `ip` sets a static address (otherwise `ETH`/DHCP manages it). |
-| [`TNT`](https://github.com/krustowski/rou2exOS-apps/tree/master/c/tnt) | C | TELNET server and remote shell on TCP/23, over SLIP or Ethernet. |
+| [`TNT`](https://github.com/krustowski/rou2exOS-apps/tree/master/c/tnt) | C | TELNET server and remote shell on TCP/23, over SLIP or Ethernet. Once Memento has been given credentials, a new connection has to log in with them; until then it gets a `root` shell straight away. |
 | [`CHAT`](https://github.com/krustowski/rou2exOS-apps/tree/master/c/chat) | C | Chatroom server on TCP/9000 with an HTTP front end on TCP/8080. |
 | [`NSK`](https://github.com/krustowski/rou2exOS-apps/tree/master/c/nsk) | C | Network swiss knife: sweeps a subnet given in CIDR notation and lists live hosts. |
 | [`ICMPR`](https://github.com/krustowski/rou2exOS-apps/tree/master/c/icmpresp) | C | ICMP echo responder over SLIP. A Go port lives in `go/icmpresp`. |

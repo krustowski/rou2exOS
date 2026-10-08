@@ -26,13 +26,30 @@ Steps execute in this exact order:
 | 7 | `heap::pmm_heap_init()` | `init/heap.rs` | Init kernel linked-list heap; run smoke test |
 | 8 | `video::print_result(...)` | `init/video.rs` | Call `init_video(fb)` to set `VIDEO_MODE` |
 | 9 | `fs::floppy_check_init()` | `init/fs.rs` | Probe FAT12 floppy; set cwd to `/` |
-| 10 | `fs::vfs_init()` | `init/fs.rs` | Mount `/`, `/mnt/fat`, `/mnt/iso` (if CD present) |
+| 10 | `fs::vfs_init(fat12)` | `init/fs.rs` | Mount `/`, `/mnt/fat` (only if step 9 found a FAT12 volume), `/mnt/tmp`, `/mnt/iso` (if CD present), `/mnt/tar` (if GRUB loaded the archive) |
 | 11 | `color::color_demo()` | `init/color.rs` | Print 16-color swatch to console |
 | 12 | `ascii::ascii_art()` | `init/ascii.rs` | Print kernel splash text |
 | 13 | `process::init_processes()` | `init/process.rs` | Save CR3, init userland heap, create initial tasks |
-| 14 | `pit::pic_pit_init()` | `init/pit.rs` | Remap 8259A PIC; start PIT at 1000 Hz; `sti` |
+| 14 | `debug::dump_debug_log_to_memdisk()` | `debug.rs` | Write the debug log so far to `/mnt/tmp/KERNDBG.LOG` |
+| 15 | `pit::pic_pit_init()` | `init/pit.rs` | Remap 8259A PIC; start PIT at 1000 Hz; `sti` |
 
-Step 14 (`sti`) is the point of no return — from here the PIT fires every 1 ms and the scheduler takes over. `init` never runs again.
+Step 15 (`sti`) is the point of no return — from here the PIT fires every 1 ms and the scheduler takes over. `init` never runs again.
+
+---
+
+## Debug Log
+
+`debug!`, `debugn!` and `debugln!` (`src/debug.rs`) append to `DEBUG_LOG`, an 8 KiB buffer in memory; what does not fit once it is full is dropped. The kernel writes it out at three points:
+
+| When | Where |
+|------|-------|
+| The Multiboot2 framebuffer tag is parsed (step 6) | `DEBUG.TXT` in the floppy's root, and the serial port (COM1) |
+| End of init (step 14) | `/mnt/tmp/KERNDBG.LOG` on the RAM disk |
+| The shell's [`debug`](../shell.md#debug-hidden) command | `DEBUG.TXT`, `KERNDBG.LOG` and serial, each file replaced |
+
+`KERNDBG.LOG` is there for a machine with neither a floppy nor a serial line, such as one booted from a USB stick: `read /mnt/tmp/KERNDBG.LOG` shows it. It is written before the timer starts, while no process can be writing to the RAM disk, so it holds everything up to that point and nothing logged afterwards until `debug` is run.
+
+The write at step 6 comes before the floppy probe, and on a machine without a floppy it prints `ERR: Could not find the FAT12 label, floppy may not be present` on the boot screen. It is harmless: the log still reaches serial and, later, the RAM disk.
 
 ---
 

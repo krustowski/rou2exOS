@@ -208,7 +208,7 @@ bg garn --config /mnt/fat/GARN/GARN.CFG
 echo INIT.RC done
 ```
 
-Binary names are resolved like in the shell: working directory first, then `/mnt/tar/bin` and `/mnt/iso/bin`, so `bg eth` works without the program being on the floppy. A `fg` line parks `init_rc` until that program exits.
+Binary names are resolved like in the shell: working directory first, then `/mnt/tar/bin` and `/mnt/iso/bin`, so `bg eth` works without the program being on the floppy. `init_rc` starts at `/`, which holds no files, so until a `cd` it takes them from the bin directories. A `fg` line parks `init_rc` until that program exits.
 
 Lines starting with `#` are ignored. Trailing `\r` is stripped (DOS line endings tolerated).
 
@@ -253,7 +253,9 @@ Before starting QEMU, `run_iso_net` also runs a few best-effort host tweaks with
 make test_kernel
 ```
 
-Builds with features `kernel_test,kernel_text` into `target/ktest`, then boots headless QEMU with the `isa-debug-exit` device (`iobase=0xf4`) and serial on stdio. With `kernel_test` enabled, `kernel_main` runs `ktest::run_tests()` right after `init::check::init` instead of entering the scheduler. Each check uses `kassert!`, which exits QEMU on the first failure. QEMU exit code `33` (`0x10 << 1 | 1`) means all tests passed and prints `TESTS PASSED`; anything else prints `TESTS FAILED`.
+Builds with features `kernel_test,kernel_text` into `target/ktest`, then boots headless QEMU with the `isa-debug-exit` device (`iobase=0xf4`) and serial on stdio. With `kernel_test` enabled, `kernel_main` runs `ktest::run_tests()` right after `init::check::init` instead of entering the idle loop. Each check uses `kassert!`, which exits QEMU on the first failure. QEMU exit code `33` (`0x10 << 1 | 1`) means all tests passed and prints `TESTS PASSED`; anything else prints `TESTS FAILED`.
+
+The timer is already running when the tests start, so the processes the floppy's `INIT.RC` starts (`eth`, `tnt`, `garn`) run alongside them, and a run can fail now and then because of it. A floppy whose `INIT.RC` is a single NUL byte gives a quiet run. The tests also expect a floppy: `test_vfs_resolve` needs `/mnt/fat`, which is mounted only when one is found.
 
 Tests in `src/ktest.rs`:
 
@@ -261,8 +263,12 @@ Tests in `src/ktest.rs`:
 |------|--------|
 | `test_fat83` | 8.3 name conversion |
 | `test_heap_alloc` | userland heap `malloc`/`free` |
+| `test_heap_grow` | filling the 4 MiB heap grows it into its extension, which is user accessible, writable and given back by `free` |
 | `test_vfs_resolve` | `/mnt/fat` and `/mnt/iso` prefix resolution |
 | `test_path_normalize` | joining, `..` and relative paths in `vfs::normalize_path` |
+| `test_mount_dir` | `/` lists `mnt`, `/mnt` lists the mount points with their types, and a mount or a path leading nowhere is no mount directory |
+| `test_kerndbg_log` | init left its debug log in `/mnt/tmp/KERNDBG.LOG` |
+| `test_memdisk` | the RAM disk at `/mnt/tmp`: files across clusters, subdirectories, `write_file_at`, delete, and a full disk that keeps earlier files intact |
 
 ### Host unit tests
 

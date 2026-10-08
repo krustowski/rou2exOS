@@ -75,7 +75,7 @@ Set up by `init::fs::vfs_init()`:
 | Path | FsType | Condition |
 |------|--------|-----------|
 | `/` | `Root` | Always |
-| `/mnt/fat` | `Fat12` | Always |
+| `/mnt/fat` | `Fat12` | Only if `floppy_check_init()` found a FAT12 volume; an empty mount would answer everything below it with a disk error |
 | `/mnt/tmp` | `MemDisk` | Always (formatted empty at every boot) |
 | `/mnt/iso` | `Iso9660` | Only if `Iso9660::probe()` succeeds |
 | `/mnt/tar` | `Tar` | Only if GRUB loaded a tar archive as a module |
@@ -99,10 +99,26 @@ Example: path `b"/mnt/fat/SUBDIR/FILE.TXT"` → `(Fat12, b"SUBDIR/FILE.TXT")`.
 | `try_iso9660_absolute(path)` | Returns `Some(rel)` if `path` resolves under the Iso9660 mount |
 | `try_fat_absolute(path)` | Returns `Some((fs_type, rel))` if `path` resolves under a writable FAT12 mount (Fat12 or MemDisk) |
 | `try_readonly_absolute(path)` | Returns `Some((fs_type, rel))` if `path` resolves under a read-only mount (Iso9660 or Tar) |
+| `mount_dir(dir)` | Returns the names directly below `dir` when it is `/` or on the way to a mount (see below) |
 | `mount(path, fs_type)` | Add a mount entry |
 | `umount(path)` | Remove a mount entry by path |
 
 These are the primary VFS entry points used by syscall handlers in `abi/syscall.rs`. Both wait (bounded spin) for the mount table lock instead of giving up at the first contention: a missed lock used to make an absolute path look relative and be resolved in the wrong directory.
+
+`FsType::name()` gives the name `mount` and `dir` print for a type (`rootfs`, `fat12`, `iso9660`, `tar`, `memdisk`).
+
+### Directories Made of Mounts
+
+`/` is no filesystem of its own, and neither is `/mnt`: they hold nothing but the way to the mount points. `VfsTable::mount_dir(dir)` lists such a directory from the mount table alone. For each mount below `dir` it takes the name one level down, once (`/mnt/fat` and `/mnt/tmp` both give `mnt` below `/`), and returns them in a `MountDir`, each with the type of the mount it is, or `Root` for a directory that only leads to mounts further down:
+
+| `dir` | Result |
+|-------|--------|
+| `/` | `mnt` (`Root`); always a `MountDir`, even with nothing mounted |
+| `/mnt` | `fat` (`Fat12`), `tmp` (`MemDisk`), `iso` (`Iso9660`), `tar` (`Tar`), whichever are mounted |
+| `/mnt/tmp`, `/mnt/iso/bin` | `None`: inside a mounted filesystem, which lists itself |
+| `/nope`, `/mn` | `None`: leads to no mount |
+
+`dir` is absolute and normalized, and is matched without regard to case, as `resolve` matches. The kernel shell's `cd` accepts such a directory (storing cluster 0), and its `dir` prints the listing; see [The Root Directory](../shell.md#the-root-directory).
 
 ### Syscall Dispatch Pattern
 
@@ -116,7 +132,7 @@ path → try_readonly_absolute(path)
 
 `RoFs` (`fs/rofs.rs`) is an enum over `Iso9660` and `Tar`; both hand out `IsoEntry`, so a handler treats the two alike. Writes to either are refused.
 
-`vfs_resolve_fat12(path)` answers `(rel, base_cluster, dev)`. A path under `/mnt/fat` or `/mnt/tmp` is stripped of its mount prefix and starts at that volume's root; anything else is resolved from the working directory's cluster, on the volume the working directory is on (`FatDev::cwd()`).
+`vfs_resolve_fat12(path)` answers `(rel, base_cluster, dev)`. A path under `/mnt/fat` or `/mnt/tmp` is stripped of its mount prefix and starts at that volume's root; anything else is resolved from the working directory's cluster, on the volume the working directory is on (`FatDev::cwd()`). A working directory on no FAT mount (`/`, `/mnt`) still sends such a name to the floppy's root, as it always has; the kernel shell, which goes by `FatDev::cwd_mounted()`, does not.
 
 ### `FatDev` (`fs/fatdev.rs`)
 
@@ -126,8 +142,9 @@ The floppy and the RAM disk run the same `fat12::Filesystem`, which is generic o
 |----------|-------------|
 | `FatDev::of(fs_type)` | The device behind a `Fat12` or `MemDisk` mount |
 | `FatDev::for_path(abs)` | The volume an absolute path lies on, and the path below the mount |
-| `FatDev::for_dir(abs)` | Like `for_path`, but a path under no FAT mount is the floppy's (a bare path under `/` has always named the floppy) |
-| `FatDev::cwd()` | The working directory's volume and cluster |
+| `FatDev::for_dir(abs)` | Like `for_path`, but a path under no FAT mount is the floppy's (a bare path under `/` has always named the floppy to the syscalls) |
+| `FatDev::cwd()` | The working directory's volume and cluster, by `for_dir`: the syscalls' view |
+| `FatDev::cwd_mounted()` | The same, or `None` when the working directory is on no FAT volume (`/`, `/mnt`, the ISO, the archive): the kernel shell's view |
 
 A FAT cluster number alone no longer identifies a directory: cluster 5 on the floppy and cluster 5 on the RAM disk are different places. The volume is always taken from the path next to it; for the working directory that is `SYSTEM_CONFIG.path`, which is why `chdir` (syscall `0x2E`) stores the normalized absolute path.
 
@@ -140,7 +157,7 @@ The current working directory is stored in `SYSTEM_CONFIG` (`init/config.rs`) as
 | Field | Type | Description |
 |-------|------|-------------|
 | `path` | `[u8; 32]` | String representation (e.g. `/mnt/fat/SUBDIR`) |
-| `path_cluster` | `u16` | FAT12 cluster for the directory on the volume `path` lies on (0 = root, 0 for ISO9660) |
+| `path_cluster` | `u16` | FAT12 cluster for the directory on the volume `path` lies on (0 = root; 0 for ISO9660, the archive, `/` and `/mnt`) |
 
 Changed by syscall `0x2E` (chdir) and the shell's `cd`, which validate that the target exists as a directory before updating.
 
@@ -162,6 +179,8 @@ The module depends on nothing else in the kernel so the host unit tests (`tests/
 `MemDisk` (`memdisk/block.rs`) is a writable `BlockDevice` over a `&'static Mutex<[u8]>`. Each sector is copied with interrupts off, so a task preempted mid-copy cannot leave the lock held. A sector number past the end reads back as zeros and is dropped on write, so a bad cluster number read from a damaged directory cannot index out of bounds.
 
 `memdisk::TMP` is the disk behind `/mnt/tmp`: a 512 KiB (`TMP_SIZE`) static buffer in the kernel's `.bss`. At boot, `vfs_init()` calls `memdisk::format_tmp()`, which lays an empty FAT12 volume onto it with `fat12::format::format()`, and then mounts it. From then on it behaves exactly like the floppy: files, subdirectories, `rename`, `delete`, `write_file_at` and ELF loading from the working directory all work there. Nothing on it survives a reboot.
+
+The first file on it is `KERNDBG.LOG`, the kernel's debug log as it stood at the end of init; the shell's `debug` command rewrites it with the log as it is now. See [Debug Log](../init/overview.md#debug-log).
 
 `fat12::format::format(dev, sectors, label)` is a small, generic mkfs. It writes one reserved sector, two FATs sized to cover the data area, a 224-entry root directory, one sector per cluster, and media byte `0xF8`. The extended boot record carries the `FAT12` type string that `Filesystem::new` looks for. It refuses volumes too small for any data or too large for FAT12 (4085 clusters or more, about 2 MiB at one sector per cluster).
 

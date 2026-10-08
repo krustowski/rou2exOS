@@ -113,7 +113,7 @@ When `Tab` (scancode `0x0F`) is pressed:
 
 1. Split the current input buffer at the first space: `(cmd, prefix)`.
 2. If `prefix` is empty, run `cmd::handle(b"help")` and return.
-3. Scan FAT12 directory entries in the current working directory.
+3. Scan FAT12 directory entries in the current working directory (`FatDev::cwd_mounted()`). When it is on no FAT12 volume (`/`, `/mnt`, the ISO or the archive) there is nothing to scan, and Tab does nothing.
 4. Pad `prefix` to 11 characters (FAT 8.3 name format: `pad_prefix()`).
 5. On a match:
    - Backspace over `prefix.len()` characters.

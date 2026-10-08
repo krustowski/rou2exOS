@@ -31,6 +31,8 @@ The shell never exits. Starting a foreground process (`fg`) records the shell as
 
 When Tab is pressed, the current input is treated as a filename prefix. The shell scans the current FAT12 directory (via `for_each_entry`) for entries whose 8.3 name starts with the uppercased prefix. If exactly one match exists, the buffer is replaced with the lowercased match name. Multiple matches are printed but the buffer is left unchanged.
 
+Nothing is completed while the working directory is on no FAT12 volume: `/`, `/mnt`, the ISO or the archive.
+
 ---
 
 ## Command Dispatch
@@ -46,6 +48,21 @@ When Tab is pressed, the current input is treated as a filename prefix. The shel
 
 ---
 
+## The Root Directory
+
+`/` is the root of the VFS mount table, not a disk. It and `/mnt` hold nothing but the way to the mounted filesystems: `dir` lists what is mounted below them, `cd` moves through them, and the commands that work on files (`read`, `rm`, `write`, `mkdir`, `mv`) refuse to work there. The shell starts at `/`, so the first `dir` after boot shows `mnt`. Every file lives below a mount:
+
+| Path | Filesystem | Mounted |
+|------|------------|---------|
+| `/mnt/fat` | the FAT12 floppy | only when a FAT12 floppy was found at boot |
+| `/mnt/tmp` | the FAT12 RAM disk | always (empty at every boot) |
+| `/mnt/iso` | the CD, ISO9660, read-only | when a CD is found |
+| `/mnt/tar` | the boot medium archive, read-only | when GRUB loaded one |
+
+A bare path under `/` used to name the floppy's root: `dir` at `/` listed the floppy, and `write` there wrote to it. Booted from a USB stick, with no floppy, that was a directory that could only answer with disk errors. User programs still see it that way; see [Filesystem syscalls](abi/syscalls/filesystem.md).
+
+---
+
 ## Built-in Commands
 
 Commands marked **hidden** do not appear in `help` output.
@@ -56,7 +73,7 @@ Plays the built-in MIDI melody via the PC speaker (`audio::midi::play_melody`), 
 
 ### `bg <binary>`
 
-Loads and runs an ELF binary in the **background** (shell remains interactive). The binary name must be ≤ 8 characters; `.elf` is appended when no extension is given. The binary is looked up in the current working directory first (the FAT12 floppy, or the ISO when the cwd is under `/mnt/iso`), then in `/mnt/tar/bin` and `/mnt/iso/bin`, so the programs shipped on the boot medium can be started from anywhere.
+Loads and runs an ELF binary in the **background** (shell remains interactive). The binary name must be ≤ 8 characters; `.elf` is appended when no extension is given. The binary is looked up in the current working directory first (when that is on a FAT12 volume, the ISO or the archive; `/` and `/mnt` hold no files), then in `/mnt/tar/bin` and `/mnt/iso/bin`, so the programs shipped on the boot medium can be started from anywhere.
 
 ```
 bg eth
@@ -79,14 +96,15 @@ The argument is joined onto the current path and `.` and `..` are collapsed
 before anything is looked up, so a relative name is always resolved on the
 filesystem the working directory sits on.
 
-- `cd /` — reset to VFS root.
+- `cd /` — reset to the VFS root (see [The Root Directory](#the-root-directory)).
+- `cd /mnt` — the directory holding the mount points.
 - `cd ..` — go to parent; at the root it stays at the root.
-- `cd <name>` — relative to the current directory, on FAT12 or ISO9660.
-- `cd /mnt/fat/<path>` — absolute FAT12 path.
+- `cd <name>` — relative to the current directory: a mount point, or a directory on FAT12 or ISO9660.
+- `cd /mnt/fat/<path>` — absolute FAT12 path (only with a FAT12 floppy).
 - `cd /mnt/tmp/<path>` — absolute path on the FAT12 RAM disk.
 - `cd /mnt/iso/<path>` — absolute ISO9660 path (validates directory exists).
 
-Multi-component paths (`foo/bar`, `../bar`) are supported.
+Multi-component paths (`foo/bar`, `../bar`) are supported. A path that is neither `/`, nor on the way to a mount, nor on a mounted filesystem is refused with `no such directory`.
 
 The working directory is kept in a 32-byte field that userland also reads back
 through `sysinfo`, so a path longer than that is refused with `cd: path too
@@ -98,7 +116,12 @@ Clears the screen (fills framebuffer/VGA buffer with black).
 
 ### `debug` *(hidden)*
 
-Dumps the in-memory debug ring buffer to the display and attempts to write it to `DEBUG.TXT` on FAT12.
+Writes the in-memory debug log (`debug!`/`debugln!`, 8 KiB) to `DEBUG.TXT` in the floppy's root when there is a FAT12 floppy, to `/mnt/tmp/KERNDBG.LOG` on the RAM disk, and to the serial port (COM1). Each file is replaced, so `KERNDBG.LOG` written at boot (see [Init](init/overview.md#debug-log)) is brought up to date.
+
+```
+debug
+read /mnt/tmp/KERNDBG.LOG
+```
 
 ### `dir [path]`
 
@@ -115,6 +138,19 @@ dir /mnt/iso
 dir GFX
 dir games
 dir ../bin
+```
+
+At `/` and `/mnt` it lists the mount table instead: a directory on the way to mounts as `[ DIR ]`, a mount point as `[MOUNT]` with its filesystem type, as `mount` names it. On a machine without a floppy, `fat` is not there.
+
+```
+root@rourex:/ > dir
+ mnt            [ DIR ]
+root@rourex:/ > cd mnt
+root@rourex:/mnt > dir
+ fat            [MOUNT] fat12
+ tmp            [MOUNT] memdisk
+ iso            [MOUNT] iso9660
+ tar            [MOUNT] tar
 ```
 
 ### `echo <text>`
@@ -200,7 +236,7 @@ Total RAM: 2047 MiB (2146959360 bytes)
 
 ### `mkdir <dirname>`
 
-Creates a subdirectory in the current FAT12 directory. Name is uppercased to 8.3 format. Maximum name length: 11 bytes.
+Creates a subdirectory in the current FAT12 directory. Name is uppercased to 8.3 format. Maximum name length: 11 bytes. Refused with `not on a writable volume` when the working directory is on no FAT12 volume (`/`, `/mnt`, the ISO or the archive).
 
 ```
 mkdir MYDIR
@@ -208,7 +244,7 @@ mkdir MYDIR
 
 ### `mount`
 
-Lists all active VFS mount table entries. Output: one line per mount, format `<path> (<fstype>)`.
+Lists all active VFS mount table entries. Output: one line per mount, format `<path> (<fstype>)`. `/mnt/fat` is there only when a FAT12 floppy was found at boot.
 
 ```
 / (rootfs)
@@ -220,7 +256,7 @@ Lists all active VFS mount table entries. Output: one line per mount, format `<p
 
 ### `mv <old> <new>`
 
-Renames a file in the current FAT12 directory. Both names are converted to 8.3 format. Does not change the file's data or cluster chain.
+Renames a file in the current FAT12 directory. Both names are converted to 8.3 format. Does not change the file's data or cluster chain. Refused with `not on a writable volume` outside a FAT12 volume, as `mkdir` is.
 
 ```
 mv FOO.TXT BAR.TXT
@@ -228,7 +264,7 @@ mv FOO.TXT BAR.TXT
 
 ### `read <filename>`
 
-Prints the contents of a file. Supports both FAT12 (relative or absolute) and ISO9660 paths. Reads up to 4096 bytes.
+Prints the contents of a file. Supports both FAT12 (relative or absolute) and ISO9660 paths. Reads up to 4096 bytes; a longer file is cut short. A name that lies on no mounted filesystem (a bare name at `/`, say) answers `no such file`.
 
 ```
 read HELLO.TXT
@@ -243,7 +279,7 @@ Force resets the VGA video mode to `0x03` (text mode).
 
 ### `rm <filename>`
 
-Deletes a file from the current FAT12 directory: its cluster chain is returned to the FAT, then the directory entry is marked `0xE5` (deleted). Directories are not matched.
+Deletes a file from the current FAT12 directory: its cluster chain is returned to the FAT, then the directory entry is marked `0xE5` (deleted). Directories are not matched. Outside a FAT12 volume it answers `no such file`; it used to delete from the floppy's root there, even with the working directory on the ISO.
 
 ```
 rm OLD.TXT
@@ -292,7 +328,7 @@ Version: 0.11.0
 
 ### `write <name> <text>`
 
-Writes `<text>` to `<NAME>.TXT` in the current FAT12 directory, replacing the file if it exists. The name is at most 8 characters, and `.TXT` is always appended. It works on the floppy and on the RAM disk at `/mnt/tmp`.
+Writes `<text>` to `<NAME>.TXT` in the current FAT12 directory, replacing the file if it exists. The name is at most 8 characters, and `.TXT` is always appended. It works on the floppy and on the RAM disk at `/mnt/tmp`, and is refused with `not on a writable volume` anywhere else.
 
 ```
 cd /mnt/tmp
@@ -321,7 +357,7 @@ Falls back to `$ ` if the config lock is contended.
 `bg` and `fg` both delegate to `input::elf::run_elf(filename, args, mode)`:
 
 1. Asks the scheduler which slot the program will occupy (`next_free_slot`); fails with `no free process slot` when all ten are held by live processes.
-2. Finds the ELF file — current working directory first (FAT12, or ISO9660 when the cwd is under `/mnt/iso`), then `/mnt/tar/bin`, then `/mnt/iso/bin` — and stages it at a per-slot scratch address.
+2. Finds the ELF file — current working directory first (when it is on FAT12, ISO9660 or the archive; at `/` and `/mnt` the floppy is no longer probed), then `/mnt/tar/bin`, then `/mnt/iso/bin` — and stages it at a per-slot scratch address.
 3. Copies the `PT_LOAD` segments into the slot's private 2 MiB physical frame and builds a page table that maps it at `0x600_000`.
 4. Pushes the argv frame onto the slot's initial user stack and creates the scheduler task at the ELF entry point.
 5. `Foreground`: the launcher (the shell, or `init_rc`) is recorded as the child's waiter and parked until the child ends.

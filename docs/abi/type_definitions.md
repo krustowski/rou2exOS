@@ -121,13 +121,13 @@ Each entry describes one VFS mount point.  The kernel writes up to 8 entries int
 |-------|------|-------------|
 | `path` | `uint8_t[32]` | Mount path, **not** NUL-terminated; use `path_len` |
 | `path_len` | `uint8_t` | Number of valid bytes in `path` |
-| `fs_type` | `uint8_t` | `0`=none, `1`=rootfs, `2`=fat12, `3`=iso9660, `4`=tar |
+| `fs_type` | `uint8_t` | `0`=none, `1`=rootfs, `2`=fat12, `3`=iso9660, `4`=tar, `5`=memdisk |
 
 ```rust
 pub struct MountInfo {
     pub path: [u8; 32],
     pub path_len: u8,
-    pub fs_type: u8,   // 0=none 1=rootfs 2=fat12 3=iso9660 4=tar
+    pub fs_type: u8,   // 0=none 1=rootfs 2=fat12 3=iso9660 4=tar 5=memdisk
 }
 ```
 
@@ -135,7 +135,7 @@ pub struct MountInfo {
 typedef struct {
     uint8_t path[32];
     uint8_t path_len;
-    uint8_t fs_type;   /* 0=none, 1=rootfs, 2=fat12, 3=iso9660, 4=tar */
+    uint8_t fs_type;   /* 0=none, 1=rootfs, 2=fat12, 3=iso9660, 4=tar, 5=memdisk */
 } __attribute__((packed)) MountInfo_T;
 ```
 

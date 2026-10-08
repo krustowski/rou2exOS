@@ -156,17 +156,21 @@ If any allocation falls outside the heap range, the function returns `Result::Fa
 
 1. Calls `Floppy::init()` and attempts to open the FAT12 filesystem.
 2. Returns `Result::Passed` on success, `Result::Skipped` on failure (floppy missing is non-fatal).
-3. Always sets `SYSTEM_CONFIG` path to `b"/"` cluster `0` regardless of outcome.
+3. Always sets `SYSTEM_CONFIG` path to `b"/"` cluster `0` regardless of outcome. `/` is the root of the mount table, not the floppy's root.
 
-### `vfs_init()`
+`init::check` passes the result on to `vfs_init`: only `Passed` mounts `/mnt/fat`.
 
-Populates the VFS mount table with three entries:
+### `vfs_init(fat12)`
+
+Populates the VFS mount table:
 
 | Path | FS type | Notes |
 |------|---------|-------|
 | `/` | `Root` | Always mounted |
-| `/mnt/fat` | `Fat12` | Always mounted; operations fail gracefully if floppy absent |
+| `/mnt/fat` | `Fat12` | Mounted only if `fat12` is set, i.e. `floppy_check_init()` found a FAT12 volume; with no floppy there is no `/mnt/fat` at all |
+| `/mnt/tmp` | `MemDisk` | Always mounted, once `memdisk::format_tmp()` has laid an empty FAT12 volume onto the RAM disk |
 | `/mnt/iso` | `Iso9660` | Mounted only if `Iso9660::probe()` succeeds (CD present) |
+| `/mnt/tar` | `Tar` | Mounted only if GRUB loaded the boot medium archive as a module |
 
 ---
 

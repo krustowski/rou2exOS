@@ -2,7 +2,7 @@
 
 File name arguments accept either a bare name relative to the current working directory (e.g. `FOO.TXT`) or an absolute VFS path (e.g. `/mnt/fat/FOO.TXT`, `/mnt/tmp/FOO.TXT`, `/mnt/iso/grub/grub.cfg`). Both forms are resolved through the VFS mount table. ISO9660 is mounted read-only at `/mnt/iso`.
 
-`/mnt/tmp` is a FAT12 RAM disk (512 KiB, empty at every boot). Every FAT12 syscall below works on it exactly as on the floppy at `/mnt/fat`, which makes it the scratch space for programs booted without a floppy. A bare name goes to whichever of the two volumes the working directory is on.
+`/mnt/tmp` is a FAT12 RAM disk (512 KiB, empty at every boot but for the kernel's `KERNDBG.LOG`). Every FAT12 syscall below works on it exactly as on the floppy at `/mnt/fat`, which makes it the scratch space for programs booted without a floppy: `/mnt/fat` is mounted only when a FAT12 floppy is found at boot. A bare name goes to whichever of the two volumes the working directory is on. A working directory on neither (`/`, `/mnt`) still sends it to the floppy's root, unlike the kernel shell, where `/` is only the root of the mount table.
 
 Relative names may reach into subdirectories (`GFX/19.IMG`): every component is walked, not just the working directory. Mount prefixes are matched case-insensitively, and names below a FAT12 mount are folded to 8.3 upper case.
 
@@ -94,7 +94,7 @@ Execute a flat binary executable (`.BIN` usually).
 
 Execute an ELF64 executable (`.ELF`). Auto-appends `.elf`/`.ELF` if no extension given. Returns the new process PID on success, `0` on failure.
 
-The file is looked up in the caller's working directory (FAT12, or ISO9660 when the working directory is under `/mnt/iso`), then in `/mnt/tar/bin` and `/mnt/iso/bin`. The program is started in the background; it fails when all ten process slots are held by live processes.
+The file is looked up in the caller's working directory (when that is on FAT12 under `/mnt/fat` or `/mnt/tmp`, or on ISO9660 or the archive; at `/` and `/mnt` nothing is looked up there), then in `/mnt/tar/bin` and `/mnt/iso/bin`. The program is started in the background; it fails when all ten process slots are held by live processes.
 
 | Argument 1 | Argument 2 | Implemented |
 |------------|------------|-------------|

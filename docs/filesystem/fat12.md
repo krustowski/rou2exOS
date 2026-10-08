@@ -2,7 +2,7 @@
 
 FAT12 is the read/write filesystem used on both the 1.44 MB floppy and the RAM disk at `/mnt/tmp`. `FatDev` selects the device from the mount or working directory, so directory clusters are interpreted on the correct volume. It is accessible as:
 
-- Absolute paths under `/mnt/fat/` or `/mnt/tmp/`
+- Absolute paths under `/mnt/fat/` (mounted only when a FAT12 floppy is found at boot) or `/mnt/tmp/`
 - Bare filenames relative to the current working directory (cluster stored in `SYSTEM_CONFIG`)
 
 ---
@@ -188,7 +188,7 @@ Follows the cluster chain starting from `start_cluster`:
 1. Convert cluster → LBA.
 2. Read 512-byte sector into the caller's buffer at offset `count × 512`.
 3. Advance to `read_fat12_entry(cluster)`.
-4. Stop when chain entry ≥ `0xFF8` or buffer is exhausted.
+4. Stop when chain entry ≥ `0xFF8` or the buffer is full; a file longer than the buffer is cut short at its end. (It used to loop forever there instead, so the shell's `read` hung on any file over 4 KiB.)
 
 ### Write File (`write_file`)
 

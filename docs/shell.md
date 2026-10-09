@@ -218,6 +218,19 @@ nic nvm <word>        # read a PCH flash NVM word
 
 Shows what `hlt` and `reboot` will use on this machine: the root table GRUB passed, the PM1 control ports, the ACPI mode switch, the `\_S5_` sleep types and the reset register. Useful to photograph when power-off or restart does not work on a particular board.
 
+### `usb`
+
+Lists the USB host controllers on the PCI bus (UHCI, OHCI, EHCI, xHCI) and whether the firmware still drives them: `firmware` when it holds the controller (EHCI/xHCI's BIOS-owned semaphore, OHCI's interrupt routing, UHCI's port 60h/64h traps), and whether the controller can raise SMIs. On Intel cores from Nehalem on it also prints the number of SMIs taken since power-on (`MSR_SMI_COUNT`).
+
+```
+00:14.0  xHCI  8086:a36d  firmware, SMIs on
+SMIs since power-on: 5214
+```
+
+r2 has no USB stack: a USB keyboard and mouse work only because the firmware emulates PS/2 ones from System Management Mode, and it keeps every USB controller to do so. Each event on those controllers is an SMI, which stops the whole machine and which no PIC mask can stop. Pulling out a USB stick is one such event, and some firmware takes seconds over it. If the SMI count jumps across such a freeze, the freeze happened in the firmware.
+
+`usb take` takes every controller from the firmware the way Linux does at boot (`src/usb/`): it asks for ownership and waits up to a second, takes it anyway if the firmware does not answer (`taken by force`), turns the SMIs off and stops the controller. After that, pulling out a stick does nothing, and **a USB keyboard or mouse stops working until the next boot**. The `usb=os` kernel option does the same at boot (see [Taking USB from the Firmware](build.md#taking-usb-from-the-firmware)).
+
 ### `kill <pid>`
 
 Kills the process with the given PID — the number `ts` prints — via `task::scheduler::kill_by_id`. PIDs are not slots: slots are reused, PIDs are not. Its page tables and heap blocks are released and a launcher waiting on it is woken. Prints `kill: no such PID` if nothing live has that PID.

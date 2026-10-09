@@ -140,7 +140,7 @@ See [Video and Audio syscalls](../abi/syscalls/video_audio.md) for request layou
 
 ### Pointer Constraints
 
-Buffers passed to video syscalls must lie wholly inside the program image (`0x600_000 – 0xA00_000`) or wholly inside the userland heap (`0xC00_000 – 0xFFF_FFF`) or its allocated extension. See [Pointer Arguments](../abi/syscall_specification.md#pointer-arguments). The whole buffer is checked: 64000 bytes for `0x13`, `width × height × 4` for `0x17`.
+Buffers passed to video syscalls must lie wholly inside the program image and initial stacks (`0x400_000 – 0xA00_000`) or wholly inside the userland heap (`0xC00_000 – 0xFFF_FFF`) or its allocated extension. See [Pointer Arguments](../abi/syscall_specification.md#pointer-arguments). The whole buffer is checked: 64000 bytes for `0x13`, `width × height × 4` for `0x17`.
 
 The exception is `map_vram` (0x14), which maps `0xA00_000` into the calling process's page table using a P1 (4 KiB) sub-table allocated from `PAGE_TABLE_POOL`. After `map_vram`, the process can write to VGA VRAM directly at that virtual address without going through a syscall.
 

@@ -32,13 +32,14 @@ All values passed into a syscall are 64-bit.
 
 ### Entry Stub
 
-The interrupt gate for `0x7f` is a naked stub (`syscall_handler` in `src/abi/syscall.rs`) that saves the general-purpose registers, calls the dispatcher `syscall_inner(arg1, arg2, syscall_no)` and returns with `iretq`:
+The interrupt gate for `0x7f` is a naked stub (`syscall_handler` in `src/abi/syscall.rs`) that saves the general-purpose registers, calls the dispatcher `syscall_inner(arg1, arg2, syscall_no, arg3)` and returns with `iretq`:
 
 ```
 cld                 ; Rust expects forward string operations
 push rax ... r15     ; every GPR except R9
 sub rsp, 8          ; align the stack for the Rust call
 mov rdx, rax         ; syscall number becomes the 3rd C argument
+                     ; RCX, untouched, is the 4th: the optional argument 3
 call syscall_inner
 mov r9, rax          ; keep the result across the pops
 add rsp, 8
@@ -50,13 +51,13 @@ iretq
 Consequences for callers:
 
 - **The number is read from `RAX`.** Setting `RDX` alone is not enough; libc++r2 sets both to be safe.
-- **There are only two arguments.** Anything in `RDX` or `RCX` is not seen by the dispatcher. Syscalls that need more take a pointer to a request struct (e.g. `0x39`, `0x3a`).
-- **`R9` is clobbered** by every syscall and must be declared as such in inline assembly.
+- **Two arguments, and an optional third in `RCX`.** `RDX` is overwritten with the number before the call, so it never reaches a syscall. `RCX` is handed to the dispatcher as argument 3, but only a syscall that asks for it reads it, and only when the caller opts in: [`0x1d`](syscalls/video_audio.md#0x1d-capture-and-scale-to-rgb24) takes it as a metadata pointer when bit 63 of argument 2 is set, because older wrappers may leave anything in `RCX`. Every other syscall has two arguments; those that need more take a pointer to a request struct (e.g. `0x39`, `0x3a`).
+- **`R9` is clobbered** by every syscall and must be declared as such in inline assembly. Every other register but `RAX` comes back as it went in, so a compiler may keep a value in `RCX`, `RDX`, `RSI` or `RDI` across the call.
 - **Interrupts are re-enabled** at the top of the dispatcher, so a long syscall can be preempted by the scheduler.
 
 ### Pointer Arguments
 
-Every syscall that takes a pointer checks the whole buffer it will touch, not just its first byte. The buffer must lie wholly inside one user region: the program image and stack (`0x600_000..0xA00_000`), the userland heap (`0xC00_000..0x1000_000`, handed out by syscall `0x0a`), or the heap's extension once the heap has grown into it (from `0xA000_000`; see [`0x0a`](syscalls/sysinfo_mem_mgmt.md#0x0a-allocate-memory-on-heap)). Otherwise the call fails with `InvalidInput` (or the call's own error value). A buffer may not straddle the gap between two regions. NUL-terminated strings are read up to the end of the region they start in.
+Every syscall that takes a pointer checks the whole buffer it will touch, not just its first byte. The buffer must lie wholly inside one user region: the program image and the initial user stacks (`0x400_000..0xA00_000`: the stacks of slots 16–31, the image, then the stacks of slots 0–15; see [Memory Overview](../memory/overview.md#user-stack-tops-by-slot)), the userland heap (`0xC00_000..0x1000_000`, handed out by syscall `0x0a`), or the heap's extension once the heap has grown into it (from `0xA000_000`; see [`0x0a`](syscalls/sysinfo_mem_mgmt.md#0x0a-allocate-memory-on-heap)). Otherwise the call fails with `InvalidInput` (or the call's own error value). A buffer may not straddle the gap between two regions. NUL-terminated strings are read up to the end of the region they start in.
 
 ### Syscall Return Codes
 
@@ -65,6 +66,7 @@ Most syscalls return one of these codes. Syscalls that return a count, an addres
 | Code (uint64) | Meaning |
 |---------------|---------|
 | `0x00` | `Okay` |
+| `0xf9` | `Unchanged` — nothing new since the caller last asked; nothing was copied (`0x1d` with metadata) |
 | `0xfa` | `Busy` — a kernel lock could not be taken in time; retry |
 | `0xfb` | `NotImplemented` |
 | `0xfc` | `InvalidInput` |

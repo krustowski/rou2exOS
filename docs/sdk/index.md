@@ -9,6 +9,7 @@ The SDK lives in the [rou2exOS-apps](https://github.com/krustowski/rou2exOS-apps
 | C | `c/libcr2` | Syscall wrappers, `printf`, strings, a TCP/IP stack (ARP, ICMP, DHCP, TCP) | [libcr2](libcr2.md) |
 | C++ | `cpp/libc++r2` | A freestanding C++23 runtime and standard library: containers, strings, formatted output, `expected`, coroutines, filesystem, graphics, input | [libc++r2](libcxxr2.md) |
 | Go (TinyGo) | `go/libgor2`, `go/r2net`, `go/tinygo-r2` | The syscall binding, a TCP/IP stack with DNS and an HTTP/1.0 client, and the TinyGo target that makes Go run at all | [libgor2](libgor2.md) |
+| C, on `r2` | `c/tcc` | TinyCC running on `r2` itself, with a small C library (stdio, `printf`, strings, time, `setjmp`), its headers and crt files, and libcr2, in the boot image | [TCC](tcc.md) |
 | NASM, Rust | — | Minimal examples calling `int 0x7f` directly | — |
 
 The programs shipped with the kernel are listed on the [Application Suite](apps.md) page.
@@ -21,19 +22,25 @@ The programs shipped with the kernel are listed on the [Application Suite](apps.
 rou2exOS-apps/
 ├── c/
 │   ├── libcr2/          the C library (+ _crt0.asm)
+│   ├── tcc/             TinyCC on r2, and the C library its programs use
 │   ├── linker.ld        shared linker script for C programs
 │   ├── Makefile.tmpl    shared build rules for C programs
 │   └── <app>/           one directory per program
 ├── cpp/
 │   ├── libc++r2/        the C++ runtime and standard library
 │   ├── example-print/   the minimal C++ program, no library
-│   └── memento-hello/   the Memento GUI demo
+│   ├── memento-hello/   the Memento GUI demo
+│   ├── r2web/           the browser process behind Memento's Web window
+│   ├── jug/             the program manager
+│   └── mpegplay/        the MPEG-1 player behind Memento's Video window
 ├── go/
 │   ├── libgor2/         the syscall binding
 │   ├── r2net/           the TCP/IP stack
+│   ├── r2tls/           HTTPS over r2net (BearSSL through Cgo)
 │   ├── tinygo-r2/       the TinyGo target (runtime hooks, r2.ld, r2.S)
 │   ├── Makefile.tmpl    shared build rules for Go programs
 │   └── <app>/           one directory per program
+├── bsh/               example scripts for the shells (.BSH)
 ├── nasm/
 └── rust/
 ```
@@ -66,12 +73,13 @@ The initial stack is small and sits in memory shared with other processes, so ev
 Each process gets a **private 2 MiB frame mapped at `0x600_000`**, which has to hold code, data, `.bss`, the private stack and (for C++ and Go) the heap. The kernel refuses to load a segment that ends past `0xA00_000`.
 
 ```
-0x600_000  ┌──────────────────────────────┐
+0x400_000  ┌──────────────────────────────┐
+           │ initial stacks, slots 16-31  │  shared, identity-mapped
+0x600_000  ├──────────────────────────────┤
            │ .text .rodata .data .bss     │  private to this process
            │ private stack, private heap  │
 0x800_000  ├──────────────────────────────┤  <-- stay below this line
-           │ other processes' initial     │  shared, identity-mapped
-           │ stacks (per-slot table)      │
+           │ initial stacks, slots 0-15   │  shared, identity-mapped
 0xA00_000  ├──────────────────────────────┤  <-- segments may not end past here
            │ VGA window (syscall 0x14)    │
 0xC00_000  ├──────────────────────────────┤
@@ -83,7 +91,7 @@ See [Memory Overview](../memory/overview.md) for how the frame is backed physica
 
 ### Pointers passed to syscalls
 
-Every syscall that takes a pointer checks the whole buffer it will touch. The buffer must lie wholly inside the process image (`0x600_000–0xA00_000`) or wholly inside the kernel's user heap (syscall `0x0a`, `0xC00_000–0xFFF_FFF`); otherwise the call returns `InvalidInput` (`0xfc`). Heap memory can be handed to syscalls directly, so a program too large to keep its heap in the image can move it to the user heap (libc++r2's `R2_HEAP_ARENA_KERNEL` and `R2_HEAP_ARENA_GROWING`; [Memento](memento.md) uses the latter), and Go can hand a `KMalloc` block to any syscall through `libgor2.KBytes`. Kernels before this check accepted only the image, and such a program will not run on them.
+Every syscall that takes a pointer checks the whole buffer it will touch. The buffer must lie wholly inside the process image and the initial stacks (`0x400_000–0xA00_000`) or wholly inside the kernel's user heap (syscall `0x0a`, `0xC00_000–0xFFF_FFF`); otherwise the call returns `InvalidInput` (`0xfc`). Heap memory can be handed to syscalls directly, so a program too large to keep its heap in the image can move it to the user heap (libc++r2's `R2_HEAP_ARENA_KERNEL` and `R2_HEAP_ARENA_GROWING`; [Memento](memento.md) uses the latter), and Go can hand a `KMalloc` block to any syscall through `libgor2.KBytes`. Kernels before this check accepted only the image, and such a program will not run on them.
 
 ### Calling convention
 
@@ -94,12 +102,12 @@ Every syscall that takes a pointer checks the whole buffer it will touch. The bu
 | `RSI` | argument 2 |
 | `R9`  | **clobbered** by every syscall |
 
-The kernel's dispatcher takes exactly two arguments. See the [Syscall Specification](../abi/syscall_specification.md) for details.
+The kernel's dispatcher takes two arguments. `RCX` is passed on as an optional third, read only by a syscall that asks for it when the caller sets its opt-in bit (`0x1d`'s metadata); every other register but `R9` and `RAX` is preserved. See the [Syscall Specification](../abi/syscall_specification.md) for details.
 
 ### Other constraints
 
 - **8.3 file names.** The shell's `bg`/`fg` take a name of at most 8 characters without the extension. Files on the floppy use FAT 8.3 names.
-- **Floating point is not saved across a context switch.** The timer interrupt saves the fifteen general-purpose registers and nothing else (no `fxsave`), so two processes using SSE or x87 at the same time corrupt each other. `gcc -O2` emits SSE too.
+- **Floating point is saved across a context switch.** The timer interrupt saves each process's x87/MMX/XMM state with `fxsave64` and restores it with `fxrstor64`, and a new process starts with a clean state (exceptions masked, round to nearest), so SSE and x87 code, including what `gcc -O2` emits, is safe in any number of processes. AVX is not enabled (`CR4.OSXSAVE` stays off), so AVX instructions fault. See [Scheduler](../multitasking/scheduler.md).
 - **At most 32 processes** exist at once, including the kernel's own tasks (`kmain`, `kclock`, `kshell`, and `init_rc` while it runs; the graphics kernel on a framebuffer starts neither `kclock` nor `kshell`).
 - **No threads, no signals, no `mmap`, no file descriptors.**
 

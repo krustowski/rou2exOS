@@ -21,19 +21,20 @@ Steps execute in this exact order:
 | 2 | `clear_screen!()` | macro | Blank the 80×25 text buffer |
 | 3 | `cpu::check()` | `init/cpu.rs` | Enable SSE (CR4/CR0), set up SYSCALL/SYSRET MSRs |
 | 4 | `idt::idt_isrs_init()` | `init/idt.rs` | Install ISRs, reload GDT, init TSS, load IDT |
-| 5 | `mouse::init()` | `input/mouse.rs` | Enable PS/2 aux port and IRQ12 |
-| 6 | `parser::parse_info(m2_ptr, ...)` | `init/parser.rs` | Parse Multiboot2 tags; fill `FRAMEBUFFER_PTR`; sum usable RAM (`total_ram_bytes`) |
-| 7 | `heap::pmm_heap_init()` | `init/heap.rs` | Init kernel linked-list heap; run smoke test |
-| 8 | `video::print_result(...)` | `init/video.rs` | Call `init_video(fb)` to set `VIDEO_MODE` |
-| 9 | `fs::floppy_check_init()` | `init/fs.rs` | Probe FAT12 floppy; set cwd to `/` |
-| 10 | `fs::vfs_init(fat12)` | `init/fs.rs` | Mount `/`, `/mnt/fat` (only if step 9 found a FAT12 volume), `/mnt/tmp` (the RAM disk, placed in high memory and formatted FAT16), `/mnt/iso` (if CD present), `/mnt/tar` (if GRUB loaded the archive) |
-| 11 | `color::color_demo()` | `init/color.rs` | Print 16-color swatch to console |
-| 12 | `ascii::ascii_art()` | `init/ascii.rs` | Print kernel splash text |
-| 13 | `process::init_processes()` | `init/process.rs` | Save CR3, init userland heap, create initial tasks |
-| 14 | `debug::dump_debug_log_to_memdisk()` | `debug.rs` | Write the debug log so far to `/mnt/tmp/KERNDBG.LOG` |
-| 15 | `pit::pic_pit_init()` | `init/pit.rs` | Remap 8259A PIC; start PIT at 1000 Hz; `sti` |
+| 5 | `parser::parse_info(m2_ptr, ...)` | `init/parser.rs` | Parse Multiboot2 tags; fill `FRAMEBUFFER_PTR`; sum usable RAM (`total_ram_bytes`); keep the kernel command line |
+| 6 | `usb::take_all()` | `usb/mod.rs` | Only with `usb=os` on the command line: take the USB controllers from the firmware (see [Taking USB from the Firmware](../build.md#taking-usb-from-the-firmware)) |
+| 7 | `mouse::init()` | `input/mouse.rs` | Enable PS/2 aux port and IRQ12 |
+| 8 | `heap::pmm_heap_init()` | `init/heap.rs` | Init kernel linked-list heap; run smoke test |
+| 9 | `video::print_result(...)` | `init/video.rs` | Call `init_video(fb)` to set `VIDEO_MODE` |
+| 10 | `fs::floppy_check_init()` | `init/fs.rs` | Probe FAT12 floppy; set cwd to `/` |
+| 11 | `fs::vfs_init(fat12)` | `init/fs.rs` | Mount `/`, `/mnt/fat` (only if step 10 found a FAT12 volume), `/mnt/tmp` (the RAM disk, placed in high memory and formatted FAT16), `/mnt/iso` (if CD present), `/mnt/tar` (if GRUB loaded the archive) |
+| 12 | `color::color_demo()` | `init/color.rs` | Print 16-color swatch to console |
+| 13 | `ascii::ascii_art()` | `init/ascii.rs` | Print kernel splash text |
+| 14 | `process::init_processes()` | `init/process.rs` | Save CR3, init userland heap, create initial tasks |
+| 15 | `debug::dump_debug_log_to_memdisk()` | `debug.rs` | Write the debug log so far to `/mnt/tmp/KERNDBG.LOG` |
+| 16 | `pit::pic_pit_init()` | `init/pit.rs` | Remap 8259A PIC; start PIT at 1000 Hz; `sti` |
 
-Step 15 (`sti`) is the point of no return — from here the PIT fires every 1 ms and the scheduler takes over. `init` never runs again.
+Step 16 (`sti`) is the point of no return — from here the PIT fires every 1 ms and the scheduler takes over. `init` never runs again.
 
 ---
 

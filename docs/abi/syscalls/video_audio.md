@@ -153,9 +153,19 @@ Captures the screen into tightly packed RGB bytes (`R, G, B`), scaled by nearest
 
 | Argument 1 | Argument 2 | Returns |
 |------------|------------|---------|
-| pointer to `dst_width × dst_height × 3` output bytes | `(dst_width << 16) \| dst_height` | `0` on success; `1` without a framebuffer; `InvalidInput` for zero dimensions or an invalid buffer; `Busy` for overlapping drawing |
+| pointer to `dst_width × dst_height × 3` output bytes | `(dst_width << 16) \| dst_height`, optionally with bit 63 set (see below) | `0` on success; `1` without a framebuffer; `InvalidInput` for zero dimensions or an invalid buffer; `Busy` for overlapping drawing; `Unchanged` (`0xf9`) with metadata, when the snapshot is the one the caller already has |
 
 At 640×480, a published snapshot from `0x19` is preferred and remains readable during the next presentation. Otherwise the kernel reads VRAM directly, currently assuming 32-bit `0x00RRGGBB` pixels. A direct capture checks for drawing both before and after copying; discard the output and retry when it returns `Busy`. This coordination covers kernel drawing syscalls, not direct writes through mapped VGA memory.
+
+### Metadata (bit 63 of argument 2)
+
+With bit 63 of argument 2 set, `RCX` (argument 3) points to an [`FBCaptureInfo`](../type_definitions.md#fbcaptureinfo-syscall-0x1d). The bit is the opt-in because older wrappers may leave anything in `RCX`; without it, `RCX` is ignored and the call is the plain capture above.
+
+- **In:** `frame_id` is the snapshot the caller already holds, `0` to always copy. Zero `timestamp_ms` and `flags` before the call.
+- **Served from a snapshot** (640×480 only): the kernel fills in the snapshot's `frame_id`, the tick time it was published (`timestamp_ms`) and `flags = 1` (`FB_CAPTURE_INFO_SNAPSHOT`). If `frame_id` matches the one passed in, it returns `Unchanged` and copies nothing, so a streamer can skip encoding a frame it has already sent.
+- **Read from VRAM:** `frame_id` and `flags` are `0`, and `timestamp_ms` is the uptime at the end of the copy. There is nothing to compare, so the pixels are always copied.
+
+A kernel that predates the metadata ignores both the bit and `RCX` and leaves the struct as it was, so zeroed `flags` tells the caller to compare pixels itself. libcr2 wraps it as `capture_framebuffer_rgb24_scaled_if_new()`; `STREAMD` is the user.
 
 ## 0x1f (Stop audio player)
 

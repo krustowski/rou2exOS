@@ -11,7 +11,7 @@
 | `printf.h` | `printf` with a minimal set of conversions |
 | `string.h`, `mem.h`, `bytes.h` | `strlen`, `memcmp`, `memcpy`, byte-order helpers |
 | `args.h` | Argument parsing helpers |
-| `net.h` | SLIP decoding, IPv4/ICMP/TCP parsing, ARP, a DHCP client, and a small TCP socket layer (`bind`, `listen`, `read`, `write`, `close`) |
+| `net.h` | SLIP decoding, IPv4/ICMP/TCP parsing, ARP, a DHCP client, and a small TCP socket layer (`bind`, `listen`, `tcp_read`, `tcp_write`, `tcp_close`) |
 
 ---
 
@@ -70,16 +70,17 @@ int main(int argc, char **argv) {
 
 | Area | Functions |
 |------|-----------|
-| Process | `exit`, `run_elf`, `list_tasks`, `kill_task` |
-| System | `read_sysinfo`, `write_sysinfo`, `read_rtc`, `get_ticks`, `sleep_ms`, `read_meminfo` |
+| Process | `exit` (also `r2_exit`), `run_elf`, `list_tasks`, `kill_task` |
+| System | `read_sysinfo`, `write_sysinfo`, `set_user`, `read_rtc`, `get_ticks`, `sleep_ms`, `read_meminfo` |
 | Console | `print`, `printf`, `clear_screen` |
 | Input | `pipe_subscribe`, `pipe_read`, `pipe_unsubscribe` (keyboard); `pipe_mouse_subscribe`, `pipe_mouse_read`, `pipe_mouse_unsubscribe` |
-| Graphics | `get_fb_info`, `write_pixel`, `write_vga`, `blit_buffer`, `blit_buffer_scaled`, `map_vram`, `set_video_mode`, `get_kernel_font` |
+| Graphics | `get_fb_info`, `write_pixel`, `write_vga`, `blit_buffer`, `blit_buffer_scaled`, `map_vram`, `set_video_mode`, `get_kernel_font`; capture: `capture_framebuffer`, `capture_framebuffer_rgb24_scaled`, and `capture_framebuffer_rgb24_scaled_if_new`, which skips a snapshot the caller already has ([`0x1d` metadata](../abi/syscalls/video_audio.md#metadata-bit-63-of-argument-2)) |
 | Audio | `play_freq`, `play_midi_file`, `stop_speaker` |
-| Files | `read_file`, `read_file_at`, `write_file`, `write_file_at`, `rename_file`, `delete_file`, `write_subdir`, `chdir`, `list_dir`, `list_dir_path`, `list_mounts`, `fs_stat` (a mount's size and format, syscall `0x40`; the `FS_TYPE_*` and `FS_FORMAT_*` constants name what it returns), `run_fs_check` |
-| Memory | `malloc`, `realloc`, `free` — on the kernel's shared userland heap |
+| Files | `read_file`, `read_file_at`, `write_file`, `write_file_at`, `rename_file`, `delete_file`, `write_subdir`, `chdir` (also `r2_chdir`), `list_dir`, `list_dir_path`, `list_mounts`, `fs_stat` (a mount's size and format, syscall `0x40`; the `FS_TYPE_*` and `FS_FORMAT_*` constants name what it returns), `run_fs_check` |
+| Memory | `malloc`, `realloc`, `free` — on the kernel's shared userland heap, its extension included; `shared_heap_contains(ptr, size)` says whether a whole range lies in it without touching it (syscall `0x43`; on older kernels only the original 4 MiB can be checked) |
 | Ports, serial | `read_port`, `write_port`, `serial_init`, `serial_read`, `serial_write` |
-| Networking | `new_packet`, `send_packet`, `net_*`, `bind`, `listen`, `read`, `write`, `close`, `on_tcp_packet` |
+| IPC | `send_data`, `receive_data`, `receive_data_nb` (syscalls `0x36`, `0x35`) |
+| Networking | `new_packet`, `send_packet`, `send_eth_frame`, `net_register`, `net_bind_port`, `net_unbind_port`, `get_net_status`, `get_net_config`, `set_net_config`, `net_*`; sockets: `bind`, `listen`, `tcp_read`, `tcp_write`, `tcp_close` (also `read`, `write`, `close`), `on_tcp_packet` |
 
 For bigger files, prefer `read_file_at` / `write_file_at` (syscalls `0x39` / `0x3a`): `read_file` is never told the size of its buffer, and `write_file` always writes exactly one 512-byte block.
 
@@ -95,9 +96,24 @@ The kernel-side model (driver registration, port binding, per-tick frame deliver
 
 ---
 
+## With a C Library
+
+libcr2 also works next to the small C library of the [TCC port](tcc.md), which programs compiled on `r2` link against. Its headers notice that library by `<sys/r2libc.h>` on the include path (`R2_LIBC`, in `types.h`) and then leave the C names to it: the integer types, `printf`, `strlen`, `memcpy`, and five calls of libcr2's own, which are known there by other names:
+
+| Name in an app built here | Name next to the C library |
+|---------------------------|----------------------------|
+| `exit(pid, code)` | `r2_exit(pid, code)` |
+| `chdir(path)` | `r2_chdir(path)` |
+| `read(sock, buf, max)` | `tcp_read(sock, buf, max)` |
+| `write(sock, buf, len)` | `tcp_write(sock, buf, len)` |
+| `close(sock)` | `tcp_close(sock)` |
+
+The names on the right exist in every build, so the apps here, built with `-nostdinc`, have both. On `r2`, `tcc -o srv.elf srv.c -lcr2` builds a program on libcr2's TCP/IP stack.
+
+---
+
 ## Known Issues
 
-- **The syscall number is loaded into `RDX` only.** The kernel reads it from `RAX` (`syscall_handler` does `mov rdx, rax` before the dispatcher). A call therefore works only when `RAX` happens to hold the number already. libc++r2 and libgor2 load `RAX`; a fix in `libcr2` is to add `"a"(number)` to the inline assembly in `syscall.c`.
-- **`R9` is not in the clobber list.** Every syscall destroys `R9`; a caller whose compiler keeps a live value there across `int 0x7f` gets the previous return value instead. libc++r2 hit this in practice (see [libc++r2](libcxxr2.md#syscalls)); the fix here is to add `"r9"` to the clobbers.
-- **The third argument never reaches the kernel.** `syscall()` has a four-argument prototype, but the dispatcher takes two.
-- **`memcpy` takes a `uint16_t` length** and silently truncates copies over 65535 bytes.
+- **`memcpy` takes a `uint16_t` length** and silently truncates copies over 65535 bytes. Programs on the TCC port's C library get that library's `memcpy` instead.
+
+`syscall()` loads the number into both `RAX` (what the kernel reads) and `RDX` (what older kernels read), passes its third argument in `RCX` (read only by [`0x1d`](../abi/syscalls/video_audio.md#metadata-bit-63-of-argument-2) with its opt-in bit), and lists `R9` as clobbered. Earlier versions loaded `RDX` only and left `R9` out of the clobbers; programs built against them should be rebuilt.

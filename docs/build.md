@@ -214,6 +214,14 @@ Lines starting with `#` are ignored. Trailing `\r` is stripped (DOS line endings
 
 ---
 
+## Taking USB from the Firmware
+
+With `usb=os` on the kernel's command line, the kernel takes the USB host controllers from the firmware at boot, before it sets up the PS/2 mouse (`src/usb/`, the boot line *Taking the USB controllers from the firmware*). `grub.cfg` has a text and a graphics entry with it, marked *PS/2 input only*. In the GRUB menu you can also press `e` and add `usb=os` to the `multiboot2` line.
+
+Use it on real hardware when pulling out the USB stick freezes the machine. The firmware's SMM code still drives the controllers to emulate a PS/2 keyboard and mouse. A stick pulled out is an SMI the firmware may spend seconds on, and the kernel cannot mask it. After the handoff, the firmware no longer emulates anything, so only a real PS/2 keyboard and mouse work (a laptop's built-in keyboard is usually one). The boot line reads `FAIL` if a controller's registers were out of reach, or if the firmware did not let go and had to be overruled. In that case, look for *XHCI/EHCI Hand-off* in the firmware setup and turn it on. The kernel shell's [`usb`](shell.md#usb) command shows the state of each controller, and `usb take` does the same handoff later.
+
+---
+
 ## Run Targets
 
 | Make target | Description |

@@ -203,6 +203,36 @@ typedef struct {
 } __attribute__((packed)) FBInfo_T;
 ```
 
+## FBCaptureInfo (syscall `0x1d`)
+
+Optional metadata for the RGB24 capture, passed in `RCX` when bit 63 of argument 2 is set (see [`0x1d`](syscalls/video_audio.md#metadata-bit-63-of-argument-2)). Written with an unaligned store.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `frame_id` | `uint64_t` | In: the snapshot the caller already has (`0` = always copy). Out: the snapshot served, `0` for a capture read from VRAM |
+| `timestamp_ms` | `uint64_t` | Out: when the snapshot was published, or the uptime after a VRAM read, in milliseconds |
+| `flags` | `uint32_t` | Out: `1` (`FB_CAPTURE_INFO_SNAPSHOT`) when served from a stable snapshot in RAM, else `0` |
+| `reserved` | `uint32_t` | Zero |
+
+```rust
+#[repr(C)]
+pub struct FrameCaptureInfo {
+    pub frame_id: u64,
+    pub timestamp_ms: u64,
+    pub flags: u32,
+    pub reserved: u32,
+}
+```
+
+```c
+typedef struct {
+    uint64_t frame_id;
+    uint64_t timestamp_ms;
+    uint32_t flags;
+    uint32_t reserved;
+} FBCaptureInfo_T;
+```
+
 ## NetStatus (syscall `0x38`)
 
 Describes the current network driver state.  All fields are filled by the kernel from `SYSTEM_CONFIG` and the port-binding registry.
@@ -335,7 +365,7 @@ Passed by pointer so that the syscall keeps its two-argument shape. Fields are r
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `buffer` | `uint64_t` | Address of the destination (read) or source (write); `buffer..buffer+length` must lie wholly in `0x600_000..0xA00_000` or wholly in the user heap `0xC00_000..0x1000_000` |
+| `buffer` | `uint64_t` | Address of the destination (read) or source (write); `buffer..buffer+length` must lie wholly in `0x400_000..0xA00_000` (image and initial stacks) or wholly in the user heap `0xC00_000..0x1000_000` |
 | `offset` | `uint64_t` | Byte offset into the file |
 | `length` | `uint64_t` | Number of bytes to transfer |
 

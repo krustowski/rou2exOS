@@ -213,3 +213,13 @@ Accumulate bytes until `SLIP_END` is seen with `out_pos > 0`; handle escape sequ
 ### Usage
 
 `ipv4::send_packet` calls `slip::encode` then feeds each byte to `serial::write`. The receive path (`ipv4::receive_loop`) accumulates UART bytes and calls `slip::decode` on each new byte until a complete IP packet is decoded, then passes it to a callback.
+
+---
+
+## WireGuard (userland)
+
+WireGuard is implemented by the standalone C daemon `wgd`, alongside `eth`. Its encrypted outer transport is IPv4 UDP; supported inner traffic is IPv4 ICMP and TCP. The portable protocol/crypto core is vendored from `wireguard-lwip`, without linking lwIP.
+
+The kernel does not perform cryptography: `tunnel.rs` supplies one owned registration, prefix routing, authenticated-frame injection and shell ICMP probe delivery through syscall `0x44`. `AllowedIPs` contains up to 16 IPv4 prefixes and checks outgoing destinations and authenticated incoming sources. The daemon supports replay protection, preshared keys, endpoint roaming, keepalives, rekeying and expiry.
+
+See [WireGuard](wireguard.md) for setup, `ping`/`traceroute`, entropy on CPUs without RDSEED/RDRAND, and the fixed 1420-byte MTU. Inner UDP, IPv6, fragmented IP reassembly, forwarding and NAT are not implemented.

@@ -92,7 +92,9 @@ For bigger files, prefer `read_file_at` / `write_file_at` (syscalls `0x39` / `0x
 
 By default the Ethernet driver reads frames from the process's kernel queue (syscall `0x35`). A process has only one queue, so a program that runs a second network stack next to libcr2's cannot let both read it: each would take and discard the other's frames. Such a program reads the queue itself and passes libcr2 its frames through `net_set_frame_source(fn)`. The callback fills a buffer with one frame and returns its length, or 0 when no frame is waiting; a blocking call waits for one. Passing `NULL` returns libcr2 to the kernel queue. [Memento](memento.md) does this so that its web browser and its Chat and IRC windows can share one queue. libcr2's frame buffer is 1518 bytes, because the kernel delivers frames with the card's 4-byte CRC still attached.
 
-The kernel-side model (driver registration, port binding, per-tick frame delivery) is described in [Networking Overview](../networking/overview.md).
+Current TCP sockets keep the incoming local destination address and use it as the reply source, allowing services to answer connections made to the [WireGuard tunnel address](../networking/wireguard.md). Relink older server binaries to get the fix. New outbound tunnel connections require the network stack to select that source address explicitly; the physical configuration read by `get_net_config` remains the Ethernet configuration.
+
+The kernel-side model (driver registration, port binding, per-tick frame delivery and tunnel routing) is described in [Networking Overview](../networking/overview.md).
 
 ---
 
@@ -116,4 +118,4 @@ The names on the right exist in every build, so the apps here, built with `-nost
 
 - **`memcpy` takes a `uint16_t` length** and silently truncates copies over 65535 bytes. Programs on the TCC port's C library get that library's `memcpy` instead.
 
-`syscall()` loads the number into both `RAX` (what the kernel reads) and `RDX` (what older kernels read), passes its third argument in `RCX` (read only by [`0x1d`](../abi/syscalls/video_audio.md#metadata-bit-63-of-argument-2) with its opt-in bit), and lists `R9` as clobbered. Earlier versions loaded `RDX` only and left `R9` out of the clobbers; programs built against them should be rebuilt.
+`syscall()` loads the number into both `RAX` (what the kernel reads) and `RDX` (what older kernels read), passes its third argument in `RCX` (read by [`0x1d`](../abi/syscalls/video_audio.md#metadata-bit-63-of-argument-2) with its opt-in bit, and by [`0x44`](../abi/syscalls/port_networking.md#0x44-userspace-ipv4-tunnel), which requires a frame length for operation 3 and zero otherwise), and lists `R9` as clobbered. Earlier versions loaded `RDX` only and left `R9` out of the clobbers; programs built against them should be rebuilt.

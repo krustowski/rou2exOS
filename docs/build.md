@@ -43,10 +43,16 @@ The resulting ISO is mounted at `/mnt/iso` at boot:
 | ISO path | Contents |
 |----------|----------|
 | `/boot` | `kernel_text.elf`, `kernel_graphics.elf`, GRUB config |
-| `/bin` | Userland programs (`eth`, `garn`, `tnt`, `chat`, `sh`, `fsck`, `nsk`, `them`, `hellofs`, `hello`, `dish`, `gfxdemo`, `routtest`, `snake`, …). Searched by `bg`/`fg` when a binary is not in the working directory. |
+| `/bin` | Userland programs (`eth`, `wgd`, `garn`, `tnt`, `chat`, `sh`, `fsck`, `nsk`, `them`, `hellofs`, `hello`, `dish`, `gfxdemo`, `routtest`, `snake`, …). Searched by `bg`/`fg` when a binary is not in the working directory. |
 | `/games` | Optional DOS games for the `THEM` emulator (not part of the repository) |
 
 Build the apps first (see [SDK](sdk/index.md)); `build_iso` fails if a listed binary is missing.
+
+### WireGuard applications
+
+The image build rebuilds the C `wgd`, `sh` and `tnt` applications and relinks `chat`. It packages `wgd.elf` and `/opt/wgd/wgd.cfg.example` into the ISO and boot archive; the example has key placeholders and needs a separate completed configuration. Starting the daemon is a shell or `INIT.RC` choice.
+
+Rebuild and boot the kernel too: `wgd` and the shell's subnet `ping`/`traceroute` commands require [syscall `0x44` ABI 2](abi/syscalls/port_networking.md#0x44-userspace-ipv4-tunnel). Relink other libcr2 TCP servers to preserve the tunnel destination as their reply source. See [WireGuard](networking/wireguard.md) for configuration, physical network prerequisites, diagnostics and entropy fallback.
 
 ### Debug build
 

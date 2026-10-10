@@ -34,6 +34,7 @@ Programs that use Ethernet need the [`ETH`](#networking) driver running first, s
 | App | Language | Description |
 |-----|----------|-------------|
 | [`ETH`](https://github.com/krustowski/rou2exOS-apps/tree/master/c/eth) | C | The default Ethernet driver: registers the NIC (RTL8139, or an Intel e1000/e1000e/PCH card), answers ARP and ICMP, obtains an address by DHCP (or `--ip <addr>`). |
+| [`WGD`](../networking/wireguard.md) | C | Standalone WireGuard daemon: one IPv4 peer, up to 16 AllowedIPs prefixes, encrypted shell ping/traceroute and access to r2 TCP services. Runs alongside `ETH`; startup and counters are in `/mnt/tmp/WGD.LOG`. Uses Jitterentropy when CPU random instructions are unavailable. |
 | [`GARN`](https://github.com/krustowski/rou2exOS-apps/tree/master/c/garn) | C | Small HTTP/1.0 server for sharing files; configured with `--config /mnt/fat/GARN/GARN.CFG`, where `ip` sets a static address (otherwise `ETH`/DHCP manages it). |
 | [`TNT`](https://github.com/krustowski/rou2exOS-apps/tree/master/c/tnt) | C | TELNET server and remote shell on TCP/23, over SLIP or Ethernet, with the same commands as `SH` (bsh) plus `get` and `net`. Once Memento has been given credentials, a new connection has to log in with them; until then it gets a `root` shell straight away. |
 | [`CHAT`](https://github.com/krustowski/rou2exOS-apps/tree/master/c/chat) | C | Chatroom server on TCP/9000 with an HTTP front end on TCP/8080. |

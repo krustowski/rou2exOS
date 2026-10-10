@@ -28,6 +28,7 @@ All values passed into a syscall are 64-bit.
 | `RAX`    | syscall No.    | `0x01` |
 | `RDI`    | argument No. 1 | `0x01` |
 | `RSI`    | argument No. 2 | `0x123abc` |
+| `RCX`    | optional argument No. 3 | frame length for `0x44` operation 3 |
 | `RAX`    | return value   | `0x00` |
 
 ### Entry Stub
@@ -51,7 +52,7 @@ iretq
 Consequences for callers:
 
 - **The number is read from `RAX`.** Setting `RDX` alone is not enough; libc++r2 sets both to be safe.
-- **Two arguments, and an optional third in `RCX`.** `RDX` is overwritten with the number before the call, so it never reaches a syscall. `RCX` is handed to the dispatcher as argument 3, but only a syscall that asks for it reads it, and only when the caller opts in: [`0x1d`](syscalls/video_audio.md#0x1d-capture-and-scale-to-rgb24) takes it as a metadata pointer when bit 63 of argument 2 is set, because older wrappers may leave anything in `RCX`. Every other syscall has two arguments; those that need more take a pointer to a request struct (e.g. `0x39`, `0x3a`).
+- **Two arguments, and a third in `RCX` for calls that require it.** `RDX` is overwritten with the number before the call, so it never reaches a syscall. [`0x1d`](syscalls/video_audio.md#0x1d-capture-and-scale-to-rgb24) reads `RCX` as a metadata pointer only when bit 63 of argument 2 is set, because older wrappers may leave anything there. [`0x44`](syscalls/port_networking.md#0x44-userspace-ipv4-tunnel) always reads it: pass the frame length for operation 3, and zero for every other operation. Other syscalls use two arguments; calls that need more take a pointer to a request struct (e.g. `0x39`, `0x3a`).
 - **`R9` is clobbered** by every syscall and must be declared as such in inline assembly. Every other register but `RAX` comes back as it went in, so a compiler may keep a value in `RCX`, `RDX`, `RSI` or `RDI` across the call.
 - **Interrupts are re-enabled** at the top of the dispatcher, so a long syscall can be preempted by the scheduler.
 
@@ -81,4 +82,4 @@ Most syscalls return one of these codes. Syscalls that return a count, an addres
 | `0x00`–`0x0f`, `0x41`–`0x43` | Exit, system information, pipes, time, heap, kill (`0x3b`), memory information (`0x3c`), power (`0x3e`), command lines (`0x41`), desktop relaunch (`0x42`), shared heap range check (`0x43`) | [System, Processes & Memory](syscalls/sysinfo_mem_mgmt.md) |
 | `0x10`–`0x1f`, `0x3f` | Console, graphics, framebuffer capture (`0x1c`, `0x1d`), audio (HD Audio PCM `0x3f`) | [Video & Audio](syscalls/video_audio.md) |
 | `0x20`–`0x2f`, `0x39`–`0x3a`, `0x40` | Files, directories, VFS, program execution, task list, mount sizes (`0x40`) | [Filesystem](syscalls/filesystem.md) |
-| `0x30`–`0x38`, `0x3d` | I/O ports, serial, packets, IPC, networking, network configuration (`0x3d`) | [Ports & Networking](syscalls/port_networking.md) |
+| `0x30`–`0x38`, `0x3d`, `0x44` | I/O ports, serial, packets, IPC, network configuration (`0x3d`), userspace IPv4 tunnel and ICMP probes (`0x44`) | [Ports & Networking](syscalls/port_networking.md) |

@@ -38,8 +38,10 @@ UART port COM1.
 
 | Argument 1 | Argument 2 | Meaning | Implemented |
 |------------|------------|-------------|---------|
-| `0x01` | pointer to buffer | Send an IPv4 packet (derives frame length from the IP header). | ✅ |
+| `0x01` | pointer to buffer | Send an IPv4 packet over the legacy serial/SLIP path (derives packet length from the IP header). | ✅ |
 | `0x04` | pointer to raw Ethernet frame | Send a raw Ethernet frame. Length is derived from the EtherType field (`0x0800` = IPv4, `0x0806` = ARP). A frame for this machine itself (`127.x`, its own address) goes through the loopback device instead of the NIC; see [Networking](../../networking/overview.md#loopback-device). | ✅ |
+
+For raw Ethernet IPv4 transmission, a frame from the registered tunnel source address to a configured prefix is queued to the tunnel daemon before loopback/NIC transmission. A full daemon queue returns `Busy`, without sending the frame in plaintext. The daemon's own outer UDP bypasses this rule. See [Userspace IPv4 tunnel](#0x44-userspace-ipv4-tunnel).
 
 ## 0x35 (Socket receive)
 
@@ -51,7 +53,7 @@ Pops a message from the calling process' MQ. Non-blocking returns `0` immediatel
 
 ## 0x36 (Socket send)
 
-Copies 512 bytes from the buffer and pushes a message to the target process' MQ, then wakes the target. 
+Copies 512 bytes from the buffer and pushes a message to the target process' MQ, then wakes the target.
 
 | Argument 1 | Argument 2 | Implemented |
 |------------|------------|-------------|
@@ -67,7 +69,7 @@ Ethernet driver registration, or port binding. Both are released when the callin
 
 ## 0x38 (Get networking status)
 
-Query network status (read-only). Writes `{ mac[6], ip[4], drv_active, n_ports, ports[16] }` into the struct. 
+Query network status (read-only). Writes `{ mac[6], ip[4], drv_active, n_ports, ports[16] }` into the struct.
 
 Returns `InvalidInput` on invalid pointer, `Ok` otherwise.
 
@@ -88,3 +90,70 @@ Returns `InvalidInput` on an invalid pointer or Argument 1, `Ok` otherwise.
 | Argument 1 | Argument 2 | Implemented |
 |------------|------------|-------------|
 | `0x01` read, `0x02` set | pointer to `NetConfig` struct | ✅ |
+
+## 0x44 (Userspace IPv4 tunnel)
+
+Register one userland tunnel daemon, deliver its outer UDP and outgoing inner frames, and inject frames that the daemon has authenticated. The kernel stores routing metadata and process ownership; WireGuard keys and protocol state remain in [wgd](../../networking/wireguard.md).
+
+Argument 1 (`RDI`) is the operation, Argument 2 (`RSI`) is a pointer or zero, and Argument 3 (`RCX`) is the frame length or zero. **Set `RCX` explicitly on every call**, including the capability query. The syscall number is `0x44` in `RAX`.
+
+| Operation | Argument 2 | Argument 3 | Result |
+|-----------|------------|------------|--------|
+| `0` — query ABI | `0` | `0` | Capability `0x52325748` (ABI 2) |
+| `1` — attach daemon | Pointer to 140-byte `WgdRegistration` | `0` | `Okay` or `Busy` |
+| `2` — detach | `0` | `0` | `Okay` or `Busy` if another process owns the tunnel |
+| `3` — inject authenticated frame | Pointer to complete Ethernet/IPv4 frame | Frame length, 34–1434 bytes | `Okay` or `Busy` |
+| `4` — claim ICMP probe | Pointer to 12-byte input/output `WgdProbe` | `0` | `Okay` or `Busy` |
+| `5` — release ICMP probe | `0` | `0` | `Okay` or `Busy` if the caller holds no probe |
+
+Unknown operations, invalid buffers or invalid argument combinations return `InvalidInput`. Operations 1 and 3 return `Busy` for rejected registration/frame contents as well as ownership or queue failures; callers must not assume it always means retrying will succeed. Older kernels can lack the syscall or report the incompatible ABI 1 capability `0x52325747`.
+
+### Structures
+
+These C layouts match the kernel's `#[repr(C)]` structures. IPv4 bytes are in network order; the `uint16_t` fields use native x86 little-endian order. Zero-initialize structures, including reserved bytes.
+
+```c
+#include <stdint.h>
+
+typedef struct {
+    uint8_t network[4];
+    uint8_t prefix;
+    uint8_t reserved[3];
+} WgdRoute;                         /* 8 bytes */
+
+typedef struct {
+    uint8_t local[4];
+    uint16_t port;
+    uint16_t mtu;
+    uint8_t count;
+    uint8_t reserved[3];
+    WgdRoute routes[16];
+} WgdRegistration;                  /* 140 bytes */
+
+typedef struct {
+    uint8_t target[4];
+    uint8_t local[4];
+    uint16_t id;
+    uint16_t reserved;
+} WgdProbe;                         /* 12 bytes */
+```
+
+`WgdRegistration` offsets are `local` 0, `port` 4, `mtu` 6, `count` 8, `reserved` 9 and `routes` 12. `WgdProbe` offsets are `target` 0, `local` 4, `id` 8 and `reserved` 10. The shared app header is `c/wgd/tunnel_abi.h`, using the names `wgd_route`, `wgd_registration` and `wgd_probe_registration`.
+
+### Daemon ownership and routing
+
+Attach requires a nonzero UDP port, MTU 576–1420, 1–16 active routes, and a local IPv4 address whose first octet is neither 0 nor 127 and is below 224. Each active route must have a prefix length 0–32, a normalized network address and zero reserved bytes. Registration reserved bytes must also be zero. Only one process can own the tunnel; the owner may replace its own registration, which also clears any probe reservation.
+
+Incoming outer IPv4 UDP addressed to the registered port is queued to the daemon. In syscall `0x34`, raw Ethernet IPv4 frames from another process with `source == local` and a destination matching a registered prefix go to the daemon before loopback/NIC transmission. A full queue returns `Busy`; the selected frame is never sent through the NIC as a fallback. The daemon's own outer frames bypass this routing rule. Physical NIC input whose source or destination equals the tunnel's local address is rejected.
+
+Injection is accepted only from the owner. The frame must contain a complete, bounded, unfragmented IPv4 packet within the configured MTU, with protocol TCP or ICMP, destination equal to `local`, and source in a registered prefix but different from `local`. TCP is delivered through the usual port/driver demultiplexer. ICMP is delivered to a matching probe owner; accepted ICMP without a matching probe is discarded with `Okay`. A full delivery queue returns `Busy`.
+
+Detaching releases the tunnel and probe state. Process exit, kill or crash releases owned registrations and queued frames; a probe client's exit releases its reservation without stopping the daemon.
+
+### ICMP probes
+
+For operation 4, fill `target` with the desired IPv4 address; the other input fields are ignored. On success the kernel overwrites the structure with the target, local tunnel source address, an ICMP identifier and zero reserved field. The shell uses that address and identifier for echo requests sent through syscall `0x34`.
+
+The target must match a registered prefix, differ from the local address, and have a first octet neither 0 nor 127 and below 224. A tunnel must be attached and the caller must differ from its owner. Only one process can reserve a probe at a time; the same process may replace its reservation. Failure returns `Busy`.
+
+Authenticated echo replies match the target and identifier. ICMP time-exceeded and destination-unreachable replies match the quoted original IPv4/ICMP request's source, target and identifier. The shell additionally verifies checksums, sequence and echo payload. Reply source addresses, including intermediate routers, must pass the tunnel's normal source-prefix check. See [Ping and traceroute](../../networking/wireguard.md#ping-and-traceroute-through-subnets) for user-facing commands.

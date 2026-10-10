@@ -25,7 +25,7 @@
         └─────────────────────────────────────────────────┘
 ```
 
-There are two independent paths:
+There are two hardware transport paths. A [userspace WireGuard tunnel](wireguard.md) can run over Ethernet alongside the physical network:
 
 | Path | Hardware | Protocol | Direction |
 |------|----------|----------|-----------|
@@ -60,11 +60,12 @@ Until v0.11 there was one shared 2 KiB buffer, `NET_FRAME_BUF`, and one frame pe
 
 ## Transmit Path (Ethernet)
 
-Userland calls syscall `0x34` with arg1 `0x04` (raw Ethernet) or `0x01` (IPv4):
+For Ethernet, userland calls syscall `0x34` with arg1 `0x04` (raw Ethernet). Argument 1 `0x01` uses the legacy serial/SLIP path instead:
 
 ```
 syscall 0x34
   → derive frame length from EtherType / IP total_length field
+  → tunnel::transmit(data, pid)     (tunnel-source frames to AllowedIPs go to wgd)
   → loopback::transmit(data, pid)   (frames for this machine stop here)
   → nic::send_frame(data, len)
     → selected RTL8139 or Intel backend
@@ -96,11 +97,23 @@ A frame a process sends to this machine itself never reaches the NIC, which woul
 | ICMP echo request to one of those | Answered by the kernel, to the sender. |
 | ARP request for one of those (sender not `0.0.0.0`) | Answered by the kernel, to the asker, with the MAC `00:00:00:00:00:00`. Still sent out too, unless it is for `127.x`. |
 
-The machine's address is the one in `SYSTEM_CONFIG` (set by the ETH driver through syscall `0x01`/`0x3D`); `SystemConfig::set_ip` keeps a lock-free copy for the loopback check.
+The physical address is the one in `SYSTEM_CONFIG` (set by the ETH driver through syscall `0x01`/`0x3D`); `SystemConfig::set_ip` keeps a lock-free copy for the loopback check. The registered tunnel address is also recognized as local through `tunnel::is_local`.
 
 The zero source MAC matters: the stacks drop frames from their own (the card's) MAC as echoes of their own broadcasts. With it they take a looped reply, learn that their own address is at `00:00:00:00:00:00`, and send there next time, which comes back through the loopback device because of the IP. A looped frame that cannot be queued (no free buffer, the receiver's queue full) is lost, as on a wire; TCP sends it again.
 
-GARN and the other `libcr2` servers answer from the machine's address whatever address they were asked on, so a client must connect to that address for the replies to match: the browser stack (`web/net_r2.cpp`) resolves `localhost` to `127.0.0.1` and connects to its own address for anything in `127.0.0.0/8`.
+Current `libcr2` TCP sockets preserve the incoming local destination and reply from that address, including the WireGuard tunnel address. Relink older servers to get this behavior. The browser stack (`web/net_r2.cpp`) resolves `localhost` to `127.0.0.1` and connects to the machine's physical address for anything in `127.0.0.0/8`.
+
+---
+
+## Userspace IPv4 Tunnel
+
+`tunnel.rs` registers one daemon through [syscall `0x44`](../abi/syscalls/port_networking.md#0x44-userspace-ipv4-tunnel): a separate local tunnel address, UDP port, MTU and up to 16 IPv4 prefixes. `wgd` holds the WireGuard keys and protocol state. `eth` continues to own the physical address, DHCP and ARP.
+
+Outer UDP for the registered port is queued to `wgd`. It authenticates and decrypts packets, enforces the peer's source prefixes, answers tunnel echo requests, and injects TCP or probe ICMP through the kernel. TCP follows the existing bound-port delivery path; matching ICMP replies go to the shell that reserved the probe.
+
+Outgoing frames whose source is the tunnel address and whose destination matches a configured prefix are queued to `wgd` before loopback/NIC transmission. Queue failure returns `Busy`, without plaintext NIC fallback. The daemon's own outer UDP stays on Ethernet. NIC input with the tunnel address as source or destination is dropped. Ordinary application connections keep using the physical address unless their stack explicitly selects the tunnel source.
+
+The userland `sh`/TNT builtins `ping` and `traceroute` select that source to reach hosts in `AllowedIPs`. See [WireGuard](wireguard.md) for configuration, hosted-shell diagnostics, entropy fallback, subnet routing and current limits.
 
 ---
 
@@ -122,7 +135,7 @@ Registrations last as long as the process. When it exits, is killed or crashes, 
 
 ### Frame Routing
 
-On each incoming frame `poll_and_deliver` calls `tcp_dest_port(frame)` to extract the TCP destination port (or `None` if not IPv4/TCP). It then calls `lookup_port(port)` against `PORT_REGISTRY`. If a match is found the frame goes to that service's PID; everything else (ARP, ICMP, unregistered ports) goes to `NET_DRV_PID`.
+On each incoming frame `poll_and_deliver` first rejects physical input using the local tunnel address. Delivery checks the registered tunnel's UDP port before calling `tcp_dest_port(frame)` and `lookup_port(port)` against `PORT_REGISTRY`. A tunnel UDP match goes to its daemon, a TCP port match to that service's PID, and everything else (ARP, ICMP, unregistered ports) to `NET_DRV_PID`.
 
 ARP replies are the exception to one destination: besides the driver, every other process with a TCP port bound gets a copy (once per process, best effort: a copy that finds no free frame buffer is not made). Those processes run TCP/IP stacks of their own, like Memento's browser, video player and chat, and ARP for hosts on the local network themselves. Without the copy they could reach the gateway, whose MAC the driver publishes (syscall `0x3d`), but never a machine beside them on the LAN.
 

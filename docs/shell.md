@@ -4,7 +4,15 @@ The kernel shell is the interactive command-line interface running as task slot 
 
 The purpose of having the kernel shell present is to provide a diagnostic command-line interface (CLI) when the system's state needs to be looked at. It is not intended to use the kernel shell as the main system shell: usage of the `SH.ELF` shell or a remote `TNT.ELF` shell instead is encouraged (see the [Application Suite](sdk/apps.md) page for more info).
 
-**The kernel shell should be considered to be the system rescue shell primarily**. 
+**The kernel shell should be considered to be the system rescue shell primarily**.
+
+---
+
+## Userland Shell and Tunnel Probes
+
+Console `sh`, Memento's Shell window (`sh --host`) and the TNT remote shell share the C `bsh` commands. With an active [WireGuard daemon](networking/wireguard.md), their `ping <IPv4>` and `traceroute <IPv4>` builtins probe hosts in the peer's `AllowedIPs` prefixes using the tunnel source address. They accept numeric IPv4 addresses and allow one probe client at a time.
+
+These commands belong to the userland shells. To use them from the text kernel's rescue shell, start `fg sh` first. In the graphics kernel, open Memento's Shell window. Use `bg wgd --check <config>` to validate a configuration there and `read /mnt/tmp/WGD.LOG` for its result; after starting `bg wgd <config>`, wait for the log's listening message before probing. See the [WireGuard guide](networking/wireguard.md#start-and-inspect) for the complete sequence and startup diagnostics.
 
 ---
 

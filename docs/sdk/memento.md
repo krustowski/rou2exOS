@@ -113,7 +113,7 @@ The file manager opens a **File** viewer on the selected file (`0x20`).
 
 ### Notes on individual windows
 
-**Shell** runs `sh.elf` as a process of its own, started with `--host` and the address of a block on the user heap: the shell writes its output into a ring in the block and reads typed characters from another, and the window is the terminal between them (`c/r2sh/host.h` has the layout). Programs the shell starts with `run` print to the console, not the window. `exit`, or the close box, ends the shell; if Memento stops beating, the shell leaves on its own after ten seconds.
+**Shell** runs `sh.elf` as a process of its own, started with `--host` and the address of a block on the user heap: the shell writes its output into a ring in the block and reads typed characters from another, and the window is the terminal between them (`c/r2sh/host.h` has the layout). Programs the shell starts with `run` print to the console, not the window. `exit`, or the close box, ends the shell; if Memento stops beating, the shell leaves on its own after ten seconds. For [WireGuard](../networking/wireguard.md), `bg wgd <config>` displays a startup log snapshot and the path `/mnt/tmp/WGD.LOG`, so daemon failures remain readable in the window. The shell's `ping <IPv4>` and `traceroute <IPv4>` builtins write their tunnel-probe results directly into the window.
 
 **Music** does not use syscall `0x1b`. That call plays a whole song inside the kernel and blocks the caller until it ends, which would freeze the desktop. Instead the window parses the file itself, drives the PIT and speaker ports directly, and plays one step at a time from the idle loop, so the other windows keep running and a song can be stopped.
 

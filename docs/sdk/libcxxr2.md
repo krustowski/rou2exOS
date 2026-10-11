@@ -68,7 +68,7 @@ Copy `examples/hello/.clangd` next to a new program too: without it clangd parse
 | `r2/fs.hpp` | Files and directories, including `write_at` (syscall `0x3a`) and `remove_dir`; `mounts()`, and `usage(path)` for the size, free space and format (`FsFormat`: `Fat12`, `Fat16`, …) of the filesystem a path is on (syscall `0x40`) |
 | `r2/gfx.hpp` | `Canvas`, `Font`, the VESA framebuffer, VGA mode 13h |
 | `r2/input.hpp` | Keyboard and mouse, with `Mouse::set_speed()` |
-| `r2/time.hpp` | Ticks, sleep, the RTC, `Stopwatch`, `FrameTimer` |
+| `r2/time.hpp` | Ticks, sleep, `clock_now()`, `set_clock(RtcTime)`, `Stopwatch`, `FrameTimer` |
 | `r2/process.hpp` | Arguments, `exit`, sysinfo, the task table, `spawn`, `kill` (`0x3b`), `meminfo` (`0x3c`), `reboot` and `power_off` (`0x3e`) |
 | `r2/net.hpp` | Addresses, byte order, frames, port binding, NIC statistics and TCP owner snapshots |
 | `r2/audio.hpp` | PC speaker, and PCM through HD Audio (`0x3f`: `open`, `write`, `queued`, `pause`, `resume`, `close`) |
@@ -76,6 +76,12 @@ Copy `examples/hello/.clangd` next to a new program too: without it clangd parse
 | `r2/panic.hpp`, `r2/source_location.hpp` | `panic`, `R2_ASSERT` |
 
 `r2.hpp` includes everything. The library's vocabulary lives in namespace `r2::`; only the names the language itself requires are placed in `std::`.
+
+`clock_now()` reads the UTC wall clock. `set_clock()` returns `true` when
+[RTC syscall `0x02`, operation `2`](../abi/syscalls/sysinfo_mem_mgmt.md#0x02-real-time-clock)
+accepts the date. It changes the running kernel's time for this boot; uptime
+and the battery-backed CMOS clock remain unchanged. Dates must be valid
+Gregorian values in years 2000–2199.
 
 ### No exceptions, so failure is in the return value
 

@@ -111,6 +111,7 @@ One clipboard serves every window: a line of text, or the last screenshot, which
 | Icon | Window | What it does | Kernel interface |
 |------|--------|--------------|------------------|
 | Clock | Clock | Analog clock | RTC, `0x02` |
+| Settings | Settings | Desktop preferences and UTC time synchronization through NTP | RTC `0x02`, UDP binding `0x37` |
 | Shell | Shell | The userland shell (`sh.elf --host`) as an 80x25 terminal with 200 lines of scrollback (PageUp/PageDown) | spawn `0x2A`, shared user-heap block |
 | Net | Network | Stats, subnet scan, ping, traceroute and charts; physical NIC throughput and TCP ports with owner PIDs and names | `0x38`, `0x45`, `0x46` |
 | Mount | Files | Two-pane file manager in the style of Norton Commander. Its top level is the mount list: each mount with its type and size, and on the info line the one under the bar in full (`/mnt/tmp: memdisk, fat16, 126 MiB, 125 MiB free`), read again after anything that changes a disk. F5 copy and F6 move to the other pane (F6 renames when both show one directory), F7 new folder, F8 delete (a folder only when empty), F3 view, F4 edit. Enter on an `.EXE` or `.COM` runs it in theM; Enter on a `.CH8` ROM runs it in C8; Alt+Space, Shift+F10 or a right click opens a menu of the same for the entry under the bar. On a `.PNG` the menu has **Set as wallpaper**: the picture covers the whole screen behind every window (and the login dialog) until Memento ends; `/mnt/tar/pics/warp.png` is one made for it. Enter on `/` walks the tree from the root (`mnt`, then the mounts), so every file has its full path; the root, like the CD and the archive, is read-only. Copies go a chunk per idle turn with progress shown | `0x2C`, `0x2D`, `0x39`, `0x3A`, `0x22`, `0x23`, `0x27`, `0x40` |
@@ -135,6 +136,48 @@ The file manager opens a **File** viewer on the selected file (`0x20`).
 ![memento-clock](../assets/r2-memento-clock-window-v0.11.5.png)
 
 *Fig. 4: The Clock window.*
+
+### Time settings
+
+Open **Settings → Time** to choose an NTP server hostname or IPv4 address,
+turn automatic synchronization `on` or `off`, and set the poll interval in
+seconds (64–86400). The defaults are `pool.ntp.org`, automatic synchronization
+on, and 3600 seconds. **Save** activates the settings; **Sync now** applies
+them and requests synchronization even when automatic polling is off.
+The tab displays the current UTC date/time and the request status. The taskbar
+and Clock window refresh after a successful correction.
+
+Memento waits for the network configuration published by `eth`, resolves
+the server, and sends SNTPv4 requests to UDP port 123 from port 47012. Work
+runs in the desktop idle loop, so network waits do not block the UI. Replies
+must come from the selected address and port and echo the current request's
+timestamp. Malformed, stale or unsynchronized replies leave the clock alone.
+Requests are at least 64 seconds apart; failures back off, `RATE` replies
+wait at least an hour, and a server denial requires choosing another server.
+
+A valid reply sets whole-second UTC through
+[RTC syscall `0x02`, operation `2`](../abi/syscalls/sysinfo_mem_mgmt.md#0x02-real-time-clock).
+The change lasts for this boot and is visible to other applications. It
+does not write the hardware CMOS clock or change uptime and sleep deadlines.
+The client handles NTP's 2036 rollover using a bootstrap date range of
+2000–2136. This is a single-server SNTP client using the wire format in
+[RFC 4330](https://www.rfc-editor.org/rfc/rfc4330) and
+[RFC 5905](https://www.rfc-editor.org/rfc/rfc5905); it does not authenticate
+servers with NTS or continuously discipline oscillator frequency.
+
+**Save** stores session preferences in `/mnt/tmp/MEMENTO.CFG`, which survives
+a desktop relaunch but is lost on reboot. To set boot defaults in the image,
+edit `iso/opt/memento/defaults.cfg` before rebuilding:
+
+```ini
+ntp_server=pool.ntp.org
+ntp_enabled=on
+ntp_interval=3600
+```
+
+Memento reads `/mnt/tar/opt/memento/defaults.cfg` before applying saved session
+overrides. A working Ethernet connection and UDP/123 access to the server
+are required.
 
 ### Network tools
 

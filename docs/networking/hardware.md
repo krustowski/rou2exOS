@@ -78,7 +78,7 @@ The MAC is read from IDR0–IDR5 (registers `+0x00`–`+0x05`) after `rtl8139_in
 
 ## NIC Selection and Intel Driver (`nic.rs`, `e1000.rs`)
 
-`netdrv::register_driver` initialises the selected backend through `nic::init`. RTL8139 is tried first, then Intel; no supported card means registration fails. Routing and userland use the same interface for either backend: `peek_frame`, `consume_frame`, `send_frame`, MAC lookup and missed-packet counters.
+`netdrv::register_driver` initialises the selected backend through `nic::init`. RTL8139 is tried first, then Intel, then Broadcom BCM57765; no initialized card means registration fails. Routing and userland use the same interface for all backends: `peek_frame`, `consume_frame`, `send_frame`, MAC lookup and missed-packet counters.
 
 The Intel driver recognises these PCI devices (vendor `0x8086`):
 
@@ -94,6 +94,41 @@ It uses BAR0 memory-mapped registers below 4 GiB and identity-mapped static DMA 
 PCH controllers have additional reset, PHY, power-management and flash NVM setup. The kernel shell's [`nic`](../shell.md#nic) command exposes link state, PHY and ring diagnostics, reset, test transmission, register access and PCH NVM reads. Recognition of a model does not establish that every board's firmware configuration works.
 
 For QEMU, replace `-device rtl8139,netdev=net0` with `-device e1000,netdev=net0` (82540EM) or `-device e1000e,netdev=net0` (82574L) to exercise the Intel backend.
+
+---
+
+## Broadcom BCM57765 (`bcm57765/`)
+
+The wired BCM57765 function has primary PCI ID `14e4:16b4`, class `02:00`.
+Matching uses that ID rather than the subsystem ID. Wireless functions are
+excluded. BAR0 must be mapped below 4 GiB; the MacBook report's `0xa0400000`
+meets this requirement.
+
+The backend wakes the PCI function into D0, masks interrupts, resets the
+controller, waits for firmware, retrieves the station MAC and resets the
+copper PHY. It advertises 10/100 Mb/s and gigabit full duplex. Standard
+Ethernet frames use 512-entry RX producer, RX return and TX descriptor rings,
+with 64 RX and 32 TX buffers of 2 KiB each. DMA storage is reserved from usable
+RAM before the RAM disk is placed, separately from USB DMA and user memory.
+
+Receive buffers stay owned by the CPU until consumption. Transmit buffers
+are reused only after hardware completion. Frame checksums and segmentation
+remain in userland; VLAN headers are retained and jumbo frames are disabled.
+Timer polling handles status updates and starts an asynchronous PHY link
+check once per second. Reset and MDIO waits during registration are bounded;
+failed initialization disables bus mastering and reports the failure stage.
+
+Run `nic` after ETH starts to see firmware status, the PHY ID, negotiated link
+speed, software drops and ring indices. It also refreshes
+`/mnt/tmp/NETINFO.TXT`. `nic reset`, raw register/PHY access and `nic tx`
+remain Intel-specific commands. Host register-model tests cover the Broadcom
+core, but physical BCM57765 packet traffic is not yet verified.
+
+Initialization and register definitions are adapted from FreeBSD's
+[bge driver](https://github.com/freebsd/freebsd-src/blob/main/sys/dev/bge/if_bge.c)
+and [register header](https://github.com/freebsd/freebsd-src/blob/main/sys/dev/bge/if_bgereg.h).
+Their BSD license notice ships at `/mnt/iso/opt/licenses/bcm57765.txt`.
+This product includes software developed by Bill Paul.
 
 ---
 

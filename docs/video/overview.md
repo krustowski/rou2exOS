@@ -12,12 +12,16 @@ The kernel supports two independent video paths selected at boot based on what t
 | Path | Source | Mode | Driver |
 |------|--------|------|--------|
 | **VESA framebuffer** | Multiboot2 framebuffer tag | Linear pixel buffer | `video/mode.rs` |
-| **VGA text mode** | Always available | 80×25 character cells | `video/vga.rs` |
+| **VGA text mode** | Legacy BIOS/VGA | 80×25 character cells | `video/vga.rs` |
+| **Framebuffer text console** | EFI text entries (`console=fb`) | 80×25 cells drawn as pixels | `video/console.rs`, `video/vga.rs` |
 
 The kernel console writes boot status to VGA text memory at `0xB8000`. When
 GRUB selects an RGB framebuffer that text memory is not visible; Memento
 provides the graphics session instead of the kernel shell and clock. See
 [Graphics Session](../build.md#graphics-session).
+
+EFI text entries select the framebuffer console, which keeps the shell visible
+on systems without a VGA text display. See [Text Mode Writer](vga.md#text-mode-writer-videovgars).
 
 ---
 

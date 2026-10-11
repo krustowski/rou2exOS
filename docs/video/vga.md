@@ -88,6 +88,15 @@ The standard palette maps the 16 EGA attribute colors (0–15) to their canonica
 
 The `Writer` struct manages the kernel's VGA text console.
 
+For an EFI text session (`console=fb`), the same writer uses a RAM character
+buffer and `video/console.rs` draws 8x16 glyphs, foreground/background colors,
+scrolling, and an underline cursor on the boot framebuffer. Glyphs scale by
+an integer factor up to 4 to fit the display. The grid stays
+80x25; stride and RGB field positions come from Multiboot2. Supported formats
+are 24-bit and 32-bit RGB below 4 GiB, at least 640x400. VGA cursor ports are
+not accessed by this output path. The kernel shell runs, Memento does not
+autostart, and the clock that writes directly into VGA memory is omitted.
+
 ```rust
 pub struct Writer {
     col_pos:    usize,

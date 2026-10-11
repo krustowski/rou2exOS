@@ -68,7 +68,7 @@ provide reliable payload delivery; see [IPC limitations](../../multitasking/IPC.
 |------------|------------|-------------|
 | target scheduler slot | pointer to 512-byte buffer | ✅ (legacy limitations above) |
 
-## 0x37 (Register Ethernet driver, bind TCP port)
+## 0x37 (Register Ethernet driver, bind TCP or UDP port)
 
 Ethernet driver registration, or port binding. Both are released when the calling process exits, is killed or crashes.
 
@@ -76,6 +76,14 @@ Ethernet driver registration, or port binding. Both are released when the callin
 |------------|------------|-------------|
 | `0` for global driver | ignored | ✅ |
 | TCP port number (`1`–`65535`) | `0` to bind, `1` to unbind | ✅ |
+| UDP port number (`1`–`65535`) | `2` to bind, `3` to unbind | ✅ |
+
+TCP and UDP have independent tables of 16 entries each. The same numeric
+port can belong to different processes for the two protocols. UDP routing
+accepts complete, unfragmented IPv4 datagrams with valid header lengths;
+protocol parsing and checksum verification belong to the receiving stack.
+ARP replies are copied once to each process with either kind of binding.
+The existing `0x38` port list and `0x46` owner table continue to list TCP only.
 
 Binding a port already owned by the caller is idempotent. Binding another
 process's port or binding when all 16 entries are occupied returns `Busy`
@@ -101,7 +109,7 @@ gateway's MAC, DNS and the card's MAC, as the global Ethernet driver (`eth`)
 got them by DHCP or was given them. Every network stack can read it instead of
 assuming addresses of its own. The published gateway MAC avoids repeating ARP
 discovery; [ARP replies](../../networking/overview.md#frame-routing) also reach
-processes with bound TCP ports.
+processes with bound TCP or UDP ports.
 
 With Argument 1 `0x01` the kernel fills the [`NetConfig`](../type_definitions.md#netconfig-syscall-0x3d) at Argument 2; the IP and MAC come from the system configuration (the same ones `0x01` and `0x38` report), the rest is what the driver last set. Unset fields are zero.
 
@@ -185,7 +193,7 @@ Authenticated echo replies match the target and identifier. ICMP time-exceeded a
 
 Read-only, coherent [NetStats](../type_definitions.md#netstats-syscall-0x45)
 snapshot of the physical NIC's traffic since boot, on
-RTL8139 and E1000. Argument 1 points to a **40-byte** `NetStats`; arguments 2
+RTL8139, E1000 and BCM57765. Argument 1 points to a **40-byte** `NetStats`; arguments 2
 and 3 are unused (SDK wrappers pass zero). No driver/card is required: totals
 are zero before traffic starts and survive driver restarts/NIC reinitialization.
 

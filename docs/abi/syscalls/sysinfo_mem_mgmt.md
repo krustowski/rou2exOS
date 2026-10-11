@@ -27,8 +27,19 @@ ordinary exit path.
 
 | Argument 1 | Argument 2 | Meaning | Implemented |
 |------------|------------|-------------|---------|
-| `0x01`   | pointer to `RTC` struct | Read the system time and date. | ✅ |
-| `0x02`   | pointer to `RTC` struct | Write the system time and date. | ❌ |
+| `0x01`   | pointer to `RTC` struct | Read the UTC system time and date. | ✅ |
+| `0x02`   | pointer to `RTC` struct | Set the UTC system time and date for this boot. | ✅ |
+
+Both operations use the packed seven-byte [`RTC`](../type_definitions.md#rtc)
+structure. The clock is initialized from CMOS on its first read and then
+advances with hardware PIT ticks. Setting it replaces that wall-clock anchor;
+uptime, sleep deadlines and the battery-backed CMOS clock are unchanged.
+
+Returns `Okay` (`0x00`) on success, `InvalidInput` (`0xfc`) for an invalid
+buffer, operation or calendar value, and `Busy` (`0xfa`) when CMOS cannot
+provide a stable initial reading. Set accepts Gregorian dates in years
+2000–2199, hours 0–23 and minutes/seconds 0–59. An invalid set preserves the
+previous clock. libc++r2 exposes this as `r2::set_clock(RtcTime)`.
 
 ## 0x03 (Pipe handling)
 
@@ -43,7 +54,10 @@ ordinary exit path.
 
 ## 0x04 (Tick count in milliseconds)
 
-Get millisecond tick count since boot. Returns elapsed milliseconds in `RAX`. The nominal resolution is 1 ms at the current 1000 Hz PIT rate (`TICKS_PER_SECOND`). The current implementation also advances the counter for software yields through `int 0x20`, so it can run ahead of wall time.
+Get millisecond tick count since boot. Returns elapsed milliseconds in `RAX`.
+The nominal resolution is 1 ms at the current 1000 Hz PIT rate
+(`TICKS_PER_SECOND`). Only hardware timer interrupts advance the counter;
+software yields through `int 0x20` and wall-clock adjustments leave it unchanged.
 
 No argument is used. The syscall is implemented.
 

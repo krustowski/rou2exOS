@@ -123,19 +123,44 @@ entry enables the same driver explicitly. It supports HID boot keyboards,
 including keyboards behind USB2 hubs, and routes the switchable USB2 ports on
 Intel's 2012 Panther Point controller to xHCI.
 
-Physical Mac hardware remains to be tested. The built-in keyboard may be on an
-EHCI-only port, and USB trackpads, USB mice, and runtime keyboard attachment are
-not supported. See [USB keyboard support](input/keyboard.md#usb-keyboards-xhci).
+The built-in keyboard may be on an EHCI-only port. USB trackpads, USB mice, and
+runtime keyboard attachment are not supported. See
+[USB keyboard support](input/keyboard.md#usb-keyboards-xhci).
 Avoid the **PS/2 input only** entries (`usb=os`) on a Mac: they stop the USB
 controllers without starting the keyboard driver.
+
+On EFI, the **text mode** entries use the framebuffer-capable kernel with
+`console=fb`. R2 draws an 80x25 text console on the RGB framebuffer and starts
+the kernel shell instead of Memento. This avoids GRUB's “no console will be
+available” warning for a VGA-only kernel and makes commands such as `nic`
+visible. BIOS text entries continue to use the VGA text kernel.
+
+If ETH exits immediately, boot **text mode, USB keyboard via xHCI** and run
+`nic`. It now lists PCI network controllers even when no Ethernet driver is
+registered, including vendor/device IDs and available R2 backends. In Memento,
+open `/mnt/tmp/NETINFO.TXT` in the file browser or run
+`cat /mnt/tmp/NETINFO.TXT` in a shell window. The file is generated at boot
+and refreshed when ETH registration succeeds or fails.
+
+R2 supports RTL8139, selected Intel e1000/e1000e/PCH Ethernet controllers,
+and the wired Broadcom BCM57765 (`14e4:16b4`). The BCM57765 backend sets up
+copper autonegotiation and polled packet rings; it does not drive the Mac's
+wireless controller. Its initialization stage, PHY, link speed and ring state
+appear in `nic` and `NETINFO.TXT`. BCM57765 hardware traffic still needs
+validation on a physical Mac; QEMU checks only the existing boot/NIC paths.
+An unsupported controller requires its own driver; an Ethernet cable or DHCP
+settings cannot fix that. Serving GARN at `http://localhost` uses the kernel's
+loopback path and does not establish support for the physical Ethernet port.
 
 ### Graphics session
 
 The graphics kernel maps the framebuffer write-combining at boot. When GRUB
 provides an RGB framebuffer, it starts neither `kshell` nor `kclock`; Memento
-provides the visible desktop, shell window and clock.
+owns the ordinary graphics session. An EFI text entry uses `console=fb` to
+start a visible kernel shell on that framebuffer instead.
 
-`init_rc` runs the startup script and then starts Memento in the foreground.
+In an ordinary graphics session, `init_rc` runs the startup script and then
+starts Memento in the foreground.
 Use the floppy's `INIT.RC` when present; an empty or missing script on the
 graphics build falls back to `/mnt/tar/opt/init.rc`, then `/mnt/iso/opt/init.rc`.
 The build copies `configs/init.rc` to both boot-medium copies. Keep `fg memento`
@@ -144,8 +169,10 @@ out of the graphics startup script, since the session launcher starts it itself.
 Memento scales its desktop by the largest whole number that leaves at least
 640×400 pixels (1920×1080 gives 960×540 at 2×), uses 256 colours, and sends
 changed rows through [indexed blitting](abi/syscalls/video_audio.md#0x19-blit-an-8-bit-indexed-frame).
-To request a particular GRUB mode, add `set gfxpayload=1920x1080x32` before
-`multiboot2` in the graphics menu entry.
+To request a particular GRUB mode, add `set gfxpayload=1920x1080x32` after
+`multiboot2` and before `boot` in the graphics menu entry. The
+[GRUB Multiboot loader](https://raw.githubusercontent.com/rhboot/grub2/master/grub-core/loader/multiboot.c)
+resets `gfxpayload` from the kernel header when it loads the kernel.
 
 The launcher stays alive as the desktop supervisor. After a cooperative
 [Jug relaunch](sdk/jug.md), it preserves Memento's arguments, adds `--relaunch`
@@ -376,7 +403,7 @@ Standard run with networking:
 make run_iso_net
 ```
 
-QEMU network setup assumes `tap0` is already created on the host. The kernel probes RTL8139 first, then supported Intel controllers via PCI scan. To test Intel in QEMU, replace the target's `-device rtl8139,netdev=net0` with `-device e1000,netdev=net0` or `-device e1000e,netdev=net0`; see [Hardware Layer](networking/hardware.md#nic-selection-and-intel-driver-nicrs-e1000rs).
+QEMU network setup assumes `tap0` is already created on the host. The kernel probes RTL8139 first, then supported Intel controllers, then BCM57765 via PCI scan. To test Intel in QEMU, replace the target's `-device rtl8139,netdev=net0` with `-device e1000,netdev=net0` or `-device e1000e,netdev=net0`; see [Hardware Layer](networking/hardware.md#nic-selection-and-intel-driver-nicrs-e1000rs).
 
 ```
 sudo ip tuntap add dev tap0 mode tap
@@ -464,7 +491,23 @@ hardware and scheduler stand-ins:
 | `tests/unit/path.rs` | Path normalisation (`src/fs/vfs/path.rs`) |
 | `tests/unit/elf_path.rs` | Bare names, absolute executable paths, invalid input and length limits |
 | `tests/unit/desktop.rs` | Preserving desktop arguments, adding `--relaunch` once, invalid and oversized commands |
-| `tests/network/main.rs` | NIC byte accounting, held frames, failed TX, registry ownership/fullness, release and layout sizes |
+| `tests/unit/bcm57765.rs` | BCM57765 descriptor ownership/wraparound, PCI power state, MAC validation, bounded reset/PHY waits and copper link resolution with a register model |
+| `tests/unit/calendar_clock.rs` | Gregorian dates and CMOS decoding, clock adjustments, midnight rollover and independent uptime |
+| `tests/network/main.rs` | NIC byte accounting, held frames, failed TX, independent TCP/UDP routing and ownership, ARP fanout, cleanup and layout sizes |
+
+### Memento time synchronization
+
+```sh
+make -C ../r2_app/cpp/memento-hello settingstest ntptest nettest
+python3 tests/time/qemu_ntp.py --grub-efi-dir /usr/lib/grub/x86_64-efi
+```
+
+The host suites test settings validation/layout, SNTP reply validation,
+timeouts, retry limits and clock application. The VM test requires freshly
+staged kernels and Memento in `iso/boot/usb.tar`, QEMU and OVMF. It uses a
+local Ethernet peer for DHCP, ARP, UDP DNS and NTP, sends a stale reply before a valid
+2040 timestamp, and checks the kernel wall clock and PIT tick rate. No Internet
+connection is needed. Output and a screenshot go to `/tmp/r2-ntp-vm` by default.
 
 ### Jug publisher tests
 

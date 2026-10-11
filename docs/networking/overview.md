@@ -11,10 +11,35 @@ There are two hardware transport paths. A [userspace WireGuard tunnel](wireguard
 
 | Path | Hardware | Protocol | Direction |
 |------|----------|----------|-----------|
-| **Ethernet** | RTL8139 or supported Intel PCI NIC | Ethernet II → IPv4/ARP | TX and RX |
+| **Ethernet** | RTL8139, supported Intel PCI NIC, or Broadcom BCM57765 | Ethernet II → IPv4/ARP | TX and RX |
 | **Serial/SLIP** | UART COM1 | SLIP-framed IPv4 | TX only (active), RX (loop-based) |
 
 ---
+
+## Hardware Diagnostics
+
+ETH registers through syscall `0x37`, which initializes an RTL8139, supported
+Intel controller, or wired Broadcom BCM57765 (`14e4:16b4`). If no backend can initialize a card, registration fails and
+ETH prints its unsupported-card message and exits. The kernel loopback path
+still serves local traffic, so GARN at `http://localhost` can work in this state.
+
+The kernel shell's `nic` command shows PCI network controllers even before a
+driver registers. It reports the PCI location, vendor/device ID, subsystem IDs,
+BAR0 address, and available R2 backend without writing controller registers.
+An ID marked `unsupported` needs a hardware driver; DHCP configuration cannot
+add support. A recognized ID can also fail initialization, for example when
+its MMIO BAR is outside the NIC driver's mapping.
+
+`/mnt/tmp/NETINFO.TXT` contains the same PCI inventory. It is generated during
+boot and refreshed on ETH registration success/failure, so it can be opened
+from Memento's file browser or read with `cat` in a shell window. EFI text GRUB
+entries use a [framebuffer console](../build.md#intel-mac-usb-boot-including-macbook-pro-2012),
+making `nic` visible on Intel Macs.
+
+For BCM57765, the report also records the initialization stage, firmware
+mailbox, PHY ID, negotiated link and packet-ring state. See the
+[Broadcom backend](hardware.md#broadcom-bcm57765-bcm57765) for hardware
+validation status and limits. This product includes software developed by Bill Paul.
 
 ## Receive Path (Ethernet)
 
@@ -56,7 +81,7 @@ This path is legacy/fallback; the RTL8139 path is preferred for QEMU guests.
 
 ## Loopback Device
 
-A frame a process sends to this machine itself never reaches the NIC, which would not hear it anyway: `loopback.rs` takes it in syscall `0x34` and queues it to the process it is for, routed as frames off the NIC are (`netdrv::deliver`: by TCP destination port, else the global driver). So r2web, Memento or any other stack can reach GARN, TNT or Chat on the same machine, at `127.0.0.1` or at the address DHCP gave it.
+A frame a process sends to this machine itself never reaches the NIC, which would not hear it anyway: `loopback.rs` takes it in syscall `0x34` and queues it to the process it is for, routed as frames off the NIC are (`netdrv::deliver`: by TCP or UDP destination port, else the global driver). So r2web, Memento or any other stack can reach GARN, TNT or Chat on the same machine, at `127.0.0.1` or at the address DHCP gave it.
 
 | Sent | What happens |
 |------|--------------|
@@ -86,26 +111,41 @@ The userland `sh`/TNT builtins `ping` and `traceroute` select that source to rea
 
 ## Driver and Port Registry
 
-`netdrv.rs` maintains two static tables (no `Mutex` — updated during registration and process cleanup, and read during polling):
+`netdrv.rs` maintains the following tables. Registration and process cleanup
+update them with interrupts disabled; polling reads them without a mutex.
 
 | Table | Size | Contents |
 |-------|------|----------|
-| `NET_DRV_PID` | 1 entry | Scheduler slot of the global Ethernet driver (ARP, ICMP, unbound TCP) |
+| `NET_DRV_PID` | 1 entry | Scheduler slot of the global Ethernet driver (ARP, ICMP, unbound TCP/UDP) |
 | `PORT_REGISTRY` | 16 entries | `(tcp_dest_port, slot)` for services and client reply ports |
+| `UDP_PORT_REGISTRY` | 16 entries | `(udp_dest_port, slot)`, independent of TCP bindings |
 
 ### Registration (syscall `0x37`)
 
-- `arg1 = 0`: register as global driver. Probes RTL8139 first, then supported Intel controllers through `nic::init`, and reads and caches the MAC address in `SYSTEM_CONFIG`. Idempotent — no-op if a driver is already registered.
+- `arg1 = 0`: register as global driver. Probes RTL8139 first, then supported Intel controllers and Broadcom BCM57765 through `nic::init`, and reads and caches the MAC address in `SYSTEM_CONFIG`. Idempotent — no-op if a driver is already registered.
 - `arg1 = N > 0`, `arg2 = 0`: bind TCP destination port `N` to the caller. Binding a port it already owns succeeds; a port owned by another process or a full table returns `Busy` without changing existing entries.
-- `arg1 = N > 0`, `arg2 = 1`: release the caller's binding. Releasing an unbound port succeeds; releasing another process's port returns `Busy`. Other `arg2` values return `InvalidInput`.
+- `arg1 = N > 0`, `arg2 = 1`: release the caller's TCP binding. Releasing an unbound port succeeds; releasing another process's port returns `Busy`.
+- `arg1 = N > 0`, `arg2 = 2`/`3`: bind/release UDP destination port `N`, with the same ownership and capacity rules in its own table. Ports must fit in 16 bits; other operations return `InvalidInput`.
 
 Registrations last as long as the process. When it exits, is killed or crashes, `scheduler::kill`/`crash` call `netdrv::release_process(slot)`: the global driver slot is freed if the process held it, its port bindings are dropped, and so are the buffers of frames still queued to it. The next process to register becomes the driver; the NIC stays initialised. Until then, frames for bound ports are still delivered, and frames nobody is registered for are dropped.
 
 ### Frame Routing
 
-On each incoming frame `poll_and_deliver` first rejects physical input using the local tunnel address. Delivery checks the registered tunnel's UDP port before calling `tcp_dest_port(frame)` and `lookup_port(port)` against `PORT_REGISTRY`. A tunnel UDP match goes to its daemon, a TCP port match to that service's PID, and everything else (ARP, ICMP, unregistered ports) to `NET_DRV_PID`.
+On each incoming frame `poll_and_deliver` first rejects physical input using
+the local tunnel address. Delivery checks the registered tunnel's UDP port
+first, then UDP and TCP destination bindings. A tunnel match goes to its
+daemon, a bound port to its owner's queue, and everything else (ARP, ICMP,
+unregistered ports) to `NET_DRV_PID`. Ordinary UDP bindings accept complete,
+unfragmented IPv4 packets with consistent IP and UDP lengths. The receiving
+userland stack verifies UDP checksums and interprets the payload.
 
-ARP replies are the exception to one destination: besides the driver, every other process with a TCP port bound gets a copy (once per process, best effort: a copy that finds no free frame buffer is not made). Those processes run TCP/IP stacks of their own, like Memento's browser, video player and chat, and ARP for hosts on the local network themselves. Without the copy they could reach the gateway, whose MAC the driver publishes (syscall `0x3d`), but never a machine beside them on the LAN.
+ARP replies are the exception to one destination: besides the driver, every
+other process with a TCP or UDP port bound gets a copy (once per process,
+best effort: a copy that finds no free frame buffer is not made). Those
+processes run stacks of their own, including Memento's NTP client, browser,
+video player and chat, and ARP for hosts on the local network themselves.
+Without the copy they could reach the gateway, whose MAC the driver publishes
+(syscall `0x3d`), but never a machine beside them on the LAN.
 
 ---
 
@@ -142,6 +182,7 @@ and falls back to its own traffic counters and port numbers on older kernels.
 | RTL8139 RX ring buffer | 32 KiB (RCR RBLEN = 10) + 1500-byte overrun guard |
 | RTL8139 TX descriptors | 4 (round-robin) |
 | Intel RX / TX descriptors | 32 / 64 (2 KiB buffers) |
+| BCM57765 RX producer / return / TX descriptors | 512 / 512 / 512 (64 RX and 32 TX buffers of 2 KiB) |
 | TX buffer per descriptor | 2 KiB |
 | Queued-frame buffers (`FRAME_BUF`) | 64 x 2 KiB |
 | Messages queued per process | 64 |

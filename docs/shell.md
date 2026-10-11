@@ -218,7 +218,14 @@ Restarts the machine: the FADT's reset register when the firmware has one, then 
 
 ### `nic`
 
-Shows the selected NIC, register base, MAC and registered driver slot, plus delivered, held, dropped and missed-frame counters. Intel cards also report link speed/duplex, PHY state, hardware counters and descriptor-ring positions. Start `eth` first to register the driver.
+Lists PCI network controllers even before ETH registers, including primary
+vendor/device IDs, subsystem IDs, BAR0 and available driver backends. After
+`eth` starts, it shows the selected NIC, MAC, driver slot and packet counters.
+Intel cards also report link speed/duplex, PHY state, hardware counters and
+descriptor-ring positions. Broadcom BCM57765 reports its initialization
+stage, firmware mailbox, PHY, negotiated link and packet-ring indices.
+The command refreshes `/mnt/tmp/NETINFO.TXT`, which is also generated at boot
+and after ETH registration. This product includes software developed by Bill Paul.
 
 Intel diagnostics accept decimal numbers or hexadecimal with `0x`:
 

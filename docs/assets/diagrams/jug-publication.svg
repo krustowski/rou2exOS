@@ -1,0 +1,106 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="634pt" height="641pt" viewBox="0.00 0.00 633.74 640.58" role="img" aria-labelledby="jug-publication-title jug-publication-description">
+<title id="jug-publication-title">Jug publication and catalog commit</title><desc id="jug-publication-description">The developer snapshots and checks ELF bytes, transfers them over SSH, and the receiver stages and verifies them before locking and merging the catalog. Immutable binaries are flushed before sums.txt is atomically switched last. HTTP verification follows the commit; old catalogs remain backed by retained versions.</desc><g id="graph0" class="graph" transform="scale(1 1) rotate(0) translate(21.6 618.98)">
+<title>publish</title>
+<polygon fill="#0f172a" stroke="none" points="-21.6,21.6 -21.6,-618.98 612.14,-618.98 612.14,21.6 -21.6,21.6" />
+
+<g id="node1" class="node">
+<title>local</title>
+<path fill="#1e293b" stroke="#60a5fa" stroke-width="1.4" d="M343.67,-597.38C343.67,-597.38 20.62,-597.38 20.62,-597.38 14.62,-597.38 8.62,-591.38 8.62,-585.38 8.62,-585.38 8.62,-559.04 8.62,-559.04 8.62,-553.04 14.62,-547.04 20.62,-547.04 20.62,-547.04 343.67,-547.04 343.67,-547.04 349.67,-547.04 355.67,-553.04 355.67,-559.04 355.67,-559.04 355.67,-585.38 355.67,-585.38 355.67,-591.38 349.67,-597.38 343.67,-597.38" />
+<text text-anchor="middle" x="182.15" y="-576.16" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">Developer machine</text>
+<text text-anchor="middle" x="182.15" y="-558.91" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">Snapshot ELF bytes + SHA-256 + validate ELF</text>
+</g>
+
+<g id="node2" class="node">
+<title>staging</title>
+<path fill="#1e293b" stroke="#60a5fa" stroke-width="1.4" d="M309.54,-501.54C309.54,-501.54 54.75,-501.54 54.75,-501.54 48.75,-501.54 42.75,-495.54 42.75,-489.54 42.75,-489.54 42.75,-463.2 42.75,-463.2 42.75,-457.2 48.75,-451.2 54.75,-451.2 54.75,-451.2 309.54,-451.2 309.54,-451.2 315.54,-451.2 321.54,-457.2 321.54,-463.2 321.54,-463.2 321.54,-489.54 321.54,-489.54 321.54,-495.54 315.54,-501.54 309.54,-501.54" />
+<text text-anchor="middle" x="182.15" y="-480.32" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">SSH receiver</text>
+<text text-anchor="middle" x="182.15" y="-463.07" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">Stage + independently verify upload</text>
+</g>
+
+<g id="edge1" class="edge">
+<title>local-&gt;staging</title>
+<path fill="none" stroke="#94a3b8" stroke-width="1.2" d="M182.15,-546.55C182.15,-535.56 182.15,-522.45 182.15,-510.61" />
+<polygon fill="#94a3b8" stroke="#94a3b8" stroke-width="1.2" points="184.6,-510.68 182.15,-503.68 179.7,-510.68 184.6,-510.68" />
+<text text-anchor="middle" x="193.02" y="-520.59" font-family="DejaVu Sans" font-size="11.00" fill="#cbd5e1">SSH</text>
+</g>
+
+<g id="node3" class="node">
+<title>lock</title>
+<path fill="#1e293b" stroke="#60a5fa" stroke-width="1.4" d="M295.67,-418.2C295.67,-418.2 68.62,-418.2 68.62,-418.2 62.62,-418.2 56.63,-412.2 56.63,-406.2 56.63,-406.2 56.63,-379.86 56.63,-379.86 56.63,-373.86 62.63,-367.86 68.63,-367.86 68.63,-367.86 295.67,-367.86 295.67,-367.86 301.67,-367.86 307.67,-373.86 307.67,-379.86 307.67,-379.86 307.67,-406.2 307.67,-406.2 307.67,-412.2 301.67,-418.2 295.67,-418.2" />
+<text text-anchor="middle" x="182.15" y="-396.98" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">Acquire .jug-publish.lock</text>
+<text text-anchor="middle" x="182.15" y="-379.73" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">Read / merge the current catalog</text>
+</g>
+
+<g id="edge2" class="edge">
+<title>staging-&gt;lock</title>
+<path fill="none" stroke="#94a3b8" stroke-width="1.2" d="M182.15,-450.97C182.15,-443.55 182.15,-435.28 182.15,-427.38" />
+<polygon fill="#94a3b8" stroke="#94a3b8" stroke-width="1.2" points="184.6,-427.51 182.15,-420.51 179.7,-427.51 184.6,-427.51" />
+</g>
+
+<g id="node4" class="node">
+<title>versions</title>
+<path fill="#1e293b" stroke="#60a5fa" stroke-width="1.4" d="M312.92,-334.86C312.92,-334.86 51.38,-334.86 51.38,-334.86 45.38,-334.86 39.38,-328.86 39.38,-322.86 39.38,-322.86 39.38,-279.27 39.38,-279.27 39.38,-273.27 45.38,-267.27 51.38,-267.27 51.38,-267.27 312.92,-267.27 312.92,-267.27 318.92,-267.27 324.92,-273.27 324.92,-279.27 324.92,-279.27 324.92,-322.86 324.92,-322.86 324.92,-328.86 318.92,-334.86 312.92,-334.86" />
+<text text-anchor="middle" x="182.15" y="-313.64" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">Immutable version objects</text>
+<text text-anchor="middle" x="182.15" y="-296.39" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">v/&lt;40 SHA-256 digits&gt;/&lt;name&gt;.elf</text>
+<text text-anchor="middle" x="182.15" y="-279.14" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">Verify + flush binaries and directories</text>
+</g>
+
+<g id="edge3" class="edge">
+<title>lock-&gt;versions</title>
+<path fill="none" stroke="#94a3b8" stroke-width="1.2" d="M182.15,-367.45C182.15,-360.11 182.15,-351.86 182.15,-343.75" />
+<polygon fill="#94a3b8" stroke="#94a3b8" stroke-width="1.2" points="184.6,-343.87 182.15,-336.87 179.7,-343.87 184.6,-343.87" />
+</g>
+
+<g id="node5" class="node">
+<title>commit</title>
+<path fill="#1e293b" stroke="#2dd4bf" stroke-width="1.4" d="M320.04,-234.27C320.04,-234.27 44.25,-234.27 44.25,-234.27 38.25,-234.27 32.25,-228.27 32.25,-222.27 32.25,-222.27 32.25,-178.68 32.25,-178.68 32.25,-172.68 38.25,-166.68 44.25,-166.68 44.25,-166.68 320.04,-166.68 320.04,-166.68 326.04,-166.68 332.04,-172.68 332.04,-178.68 332.04,-178.68 332.04,-222.27 332.04,-222.27 332.04,-228.27 326.04,-234.27 320.04,-234.27" />
+<text text-anchor="middle" x="182.15" y="-213.05" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">Catalog commit · LAST</text>
+<text text-anchor="middle" x="182.15" y="-195.8" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">Back up old sums.txt</text>
+<text text-anchor="middle" x="182.15" y="-178.55" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">Atomic rename of flushed new sums.txt</text>
+</g>
+
+<g id="edge4" class="edge">
+<title>versions-&gt;commit</title>
+<path fill="none" stroke="#94a3b8" stroke-width="1.2" d="M182.15,-266.96C182.15,-259.4 182.15,-251.27 182.15,-243.4" />
+<polygon fill="#94a3b8" stroke="#94a3b8" stroke-width="1.2" points="184.6,-243.47 182.15,-236.48 179.7,-243.48 184.6,-243.47" />
+</g>
+
+<g id="node8" class="node">
+<title>retained</title>
+<path fill="#1e293b" stroke="#c4b5fd" stroke-width="1.4" d="M578.54,-597.38C578.54,-597.38 389.75,-597.38 389.75,-597.38 383.75,-597.38 377.75,-591.38 377.75,-585.38 377.75,-585.38 377.75,-559.04 377.75,-559.04 377.75,-553.04 383.75,-547.04 389.75,-547.04 389.75,-547.04 578.54,-547.04 578.54,-547.04 584.54,-547.04 590.54,-553.04 590.54,-559.04 590.54,-559.04 590.54,-585.38 590.54,-585.38 590.54,-591.38 584.54,-597.38 578.54,-597.38" />
+<text text-anchor="middle" x="484.14" y="-576.16" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">Retain old version objects</text>
+<text text-anchor="middle" x="484.14" y="-558.91" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">Earlier catalogs still resolve</text>
+</g>
+
+<g id="edge7" class="edge">
+<title>versions-&gt;retained</title>
+<path fill="none" stroke="#94a3b8" stroke-width="1.2" stroke-dasharray="5,2" d="M266.39,-335.29C284.7,-344.44 303.3,-355.35 319.14,-367.86 386.04,-420.69 443.46,-505.22 469.4,-546.67" />
+</g>
+
+<g id="node6" class="node">
+<title>verify</title>
+<path fill="#1e293b" stroke="#60a5fa" stroke-width="1.4" d="M300.54,-133.68C300.54,-133.68 63.75,-133.68 63.75,-133.68 57.75,-133.68 51.75,-127.68 51.75,-121.68 51.75,-121.68 51.75,-95.34 51.75,-95.34 51.75,-89.34 57.75,-83.34 63.75,-83.34 63.75,-83.34 300.54,-83.34 300.54,-83.34 306.54,-83.34 312.54,-89.34 312.54,-95.34 312.54,-95.34 312.54,-121.68 312.54,-121.68 312.54,-127.68 306.54,-133.68 300.54,-133.68" />
+<text text-anchor="middle" x="182.15" y="-112.46" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">Developer public HTTP(S) check</text>
+<text text-anchor="middle" x="182.15" y="-95.21" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">Fetch catalog + uploaded binaries</text>
+</g>
+
+<g id="edge5" class="edge">
+<title>commit-&gt;verify</title>
+<path fill="none" stroke="#94a3b8" stroke-width="1.2" d="M182.15,-166.23C182.15,-158.53 182.15,-150.34 182.15,-142.65" />
+<polygon fill="#94a3b8" stroke="#94a3b8" stroke-width="1.2" points="184.6,-142.72 182.15,-135.72 179.7,-142.72 184.6,-142.72" />
+</g>
+
+<g id="node7" class="node">
+<title>client</title>
+<path fill="#1e293b" stroke="#60a5fa" stroke-width="1.4" d="M352.29,-50.34C352.29,-50.34 12,-50.34 12,-50.34 6,-50.34 0,-44.34 0,-38.34 0,-38.34 0,-12 0,-12 0,-6 6,0 12,0 12,0 352.29,0 352.29,0 358.29,0 364.29,-6 364.29,-12 364.29,-12 364.29,-38.34 364.29,-38.34 364.29,-44.34 358.29,-50.34 352.29,-50.34" />
+<text text-anchor="middle" x="182.15" y="-29.12" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">Jug on r2</text>
+<text text-anchor="middle" x="182.15" y="-11.87" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">Refresh catalog → verify download → next launch</text>
+</g>
+
+<g id="edge6" class="edge">
+<title>verify-&gt;client</title>
+<path fill="none" stroke="#94a3b8" stroke-width="1.2" d="M182.15,-83.11C182.15,-75.69 182.15,-67.42 182.15,-59.52" />
+<polygon fill="#94a3b8" stroke="#94a3b8" stroke-width="1.2" points="184.6,-59.65 182.15,-52.65 179.7,-59.65 184.6,-59.65" />
+</g>
+</g>
+</svg>

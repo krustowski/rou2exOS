@@ -1,0 +1,14 @@
+// Title: Coordinated Memento relaunch
+// Description: Jug verifies the installed Memento update and asks for confirmation, then requests relaunch via syscall 0x42. Memento accepts after unlocking, closes its windows and children, and exits with 0x4d52. The parked init_rc supervisor starts the replacement with preserved arguments and --relaunch. RAM disk files and background services survive.
+digraph relaunch {
+  jug [label="Jug\nVerify installed update + Y confirmation"];
+  request [label="Kernel · syscall 0x42\nRecord request for capable supervised Memento"];
+  memento [label="Memento polls + accepts\nWait for unlock if session is locked"];
+  close [label="Close windows + hosted children\nCooperative exit code 0x4d52"];
+  cleanup [label="Kernel termination cleanup\nRelease ownership + wake init_rc"];
+  supervisor [label="Parked init_rc supervisor\nConsume one-shot relaunch command"];
+  replacement [label="Downloaded MEMENTO.ELF\nPreserved argv + --relaunch → Login / Locked", color="#2dd4bf"];
+  retained [label="Retained across this handoff\nRAM disk · SESSION.CFG · background services", color="#c4b5fd"];
+  jug -> request -> memento -> close -> cleanup -> supervisor -> replacement;
+  replacement -> retained [style=dashed, arrowhead=none];
+}

@@ -1,0 +1,20 @@
+// Title: WireGuard inner and outer packet paths
+// Description: A tunnel-source packet matching AllowedIPs is routed to wgd, encrypted into outer UDP and sent through the NIC. The reverse path sends registered-port UDP to wgd for authentication, decryption and source-prefix checks, then injects supported inner packets for TCP services or shell probes.
+digraph wireguard {
+  subgraph cluster_out {
+    label="Outbound";
+    out [label="Application / shell probe\nExplicit tunnel source + AllowedIPs destination"];
+    route [label="Kernel tunnel routing\nQueue to wgd via 0x44"];
+    encrypt [label="wgd · userland\nEncrypt inner packet → outer UDP", color="#c4b5fd"];
+    send [label="Physical NIC → remote peer\nOuter UDP stays on Ethernet", color="#fbbf24"];
+    out -> route -> encrypt -> send;
+  }
+  subgraph cluster_in {
+    label="Inbound";
+    recv [label="Remote peer → physical NIC\nUDP to registered tunnel port", color="#fbbf24"];
+    decrypt [label="wgd · userland\nAuthenticate + decrypt + check source prefix", color="#c4b5fd"];
+    inject [label="Kernel authenticated injection\nSupported inner TCP / probe ICMP"];
+    target [label="Bound TCP service / shell probe", color="#2dd4bf"];
+    recv -> decrypt -> inject -> target;
+  }
+}

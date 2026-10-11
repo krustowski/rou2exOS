@@ -1,0 +1,15 @@
+// Title: Ordered subsystem initialization
+// Description: The 18 initialization steps run in order: console and CPU, interrupts and boot tags, USB and PS/2, memory and video, mounts and splash, processes and debug log, then PIT interrupts. INIT.RC runs as a scheduled task afterwards.
+digraph init {
+  console [label="1–3 · Console + CPU\nVGA writer → clear screen → CPU setup"];
+  interrupts [label="4–5 · Interrupts + boot information\nGDT / TSS / IDT → Multiboot2 tags"];
+  devices [label="6–8 · Input + RAM validation\nOptional USB handoff → mouse → process-frame check"];
+  memory [label="9–11 · Heap + display\nKernel heap → video selection → framebuffer cache mode"];
+  mounts [label="12–15 · Filesystems + splash\nFloppy probe → VFS mounts → colours → splash"];
+  tasks [label="16–18 · Start multitasking\nInitial tasks → KERNDBG.LOG → PIC / PIT", color="#2dd4bf"];
+  script [label="Scheduled init_rc task\nRun INIT.RC"];
+  text [label="Text session\nKernel shell + clock"];
+  gui [label="Graphics framebuffer session\ninit_rc supervises Memento", color="#c4b5fd"];
+  console -> interrupts -> devices -> memory -> mounts -> tasks -> script;
+  script -> text; script -> gui;
+}

@@ -15,7 +15,8 @@ installed separately:
 - Target `x86_64-unknown-none`
 - Components `rust-src` and `llvm-tools-preview`
 - `bootimage` cargo subcommand
-- `grub2-mkrescue`, `xorriso`, GNU Make and `tar` for ISO/archive creation
+- `grub2-mkrescue` (or `grub-mkrescue`), `xorriso`, GNU Make and `tar` for ISO/archive creation
+- GRUB platform modules: `i386-pc` for legacy BIOS boot, `x86_64-efi` for Intel Mac/UEFI boot
 - QEMU (`qemu-system-x86_64`) for the run targets
 - `mtools` (`mmd`, `mcopy`) and `mkfs.fat` for floppy image creation
 
@@ -64,6 +65,69 @@ Everything outside `iso/boot/` is also packed as `iso/boot/usb.tar`, which GRUB
 loads as a module. The kernel mounts that archive at `/mnt/tar`; it is the
 source of programs and data when booted from USB without a storage driver.
 See [Boot Medium Archive](filesystem/overview.md#boot-medium-archive-mnttar).
+
+### Intel Mac USB boot (including MacBook Pro 2012)
+
+`grub2-mkrescue` includes boot support for the GRUB platforms installed on the
+build host. Installing `grub2-tools` alone can produce a BIOS-only `r2.iso`.
+That image has no EFI loader for the Intel Mac's native USB boot path, even
+though it boots in QEMU's default BIOS. `make image_iso` warns when the host's
+standard `x86_64-efi` module directory is missing.
+
+Install the EFI modules on the Linux build host:
+
+```sh
+# Fedora
+sudo dnf install grub2-efi-x64-modules
+
+# Debian/Ubuntu
+sudo apt install grub-efi-amd64-bin
+```
+
+After `make build` has staged the kernels and applications, create the explicit
+EFI image. This target also works with an existing populated `iso/` tree:
+
+```sh
+make image_efi
+```
+
+This produces `r2-efi.iso`, containing an EFI System Partition and the removable
+media loader `/EFI/BOOT/BOOTX64.EFI`. It rebuilds `usb.tar` from the staged files
+without recompiling the kernels or applications. The target fails with package
+instructions if EFI modules are missing. For modules extracted elsewhere, use
+`make image_efi GRUB_EFI_DIR=/path/to/x86_64-efi`; `GRUB_MKRESCUE` can override
+the selected host command.
+
+Flash **`r2-efi.iso` as a disk image** to the USB stick, replacing its contents;
+copying the ISO file onto a filesystem is insufficient. On the Mac, power on
+while holding **Option (⌥)** and select **EFI Boot**, then choose the ordinary
+**graphics** GRUB entry. See [Apple's startup key
+instructions](https://support.apple.com/en-gb/102603).
+
+Check an image before flashing:
+
+```sh
+xorriso -indev r2-efi.iso -report_el_torito plain -report_system_area plain
+```
+
+Expect a `UEFI` boot image and a GPT `EFI boot partition`. A report containing
+only `BIOS` confirms that the image has no EFI bootloader. If the Mac shows
+**EFI Boot** but reports “no bootable device” before the GRUB menu appears,
+verify which image was flashed and how it was written: the boot picker entry
+alone does not establish that R2's loader was reached. A failure after the GRUB
+menu is a different stage; record its exact message.
+
+EFI boots initialize native xHCI USB keyboard support automatically. Connect an
+external USB keyboard before booting; the **USB keyboard via xHCI** graphics
+entry enables the same driver explicitly. It supports HID boot keyboards,
+including keyboards behind USB2 hubs, and routes the switchable USB2 ports on
+Intel's 2012 Panther Point controller to xHCI.
+
+Physical Mac hardware remains to be tested. The built-in keyboard may be on an
+EHCI-only port, and USB trackpads, USB mice, and runtime keyboard attachment are
+not supported. See [USB keyboard support](input/keyboard.md#usb-keyboards-xhci).
+Avoid the **PS/2 input only** entries (`usb=os`) on a Mac: they stop the USB
+controllers without starting the keyboard driver.
 
 ### Graphics session
 
@@ -166,6 +230,12 @@ The `p2_table`, `p2_high_tables`, `p3_table`, `ist0/ist1_stack` (16 KiB each: th
 ---
 
 ## Boot Flow
+
+[![GRUB loads the kernel and archive, assembly enters long mode, and Rust initializes the kernel before scheduled tasks run.](assets/diagrams/boot-flow.svg)](assets/diagrams/boot-flow.svg)
+
+*Boot handoff from GRUB to Rust and the scheduler. The assembly operations below
+expand the middle stages; [subsystem initialization](init/overview.md#boot-sequence)
+expands the final setup.*
 
 ```
 GRUB (Multiboot2)
@@ -278,7 +348,12 @@ Lines starting with `#` are ignored. Trailing `\r` is stripped (DOS line endings
 
 With `usb=os` on the kernel's command line, the kernel takes the USB host controllers from the firmware at boot, before it sets up the PS/2 mouse (`src/usb/`, the boot line *Taking the USB controllers from the firmware*). `grub.cfg` has a text and a graphics entry with it, marked *PS/2 input only*. In the GRUB menu you can also press `e` and add `usb=os` to the `multiboot2` line.
 
-Use it on real hardware when pulling out the USB stick freezes the machine. The firmware's SMM code still drives the controllers to emulate a PS/2 keyboard and mouse. A stick pulled out is an SMI the firmware may spend seconds on, and the kernel cannot mask it. After the handoff, the firmware no longer emulates anything, so only a real PS/2 keyboard and mouse work (a laptop's built-in keyboard is usually one). The boot line reads `FAIL` if a controller's registers were out of reach, or if the firmware did not let go and had to be overruled. In that case, look for *XHCI/EHCI Hand-off* in the firmware setup and turn it on. The kernel shell's [`usb`](shell.md#usb) command shows the state of each controller, and `usb take` does the same handoff later.
+Use it on real hardware when pulling out the USB stick freezes the machine. The firmware's SMM code still drives the controllers to emulate a PS/2 keyboard and mouse. A stick pulled out is an SMI the firmware may spend seconds on, and the kernel cannot mask it. This ownership-only mode stops the controllers, leaving input to real PS/2 devices. The boot line reads `FAIL` if a controller's registers were out of reach, or if the firmware did not let go and had to be overruled. In that case, look for *XHCI/EHCI Hand-off* in the firmware setup and turn it on. The kernel shell's [`usb`](shell.md#usb) command shows the state of each controller, and `usb take` does the same handoff later, also stopping the native keyboard driver.
+
+For native USB keyboard input, use `usb=xhci` instead. EFI boots enable it
+automatically unless `usb=os` or `usb=firmware` is present. BIOS boots retain
+firmware input by default. See [USB keyboard support](input/keyboard.md#usb-keyboards-xhci)
+for device support and current limits.
 
 ---
 
@@ -440,6 +515,20 @@ missing navigation entries, missing files and broken heading anchors.
 `docs/assets/stylesheets/navigation.css`. Section overview files keep their
 existing URLs; the sidebar, tabs and previous/next links come from the Material
 theme and `nav`.
+
+Diagrams are SVG images with editable Graphviz `.dot` sources in
+`docs/assets/diagrams/`. Click a diagram to open its full-size export. To update
+them, edit the source and regenerate with Graphviz installed (`dot` on `PATH`):
+
+```sh
+python3 utils/render_docs_diagrams.py
+```
+
+The renderer also creates the fixed-memory-pool chart from the capacities in
+`memory_budget()`. Keep those values aligned with `src/task/process.rs`,
+`src/mem/pages.rs` and `src/mem/uheap.rs`. Chart bars show reserved capacity,
+not measured usage. Regeneration needs Python's standard library and Graphviz;
+viewing the committed SVGs needs no extra site plugin.
 
 ---
 

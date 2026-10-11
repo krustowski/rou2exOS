@@ -1,0 +1,77 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="896pt" height="307pt" viewBox="0.00 0.00 895.62 307.22" role="img" aria-labelledby="memory-mapping-title memory-mapping-description">
+<title id="memory-mapping-title">Private images and shared user memory</title><desc id="memory-mapping-description">Two processes map the same virtual ELF window to different physical 2 MiB frames. Both map the same user-stack pages and shared user heap. Kernel mappings remain supervisor-only.</desc><g id="graph0" class="graph" transform="scale(1 1) rotate(0) translate(21.6 285.62)">
+<title>memory</title>
+<polygon fill="#0f172a" stroke="none" points="-21.6,21.6 -21.6,-285.62 874.01,-285.62 874.01,21.6 -21.6,21.6" />
+
+<g id="node1" class="node">
+<title>a</title>
+<path fill="#1e293b" stroke="#60a5fa" stroke-width="1.4" d="M383.04,-264.02C383.04,-264.02 153.75,-264.02 153.75,-264.02 147.75,-264.02 141.75,-258.02 141.75,-252.02 141.75,-252.02 141.75,-225.68 141.75,-225.68 141.75,-219.68 147.75,-213.68 153.75,-213.68 153.75,-213.68 383.04,-213.68 383.04,-213.68 389.04,-213.68 395.04,-219.68 395.04,-225.68 395.04,-225.68 395.04,-252.02 395.04,-252.02 395.04,-258.02 389.04,-264.02 383.04,-264.02" />
+<text text-anchor="middle" x="268.39" y="-242.8" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">Process in slot 4</text>
+<text text-anchor="middle" x="268.39" y="-225.55" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">Virtual image: 0x600000–0x7fffff</text>
+</g>
+
+<g id="node3" class="node">
+<title>framea</title>
+<path fill="#1e293b" stroke="#60a5fa" stroke-width="1.4" d="M206.79,-150.93C206.79,-150.93 12,-150.93 12,-150.93 6,-150.93 0,-144.93 0,-138.93 0,-138.93 0,-112.59 0,-112.59 0,-106.59 6,-100.59 12,-100.59 12,-100.59 206.79,-100.59 206.79,-100.59 212.79,-100.59 218.79,-106.59 218.79,-112.59 218.79,-112.59 218.79,-138.93 218.79,-138.93 218.79,-144.93 212.79,-150.93 206.79,-150.93" />
+<text text-anchor="middle" x="109.39" y="-129.71" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">Private physical frame</text>
+<text text-anchor="middle" x="109.39" y="-112.46" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">Slot 4: 0x1800000–0x19fffff</text>
+</g>
+
+<g id="edge1" class="edge">
+<title>a-&gt;framea</title>
+<path fill="none" stroke="#94a3b8" stroke-width="1.2" d="M233.11,-213.2C209.02,-196.37 177,-173.99 151.57,-156.23" />
+<polygon fill="#94a3b8" stroke="#94a3b8" stroke-width="1.2" points="153.21,-154.39 146.07,-152.39 150.41,-158.4 153.21,-154.39" />
+<text text-anchor="middle" x="235.56" y="-187.23" font-family="DejaVu Sans" font-size="11.00" fill="#cbd5e1">own P2[3]</text>
+</g>
+
+<g id="node5" class="node">
+<title>shared</title>
+<path fill="#1e293b" stroke="#2dd4bf" stroke-width="1.4" d="M599.91,-168.18C599.91,-168.18 252.88,-168.18 252.88,-168.18 246.88,-168.18 240.87,-162.18 240.87,-156.18 240.87,-156.18 240.87,-95.34 240.87,-95.34 240.87,-89.34 246.87,-83.34 252.87,-83.34 252.87,-83.34 599.91,-83.34 599.91,-83.34 605.91,-83.34 611.91,-89.34 611.91,-95.34 611.91,-95.34 611.91,-156.18 611.91,-156.18 611.91,-162.18 605.91,-168.18 599.91,-168.18" />
+<text text-anchor="middle" x="426.39" y="-146.96" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">Shared USER + WRITE mappings</text>
+<text text-anchor="middle" x="426.39" y="-129.71" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">Stacks: 0x400000–0x5fffff and 0x800000–0x9fffff</text>
+<text text-anchor="middle" x="426.39" y="-112.46" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">Base heap: 0xc00000–0xffffff</text>
+<text text-anchor="middle" x="426.39" y="-95.21" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">Heap extension: mapped only after growth</text>
+</g>
+
+<g id="edge3" class="edge">
+<title>a-&gt;shared</title>
+<path fill="none" stroke="#94a3b8" stroke-width="1.2" d="M303.46,-213.2C320.06,-201.52 340.45,-187.19 359.82,-173.57" />
+<polygon fill="#94a3b8" stroke="#94a3b8" stroke-width="1.2" points="361.1,-175.66 365.42,-169.63 358.28,-171.65 361.1,-175.66" />
+</g>
+
+<g id="node2" class="node">
+<title>b</title>
+<path fill="#1e293b" stroke="#60a5fa" stroke-width="1.4" d="M758.04,-264.02C758.04,-264.02 528.75,-264.02 528.75,-264.02 522.75,-264.02 516.75,-258.02 516.75,-252.02 516.75,-252.02 516.75,-225.68 516.75,-225.68 516.75,-219.68 522.75,-213.68 528.75,-213.68 528.75,-213.68 758.04,-213.68 758.04,-213.68 764.04,-213.68 770.04,-219.68 770.04,-225.68 770.04,-225.68 770.04,-252.02 770.04,-252.02 770.04,-258.02 764.04,-264.02 758.04,-264.02" />
+<text text-anchor="middle" x="643.39" y="-242.8" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">Process in slot 5</text>
+<text text-anchor="middle" x="643.39" y="-225.55" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">Virtual image: 0x600000–0x7fffff</text>
+</g>
+
+<g id="node4" class="node">
+<title>frameb</title>
+<path fill="#1e293b" stroke="#60a5fa" stroke-width="1.4" d="M840.41,-150.93C840.41,-150.93 646.38,-150.93 646.38,-150.93 640.38,-150.93 634.38,-144.93 634.38,-138.93 634.38,-138.93 634.38,-112.59 634.38,-112.59 634.38,-106.59 640.38,-100.59 646.38,-100.59 646.38,-100.59 840.41,-100.59 840.41,-100.59 846.41,-100.59 852.41,-106.59 852.41,-112.59 852.41,-112.59 852.41,-138.93 852.41,-138.93 852.41,-144.93 846.41,-150.93 840.41,-150.93" />
+<text text-anchor="middle" x="743.39" y="-129.71" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">Private physical frame</text>
+<text text-anchor="middle" x="743.39" y="-112.46" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">Slot 5: 0x1a00000–0x1bfffff</text>
+</g>
+
+<g id="edge2" class="edge">
+<title>b-&gt;frameb</title>
+<path fill="none" stroke="#94a3b8" stroke-width="1.2" d="M665.59,-213.2C680.35,-196.8 699.85,-175.14 715.63,-157.6" />
+<polygon fill="#94a3b8" stroke="#94a3b8" stroke-width="1.2" points="717.19,-159.54 720.05,-152.7 713.54,-156.26 717.19,-159.54" />
+<text text-anchor="middle" x="718.15" y="-187.23" font-family="DejaVu Sans" font-size="11.00" fill="#cbd5e1">own P2[3]</text>
+</g>
+
+<g id="edge4" class="edge">
+<title>b-&gt;shared</title>
+<path fill="none" stroke="#94a3b8" stroke-width="1.2" d="M595.24,-213.2C571.84,-201.22 542.95,-186.43 515.73,-172.49" />
+<polygon fill="#94a3b8" stroke="#94a3b8" stroke-width="1.2" points="517.06,-170.42 509.72,-169.42 514.83,-174.79 517.06,-170.42" />
+</g>
+
+<g id="node6" class="node">
+<title>kernel</title>
+<path fill="#1e293b" stroke="#c4b5fd" stroke-width="1.4" d="M535.41,-50.34C535.41,-50.34 317.38,-50.34 317.38,-50.34 311.38,-50.34 305.38,-44.34 305.38,-38.34 305.38,-38.34 305.38,-12 305.38,-12 305.38,-6 311.38,0 317.38,0 317.38,0 535.41,0 535.41,0 541.41,0 547.41,-6 547.41,-12 547.41,-12 547.41,-38.34 547.41,-38.34 547.41,-44.34 541.41,-50.34 535.41,-50.34" />
+<text text-anchor="middle" x="426.39" y="-29.12" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">Supervisor-only mappings</text>
+<text text-anchor="middle" x="426.39" y="-11.87" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">Kernel · boot archive · RAM disk</text>
+</g>
+
+</g>
+</svg>

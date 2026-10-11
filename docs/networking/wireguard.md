@@ -4,6 +4,12 @@
 
 The daemon implements the protocol and cryptography in userland using a pinned BSD-licensed `wireguard-lwip` core, without a lwIP dependency. The kernel supplies packet routing and authenticated-frame injection through [syscall `0x44`](../abi/syscalls/port_networking.md#0x44-userspace-ipv4-tunnel). See the [daemon source and development guide](https://github.com/krustowski/rou2exOS-apps/tree/master/c/wgd) for build and interoperability tests.
 
+[![Outbound tunnel-source packets go to wgd for encryption and Ethernet UDP transport; inbound UDP is authenticated and decrypted before supported inner TCP or probe ICMP is injected.](../assets/diagrams/wireguard-path.svg)](../assets/diagrams/wireguard-path.svg)
+
+*Inner and outer packet paths. `AllowedIPs` matches outgoing destinations and
+authenticated incoming sources; `eth` keeps the physical address and ARP.
+Tunnel echo requests addressed to r2 are answered inside `wgd`.*
+
 ## Build and prerequisites
 
 Build and boot the updated kernel and applications together; copying `wgd.elf` onto an old kernel is insufficient. The daemon requires tunnel ABI 2, whose capability value is `0x52325748`. Both text and graphics kernels support it.

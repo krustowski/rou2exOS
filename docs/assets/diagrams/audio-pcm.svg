@@ -1,0 +1,86 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="605pt" height="439pt" viewBox="0.00 0.00 604.99 439.40" role="img" aria-labelledby="audio-pcm-title audio-pcm-description">
+<title id="audio-pcm-title">HD Audio PCM playback and silence reclamation</title><desc id="audio-pcm-description">Programs submit 16-bit stereo samples through nonblocking syscall 0x3f writes. The kernel copies accepted samples into a 128 KiB ring, leaving a 1 KiB guard; a four-entry descriptor list feeds controller DMA and the codec. Timer ticks and syscall calls poll LPIB and zero already played samples.</desc><g id="graph0" class="graph" transform="scale(1 1) rotate(0) translate(21.6 417.8)">
+<title>audio</title>
+<polygon fill="#0f172a" stroke="none" points="-21.6,21.6 -21.6,-417.8 583.39,-417.8 583.39,21.6 -21.6,21.6" />
+
+<g id="node1" class="node">
+<title>program</title>
+<path fill="#1e293b" stroke="#60a5fa" stroke-width="1.4" d="M229.91,-396.2C229.91,-396.2 59.12,-396.2 59.12,-396.2 53.12,-396.2 47.12,-390.2 47.12,-384.2 47.12,-384.2 47.12,-357.86 47.12,-357.86 47.12,-351.86 53.12,-345.86 59.12,-345.86 59.12,-345.86 229.91,-345.86 229.91,-345.86 235.91,-345.86 241.91,-351.86 241.91,-357.86 241.91,-357.86 241.91,-384.2 241.91,-384.2 241.91,-390.2 235.91,-396.2 229.91,-396.2" />
+<text text-anchor="middle" x="144.52" y="-374.98" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">Userland audio producer</text>
+<text text-anchor="middle" x="144.52" y="-357.73" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">16-bit stereo PCM</text>
+</g>
+
+<g id="node2" class="node">
+<title>write</title>
+<path fill="#1e293b" stroke="#60a5fa" stroke-width="1.4" d="M254.66,-312.86C254.66,-312.86 34.38,-312.86 34.38,-312.86 28.38,-312.86 22.38,-306.86 22.38,-300.86 22.38,-300.86 22.38,-274.52 22.38,-274.52 22.38,-268.52 28.38,-262.52 34.38,-262.52 34.38,-262.52 254.66,-262.52 254.66,-262.52 260.66,-262.52 266.66,-268.52 266.66,-274.52 266.66,-274.52 266.66,-300.86 266.66,-300.86 266.66,-306.86 260.66,-312.86 254.66,-312.86" />
+<text text-anchor="middle" x="144.52" y="-291.64" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">Syscall 0x3f · nonblocking write</text>
+<text text-anchor="middle" x="144.52" y="-274.39" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">Accept whole samples that fit</text>
+</g>
+
+<g id="edge1" class="edge">
+<title>program-&gt;write</title>
+<path fill="none" stroke="#94a3b8" stroke-width="1.2" d="M144.52,-345.63C144.52,-338.21 144.52,-329.94 144.52,-322.04" />
+<polygon fill="#94a3b8" stroke="#94a3b8" stroke-width="1.2" points="146.97,-322.17 144.52,-315.17 142.07,-322.17 146.97,-322.17" />
+</g>
+
+<g id="node3" class="node">
+<title>ring</title>
+<path fill="#1e293b" stroke="#60a5fa" stroke-width="1.4" d="M269.29,-229.52C269.29,-229.52 19.75,-229.52 19.75,-229.52 13.75,-229.52 7.75,-223.52 7.75,-217.52 7.75,-217.52 7.75,-191.18 7.75,-191.18 7.75,-185.18 13.75,-179.18 19.75,-179.18 19.75,-179.18 269.29,-179.18 269.29,-179.18 275.29,-179.18 281.29,-185.18 281.29,-191.18 281.29,-191.18 281.29,-217.52 281.29,-217.52 281.29,-223.52 275.29,-229.52 269.29,-229.52" />
+<text text-anchor="middle" x="144.52" y="-208.3" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">Kernel PCM ring · 128 KiB</text>
+<text text-anchor="middle" x="144.52" y="-191.05" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">Keep 1 KiB clear of the play position</text>
+</g>
+
+<g id="edge2" class="edge">
+<title>write-&gt;ring</title>
+<path fill="none" stroke="#94a3b8" stroke-width="1.2" d="M144.52,-262.29C144.52,-254.87 144.52,-246.6 144.52,-238.7" />
+<polygon fill="#94a3b8" stroke="#94a3b8" stroke-width="1.2" points="146.97,-238.83 144.52,-231.83 142.07,-238.83 146.97,-238.83" />
+</g>
+
+<g id="node4" class="node">
+<title>dma</title>
+<path fill="#1e293b" stroke="#fbbf24" stroke-width="1.4" d="M229.91,-146.18C229.91,-146.18 59.12,-146.18 59.12,-146.18 53.12,-146.18 47.12,-140.18 47.12,-134.18 47.12,-134.18 47.12,-107.84 47.12,-107.84 47.12,-101.84 53.12,-95.84 59.12,-95.84 59.12,-95.84 229.91,-95.84 229.91,-95.84 235.91,-95.84 241.91,-101.84 241.91,-107.84 241.91,-107.84 241.91,-134.18 241.91,-134.18 241.91,-140.18 235.91,-146.18 229.91,-146.18" />
+<text text-anchor="middle" x="144.52" y="-124.96" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">HD Audio controller DMA</text>
+<text text-anchor="middle" x="144.52" y="-107.71" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">4 buffer descriptors</text>
+</g>
+
+<g id="edge3" class="edge">
+<title>ring-&gt;dma</title>
+<path fill="none" stroke="#94a3b8" stroke-width="1.2" d="M144.52,-178.95C144.52,-171.53 144.52,-163.26 144.52,-155.36" />
+<polygon fill="#94a3b8" stroke="#94a3b8" stroke-width="1.2" points="146.97,-155.49 144.52,-148.49 142.07,-155.49 146.97,-155.49" />
+</g>
+
+<g id="node5" class="node">
+<title>codec</title>
+<path fill="#1e293b" stroke="#60a5fa" stroke-width="1.4" d="M239.04,-50.34C239.04,-50.34 12,-50.34 12,-50.34 6,-50.34 0,-44.34 0,-38.34 0,-38.34 0,-12 0,-12 0,-6 6,0 12,0 12,0 239.04,0 239.04,0 245.04,0 251.04,-6 251.04,-12 251.04,-12 251.04,-38.34 251.04,-38.34 251.04,-44.34 245.04,-50.34 239.04,-50.34" />
+<text text-anchor="middle" x="125.52" y="-29.12" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">Codec DAC → output pins</text>
+<text text-anchor="middle" x="125.52" y="-11.87" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">Speakers / headphones / line out</text>
+</g>
+
+<g id="edge4" class="edge">
+<title>dma-&gt;codec</title>
+<path fill="none" stroke="#94a3b8" stroke-width="1.2" d="M139.53,-95.35C137.28,-84.26 134.6,-70.99 132.18,-59.06" />
+<polygon fill="#94a3b8" stroke="#94a3b8" stroke-width="1.2" points="134.63,-58.82 130.84,-52.44 129.83,-59.79 134.63,-58.82" />
+</g>
+
+<g id="node6" class="node">
+<title>poll</title>
+<path fill="#1e293b" stroke="#2dd4bf" stroke-width="1.4" d="M549.79,-50.34C549.79,-50.34 285.25,-50.34 285.25,-50.34 279.25,-50.34 273.25,-44.34 273.25,-38.34 273.25,-38.34 273.25,-12 273.25,-12 273.25,-6 279.25,0 285.25,0 285.25,0 549.79,0 549.79,0 555.79,0 561.79,-6 561.79,-12 561.79,-12 561.79,-38.34 561.79,-38.34 561.79,-44.34 555.79,-50.34 549.79,-50.34" />
+<text text-anchor="middle" x="417.52" y="-29.12" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">Timer tick + 0x3f calls</text>
+<text text-anchor="middle" x="417.52" y="-11.87" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">Poll LPIB; zero already played samples</text>
+</g>
+
+<g id="edge5" class="edge">
+<title>dma-&gt;poll</title>
+<path fill="none" stroke="#94a3b8" stroke-width="1.2" stroke-dasharray="5,2" d="M159.19,-95.46C166.78,-84.87 176.98,-73.33 189.02,-66.34 193.14,-63.95 225.37,-57.85 264.39,-51.1" />
+<polygon fill="#94a3b8" stroke="#94a3b8" stroke-width="1.2" points="264.54,-53.56 271.02,-49.96 263.7,-48.73 264.54,-53.56" />
+<text text-anchor="middle" x="224.27" y="-69.39" font-family="DejaVu Sans" font-size="11.00" fill="#cbd5e1">play position</text>
+</g>
+
+<g id="edge6" class="edge">
+<title>poll-&gt;ring</title>
+<path fill="none" stroke="#94a3b8" stroke-width="1.2" d="M386.51,-50.78C354.02,-76.06 301.05,-115.9 252.52,-146.18 236.52,-156.16 218.61,-166.1 202.05,-174.83" />
+<polygon fill="#94a3b8" stroke="#94a3b8" stroke-width="1.2" points="201.22,-172.5 196.15,-177.91 203.49,-176.84 201.22,-172.5" />
+<text text-anchor="middle" x="391.69" y="-117.31" font-family="DejaVu Sans" font-size="11.00" fill="#cbd5e1">silence reclaimed region</text>
+</g>
+</g>
+</svg>

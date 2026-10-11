@@ -5,6 +5,11 @@ ring-0 tasks and ring-3 ELF programs, dispatches syscalls through `int 0x7f`, an
 provides hardware access and filesystem mounts. TCP/IP stacks, the desktop and
 application runtimes live in userland.
 
+[![Applications and userland network stacks call SDK libraries and the kernel ABI; the kernel provides tasks, memory, filesystems and hardware access.](assets/diagrams/kernel-architecture.svg)](assets/diagrams/kernel-architecture.svg)
+
+*Kernel and userland responsibilities. TCP/IP connection state stays in userland;
+the kernel routes frames and exposes device access.*
+
 Start with [Boot and Initialization](init/overview.md), then follow the subsystem
 that owns the behavior you are investigating. For application development, use
 the [SDK](sdk/index.md) and [ABI Specification](abi/syscall_specification.md).

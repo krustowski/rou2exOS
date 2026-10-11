@@ -16,6 +16,12 @@ The scheduler is a global `spin::Mutex<Scheduler>`, accessed as `SCHEDULER`. All
 
 ## Scheduling Algorithm
 
+[![Process states: Ready and Running alternate through selection and preemption; waits use Blocked or Idle; termination uses Dead or Crashed before slot reuse.](../assets/diagrams/process-states.svg)](../assets/diagrams/process-states.svg)
+
+*State transitions and slot reuse. Exit and kill can terminate other live states
+too. `Idle` parks a foreground launcher; `Blocked` waits for a deadline or message.
+A crashed slot stays visible until reclaimed when the process table is full.*
+
 On every PIT tick:
 
 1. Any `Blocked` process whose `sleep_until` ≤ current tick is transitioned to `Ready`.

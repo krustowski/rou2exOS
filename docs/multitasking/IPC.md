@@ -57,7 +57,10 @@ buffers until received or its owner exits. A frame that cannot be queued is
 held at the ring head and retried, with a 200-tick limit for an unresponsive
 receiver. See [Receive Path](../networking/overview.md#receive-path-ethernet).
 
-![network-frame-routing](../assets/r2-network-frame-routing.png)
+[![Network delivery owns one frame buffer until the process receives it; enqueue succeeds before the NIC consumes the frame, and unavailable queues hold the ring head for retry.](../assets/diagrams/network-receive.svg)](../assets/diagrams/network-receive.svg)
+
+*Network message ownership. The frame buffer lives until receive or process
+termination; a message queue entry carries its address and length.*
 
 ## Keyboard Pipe (IRQ 1 → userland)
 

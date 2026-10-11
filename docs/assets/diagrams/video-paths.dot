@@ -1,0 +1,15 @@
+// Title: Text and framebuffer session paths
+// Description: Boot information selects the output path. A graphics kernel with an RGB framebuffer starts supervised Memento and uses palette-indexed blits to the linear framebuffer. Text sessions run the shell and clock in VGA text memory; manually launched Memento changes VGA to planar graphics and writes the mapped VRAM.
+digraph video {
+  boot [label="Multiboot2 framebuffer information"];
+  graphics [label="Graphics kernel + RGB framebuffer"];
+  text [label="Text session"];
+  gui [label="init_rc supervises Memento\n256-colour indexed desktop"];
+  blit [label="Video syscalls\nIndexed blits → linear RGB framebuffer", color="#2dd4bf"];
+  console [label="Kernel shell + clock\n80×25 cells at VGA 0xb8000", color="#fbbf24"];
+  manual [label="fg memento\nSwitch VGA to 640×400×16"];
+  vram [label="map_vram · syscall 0x14\nWrite four planar VGA planes", color="#c4b5fd"];
+  boot -> graphics; boot -> text;
+  graphics -> gui -> blit;
+  text -> console; text -> manual -> vram;
+}

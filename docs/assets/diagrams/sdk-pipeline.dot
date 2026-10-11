@@ -1,0 +1,15 @@
+// Title: SDK build and execution pipeline
+// Description: C, C++ and TinyGo programs use their libraries and target configuration to produce a static ELF64 image. The image is staged on a boot medium or downloaded by Jug, loaded into a slot's private frame, and calls the kernel through int 0x7f.
+digraph sdk {
+  c [label="C\nlibcr2 + crt0"];
+  cpp [label="C++\nlibc++r2 + runtime"];
+  go [label="TinyGo\nlibgor2 + tinygo-r2 target"];
+  elf [label="Static ELF64 x86-64\nLinked for the user image window"];
+  media [label="Stage in boot medium bin/\nOr install with Jug"];
+  loader [label="r2 ELF loader\nAllocate slot → load segments + argv"];
+  process [label="Ring-3 program\nPrivate 2 MiB image + slot stack", color="#2dd4bf"];
+  abi [label="SDK syscall wrapper\nint 0x7f → kernel ABI", color="#c4b5fd"];
+  { rank=same; c; cpp; go; }
+  c -> elf; cpp -> elf; go -> elf;
+  elf -> media -> loader -> process -> abi;
+}

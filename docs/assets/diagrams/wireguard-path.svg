@@ -1,0 +1,107 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="791pt" height="398pt" viewBox="0.00 0.00 791.20 397.81" role="img" aria-labelledby="wireguard-path-title wireguard-path-description">
+<title id="wireguard-path-title">WireGuard inner and outer packet paths</title><desc id="wireguard-path-description">A tunnel-source packet matching AllowedIPs is routed to wgd, encrypted into outer UDP and sent through the NIC. The reverse path sends registered-port UDP to wgd for authentication, decryption and source-prefix checks, then injects supported inner packets for TCP services or shell probes.</desc><g id="graph0" class="graph" transform="scale(1 1) rotate(0) translate(21.6 376.21)">
+<title>wireguard</title>
+<polygon fill="#0f172a" stroke="none" points="-21.6,21.6 -21.6,-376.21 769.6,-376.21 769.6,21.6 -21.6,21.6" />
+<g id="clust1" class="cluster">
+<title>cluster_out</title>
+<path fill="#0f172a" stroke="#475569" d="M20,-8C20,-8 362,-8 362,-8 368,-8 374,-14 374,-20 374,-20 374,-334.61 374,-334.61 374,-340.61 368,-346.61 362,-346.61 362,-346.61 20,-346.61 20,-346.61 14,-346.61 8,-340.61 8,-334.61 8,-334.61 8,-20 8,-20 8,-14 14,-8 20,-8" />
+<text text-anchor="middle" x="191" y="-329.31" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">Outbound</text>
+</g>
+<g id="clust2" class="cluster">
+<title>cluster_in</title>
+<path fill="#0f172a" stroke="#475569" d="M394,-15.17C394,-15.17 728,-15.17 728,-15.17 734,-15.17 740,-21.17 740,-27.17 740,-27.17 740,-334.61 740,-334.61 740,-340.61 734,-346.61 728,-346.61 728,-346.61 394,-346.61 394,-346.61 388,-346.61 382,-340.61 382,-334.61 382,-334.61 382,-27.17 382,-27.17 382,-21.17 388,-15.17 394,-15.17" />
+<text text-anchor="middle" x="561" y="-329.31" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">Inbound</text>
+</g>
+
+<g id="node1" class="node">
+<title>out</title>
+<path fill="#1e293b" stroke="#60a5fa" stroke-width="1.4" d="M353.64,-313.36C353.64,-313.36 28.36,-313.36 28.36,-313.36 22.36,-313.36 16.35,-307.36 16.35,-301.36 16.35,-301.36 16.35,-275.02 16.35,-275.02 16.35,-269.02 22.35,-263.02 28.35,-263.02 28.35,-263.02 353.64,-263.02 353.64,-263.02 359.64,-263.02 365.64,-269.02 365.64,-275.02 365.64,-275.02 365.64,-301.36 365.64,-301.36 365.64,-307.36 359.64,-313.36 353.64,-313.36" />
+<text text-anchor="middle" x="191" y="-292.14" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">Application / shell probe</text>
+<text text-anchor="middle" x="191" y="-274.89" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">Explicit tunnel source + AllowedIPs destination</text>
+</g>
+
+<g id="node2" class="node">
+<title>route</title>
+<path fill="#1e293b" stroke="#60a5fa" stroke-width="1.4" d="M271.52,-231.02C271.52,-231.02 110.48,-231.02 110.48,-231.02 104.48,-231.02 98.48,-225.02 98.48,-219.02 98.48,-219.02 98.48,-192.68 98.48,-192.68 98.48,-186.68 104.48,-180.68 110.48,-180.68 110.48,-180.68 271.52,-180.68 271.52,-180.68 277.52,-180.68 283.52,-186.68 283.52,-192.68 283.52,-192.68 283.52,-219.02 283.52,-219.02 283.52,-225.02 277.52,-231.02 271.52,-231.02" />
+<text text-anchor="middle" x="191" y="-209.8" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">Kernel tunnel routing</text>
+<text text-anchor="middle" x="191" y="-192.55" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">Queue to wgd via 0x44</text>
+</g>
+
+<g id="edge1" class="edge">
+<title>out-&gt;route</title>
+<path fill="none" stroke="#94a3b8" stroke-width="1.2" d="M191,-262.65C191,-255.55 191,-247.68 191,-240.15" />
+<polygon fill="#94a3b8" stroke="#94a3b8" stroke-width="1.2" points="193.45,-240.33 191,-233.33 188.55,-240.33 193.45,-240.33" />
+</g>
+
+<g id="node3" class="node">
+<title>encrypt</title>
+<path fill="#1e293b" stroke="#c4b5fd" stroke-width="1.4" d="M308.64,-148.68C308.64,-148.68 73.36,-148.68 73.36,-148.68 67.36,-148.68 61.35,-142.68 61.35,-136.68 61.35,-136.68 61.35,-110.34 61.35,-110.34 61.35,-104.34 67.35,-98.34 73.35,-98.34 73.35,-98.34 308.64,-98.34 308.64,-98.34 314.64,-98.34 320.64,-104.34 320.64,-110.34 320.64,-110.34 320.64,-136.68 320.64,-136.68 320.64,-142.68 314.64,-148.68 308.64,-148.68" />
+<text text-anchor="middle" x="191" y="-127.46" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">wgd · userland</text>
+<text text-anchor="middle" x="191" y="-110.21" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">Encrypt inner packet → outer UDP</text>
+</g>
+
+<g id="edge2" class="edge">
+<title>route-&gt;encrypt</title>
+<path fill="none" stroke="#94a3b8" stroke-width="1.2" d="M191,-180.31C191,-173.21 191,-165.34 191,-157.81" />
+<polygon fill="#94a3b8" stroke="#94a3b8" stroke-width="1.2" points="193.45,-157.99 191,-150.99 188.55,-157.99 193.45,-157.99" />
+</g>
+
+<g id="node4" class="node">
+<title>send</title>
+<path fill="#1e293b" stroke="#fbbf24" stroke-width="1.4" d="M290.64,-66.34C290.64,-66.34 91.36,-66.34 91.36,-66.34 85.36,-66.34 79.36,-60.34 79.36,-54.34 79.36,-54.34 79.36,-28 79.36,-28 79.36,-22 85.36,-16 91.36,-16 91.36,-16 290.64,-16 290.64,-16 296.64,-16 302.64,-22 302.64,-28 302.64,-28 302.64,-54.34 302.64,-54.34 302.64,-60.34 296.64,-66.34 290.64,-66.34" />
+<text text-anchor="middle" x="191" y="-45.12" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">Physical NIC → remote peer</text>
+<text text-anchor="middle" x="191" y="-27.87" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">Outer UDP stays on Ethernet</text>
+</g>
+
+<g id="edge3" class="edge">
+<title>encrypt-&gt;send</title>
+<path fill="none" stroke="#94a3b8" stroke-width="1.2" d="M191,-97.97C191,-90.87 191,-83 191,-75.47" />
+<polygon fill="#94a3b8" stroke="#94a3b8" stroke-width="1.2" points="193.45,-75.65 191,-68.65 188.55,-75.65 193.45,-75.65" />
+</g>
+
+<g id="node5" class="node">
+<title>recv</title>
+<path fill="#1e293b" stroke="#fbbf24" stroke-width="1.4" d="M662.14,-313.36C662.14,-313.36 459.86,-313.36 459.86,-313.36 453.86,-313.36 447.86,-307.36 447.86,-301.36 447.86,-301.36 447.86,-275.02 447.86,-275.02 447.86,-269.02 453.86,-263.02 459.86,-263.02 459.86,-263.02 662.14,-263.02 662.14,-263.02 668.14,-263.02 674.14,-269.02 674.14,-275.02 674.14,-275.02 674.14,-301.36 674.14,-301.36 674.14,-307.36 668.14,-313.36 662.14,-313.36" />
+<text text-anchor="middle" x="561" y="-292.14" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">Remote peer → physical NIC</text>
+<text text-anchor="middle" x="561" y="-274.89" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">UDP to registered tunnel port</text>
+</g>
+
+<g id="node6" class="node">
+<title>decrypt</title>
+<path fill="#1e293b" stroke="#c4b5fd" stroke-width="1.4" d="M719.89,-231.02C719.89,-231.02 402.11,-231.02 402.11,-231.02 396.11,-231.02 390.11,-225.02 390.11,-219.02 390.11,-219.02 390.11,-192.68 390.11,-192.68 390.11,-186.68 396.11,-180.68 402.11,-180.68 402.11,-180.68 719.89,-180.68 719.89,-180.68 725.89,-180.68 731.89,-186.68 731.89,-192.68 731.89,-192.68 731.89,-219.02 731.89,-219.02 731.89,-225.02 725.89,-231.02 719.89,-231.02" />
+<text text-anchor="middle" x="561" y="-209.8" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">wgd · userland</text>
+<text text-anchor="middle" x="561" y="-192.55" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">Authenticate + decrypt + check source prefix</text>
+</g>
+
+<g id="edge4" class="edge">
+<title>recv-&gt;decrypt</title>
+<path fill="none" stroke="#94a3b8" stroke-width="1.2" d="M561,-262.65C561,-255.55 561,-247.68 561,-240.15" />
+<polygon fill="#94a3b8" stroke="#94a3b8" stroke-width="1.2" points="563.45,-240.33 561,-233.33 558.55,-240.33 563.45,-240.33" />
+</g>
+
+<g id="node7" class="node">
+<title>inject</title>
+<path fill="#1e293b" stroke="#60a5fa" stroke-width="1.4" d="M678.27,-148.68C678.27,-148.68 443.73,-148.68 443.73,-148.68 437.73,-148.68 431.73,-142.68 431.73,-136.68 431.73,-136.68 431.73,-110.34 431.73,-110.34 431.73,-104.34 437.73,-98.34 443.73,-98.34 443.73,-98.34 678.27,-98.34 678.27,-98.34 684.27,-98.34 690.27,-104.34 690.27,-110.34 690.27,-110.34 690.27,-136.68 690.27,-136.68 690.27,-142.68 684.27,-148.68 678.27,-148.68" />
+<text text-anchor="middle" x="561" y="-127.46" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">Kernel authenticated injection</text>
+<text text-anchor="middle" x="561" y="-110.21" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">Supported inner TCP / probe ICMP</text>
+</g>
+
+<g id="edge5" class="edge">
+<title>decrypt-&gt;inject</title>
+<path fill="none" stroke="#94a3b8" stroke-width="1.2" d="M561,-180.31C561,-173.21 561,-165.34 561,-157.81" />
+<polygon fill="#94a3b8" stroke="#94a3b8" stroke-width="1.2" points="563.45,-157.99 561,-150.99 558.55,-157.99 563.45,-157.99" />
+</g>
+
+<g id="node8" class="node">
+<title>target</title>
+<path fill="#1e293b" stroke="#2dd4bf" stroke-width="1.4" d="M670.02,-59.17C670.02,-59.17 451.98,-59.17 451.98,-59.17 445.98,-59.17 439.98,-53.17 439.98,-47.17 439.98,-47.17 439.98,-35.17 439.98,-35.17 439.98,-29.17 445.98,-23.17 451.98,-23.17 451.98,-23.17 670.02,-23.17 670.02,-23.17 676.02,-23.17 682.02,-29.17 682.02,-35.17 682.02,-35.17 682.02,-47.17 682.02,-47.17 682.02,-53.17 676.02,-59.17 670.02,-59.17" />
+<text text-anchor="middle" x="561" y="-36.5" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">Bound TCP service / shell probe</text>
+</g>
+
+<g id="edge6" class="edge">
+<title>inject-&gt;target</title>
+<path fill="none" stroke="#94a3b8" stroke-width="1.2" d="M561,-97.97C561,-88.53 561,-77.72 561,-68.15" />
+<polygon fill="#94a3b8" stroke="#94a3b8" stroke-width="1.2" points="563.45,-68.25 561,-61.25 558.55,-68.25 563.45,-68.25" />
+</g>
+</g>
+</svg>

@@ -5,11 +5,59 @@
 On every keypress or key-release, the 8042 latches a scancode in port `0x60` and asserts IRQ1. `keyboard_handler` fires at IDT vector `0x21`:
 
 1. Read scancode from port `0x60`.
-2. Call `keyboard::push_scancode(sc)` — writes into `SCANCODE_BUF`.
-3. Call `s.push_irq(sc)` for every active `RECEPTORS` subscriber.
-4. Acknowledge master PIC: port `0x20` ← `0x20`.
+2. Call `keyboard::dispatch_scancode(sc)` — writes into `SCANCODE_BUF` and calls
+   `s.push_irq(sc)` for every active `RECEPTORS` subscriber.
+3. Acknowledge master PIC: port `0x20` ← `0x20`.
 
 The handler runs in interrupt context with interrupts disabled and no scheduler involvement.
+
+## USB Keyboards (xHCI)
+
+EFI boots initialize the first PCI xHCI controller automatically. Add `usb=xhci`
+to the GRUB `multiboot2` line to enable it explicitly, including on BIOS boots;
+`usb=firmware` disables automatic initialization. The driver takes controller
+ownership, disables firmware SMIs, resets the host, reserves DMA memory, and
+enumerates devices connected before boot. Intel Panther Point (`8086:1e31`)
+switchable USB2 ports are routed from EHCI to xHCI.
+
+Supported keyboards advertise a HID boot interface (class 3, subclass 1,
+protocol 1) with an interrupt-IN endpoint. Composite devices are supported when
+they contain this interface. The driver selects boot protocol and translates
+eight-byte reports into Set 1 make/break codes, including modifiers and `E0`
+navigation keys. It repeats held keys after 500 ms, at approximately 30 Hz,
+and releases held keys when a device disconnects or its endpoint fails.
+
+`usb::xhci::poll()` runs from the PIT interrupt and sends bytes through
+`keyboard::dispatch_scancode`, so the shell and applications use their existing
+input API. Polling performs no allocation or blocking waits. DMA memory is
+reserved outside process frames, the boot archive, and the RAM disk. Controller
+BARs above 4 GiB receive supervisor-only, uncached mappings.
+
+This initial driver supports direct root-port connections and USB2 hubs, up to
+16 device slots and five hub levels. Connect the keyboard before starting R2.
+Runtime attachment/reconnection, SuperSpeed hubs, EHCI/OHCI/UHCI input, USB
+mice/trackpads, keyboard LEDs, and keyboards requiring a custom report protocol
+are not supported. A Mac's built-in keyboard may remain on an EHCI-only port;
+an external boot-protocol keyboard on a switchable xHCI port is the first
+hardware test to try.
+
+Host tests cover HID reports and descriptors; the VM test boots an EFI image
+with PS/2 disabled and checks USB key presses, modifiers, arrows, repeat,
+ring wrap, and disconnect releases:
+
+```sh
+rustc tests/unit/main.rs --test --edition 2021 -o /tmp/r2-unit-tests
+/tmp/r2-unit-tests
+python3 tests/usb/qemu_keyboard.py
+python3 tests/usb/qemu_keyboard.py --hub
+python3 tests/usb/qemu_keyboard.py --ps2
+```
+
+The VM test needs QEMU, OVMF, `nm`, and a freshly built `r2-efi.iso` with its
+matching staged `iso/boot/kernel_graphics.elf`.
+
+Register and report layouts follow the [Intel xHCI specification](https://www.intel.com/content/dam/www/public/us/en/documents/technical-specifications/extensible-host-controler-interface-usb-xhci.pdf)
+and [USB-IF HID specification](https://www.usb.org/sites/default/files/hid1_12.pdf).
 
 ---
 
@@ -23,7 +71,7 @@ SCANCODE_BUF_HEAD: usize     ← write index
 SCANCODE_BUF_LOCKED: bool    ← true when no new scancode is available
 ```
 
-**Write path** (`push_scancode`, called from IRQ1):
+**Write path** (`push_scancode`, called through `dispatch_scancode` by IRQ1 or USB polling):
 1. Write `scancode` to `SCANCODE_BUF[HEAD]`.
 2. Increment and wrap `HEAD` modulo 2048.
 3. Set `SCANCODE_BUF_LOCKED = false`.

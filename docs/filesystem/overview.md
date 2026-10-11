@@ -2,22 +2,10 @@
 
 ## Filesystem Stack
 
-```
-Userland (syscalls 0x20–0x2E, 0x39, 0x3A, 0x40)
-    │
-    ▼
-fs/vfs — mount table, path dispatch
-    ├── fs/fat12    — FAT12/FAT16 (read/write)      behind fs/fatdev::FatDev
-    │     ├── on the floppy   (/mnt/fat, FAT12)
-    │     └── on the RAM disk (/mnt/tmp, FAT16)
-    ├── fs/iso9660  — CD-ROM ISO9660 (read-only)  ┐ behind fs/rofs::RoFs
-    └── fs/ustar    — tar archive in RAM (read-only) ┘
-         │                              │
-    fat12/block.rs  memdisk/block.rs  iso9660/block.rs
-    (Floppy/ISA DMA) (MemDisk/RAM)    (Atapi/PIO)
-         │                              │
-    BlockDevice trait (fs/block.rs)
-```
+[![VFS dispatches writable mounts through FatDev and FAT, and read-only mounts through RoFs; floppy, RAM disk and CD use BlockDevice, while tar is read directly from RAM.](../assets/diagrams/filesystem-stack.svg)](../assets/diagrams/filesystem-stack.svg)
+
+*Filesystem dispatch and storage backends. Mounts appear only when their backing
+device or archive is available; `/` and `/mnt` are synthesized from the mount table.*
 
 The floppy, RAM disk and ATAPI device implement `BlockDevice`. FAT directory
 and chain logic runs over that abstraction; ISO9660 uses ATAPI block reads,

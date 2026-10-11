@@ -1,0 +1,110 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="765pt" height="502pt" viewBox="0.00 0.00 764.61 502.24" role="img" aria-labelledby="heap-growth-title heap-growth-description">
+<title id="heap-growth-title">Shared user-heap growth</title><desc id="heap-growth-description">Allocations first search the 4 MiB base heap. If no block fits, a one-time extension is placed using usable RAM, avoiding the boot archive and RAM disk, and mapped USER plus WRITE into kernel and live process page tables. Allocation retries over both regions or fails if no usable space remains.</desc><g id="graph0" class="graph" transform="scale(1 1) rotate(0) translate(21.6 480.64)">
+<title>heap</title>
+<polygon fill="#0f172a" stroke="none" points="-21.6,21.6 -21.6,-480.64 743.01,-480.64 743.01,21.6 -21.6,21.6" />
+
+<g id="node1" class="node">
+<title>alloc</title>
+<path fill="#1e293b" stroke="#60a5fa" stroke-width="1.4" d="M466.41,-459.04C466.41,-459.04 306.88,-459.04 306.88,-459.04 300.88,-459.04 294.88,-453.04 294.88,-447.04 294.88,-447.04 294.88,-420.7 294.88,-420.7 294.88,-414.7 300.88,-408.7 306.88,-408.7 306.88,-408.7 466.41,-408.7 466.41,-408.7 472.41,-408.7 478.41,-414.7 478.41,-420.7 478.41,-420.7 478.41,-447.04 478.41,-447.04 478.41,-453.04 472.41,-459.04 466.41,-459.04" />
+<text text-anchor="middle" x="386.64" y="-437.82" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">malloc / realloc request</text>
+<text text-anchor="middle" x="386.64" y="-420.57" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">Shared user heap</text>
+</g>
+
+<g id="node2" class="node">
+<title>scan</title>
+<path fill="#1e293b" stroke="#60a5fa" stroke-width="1.4" d="M497.91,-375.7C497.91,-375.7 275.38,-375.7 275.38,-375.7 269.38,-375.7 263.38,-369.7 263.38,-363.7 263.38,-363.7 263.38,-337.36 263.38,-337.36 263.38,-331.36 269.38,-325.36 275.38,-325.36 275.38,-325.36 497.91,-325.36 497.91,-325.36 503.91,-325.36 509.91,-331.36 509.91,-337.36 509.91,-337.36 509.91,-363.7 509.91,-363.7 509.91,-369.7 503.91,-375.7 497.91,-375.7" />
+<text text-anchor="middle" x="386.64" y="-354.48" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">Find a fitting free block</text>
+<text text-anchor="middle" x="386.64" y="-337.23" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">Initially in the 4 MiB base region</text>
+</g>
+
+<g id="edge1" class="edge">
+<title>alloc-&gt;scan</title>
+<path fill="none" stroke="#94a3b8" stroke-width="1.2" d="M386.64,-408.47C386.64,-401.05 386.64,-392.78 386.64,-384.88" />
+<polygon fill="#94a3b8" stroke="#94a3b8" stroke-width="1.2" points="389.1,-385.01 386.65,-378.01 384.2,-385.01 389.1,-385.01" />
+</g>
+
+<g id="node3" class="node">
+<title>fit</title>
+<path fill="#1e293b" stroke="#60a5fa" stroke-width="1.4" d="M375.32,-288.39C375.32,-288.39 303.68,-263.24 303.68,-263.24 298.02,-261.26 298.02,-257.28 303.68,-255.3 303.68,-255.3 375.32,-230.15 375.32,-230.15 380.98,-228.17 392.31,-228.17 397.97,-230.15 397.97,-230.15 469.61,-255.3 469.61,-255.3 475.27,-257.28 475.27,-261.26 469.61,-263.24 469.61,-263.24 397.97,-288.39 397.97,-288.39 392.31,-290.37 380.98,-290.37 375.32,-288.39" />
+<text text-anchor="middle" x="386.64" y="-254.59" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">Block fits?</text>
+</g>
+
+<g id="edge2" class="edge">
+<title>scan-&gt;fit</title>
+<path fill="none" stroke="#94a3b8" stroke-width="1.2" d="M386.64,-325.14C386.64,-317.79 386.64,-309.5 386.64,-301.37" />
+<polygon fill="#94a3b8" stroke="#94a3b8" stroke-width="1.2" points="389.1,-301.48 386.65,-294.48 384.2,-301.48 389.1,-301.48" />
+</g>
+
+<g id="node4" class="node">
+<title>result</title>
+<path fill="#1e293b" stroke="#2dd4bf" stroke-width="1.4" d="M193.29,-172.06C193.29,-172.06 12,-172.06 12,-172.06 6,-172.06 0,-166.06 0,-160.06 0,-160.06 0,-133.71 0,-133.71 0,-127.71 6,-121.71 12,-121.71 12,-121.71 193.29,-121.71 193.29,-121.71 199.29,-121.71 205.29,-127.71 205.29,-133.71 205.29,-133.71 205.29,-160.06 205.29,-160.06 205.29,-166.06 199.29,-172.06 193.29,-172.06" />
+<text text-anchor="middle" x="102.64" y="-150.83" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">Allocate + tag owning slot</text>
+<text text-anchor="middle" x="102.64" y="-133.58" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">Return user pointer</text>
+</g>
+
+<g id="edge3" class="edge">
+<title>fit-&gt;result</title>
+<path fill="none" stroke="#94a3b8" stroke-width="1.2" d="M342.58,-241.14C297.6,-223.66 227.07,-196.25 174.1,-175.66" />
+<polygon fill="#94a3b8" stroke="#94a3b8" stroke-width="1.2" points="175.19,-173.45 167.78,-173.2 173.41,-178.02 175.19,-173.45" />
+<text text-anchor="middle" x="271.4" y="-199.73" font-family="DejaVu Sans" font-size="11.00" fill="#cbd5e1">yes</text>
+</g>
+
+<g id="node5" class="node">
+<title>growth</title>
+<path fill="#1e293b" stroke="#60a5fa" stroke-width="1.4" d="M533.54,-180.68C533.54,-180.68 239.75,-180.68 239.75,-180.68 233.75,-180.68 227.75,-174.68 227.75,-168.68 227.75,-168.68 227.75,-125.09 227.75,-125.09 227.75,-119.09 233.75,-113.09 239.75,-113.09 239.75,-113.09 533.54,-113.09 533.54,-113.09 539.54,-113.09 545.54,-119.09 545.54,-125.09 545.54,-125.09 545.54,-168.68 545.54,-168.68 545.54,-174.68 539.54,-180.68 533.54,-180.68" />
+<text text-anchor="middle" x="386.64" y="-159.46" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">First exhaustion: try one extension</text>
+<text text-anchor="middle" x="386.64" y="-142.21" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">Target RAM / 8, rounded to 2 MiB pages</text>
+<text text-anchor="middle" x="386.64" y="-124.96" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">Halve if needed; avoid archive + RAM disk</text>
+</g>
+
+<g id="edge4" class="edge">
+<title>fit-&gt;growth</title>
+<path fill="none" stroke="#94a3b8" stroke-width="1.2" d="M386.64,-225.75C386.64,-214.39 386.64,-201.48 386.64,-189.48" />
+<polygon fill="#94a3b8" stroke="#94a3b8" stroke-width="1.2" points="389.1,-189.75 386.65,-182.75 384.2,-189.75 389.1,-189.75" />
+<text text-anchor="middle" x="435.77" y="-199.73" font-family="DejaVu Sans" font-size="11.00" fill="#cbd5e1">no; not yet grown</text>
+</g>
+
+<g id="node7" class="node">
+<title>fail</title>
+<path fill="#1e293b" stroke="#fbbf24" stroke-width="1.4" d="M707.66,-58.97C707.66,-58.97 471.62,-58.97 471.62,-58.97 465.62,-58.97 459.62,-52.97 459.62,-46.97 459.62,-46.97 459.62,-20.62 459.62,-20.62 459.62,-14.62 465.62,-8.62 471.62,-8.62 471.62,-8.62 707.66,-8.62 707.66,-8.62 713.66,-8.62 719.66,-14.62 719.66,-20.62 719.66,-20.62 719.66,-46.97 719.66,-46.97 719.66,-52.97 713.66,-58.97 707.66,-58.97" />
+<text text-anchor="middle" x="589.64" y="-37.75" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">No fitting block / usable extension</text>
+<text text-anchor="middle" x="589.64" y="-20.5" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">Allocation fails</text>
+</g>
+
+<g id="edge5" class="edge">
+<title>fit-&gt;fail</title>
+<path fill="none" stroke="#94a3b8" stroke-width="1.2" d="M444.11,-246.04C481.55,-235.11 528.51,-215.3 556.64,-180.68 582.7,-148.63 589.11,-100.1 590.24,-67.93" />
+<polygon fill="#94a3b8" stroke="#94a3b8" stroke-width="1.2" points="592.68,-68.19 590.39,-61.13 587.79,-68.08 592.68,-68.19" />
+<text text-anchor="middle" x="635.08" y="-143.19" font-family="DejaVu Sans" font-size="11.00" fill="#cbd5e1">no; already grown</text>
+</g>
+
+<g id="node6" class="node">
+<title>patch</title>
+<path fill="#1e293b" stroke="#60a5fa" stroke-width="1.4" d="M425.79,-67.59C425.79,-67.59 133.5,-67.59 133.5,-67.59 127.5,-67.59 121.5,-61.59 121.5,-55.59 121.5,-55.59 121.5,-12 121.5,-12 121.5,-6 127.5,0 133.5,0 133.5,0 425.79,0 425.79,0 431.79,0 437.79,-6 437.79,-12 437.79,-12 437.79,-55.59 437.79,-55.59 437.79,-61.59 431.79,-67.59 425.79,-67.59" />
+<text text-anchor="middle" x="279.64" y="-46.37" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">Usable region found</text>
+<text text-anchor="middle" x="279.64" y="-29.12" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">Map USER + WRITE in kernel + live tables</text>
+<text text-anchor="middle" x="279.64" y="-11.87" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">Retry allocation across both regions</text>
+</g>
+
+<g id="edge6" class="edge">
+<title>growth-&gt;patch</title>
+<path fill="none" stroke="#94a3b8" stroke-width="1.2" d="M354.83,-112.86C343.08,-100.65 329.65,-86.71 317.42,-74.01" />
+<polygon fill="#94a3b8" stroke="#94a3b8" stroke-width="1.2" points="319.4,-72.54 312.78,-69.2 315.87,-75.94 319.4,-72.54" />
+<text text-anchor="middle" x="372.93" y="-86.64" font-family="DejaVu Sans" font-size="11.00" fill="#cbd5e1">space found</text>
+</g>
+
+<g id="edge7" class="edge">
+<title>growth-&gt;fail</title>
+<path fill="none" stroke="#94a3b8" stroke-width="1.2" d="M447.28,-112.7C475.9,-97.04 509.72,-78.53 537.22,-63.49" />
+<polygon fill="#94a3b8" stroke="#94a3b8" stroke-width="1.2" points="538.24,-65.72 543.2,-60.21 535.89,-61.42 538.24,-65.72" />
+<text text-anchor="middle" x="525.05" y="-86.64" font-family="DejaVu Sans" font-size="11.00" fill="#cbd5e1">no space</text>
+</g>
+
+<g id="edge8" class="edge">
+<title>patch-&gt;scan</title>
+<path fill="none" stroke="#94a3b8" stroke-width="1.2" d="M437.93,-65.72C441.54,-66.36 445.11,-66.98 448.64,-67.59 502.35,-76.85 655.47,-70.64 689.64,-113.09 763.71,-205.09 590.5,-282.9 476.56,-322.16" />
+<polygon fill="#94a3b8" stroke="#94a3b8" stroke-width="1.2" points="476.01,-319.76 470.18,-324.34 477.59,-324.4 476.01,-319.76" />
+<text text-anchor="middle" x="707.91" y="-199.73" font-family="DejaVu Sans" font-size="11.00" fill="#cbd5e1">retry</text>
+</g>
+</g>
+</svg>

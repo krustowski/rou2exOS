@@ -8,10 +8,12 @@ The single entry point is `init::check::init(m2_ptr: u32)`, called from `main.rs
 
 ## Boot Sequence
 
-```
-main(m2_ptr)
-  └── init::check::init(m2_ptr)
-```
+[![The 18 init steps run from console and CPU setup through interrupts, input, memory, display, mounts and tasks, with the PIT enabled last.](../assets/diagrams/init-sequence.svg)](../assets/diagrams/init-sequence.svg)
+
+*Ordered groups of initialization steps. `INIT.RC` runs later in the scheduled
+`init_rc` task; it is not one of the 18 sequential checks. The final branches
+show the session each boot exposes; the text shell and clock already exist
+when the script runs.*
 
 Steps execute in this exact order:
 

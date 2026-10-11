@@ -112,6 +112,11 @@ At `init()`, a single free block spanning `HEAP_SIZE − 8` bytes is written at 
 
 ### Growing: the extension
 
+[![User allocation searches the base heap, attempts one usable-RAM extension when full, patches kernel and live process tables, and retries allocation.](../assets/diagrams/heap-growth.svg)](../assets/diagrams/heap-growth.svg)
+
+*One-time shared-heap growth. Mapping the extension into every live process
+keeps pointers returned by the allocator usable across existing tasks.*
+
 When an allocation (or a `realloc`) finds no room in the 4 MiB, the heap grows once, and the allocation is tried again:
 
 - **Size:** an eighth of the usable RAM the Multiboot2 map reported (`boot::total_ram_bytes`), in whole 2 MiB pages, at least 2 MiB — 32 MiB with 256 MiB of RAM, 256 MiB with 2 GiB.

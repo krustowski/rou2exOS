@@ -2,6 +2,11 @@
 
 ## Two Output Paths
 
+[![A graphics framebuffer session runs supervised Memento and indexed blits; a text session runs the VGA shell and clock and can launch Memento into planar VGA graphics.](../assets/diagrams/video-paths.svg)](../assets/diagrams/video-paths.svg)
+
+*Session and display paths. The automatic desktop requires the graphics kernel
+and an RGB framebuffer; a text-session desktop is started explicitly.*
+
 The kernel supports two independent video paths selected at boot based on what the bootloader provides:
 
 | Path | Source | Mode | Driver |

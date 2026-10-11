@@ -1,0 +1,17 @@
+// Title: Private images and shared user memory
+// Description: Two processes map the same virtual ELF window to different physical 2 MiB frames. Both map the same user-stack pages and shared user heap. Kernel mappings remain supervisor-only.
+digraph memory {
+  rankdir=TB;
+  a [label="Process in slot 4\nVirtual image: 0x600000–0x7fffff"];
+  b [label="Process in slot 5\nVirtual image: 0x600000–0x7fffff"];
+  framea [label="Private physical frame\nSlot 4: 0x1800000–0x19fffff", color="#60a5fa"];
+  frameb [label="Private physical frame\nSlot 5: 0x1a00000–0x1bfffff", color="#60a5fa"];
+  shared [label="Shared USER + WRITE mappings\nStacks: 0x400000–0x5fffff and 0x800000–0x9fffff\nBase heap: 0xc00000–0xffffff\nHeap extension: mapped only after growth", color="#2dd4bf"];
+  kernel [label="Supervisor-only mappings\nKernel · boot archive · RAM disk", color="#c4b5fd"];
+  { rank=same; a; b; }
+  { rank=same; framea; frameb; }
+  a -> framea [label="own P2[3]"];
+  b -> frameb [label="own P2[3]"];
+  a -> shared; b -> shared;
+  shared -> kernel [style=invis];
+}

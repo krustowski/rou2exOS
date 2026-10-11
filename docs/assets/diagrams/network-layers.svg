@@ -1,0 +1,94 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="796pt" height="356pt" viewBox="0.00 0.00 796.24 356.06" role="img" aria-labelledby="network-layers-title network-layers-description">
+<title id="network-layers-title">Userland stacks and kernel transports</title><desc id="network-layers-description">TCP/IP connection state lives in userland. Raw Ethernet syscalls pass through the kernel's tunnel, loopback and NIC routing; the legacy serial path carries SLIP-framed IPv4. Stateless protocol helpers support the kernel routing code.</desc><g id="graph0" class="graph" transform="scale(1 1) rotate(0) translate(21.6 334.46)">
+<title>layers</title>
+<polygon fill="#0f172a" stroke="none" points="-21.6,21.6 -21.6,-334.46 774.64,-334.46 774.64,21.6 -21.6,21.6" />
+
+<g id="node1" class="node">
+<title>app</title>
+<path fill="#1e293b" stroke="#60a5fa" stroke-width="1.4" d="M421.91,-312.86C421.91,-312.86 259.38,-312.86 259.38,-312.86 253.38,-312.86 247.38,-306.86 247.38,-300.86 247.38,-300.86 247.38,-274.52 247.38,-274.52 247.38,-268.52 253.38,-262.52 259.38,-262.52 259.38,-262.52 421.91,-262.52 421.91,-262.52 427.91,-262.52 433.91,-268.52 433.91,-274.52 433.91,-274.52 433.91,-300.86 433.91,-300.86 433.91,-306.86 427.91,-312.86 421.91,-312.86" />
+<text text-anchor="middle" x="340.64" y="-291.64" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">Userland TCP/IP stacks</text>
+<text text-anchor="middle" x="340.64" y="-274.39" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">Applications · eth · wgd</text>
+</g>
+
+<g id="node2" class="node">
+<title>abi</title>
+<path fill="#1e293b" stroke="#60a5fa" stroke-width="1.4" d="M482.29,-229.52C482.29,-229.52 199,-229.52 199,-229.52 193,-229.52 187,-223.52 187,-217.52 187,-217.52 187,-191.18 187,-191.18 187,-185.18 193,-179.18 199,-179.18 199,-179.18 482.29,-179.18 482.29,-179.18 488.29,-179.18 494.29,-185.18 494.29,-191.18 494.29,-191.18 494.29,-217.52 494.29,-217.52 494.29,-223.52 488.29,-229.52 482.29,-229.52" />
+<text text-anchor="middle" x="340.64" y="-208.3" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">Packet ABI</text>
+<text text-anchor="middle" x="340.64" y="-191.05" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">Send 0x34 · receive 0x35 · register 0x37</text>
+</g>
+
+<g id="edge1" class="edge">
+<title>app-&gt;abi</title>
+<path fill="none" stroke="#94a3b8" stroke-width="1.2" d="M340.64,-262.29C340.64,-254.87 340.64,-246.6 340.64,-238.7" />
+<polygon fill="#94a3b8" stroke="#94a3b8" stroke-width="1.2" points="343.1,-238.83 340.65,-231.83 338.2,-238.83 343.1,-238.83" />
+</g>
+
+<g id="node3" class="node">
+<title>route</title>
+<path fill="#1e293b" stroke="#60a5fa" stroke-width="1.4" d="M300.79,-133.68C300.79,-133.68 122.5,-133.68 122.5,-133.68 116.5,-133.68 110.5,-127.68 110.5,-121.68 110.5,-121.68 110.5,-95.34 110.5,-95.34 110.5,-89.34 116.5,-83.34 122.5,-83.34 122.5,-83.34 300.79,-83.34 300.79,-83.34 306.79,-83.34 312.79,-89.34 312.79,-95.34 312.79,-95.34 312.79,-121.68 312.79,-121.68 312.79,-127.68 306.79,-133.68 300.79,-133.68" />
+<text text-anchor="middle" x="211.64" y="-112.46" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">Ethernet routing</text>
+<text text-anchor="middle" x="211.64" y="-95.21" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">netdrv · tunnel · loopback</text>
+</g>
+
+<g id="edge2" class="edge">
+<title>abi-&gt;route</title>
+<path fill="none" stroke="#94a3b8" stroke-width="1.2" d="M306.75,-178.69C290.01,-166.52 269.69,-151.74 252.14,-138.97" />
+<polygon fill="#94a3b8" stroke="#94a3b8" stroke-width="1.2" points="253.88,-137.21 246.78,-135.07 251,-141.17 253.88,-137.21" />
+<text text-anchor="middle" x="319.49" y="-152.73" font-family="DejaVu Sans" font-size="11.00" fill="#cbd5e1">raw Ethernet</text>
+</g>
+
+<g id="node4" class="node">
+<title>serial</title>
+<path fill="#1e293b" stroke="#c4b5fd" stroke-width="1.4" d="M498.29,-133.68C498.29,-133.68 347,-133.68 347,-133.68 341,-133.68 335,-127.68 335,-121.68 335,-121.68 335,-95.34 335,-95.34 335,-89.34 341,-83.34 347,-83.34 347,-83.34 498.29,-83.34 498.29,-83.34 504.29,-83.34 510.29,-89.34 510.29,-95.34 510.29,-95.34 510.29,-121.68 510.29,-121.68 510.29,-127.68 504.29,-133.68 498.29,-133.68" />
+<text text-anchor="middle" x="422.64" y="-112.46" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">Legacy IPv4 transport</text>
+<text text-anchor="middle" x="422.64" y="-95.21" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">SLIP → COM1 UART</text>
+</g>
+
+<g id="edge3" class="edge">
+<title>abi-&gt;serial</title>
+<path fill="none" stroke="#94a3b8" stroke-width="1.2" d="M362.19,-178.69C372.45,-166.95 384.83,-152.78 395.71,-140.33" />
+<polygon fill="#94a3b8" stroke="#94a3b8" stroke-width="1.2" points="397.29,-142.25 400.05,-135.37 393.6,-139.03 397.29,-142.25" />
+<text text-anchor="middle" x="419.55" y="-152.73" font-family="DejaVu Sans" font-size="11.00" fill="#cbd5e1">legacy send</text>
+</g>
+
+<g id="node5" class="node">
+<title>nic</title>
+<path fill="#1e293b" stroke="#fbbf24" stroke-width="1.4" d="M157.29,-50.34C157.29,-50.34 12,-50.34 12,-50.34 6,-50.34 0,-44.34 0,-38.34 0,-38.34 0,-12 0,-12 0,-6 6,0 12,0 12,0 157.29,0 157.29,0 163.29,0 169.29,-6 169.29,-12 169.29,-12 169.29,-38.34 169.29,-38.34 169.29,-44.34 163.29,-50.34 157.29,-50.34" />
+<text text-anchor="middle" x="84.64" y="-29.12" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">Physical Ethernet</text>
+<text text-anchor="middle" x="84.64" y="-11.87" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">nic → RTL8139 / Intel</text>
+</g>
+
+<g id="edge4" class="edge">
+<title>route-&gt;nic</title>
+<path fill="none" stroke="#94a3b8" stroke-width="1.2" d="M173.2,-82.88C159.64,-74.2 144.28,-64.36 130.19,-55.34" />
+<polygon fill="#94a3b8" stroke="#94a3b8" stroke-width="1.2" points="131.71,-53.4 124.49,-51.69 129.07,-57.53 131.71,-53.4" />
+</g>
+
+<g id="node6" class="node">
+<title>local</title>
+<path fill="#1e293b" stroke="#2dd4bf" stroke-width="1.4" d="M473.54,-50.34C473.54,-50.34 203.75,-50.34 203.75,-50.34 197.75,-50.34 191.75,-44.34 191.75,-38.34 191.75,-38.34 191.75,-12 191.75,-12 191.75,-6 197.75,0 203.75,0 203.75,0 473.54,0 473.54,0 479.54,0 485.54,-6 485.54,-12 485.54,-12 485.54,-38.34 485.54,-38.34 485.54,-44.34 479.54,-50.34 473.54,-50.34" />
+<text text-anchor="middle" x="338.64" y="-29.12" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">Local delivery</text>
+<text text-anchor="middle" x="338.64" y="-11.87" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">Owned frame buffers → process queue</text>
+</g>
+
+<g id="edge5" class="edge">
+<title>route-&gt;local</title>
+<path fill="none" stroke="#94a3b8" stroke-width="1.2" d="M250.09,-82.88C263.65,-74.2 279.01,-64.36 293.1,-55.34" />
+<polygon fill="#94a3b8" stroke="#94a3b8" stroke-width="1.2" points="294.22,-57.53 298.8,-51.69 291.58,-53.4 294.22,-57.53" />
+</g>
+
+<g id="node7" class="node">
+<title>helpers</title>
+<path fill="#1e293b" stroke="#60a5fa" stroke-width="1.4" d="M741.04,-312.86C741.04,-312.86 468.25,-312.86 468.25,-312.86 462.25,-312.86 456.25,-306.86 456.25,-300.86 456.25,-300.86 456.25,-274.52 456.25,-274.52 456.25,-268.52 462.25,-262.52 468.25,-262.52 468.25,-262.52 741.04,-262.52 741.04,-262.52 747.04,-262.52 753.04,-268.52 753.04,-274.52 753.04,-274.52 753.04,-300.86 753.04,-300.86 753.04,-306.86 747.04,-312.86 741.04,-312.86" />
+<text text-anchor="middle" x="604.64" y="-291.64" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">Stateless protocol helpers</text>
+<text text-anchor="middle" x="604.64" y="-274.39" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">Ethernet · ARP · IPv4 · ICMP · TCP · UDP</text>
+</g>
+
+<g id="edge6" class="edge">
+<title>helpers-&gt;route</title>
+<path fill="none" stroke="#94a3b8" stroke-width="1.2" stroke-dasharray="5,2" d="M588.56,-262.25C564.72,-228.69 516.46,-170.15 457.64,-149.68 401,-129.96 382.8,-143.57 323.64,-133.68 323,-133.57 322.36,-133.46 321.71,-133.35" />
+<polygon fill="#94a3b8" stroke="#94a3b8" stroke-width="1.2" points="322.31,-130.97 315,-132.18 321.47,-135.8 322.31,-130.97" />
+<text text-anchor="middle" x="596.9" y="-200.65" font-family="DejaVu Sans" font-size="11.00" fill="#cbd5e1">parse / build</text>
+</g>
+</g>
+</svg>

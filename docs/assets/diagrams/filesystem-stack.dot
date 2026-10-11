@@ -1,0 +1,16 @@
+// Title: VFS mounts and storage backends
+// Description: Filesystem syscalls resolve through the VFS. Writable floppy and RAM disk mounts use FatDev and the FAT implementation over BlockDevice. Read-only CD and boot archive mounts share RoFs; tar is read directly from memory.
+digraph filesystem {
+  calls [label="Filesystem syscalls\nRead · write · list · rename · usage"];
+  vfs [label="VFS\nNormalize path + select longest mount prefix"];
+  fat [label="Writable mounts\nFatDev → FAT12 / FAT16", color="#2dd4bf"];
+  ro [label="Read-only mounts\nRoFs → ISO9660 / ustar", color="#c4b5fd"];
+  floppy [label="/mnt/fat · FAT12\nFloppy → ISA DMA"];
+  ram [label="/mnt/tmp · usually FAT16\nMemDisk → RAM"];
+  cd [label="/mnt/iso · ISO9660\nAtapi → PIO"];
+  tar [label="/mnt/tar · ustar\nGRUB module in RAM"];
+  block [label="BlockDevice\nSector reads / writes", color="#fbbf24"];
+  calls -> vfs; vfs -> fat; vfs -> ro;
+  fat -> floppy; fat -> ram; ro -> cd; ro -> tar;
+  floppy -> block; ram -> block; cd -> block;
+}

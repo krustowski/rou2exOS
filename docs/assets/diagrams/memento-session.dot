@@ -1,0 +1,19 @@
+// Title: Memento session and lock screen
+// Description: A normal launch without saved credentials enters Hello, then Login and Desktop. Relaunch or saved credentials skip Hello; saved credentials use a Locked dialog. Locking overlays the desktop while windows keep running. Hello offers restart and power off, Login cancellation restarts, and the lock screen offers restart and power off.
+digraph session {
+  launch [label="Start Memento"];
+  hello [label="Hello\nLanding screen"];
+  login [label="Login / Locked\nCreate / check session credentials"];
+  desktop [label="Desktop\nWindows + hosted processes", color="#2dd4bf"];
+  locked [label="Locked overlay\nWindows keep running underneath", color="#c4b5fd"];
+  end [label="Restart / power off\nSession ends", color="#fbbf24"];
+  launch -> hello [label="normal; no saved credentials"];
+  launch -> login [label="--relaunch / saved session"];
+  hello -> login [label="Enter / click"];
+  login -> desktop [label="accepted login"];
+  desktop -> locked [label="Alt+L / desktop Esc"];
+  locked -> desktop [label="valid unlock", constraint=false];
+  login -> end [label="Login: Esc / Cancel / close\nLocked: Restart / Power off"];
+  locked -> end [label="Restart / Power off"];
+  hello -> end [label="Esc: restart\nShift+Esc: power off"];
+}

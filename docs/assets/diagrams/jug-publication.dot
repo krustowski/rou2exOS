@@ -1,0 +1,15 @@
+// Title: Jug publication and catalog commit
+// Description: The developer snapshots and checks ELF bytes, transfers them over SSH, and the receiver stages and verifies them before locking and merging the catalog. Immutable binaries are flushed before sums.txt is atomically switched last. HTTP verification follows the commit; old catalogs remain backed by retained versions.
+digraph publish {
+  local [label="Developer machine\nSnapshot ELF bytes + SHA-256 + validate ELF"];
+  staging [label="SSH receiver\nStage + independently verify upload"];
+  lock [label="Acquire .jug-publish.lock\nRead / merge the current catalog"];
+  versions [label="Immutable version objects\nv/<40 SHA-256 digits>/<name>.elf\nVerify + flush binaries and directories"];
+  commit [label="Catalog commit · LAST\nBack up old sums.txt\nAtomic rename of flushed new sums.txt", color="#2dd4bf"];
+  verify [label="Developer public HTTP(S) check\nFetch catalog + uploaded binaries"];
+  client [label="Jug on r2\nRefresh catalog → verify download → next launch"];
+  retained [label="Retain old version objects\nEarlier catalogs still resolve", color="#c4b5fd"];
+  local -> staging [label="SSH"];
+  staging -> lock -> versions -> commit -> verify -> client;
+  versions -> retained [style=dashed, arrowhead=none, constraint=false];
+}

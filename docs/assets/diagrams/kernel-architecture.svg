@@ -1,0 +1,116 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="727pt" height="423pt" viewBox="0.00 0.00 727.12 422.90" role="img" aria-labelledby="kernel-architecture-title kernel-architecture-description">
+<title id="kernel-architecture-title">Kernel and userland responsibilities</title><desc id="kernel-architecture-description">Applications and userland TCP/IP stacks use SDK libraries and the int 0x7f ABI. The kernel owns scheduling, memory, filesystems and device access. Hardware interrupts also enter the kernel.</desc><g id="graph0" class="graph" transform="scale(1 1) rotate(0) translate(21.6 401.3)">
+<title>kernel</title>
+<polygon fill="#0f172a" stroke="none" points="-21.6,21.6 -21.6,-401.3 705.51,-401.3 705.51,21.6 -21.6,21.6" />
+
+<g id="node1" class="node">
+<title>apps</title>
+<path fill="#1e293b" stroke="#60a5fa" stroke-width="1.4" d="M358.29,-379.7C358.29,-379.7 109.5,-379.7 109.5,-379.7 103.5,-379.7 97.5,-373.7 97.5,-367.7 97.5,-367.7 97.5,-341.36 97.5,-341.36 97.5,-335.36 103.5,-329.36 109.5,-329.36 109.5,-329.36 358.29,-329.36 358.29,-329.36 364.29,-329.36 370.29,-335.36 370.29,-341.36 370.29,-341.36 370.29,-367.7 370.29,-367.7 370.29,-373.7 364.29,-379.7 358.29,-379.7" />
+<text text-anchor="middle" x="233.89" y="-358.48" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">Userland applications</text>
+<text text-anchor="middle" x="233.89" y="-341.23" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">Memento · shells · hosted programs</text>
+</g>
+
+<g id="node3" class="node">
+<title>sdk</title>
+<path fill="#1e293b" stroke="#60a5fa" stroke-width="1.4" d="M441.29,-297.36C441.29,-297.36 288.5,-297.36 288.5,-297.36 282.5,-297.36 276.5,-291.36 276.5,-285.36 276.5,-285.36 276.5,-259.02 276.5,-259.02 276.5,-253.02 282.5,-247.02 288.5,-247.02 288.5,-247.02 441.29,-247.02 441.29,-247.02 447.29,-247.02 453.29,-253.02 453.29,-259.02 453.29,-259.02 453.29,-285.36 453.29,-285.36 453.29,-291.36 447.29,-297.36 441.29,-297.36" />
+<text text-anchor="middle" x="364.89" y="-276.14" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">SDK libraries</text>
+<text text-anchor="middle" x="364.89" y="-258.89" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">C · C++ · Go bindings</text>
+</g>
+
+<g id="edge1" class="edge">
+<title>apps-&gt;sdk</title>
+<path fill="none" stroke="#94a3b8" stroke-width="1.2" d="M273.91,-328.99C287.62,-320.58 303.1,-311.09 317.35,-302.35" />
+<polygon fill="#94a3b8" stroke="#94a3b8" stroke-width="1.2" points="318.44,-304.56 323.12,-298.81 315.88,-300.38 318.44,-304.56" />
+</g>
+
+<g id="node2" class="node">
+<title>stacks</title>
+<path fill="#1e293b" stroke="#60a5fa" stroke-width="1.4" d="M587.66,-379.7C587.66,-379.7 404.12,-379.7 404.12,-379.7 398.12,-379.7 392.12,-373.7 392.12,-367.7 392.12,-367.7 392.12,-341.36 392.12,-341.36 392.12,-335.36 398.12,-329.36 404.12,-329.36 404.12,-329.36 587.66,-329.36 587.66,-329.36 593.66,-329.36 599.66,-335.36 599.66,-341.36 599.66,-341.36 599.66,-367.7 599.66,-367.7 599.66,-373.7 593.66,-379.7 587.66,-379.7" />
+<text text-anchor="middle" x="495.89" y="-358.48" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">Userland network services</text>
+<text text-anchor="middle" x="495.89" y="-341.23" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">TCP/IP stacks · eth · wgd</text>
+</g>
+
+<g id="edge2" class="edge">
+<title>stacks-&gt;sdk</title>
+<path fill="none" stroke="#94a3b8" stroke-width="1.2" d="M455.88,-328.99C442.17,-320.58 426.69,-311.09 412.44,-302.35" />
+<polygon fill="#94a3b8" stroke="#94a3b8" stroke-width="1.2" points="413.91,-300.38 406.67,-298.81 411.35,-304.56 413.91,-300.38" />
+</g>
+
+<g id="node4" class="node">
+<title>abi</title>
+<path fill="#1e293b" stroke="#2dd4bf" stroke-width="1.4" d="M400.04,-215.02C400.04,-215.02 329.75,-215.02 329.75,-215.02 323.75,-215.02 317.75,-209.02 317.75,-203.02 317.75,-203.02 317.75,-176.68 317.75,-176.68 317.75,-170.68 323.75,-164.68 329.75,-164.68 329.75,-164.68 400.04,-164.68 400.04,-164.68 406.04,-164.68 412.04,-170.68 412.04,-176.68 412.04,-176.68 412.04,-203.02 412.04,-203.02 412.04,-209.02 406.04,-215.02 400.04,-215.02" />
+<text text-anchor="middle" x="364.89" y="-193.8" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">Kernel ABI</text>
+<text text-anchor="middle" x="364.89" y="-176.55" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">int 0x7f</text>
+</g>
+
+<g id="edge3" class="edge">
+<title>sdk-&gt;abi</title>
+<path fill="none" stroke="#94a3b8" stroke-width="1.2" d="M364.89,-246.65C364.89,-239.55 364.89,-231.68 364.89,-224.15" />
+<polygon fill="#94a3b8" stroke="#94a3b8" stroke-width="1.2" points="367.35,-224.33 364.9,-217.33 362.45,-224.33 367.35,-224.33" />
+</g>
+
+<g id="node5" class="node">
+<title>tasks</title>
+<path fill="#1e293b" stroke="#60a5fa" stroke-width="1.4" d="M233.79,-132.68C233.79,-132.68 12,-132.68 12,-132.68 6,-132.68 0,-126.68 0,-120.68 0,-120.68 0,-94.34 0,-94.34 0,-88.34 6,-82.34 12,-82.34 12,-82.34 233.79,-82.34 233.79,-82.34 239.79,-82.34 245.79,-88.34 245.79,-94.34 245.79,-94.34 245.79,-120.68 245.79,-120.68 245.79,-126.68 239.79,-132.68 233.79,-132.68" />
+<text text-anchor="middle" x="122.89" y="-111.46" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">Tasks + memory</text>
+<text text-anchor="middle" x="122.89" y="-94.21" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">Scheduler · IPC · paging · heaps</text>
+</g>
+
+<g id="edge4" class="edge">
+<title>abi-&gt;tasks</title>
+<path fill="none" stroke="#94a3b8" stroke-width="1.2" d="M317.37,-173.07C285.37,-162.45 242.34,-148.16 204.89,-135.73" />
+<polygon fill="#94a3b8" stroke="#94a3b8" stroke-width="1.2" points="206.13,-133.56 198.71,-133.68 204.59,-138.21 206.13,-133.56" />
+</g>
+
+<g id="node6" class="node">
+<title>fs</title>
+<path fill="#1e293b" stroke="#60a5fa" stroke-width="1.4" d="M449.54,-132.68C449.54,-132.68 280.25,-132.68 280.25,-132.68 274.25,-132.68 268.25,-126.68 268.25,-120.68 268.25,-120.68 268.25,-94.34 268.25,-94.34 268.25,-88.34 274.25,-82.34 280.25,-82.34 280.25,-82.34 449.54,-82.34 449.54,-82.34 455.54,-82.34 461.54,-88.34 461.54,-94.34 461.54,-94.34 461.54,-120.68 461.54,-120.68 461.54,-126.68 455.54,-132.68 449.54,-132.68" />
+<text text-anchor="middle" x="364.89" y="-111.46" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">Filesystems</text>
+<text text-anchor="middle" x="364.89" y="-94.21" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">VFS · FAT · ISO9660 · tar</text>
+</g>
+
+<g id="edge5" class="edge">
+<title>abi-&gt;fs</title>
+<path fill="none" stroke="#94a3b8" stroke-width="1.2" d="M364.89,-164.31C364.89,-157.21 364.89,-149.34 364.89,-141.81" />
+<polygon fill="#94a3b8" stroke="#94a3b8" stroke-width="1.2" points="367.35,-141.99 364.9,-134.99 362.45,-141.99 367.35,-141.99" />
+</g>
+
+<g id="node7" class="node">
+<title>io</title>
+<path fill="#1e293b" stroke="#60a5fa" stroke-width="1.4" d="M671.91,-132.68C671.91,-132.68 495.88,-132.68 495.88,-132.68 489.88,-132.68 483.88,-126.68 483.88,-120.68 483.88,-120.68 483.88,-94.34 483.88,-94.34 483.88,-88.34 489.88,-82.34 495.88,-82.34 495.88,-82.34 671.91,-82.34 671.91,-82.34 677.91,-82.34 683.91,-88.34 683.91,-94.34 683.91,-94.34 683.91,-120.68 683.91,-120.68 683.91,-126.68 677.91,-132.68 671.91,-132.68" />
+<text text-anchor="middle" x="583.89" y="-111.46" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">Device access</text>
+<text text-anchor="middle" x="583.89" y="-94.21" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">NIC · input · video · audio</text>
+</g>
+
+<g id="edge6" class="edge">
+<title>abi-&gt;io</title>
+<path fill="none" stroke="#94a3b8" stroke-width="1.2" d="M412.41,-171.42C440.6,-161.08 476.94,-147.74 508.92,-136.02" />
+<polygon fill="#94a3b8" stroke="#94a3b8" stroke-width="1.2" points="509.51,-138.41 515.24,-133.7 507.82,-133.81 509.51,-138.41" />
+</g>
+
+<g id="node8" class="node">
+<title>hardware</title>
+<path fill="#1e293b" stroke="#fbbf24" stroke-width="1.4" d="M488.91,-50.34C488.91,-50.34 240.88,-50.34 240.88,-50.34 234.88,-50.34 228.87,-44.34 228.87,-38.34 228.87,-38.34 228.87,-12 228.87,-12 228.87,-6 234.87,0 240.87,0 240.87,0 488.91,0 488.91,0 494.91,0 500.91,-6 500.91,-12 500.91,-12 500.91,-38.34 500.91,-38.34 500.91,-44.34 494.91,-50.34 488.91,-50.34" />
+<text text-anchor="middle" x="364.89" y="-29.12" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">Hardware</text>
+<text text-anchor="middle" x="364.89" y="-11.87" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">CPU / PIT · RAM · disks · peripherals</text>
+</g>
+
+<g id="edge7" class="edge">
+<title>tasks-&gt;hardware</title>
+<path fill="none" stroke="#94a3b8" stroke-width="1.2" d="M197.15,-81.86C224.21,-72.88 254.96,-62.67 282.67,-53.47" />
+<polygon fill="#94a3b8" stroke="#94a3b8" stroke-width="1.2" points="283.19,-55.88 289.06,-51.35 281.64,-51.23 283.19,-55.88" />
+</g>
+
+<g id="edge8" class="edge">
+<title>fs-&gt;hardware</title>
+<path fill="none" stroke="#94a3b8" stroke-width="1.2" d="M364.89,-81.97C364.89,-74.87 364.89,-67 364.89,-59.47" />
+<polygon fill="#94a3b8" stroke="#94a3b8" stroke-width="1.2" points="367.35,-59.65 364.9,-52.65 362.45,-59.65 367.35,-59.65" />
+</g>
+
+<g id="edge9" class="edge">
+<title>io-&gt;hardware</title>
+<path fill="none" stroke="#94a3b8" stroke-width="1.2" d="M516.7,-81.86C492.42,-72.95 464.86,-62.84 439.95,-53.7" />
+<polygon fill="#94a3b8" stroke="#94a3b8" stroke-width="1.2" points="441.08,-51.51 433.67,-51.4 439.4,-56.11 441.08,-51.51" />
+</g>
+</g>
+</svg>

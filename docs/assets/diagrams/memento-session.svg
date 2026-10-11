@@ -1,0 +1,112 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="558pt" height="572pt" viewBox="0.00 0.00 557.99 571.90" role="img" aria-labelledby="memento-session-title memento-session-description">
+<title id="memento-session-title">Memento session and lock screen</title><desc id="memento-session-description">A normal launch without saved credentials enters Hello, then Login and Desktop. Relaunch or saved credentials skip Hello; saved credentials use a Locked dialog. Locking overlays the desktop while windows keep running. Hello offers restart and power off, Login cancellation restarts, and the lock screen offers restart and power off.</desc><g id="graph0" class="graph" transform="scale(1 1) rotate(0) translate(21.6 550.3)">
+<title>session</title>
+<polygon fill="#0f172a" stroke="none" points="-21.6,21.6 -21.6,-550.3 536.39,-550.3 536.39,21.6 -21.6,21.6" />
+
+<g id="node1" class="node">
+<title>launch</title>
+<path fill="#1e293b" stroke="#60a5fa" stroke-width="1.4" d="M197.29,-528.7C197.29,-528.7 95.5,-528.7 95.5,-528.7 89.5,-528.7 83.5,-522.7 83.5,-516.7 83.5,-516.7 83.5,-504.7 83.5,-504.7 83.5,-498.7 89.5,-492.7 95.5,-492.7 95.5,-492.7 197.29,-492.7 197.29,-492.7 203.29,-492.7 209.29,-498.7 209.29,-504.7 209.29,-504.7 209.29,-516.7 209.29,-516.7 209.29,-522.7 203.29,-528.7 197.29,-528.7" />
+<text text-anchor="middle" x="146.39" y="-506.03" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">Start Memento</text>
+</g>
+
+<g id="node2" class="node">
+<title>hello</title>
+<path fill="#1e293b" stroke="#60a5fa" stroke-width="1.4" d="M116.79,-447.2C116.79,-447.2 12,-447.2 12,-447.2 6,-447.2 0,-441.2 0,-435.2 0,-435.2 0,-408.86 0,-408.86 0,-402.86 6,-396.86 12,-396.86 12,-396.86 116.79,-396.86 116.79,-396.86 122.79,-396.86 128.79,-402.86 128.79,-408.86 128.79,-408.86 128.79,-435.2 128.79,-435.2 128.79,-441.2 122.79,-447.2 116.79,-447.2" />
+<text text-anchor="middle" x="64.39" y="-425.98" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">Hello</text>
+<text text-anchor="middle" x="64.39" y="-408.73" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">Landing screen</text>
+</g>
+
+<g id="edge1" class="edge">
+<title>launch-&gt;hello</title>
+<path fill="none" stroke="#94a3b8" stroke-width="1.2" d="M83.15,-497.05C73.21,-492.29 64.16,-485.72 57.89,-476.7 53.7,-470.66 52.68,-463.29 53.29,-455.97" />
+<polygon fill="#94a3b8" stroke="#94a3b8" stroke-width="1.2" points="55.67,-456.58 54.37,-449.28 50.84,-455.8 55.67,-456.58" />
+<text text-anchor="middle" x="138.14" y="-466.25" font-family="DejaVu Sans" font-size="11.00" fill="#cbd5e1">normal; no saved credentials</text>
+</g>
+
+<g id="node3" class="node">
+<title>login</title>
+<path fill="#1e293b" stroke="#60a5fa" stroke-width="1.4" d="M348.66,-351.36C348.66,-351.36 114.12,-351.36 114.12,-351.36 108.12,-351.36 102.12,-345.36 102.12,-339.36 102.12,-339.36 102.12,-313.02 102.12,-313.02 102.12,-307.02 108.12,-301.02 114.12,-301.02 114.12,-301.02 348.66,-301.02 348.66,-301.02 354.66,-301.02 360.66,-307.02 360.66,-313.02 360.66,-313.02 360.66,-339.36 360.66,-339.36 360.66,-345.36 354.66,-351.36 348.66,-351.36" />
+<text text-anchor="middle" x="231.39" y="-330.14" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">Login / Locked</text>
+<text text-anchor="middle" x="231.39" y="-312.89" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">Create / check session credentials</text>
+</g>
+
+<g id="edge2" class="edge">
+<title>launch-&gt;login</title>
+<path fill="none" stroke="#94a3b8" stroke-width="1.2" d="M202.24,-492.41C208.9,-488.23 214.91,-483.07 219.39,-476.7 243.4,-442.59 242.06,-392.63 237.7,-360.01" />
+<polygon fill="#94a3b8" stroke="#94a3b8" stroke-width="1.2" points="240.18,-360.07 236.74,-353.5 235.34,-360.78 240.18,-360.07" />
+<text text-anchor="middle" x="312.22" y="-418.33" font-family="DejaVu Sans" font-size="11.00" fill="#cbd5e1">--relaunch / saved session</text>
+</g>
+
+<g id="edge3" class="edge">
+<title>hello-&gt;login</title>
+<path fill="none" stroke="#94a3b8" stroke-width="1.2" d="M104.18,-396.45C119.59,-387.12 137.44,-376.55 153.89,-367.36 160.7,-363.56 167.89,-359.67 175.05,-355.87" />
+<polygon fill="#94a3b8" stroke="#94a3b8" stroke-width="1.2" points="176.12,-358.08 181.17,-352.65 173.84,-353.74 176.12,-358.08" />
+<text text-anchor="middle" x="186.14" y="-370.41" font-family="DejaVu Sans" font-size="11.00" fill="#cbd5e1">Enter / click</text>
+</g>
+
+<g id="node6" class="node">
+<title>end</title>
+<path fill="#1e293b" stroke="#fbbf24" stroke-width="1.4" d="M274.04,-50.34C274.04,-50.34 146.75,-50.34 146.75,-50.34 140.75,-50.34 134.75,-44.34 134.75,-38.34 134.75,-38.34 134.75,-12 134.75,-12 134.75,-6 140.75,0 146.75,0 146.75,0 274.04,0 274.04,0 280.04,0 286.04,-6 286.04,-12 286.04,-12 286.04,-38.34 286.04,-38.34 286.04,-44.34 280.04,-50.34 274.04,-50.34" />
+<text text-anchor="middle" x="210.39" y="-29.12" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">Restart / power off</text>
+<text text-anchor="middle" x="210.39" y="-11.87" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">Session ends</text>
+</g>
+
+<g id="edge9" class="edge">
+<title>hello-&gt;end</title>
+<path fill="none" stroke="#94a3b8" stroke-width="1.2" d="M64.39,-396.73C64.39,-377.78 64.39,-350.81 64.39,-327.19 64.39,-327.19 64.39,-327.19 64.39,-120.01 64.39,-85.28 93.99,-62.8 126.53,-48.58" />
+<polygon fill="#94a3b8" stroke="#94a3b8" stroke-width="1.2" points="127.2,-50.96 132.72,-46.01 125.32,-46.43 127.2,-50.96" />
+<text text-anchor="middle" x="120.27" y="-233.4" font-family="DejaVu Sans" font-size="11.00" fill="#cbd5e1">Esc: restart</text>
+<text text-anchor="middle" x="120.27" y="-219.9" font-family="DejaVu Sans" font-size="11.00" fill="#cbd5e1">Shift+Esc: power off</text>
+</g>
+
+<g id="node4" class="node">
+<title>desktop</title>
+<path fill="#1e293b" stroke="#2dd4bf" stroke-width="1.4" d="M473.91,-255.52C473.91,-255.52 270.88,-255.52 270.88,-255.52 264.88,-255.52 258.88,-249.52 258.88,-243.52 258.88,-243.52 258.88,-217.18 258.88,-217.18 258.88,-211.18 264.88,-205.18 270.88,-205.18 270.88,-205.18 473.91,-205.18 473.91,-205.18 479.91,-205.18 485.91,-211.18 485.91,-217.18 485.91,-217.18 485.91,-243.52 485.91,-243.52 485.91,-249.52 479.91,-255.52 473.91,-255.52" />
+<text text-anchor="middle" x="372.39" y="-234.3" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">Desktop</text>
+<text text-anchor="middle" x="372.39" y="-217.05" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">Windows + hosted processes</text>
+</g>
+
+<g id="edge4" class="edge">
+<title>login-&gt;desktop</title>
+<path fill="none" stroke="#94a3b8" stroke-width="1.2" d="M268.44,-300.53C286.82,-288.3 309.14,-273.45 328.39,-260.64" />
+<polygon fill="#94a3b8" stroke="#94a3b8" stroke-width="1.2" points="329.61,-262.76 334.08,-256.85 326.9,-258.69 329.61,-262.76" />
+<text text-anchor="middle" x="350.46" y="-274.57" font-family="DejaVu Sans" font-size="11.00" fill="#cbd5e1">accepted login</text>
+</g>
+
+<g id="edge7" class="edge">
+<title>login-&gt;end</title>
+<path fill="none" stroke="#94a3b8" stroke-width="1.2" d="M229.68,-300.72C225.92,-247.25 216.98,-119.96 212.72,-59.35" />
+<polygon fill="#94a3b8" stroke="#94a3b8" stroke-width="1.2" points="215.17,-59.18 212.24,-52.37 210.28,-59.53 215.17,-59.18" />
+<text text-anchor="middle" x="295.87" y="-178.73" font-family="DejaVu Sans" font-size="11.00" fill="#cbd5e1">Login: Esc / Cancel / close</text>
+<text text-anchor="middle" x="295.87" y="-165.23" font-family="DejaVu Sans" font-size="11.00" fill="#cbd5e1">Locked: Restart / Power off</text>
+</g>
+
+<g id="node5" class="node">
+<title>locked</title>
+<path fill="#1e293b" stroke="#c4b5fd" stroke-width="1.4" d="M502.79,-146.18C502.79,-146.18 260,-146.18 260,-146.18 254,-146.18 248,-140.18 248,-134.18 248,-134.18 248,-107.84 248,-107.84 248,-101.84 254,-95.84 260,-95.84 260,-95.84 502.79,-95.84 502.79,-95.84 508.79,-95.84 514.79,-101.84 514.79,-107.84 514.79,-107.84 514.79,-134.18 514.79,-134.18 514.79,-140.18 508.79,-146.18 502.79,-146.18" />
+<text text-anchor="middle" x="381.39" y="-124.96" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">Locked overlay</text>
+<text text-anchor="middle" x="381.39" y="-107.71" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">Windows keep running underneath</text>
+</g>
+
+<g id="edge5" class="edge">
+<title>desktop-&gt;locked</title>
+<path fill="none" stroke="#94a3b8" stroke-width="1.2" d="M374.46,-204.72C375.69,-190 377.28,-171.09 378.62,-155.08" />
+<polygon fill="#94a3b8" stroke="#94a3b8" stroke-width="1.2" points="381.04,-155.51 379.19,-148.33 376.16,-155.1 381.04,-155.51" />
+<text text-anchor="middle" x="431.59" y="-171.98" font-family="DejaVu Sans" font-size="11.00" fill="#cbd5e1">Alt+L / desktop Esc</text>
+</g>
+
+<g id="edge6" class="edge">
+<title>locked-&gt;desktop</title>
+<path fill="none" stroke="#94a3b8" stroke-width="1.2" d="M247.71,-126.6C191.79,-131.6 135.69,-141.75 118.14,-162.18 110.33,-171.28 110.35,-180.06 118.14,-189.18 122.82,-194.66 187.31,-204.81 250.16,-213.54" />
+<polygon fill="#94a3b8" stroke="#94a3b8" stroke-width="1.2" points="249.54,-215.92 256.81,-214.46 250.21,-211.07 249.54,-215.92" />
+<text text-anchor="middle" x="150.77" y="-171.98" font-family="DejaVu Sans" font-size="11.00" fill="#cbd5e1">valid unlock</text>
+</g>
+
+<g id="edge8" class="edge">
+<title>locked-&gt;end</title>
+<path fill="none" stroke="#94a3b8" stroke-width="1.2" d="M336.47,-95.35C313.88,-82.96 286.37,-67.86 262.82,-54.94" />
+<polygon fill="#94a3b8" stroke="#94a3b8" stroke-width="1.2" points="264.23,-52.92 256.91,-51.7 261.87,-57.21 264.23,-52.92" />
+<text text-anchor="middle" x="357.51" y="-69.39" font-family="DejaVu Sans" font-size="11.00" fill="#cbd5e1">Restart / Power off</text>
+</g>
+</g>
+</svg>

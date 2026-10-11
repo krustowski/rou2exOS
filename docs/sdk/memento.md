@@ -1,13 +1,24 @@
 # Memento (GUI)
 
-`MEMENTO.ELF` is a windowed desktop for `r2`. It is built on [Memento](https://github.com/Tarferi/Memento), a small cross-platform UI toolkit, and uses a backend written for this kernel. It is the largest program in the [application suite](apps.md) and the best example of the C++ SDK in real use. It runs a window manager, a mouse cursor, a dozen windows, a TCP/IP client and a TLS-capable web browser with pictures, all in one process, and starts DOS games, films and Turbo C++ as processes of their own in windows beside it.
+Memento is the graphical desktop for `r2`, shipped as `MEMENTO.ELF`. It provides
+login and session locking, a window manager, and a taskbar for switching between
+applications. It is built with [libc++r2](libcxxr2.md) and the
+[Memento](https://github.com/Tarferi/Memento) cross-platform UI toolkit, using a
+backend written for this kernel.
+
+Files, Tasks, the clock and network tools run within the desktop. Other windows
+host separate programs: the shell, web browser, [Jug](jug.md), media players,
+Telegram, Turbo C++ and DOS programs. Memento displays their output and forwards
+input, bringing the [application suite](apps.md) together in one session.
 
 + [Source (`cpp/memento-hello`)](https://github.com/krustowski/rou2exOS-apps/tree/master/cpp/memento-hello)
 + [Memento toolkit](https://github.com/Tarferi/Memento), with the `r2` backend in `src/ui/platform/impl/r2`
 
-![memento-welcome](../assets/r2-memento-start-screen.png)
+![memento-welcome](../assets/r2-memento-new-landing-screen.png)
 
-*Fig. 1: The landing screen. Enter (or a click) goes on to the login dialog, and Esc quits back to the shell.*
+*Fig. 1: The landing screen. Enter (or a click) opens Login; Esc restarts the
+machine and Shift+Esc powers it off. On a kernel without the power calls,
+Memento ends instead.*
 
 ---
 
@@ -43,14 +54,20 @@ Some windows need things that live outside the program:
 | MIDI files in `/mnt/fat/SOUND` | Music |
 
 Esc on the desktop locks the session, and leaving the login dialog restarts
-the machine (syscall `0x3e`); see [The Session](#the-session). Esc on the landing
-screen ends the program; on the text kernel it restores text mode and returns
-to the shell. The graphics supervisor applies its normal reboot policy unless
-this was a coordinated Jug relaunch.
+the machine (syscall `0x3e`); see [The Session](#the-session). Hello offers restart
+with Esc and power off with Shift+Esc. On older kernels without those power
+calls, leaving Hello ends the program and returns to the text shell. The
+graphics supervisor applies its normal reboot policy to an ordinary exit.
 
 ---
 
 ## The Session
+
+[![Memento enters Hello, Login and Desktop; relaunch or saved credentials skip Hello, locking overlays the running desktop, and restart or power off ends the session.](../assets/diagrams/memento-session.svg)](../assets/diagrams/memento-session.svg)
+
+*Session flow. Saved credentials select the Locked dialog; an active lock keeps
+the existing windows running underneath it. The diagram shows the normal path
+when allocation succeeds.*
 
 The program goes through three full-screen stages:
 
@@ -63,7 +80,8 @@ The lock screen is the login dialog titled *Locked*, over the whole screen and t
 After [Jug](jug.md) updates Memento, its **Y / N** confirmation can relaunch
 the desktop without rebooting. All windows close and their hosted processes
 stop; save unsaved work first. The graphics kernel starts the downloaded
-Memento with `--relaunch`, skipping Hello and opening Login. The existing
+Memento with `--relaunch`, skipping Hello and opening Locked when saved
+credentials exist, or Login otherwise. The existing
 `/mnt/tmp/SESSION.CFG` stays on the RAM disk and supplies the credentials again.
 A relaunch requested while the session is locked waits until it is unlocked.
 The first deployment of this feature requires booting the updated image once.
@@ -120,6 +138,11 @@ The file manager opens a **File** viewer on the selected file (`0x20`).
 
 ### Network tools
 
+[![netmux reads Memento's frame queue once and routes frames to embedded web networking, the libcr2 Chat and IRC stack, and the Net window's scan, ping and traceroute client.](../assets/diagrams/memento-network-mux.svg)](../assets/diagrams/memento-network-mux.svg)
+
+*In-process network clients share one frame reader. Hosted applications such as
+`r2web.elf` are separate processes with their own kernel frame queues.*
+
 The Net window has **Stats**, **Scan**, **Ping**, **Trace** and **Charts** tabs.
 Stats reads [physical NIC counters](../networking/overview.md#network-monitoring)
 and the TCP owner table: both services and client reply ports are listed with
@@ -170,19 +193,11 @@ the 64×32 aspect ratio; only original CHIP-8 is supported. See the
 
 ## How It Is Put Together
 
-```
-main.cpp + windows/*.cpp       the session, the launcher, the windows
-      │
-Memento platform layer         PlatformWindow, PlatformDrawingContext,
-      │                        PlatformBitmap, PlatformFont, ...
-r2 backend (impl/r2)           window manager, VGA 640x400x16, mouse, keyboard
-      │
-libc++r2 + libc++r2compat      runtime, containers, heap, gfx, input, syscalls
-      │
-libcr2.a (TCP/IP only)         sockets for Chat and IRC
-web/ + BearSSL                 the browser engine, its own TCP/IP, and TLS
-netmux.cpp                     splits the one frame queue between the two stacks
-```
+[![Memento's session and windows use the platform layer and r2 backend, which compose the desktop and exchange shared-heap input and frame blocks with separate hosted child programs.](../assets/diagrams/memento-architecture.svg)](../assets/diagrams/memento-architecture.svg)
+
+*UI composition and hosted processes. The backend owns the visible desktop;
+each hosted program owns its runtime. `libc++r2compat` supplies toolkit support,
+and in-process network clients use `libcr2`, `web/` and BearSSL through the mux.*
 
 + **Display.** On the text kernel the backend asks the kernel for mode `0x12` (syscall `0x15`), then reprograms the CRTC to a 640×400 planar mode with the EGA 16-colour palette. Frames are composed in memory and written to the four planes through the VGA window mapped by syscall `0x14`. On the graphics kernel's framebuffer the screen is as large as the framebuffer and has 256 colours: the same 16, a 6×6×6 cube and 24 greys. Either way a bitmap is one palette index a pixel, which is what the Web, Telegram, Video and theM windows write their pictures into directly.
 + **Coordinates.** Windows are written in 320×200 units. They are created at 192 DPI, so the backend draws them at twice that resolution, text included.
@@ -192,15 +207,18 @@ netmux.cpp                     splits the one frame queue between the two stacks
 
 ### Memory
 
-The process's private 2 MiB frame at `0x600_000` is full. It holds the code (the browser and BearSSL are most of it), the window manager's frame buffer, the VGA plane staging buffer and a 256 KiB stack. So the heap arena starts small in `.bss` and grows onto the kernel's shared user heap:
+The process's private 2 MiB frame at `0x600_000` holds code, static data, the
+window manager's buffers and its runtime stack. The heap arena starts in `.bss`
+and grows onto the kernel's shared user heap:
 
 ```cpp
-R2_HEAP_ARENA_GROWING(768 * 1024)   // r2_stubs.cpp
+R2_HEAP_ARENA_GROWING(640 * 1024)   // r2_stubs.cpp
 ```
 
-The arena starts at 768 KiB in the image. When it is full, it takes further 256 KiB regions from the user heap (syscall `0x0a`). The desktop bitmap alone is 244 KiB and every window has a bitmap of its own, so opening more windows grows the arena instead of failing. The arena does not start on the user heap because the browser keeps page bodies and layout there, about four times the page's size. The user heap is 4 MiB for all processes together until it is full; then the kernel grows it once by an eighth of the RAM (see [`0x0a`](../abi/syscalls/sysinfo_mem_mgmt.md#0x0a-allocate-memory-on-heap)), which is where decoded pictures, the theM window's 600 KiB block and screenshots find their room.
+The arena starts at 640 KiB in the image. When it is full, it takes further 256 KiB regions from the user heap (syscall `0x0a`). The desktop bitmap alone is 244 KiB and every window has a bitmap of its own, so opening more windows grows the arena instead of failing. The arena does not start on the user heap because the browser keeps page bodies and layout there, about four times the page's size. The user heap is 4 MiB for all processes together until it is full; then the kernel grows it once by an eighth of the RAM (see [`0x0a`](../abi/syscalls/sysinfo_mem_mgmt.md#0x0a-allocate-memory-on-heap)), which is where decoded pictures, the theM window's 600 KiB block and screenshots find their room.
 
-The image itself is close to full: code, data and `.bss` come to about 2 MiB less 85 KiB. Anything large belongs on the heap.
+Image usage depends on the build and the windows linked into it. Large buffers
+belong on the heap so the code, data and `.bss` stay within the 2 MiB frame.
 
 This only works because the kernel accepts user-heap pointers in syscalls: every pointer argument may lie wholly inside the program image or wholly inside the user heap (see [the specification](../abi/syscall_specification.md)). On older kernels, which accepted pointers only into the image, the program cannot run.
 

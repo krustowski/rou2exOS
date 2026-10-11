@@ -1,0 +1,11 @@
+// Title: int 0x7f syscall round trip
+// Description: A ring-3 SDK wrapper supplies RAX, RDI, RSI and optional RCX. The interrupt gate enters ring 0 on the process kernel stack; the entry stub calls syscall_inner, which validates and dispatches the request. The stub restores registers and returns with iretq; RAX carries the result and R9 is clobbered.
+digraph syscall {
+  wrapper [label="Ring 3 · application / SDK wrapper\nRAX = number · RDI / RSI = arguments\nRCX = optional third argument"];
+  gate [label="int 0x7f interrupt gate\nEnter ring 0 on this process's kernel stack"];
+  stub [label="syscall_handler entry stub\nSave registers · align stack · RDX ← RAX"];
+  dispatch [label="syscall_inner(arg1, arg2, number, arg3)\nValidate buffers + dispatch to subsystem"];
+  restore [label="Entry stub return\nKeep result in R9 · restore registers\nRAX ← result · iretq"];
+  caller [label="Ring 3 · caller resumes\nRAX = result · R9 clobbered", color="#2dd4bf"];
+  wrapper -> gate -> stub -> dispatch -> restore -> caller;
+}

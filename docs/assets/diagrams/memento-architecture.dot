@@ -1,0 +1,13 @@
+// Title: Memento UI and hosted programs
+// Description: Memento's session and windows use the platform layer and r2 backend. Hosted applications run in separate processes and exchange input and frames through shared-heap blocks. Memento owns the desktop composition while each child owns its execution and runtime.
+digraph memento {
+  ui [label="Session + window sources\nmain.cpp · windows/*.cpp"];
+  platform [label="Memento platform layer\nWindow · drawing context · bitmap · font"];
+  backend [label="r2 backend + libc++r2\nWindow manager · drawing · input"];
+  display [label="Display\nVGA 640×400×16 / RGB framebuffer", color="#fbbf24"];
+  host [label="Hosted-window bridge\nShared user-heap input + frame blocks", color="#2dd4bf"];
+  children [label="Separate child processes\nsh · r2web · jug · tcpp · theM\nc8 · mpegplay · spotify · telegram"];
+  ui -> platform -> backend;
+  backend -> display; backend -> host -> children;
+  { rank=same; display; children; }
+}

@@ -1,0 +1,14 @@
+// Title: Userland stacks and kernel transports
+// Description: TCP/IP connection state lives in userland. Raw Ethernet syscalls pass through the kernel's tunnel, loopback and NIC routing; the legacy serial path carries SLIP-framed IPv4. Stateless protocol helpers support the kernel routing code.
+digraph layers {
+  app [label="Userland TCP/IP stacks\nApplications · eth · wgd"];
+  abi [label="Packet ABI\nSend 0x34 · receive 0x35 · register 0x37"];
+  route [label="Ethernet routing\nnetdrv · tunnel · loopback"];
+  serial [label="Legacy IPv4 transport\nSLIP → COM1 UART", color="#c4b5fd"];
+  nic [label="Physical Ethernet\nnic → RTL8139 / Intel", color="#fbbf24"];
+  local [label="Local delivery\nOwned frame buffers → process queue", color="#2dd4bf"];
+  helpers [label="Stateless protocol helpers\nEthernet · ARP · IPv4 · ICMP · TCP · UDP"];
+  app -> abi; abi -> route [label="raw Ethernet"]; abi -> serial [label="legacy send"];
+  route -> nic; route -> local;
+  helpers -> route [label="parse / build", style=dashed, constraint=false];
+}

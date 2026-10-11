@@ -1,0 +1,116 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="574pt" height="423pt" viewBox="0.00 0.00 574.49 422.90" role="img" aria-labelledby="input-routing-title input-routing-description">
+<title id="input-routing-title">PS/2 input fan-out</title><desc id="input-routing-description">Keyboard IRQ1 feeds the shell scancode buffer and userland keyboard subscriptions. Mouse IRQ12 reassembles three-byte packets and feeds mouse subscriptions. Applications poll their subscribed buffers.</desc><g id="graph0" class="graph" transform="scale(1 1) rotate(0) translate(21.6 401.3)">
+<title>input</title>
+<polygon fill="#0f172a" stroke="none" points="-21.6,21.6 -21.6,-401.3 552.89,-401.3 552.89,21.6 -21.6,21.6" />
+
+<g id="node1" class="node">
+<title>keyboard</title>
+<path fill="#1e293b" stroke="#60a5fa" stroke-width="1.4" d="M189.79,-379.7C189.79,-379.7 52,-379.7 52,-379.7 46,-379.7 40,-373.7 40,-367.7 40,-367.7 40,-341.36 40,-341.36 40,-335.36 46,-329.36 52,-329.36 52,-329.36 189.79,-329.36 189.79,-329.36 195.79,-329.36 201.79,-335.36 201.79,-341.36 201.79,-341.36 201.79,-367.7 201.79,-367.7 201.79,-373.7 195.79,-379.7 189.79,-379.7" />
+<text text-anchor="middle" x="120.89" y="-358.48" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">PS/2 keyboard</text>
+<text text-anchor="middle" x="120.89" y="-341.23" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">IRQ1 → vector 0x21</text>
+</g>
+
+<g id="node3" class="node">
+<title>kh</title>
+<path fill="#1e293b" stroke="#60a5fa" stroke-width="1.4" d="M211.91,-297.36C211.91,-297.36 29.88,-297.36 29.88,-297.36 23.88,-297.36 17.87,-291.36 17.87,-285.36 17.87,-285.36 17.87,-259.02 17.87,-259.02 17.87,-253.02 23.87,-247.02 29.87,-247.02 29.87,-247.02 211.91,-247.02 211.91,-247.02 217.91,-247.02 223.91,-253.02 223.91,-259.02 223.91,-259.02 223.91,-285.36 223.91,-285.36 223.91,-291.36 217.91,-297.36 211.91,-297.36" />
+<text text-anchor="middle" x="120.89" y="-276.14" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">keyboard_handler</text>
+<text text-anchor="middle" x="120.89" y="-258.89" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">Read 8042 data port 0x60</text>
+</g>
+
+<g id="edge1" class="edge">
+<title>keyboard-&gt;kh</title>
+<path fill="none" stroke="#94a3b8" stroke-width="1.2" d="M120.89,-328.99C120.89,-321.89 120.89,-314.02 120.89,-306.49" />
+<polygon fill="#94a3b8" stroke="#94a3b8" stroke-width="1.2" points="123.35,-306.67 120.9,-299.67 118.45,-306.67 123.35,-306.67" />
+</g>
+
+<g id="node2" class="node">
+<title>mouse</title>
+<path fill="#1e293b" stroke="#60a5fa" stroke-width="1.4" d="M491.54,-379.7C491.54,-379.7 346.25,-379.7 346.25,-379.7 340.25,-379.7 334.25,-373.7 334.25,-367.7 334.25,-367.7 334.25,-341.36 334.25,-341.36 334.25,-335.36 340.25,-329.36 346.25,-329.36 346.25,-329.36 491.54,-329.36 491.54,-329.36 497.54,-329.36 503.54,-335.36 503.54,-341.36 503.54,-341.36 503.54,-367.7 503.54,-367.7 503.54,-373.7 497.54,-379.7 491.54,-379.7" />
+<text text-anchor="middle" x="418.89" y="-358.48" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">PS/2 mouse</text>
+<text text-anchor="middle" x="418.89" y="-341.23" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">IRQ12 → vector 0x2c</text>
+</g>
+
+<g id="node4" class="node">
+<title>mh</title>
+<path fill="#1e293b" stroke="#60a5fa" stroke-width="1.4" d="M509.91,-297.36C509.91,-297.36 327.88,-297.36 327.88,-297.36 321.88,-297.36 315.88,-291.36 315.88,-285.36 315.88,-285.36 315.88,-259.02 315.88,-259.02 315.88,-253.02 321.88,-247.02 327.88,-247.02 327.88,-247.02 509.91,-247.02 509.91,-247.02 515.91,-247.02 521.91,-253.02 521.91,-259.02 521.91,-259.02 521.91,-285.36 521.91,-285.36 521.91,-291.36 515.91,-297.36 509.91,-297.36" />
+<text text-anchor="middle" x="418.89" y="-276.14" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">mouse_handler</text>
+<text text-anchor="middle" x="418.89" y="-258.89" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">Read 8042 data port 0x60</text>
+</g>
+
+<g id="edge2" class="edge">
+<title>mouse-&gt;mh</title>
+<path fill="none" stroke="#94a3b8" stroke-width="1.2" d="M418.89,-328.99C418.89,-321.89 418.89,-314.02 418.89,-306.49" />
+<polygon fill="#94a3b8" stroke="#94a3b8" stroke-width="1.2" points="421.35,-306.67 418.9,-299.67 416.45,-306.67 421.35,-306.67" />
+</g>
+
+<g id="node5" class="node">
+<title>shell</title>
+<path fill="#1e293b" stroke="#c4b5fd" stroke-width="1.4" d="M125.79,-215.02C125.79,-215.02 12,-215.02 12,-215.02 6,-215.02 0,-209.02 0,-203.02 0,-203.02 0,-176.68 0,-176.68 0,-170.68 6,-164.68 12,-164.68 12,-164.68 125.79,-164.68 125.79,-164.68 131.79,-164.68 137.79,-170.68 137.79,-176.68 137.79,-176.68 137.79,-203.02 137.79,-203.02 137.79,-209.02 131.79,-215.02 125.79,-215.02" />
+<text text-anchor="middle" x="68.89" y="-193.8" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">SCANCODE_BUF</text>
+<text text-anchor="middle" x="68.89" y="-176.55" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">Kernel shell</text>
+</g>
+
+<g id="edge3" class="edge">
+<title>kh-&gt;shell</title>
+<path fill="none" stroke="#94a3b8" stroke-width="1.2" d="M105.01,-246.65C100.12,-239.09 94.66,-230.65 89.49,-222.68" />
+<polygon fill="#94a3b8" stroke="#94a3b8" stroke-width="1.2" points="91.71,-221.59 85.85,-217.04 87.59,-224.25 91.71,-221.59" />
+</g>
+
+<g id="node6" class="node">
+<title>keys</title>
+<path fill="#1e293b" stroke="#60a5fa" stroke-width="1.4" d="M272.29,-132.68C272.29,-132.68 71.5,-132.68 71.5,-132.68 65.5,-132.68 59.5,-126.68 59.5,-120.68 59.5,-120.68 59.5,-94.34 59.5,-94.34 59.5,-88.34 65.5,-82.34 71.5,-82.34 71.5,-82.34 272.29,-82.34 272.29,-82.34 278.29,-82.34 284.29,-88.34 284.29,-94.34 284.29,-94.34 284.29,-120.68 284.29,-120.68 284.29,-126.68 278.29,-132.68 272.29,-132.68" />
+<text text-anchor="middle" x="171.89" y="-111.46" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">Keyboard subscriber rings</text>
+<text text-anchor="middle" x="171.89" y="-94.21" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">Up to 5 userland subscribers</text>
+</g>
+
+<g id="edge4" class="edge">
+<title>kh-&gt;keys</title>
+<path fill="none" stroke="#94a3b8" stroke-width="1.2" d="M134.82,-246.61C139.82,-236.99 145.14,-225.71 148.89,-215.02 157.28,-191.12 163.19,-163.09 166.91,-141.79" />
+<polygon fill="#94a3b8" stroke="#94a3b8" stroke-width="1.2" points="169.33,-142.2 168.07,-134.89 164.5,-141.38 169.33,-142.2" />
+</g>
+
+<g id="node7" class="node">
+<title>packet</title>
+<path fill="#1e293b" stroke="#60a5fa" stroke-width="1.4" d="M509.91,-207.85C509.91,-207.85 327.88,-207.85 327.88,-207.85 321.88,-207.85 315.88,-201.85 315.88,-195.85 315.88,-195.85 315.88,-183.85 315.88,-183.85 315.88,-177.85 321.88,-171.85 327.88,-171.85 327.88,-171.85 509.91,-171.85 509.91,-171.85 515.91,-171.85 521.91,-177.85 521.91,-183.85 521.91,-183.85 521.91,-195.85 521.91,-195.85 521.91,-201.85 515.91,-207.85 509.91,-207.85" />
+<text text-anchor="middle" x="418.89" y="-185.18" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">Reassemble 3-byte packet</text>
+</g>
+
+<g id="edge5" class="edge">
+<title>mh-&gt;packet</title>
+<path fill="none" stroke="#94a3b8" stroke-width="1.2" d="M418.89,-246.65C418.89,-237.21 418.89,-226.4 418.89,-216.83" />
+<polygon fill="#94a3b8" stroke="#94a3b8" stroke-width="1.2" points="421.35,-216.93 418.9,-209.93 416.45,-216.93 421.35,-216.93" />
+</g>
+
+<g id="node9" class="node">
+<title>app</title>
+<path fill="#1e293b" stroke="#2dd4bf" stroke-width="1.4" d="M405.41,-50.34C405.41,-50.34 184.38,-50.34 184.38,-50.34 178.38,-50.34 172.38,-44.34 172.38,-38.34 172.38,-38.34 172.38,-12 172.38,-12 172.38,-6 178.38,0 184.38,0 184.38,0 405.41,0 405.41,0 411.41,0 417.41,-6 417.41,-12 417.41,-12 417.41,-38.34 417.41,-38.34 417.41,-44.34 411.41,-50.34 405.41,-50.34" />
+<text text-anchor="middle" x="294.89" y="-29.12" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">Userland application</text>
+<text text-anchor="middle" x="294.89" y="-11.87" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">Poll input pipes via syscall 0x03</text>
+</g>
+
+<g id="edge7" class="edge">
+<title>keys-&gt;app</title>
+<path fill="none" stroke="#94a3b8" stroke-width="1.2" d="M209.47,-81.97C222.22,-73.64 236.61,-64.24 249.88,-55.57" />
+<polygon fill="#94a3b8" stroke="#94a3b8" stroke-width="1.2" points="251.09,-57.71 255.61,-51.83 248.41,-53.61 251.09,-57.71" />
+</g>
+
+<g id="node8" class="node">
+<title>mice</title>
+<path fill="#1e293b" stroke="#60a5fa" stroke-width="1.4" d="M519.29,-132.68C519.29,-132.68 318.5,-132.68 318.5,-132.68 312.5,-132.68 306.5,-126.68 306.5,-120.68 306.5,-120.68 306.5,-94.34 306.5,-94.34 306.5,-88.34 312.5,-82.34 318.5,-82.34 318.5,-82.34 519.29,-82.34 519.29,-82.34 525.29,-82.34 531.29,-88.34 531.29,-94.34 531.29,-94.34 531.29,-120.68 531.29,-120.68 531.29,-126.68 525.29,-132.68 519.29,-132.68" />
+<text text-anchor="middle" x="418.89" y="-111.46" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">Mouse subscriber rings</text>
+<text text-anchor="middle" x="418.89" y="-94.21" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">Up to 5 userland subscribers</text>
+</g>
+
+<g id="edge6" class="edge">
+<title>packet-&gt;mice</title>
+<path fill="none" stroke="#94a3b8" stroke-width="1.2" d="M418.89,-171.42C418.89,-162.71 418.89,-151.87 418.89,-141.66" />
+<polygon fill="#94a3b8" stroke="#94a3b8" stroke-width="1.2" points="421.35,-141.73 418.9,-134.73 416.45,-141.73 421.35,-141.73" />
+</g>
+
+<g id="edge8" class="edge">
+<title>mice-&gt;app</title>
+<path fill="none" stroke="#94a3b8" stroke-width="1.2" d="M381.02,-81.97C368.16,-73.64 353.66,-64.24 340.27,-55.57" />
+<polygon fill="#94a3b8" stroke="#94a3b8" stroke-width="1.2" points="341.7,-53.58 334.49,-51.83 339.04,-57.69 341.7,-53.58" />
+</g>
+</g>
+</svg>

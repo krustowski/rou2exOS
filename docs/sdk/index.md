@@ -14,6 +14,11 @@ The SDK lives in the [rou2exOS-apps](https://github.com/krustowski/rou2exOS-apps
 
 The programs shipped with the kernel are listed on the [Application Suite](apps.md) page.
 
+[![C, C++ and TinyGo SDKs build static ELF64 programs, stage them in a boot medium or Jug, and load them into ring-3 slots that call the kernel ABI.](../assets/diagrams/sdk-pipeline.svg)](../assets/diagrams/sdk-pipeline.svg)
+
+*Build-to-execution path shared by the three SDKs. Each language supplies its
+own runtime and wrappers; the resulting programs use the same loader and ABI.*
+
 Use [Memento](memento.md) for the desktop, [Jug](jug.md) for installing and
 restarting programs, and [Publishing Jug Programs](jug-publishing.md) for the
 SSH publication workflow. Kernel implementations are indexed in

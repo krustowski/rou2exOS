@@ -1,0 +1,12 @@
+// Title: From GRUB to scheduled tasks
+// Description: GRUB loads the kernel and archive; the 32-bit assembly entry sets up paging and the GDT, enters long mode, and calls kernel_main. Rust adopts the archive, initializes subsystems and starts scheduling.
+digraph boot {
+  grub [label="GRUB / Multiboot2\nLoad kernel + usb.tar module\nPass magic and information pointer"];
+  start [label="_start · 32-bit protected mode\nSave boot information\nBuild 0–4 GiB page tables + load GDT"];
+  long [label="Enable PAE + LME + paging\nFar jump to long_mode_entry\nSet 64-bit boot stack"];
+  main [label="kernel_main\nAdopt / relocate the boot archive"];
+  init [label="init::check::init\nInitialize subsystems and initial tasks"];
+  pit [label="Enable PIT interrupts\nScheduler can run the initial tasks", color="#2dd4bf"];
+  idle [label="kernel_main idle path\nOr kernel_test self-tests", color="#c4b5fd"];
+  grub -> start -> long -> main -> init -> pit -> idle;
+}

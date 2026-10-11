@@ -1,0 +1,11 @@
+// Title: Memento's single-reader network mux
+// Description: Only netmux reads Memento's kernel frame queue. It routes to the embedded web networking stack, libcr2's Chat and IRC stack, and the Network window's probe client. ARP is copied to interested clients. Hosted applications such as r2web have their own process queues.
+digraph mux {
+  queue [label="Memento's kernel frame queue\nSyscall 0x35"];
+  mux [label="netmux.cpp · single reader\nRoute by claimed ports + probe identifiers\nCopy ARP to interested clients", color="#2dd4bf"];
+  web [label="NETMUX_WEB\nEmbedded web networking"];
+  cr2 [label="NETMUX_CR2\nlibcr2 · Chat + IRC"];
+  nsk [label="NETMUX_NSK\nScan · ping · traceroute"];
+  queue -> mux;
+  mux -> web; mux -> cr2; mux -> nsk;
+}

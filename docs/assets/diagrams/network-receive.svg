@@ -1,0 +1,101 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="607pt" height="452pt" viewBox="0.00 0.00 606.74 451.90" role="img" aria-labelledby="network-receive-title network-receive-description">
+<title id="network-receive-title">NIC receive ownership and backpressure</title><desc id="network-receive-description">Every timer tick polls up to 16 frames. A frame is peeked, routed and copied to an owned buffer, then queued before the NIC ring is consumed. Queue failure holds the frame for retry; an unresponsive receiver has a 200-tick limit. Receive copies the frame and frees its buffer.</desc><g id="graph0" class="graph" transform="scale(1 1) rotate(0) translate(21.6 430.3)">
+<title>receive</title>
+<polygon fill="#0f172a" stroke="none" points="-21.6,21.6 -21.6,-430.3 585.14,-430.3 585.14,21.6 -21.6,21.6" />
+
+<g id="node1" class="node">
+<title>tick</title>
+<path fill="#1e293b" stroke="#60a5fa" stroke-width="1.4" d="M366.91,-408.7C366.91,-408.7 98.62,-408.7 98.62,-408.7 92.62,-408.7 86.62,-402.7 86.62,-396.7 86.62,-396.7 86.62,-370.36 86.62,-370.36 86.62,-364.36 92.62,-358.36 98.62,-358.36 98.62,-358.36 366.91,-358.36 366.91,-358.36 372.91,-358.36 378.91,-364.36 378.91,-370.36 378.91,-370.36 378.91,-396.7 378.91,-396.7 378.91,-402.7 372.91,-408.7 366.91,-408.7" />
+<text text-anchor="middle" x="232.77" y="-387.48" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">PIT tick · 1000 Hz</text>
+<text text-anchor="middle" x="232.77" y="-370.23" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">Poll up to 16 frames before scheduling</text>
+</g>
+
+<g id="node2" class="node">
+<title>peek</title>
+<path fill="#1e293b" stroke="#60a5fa" stroke-width="1.4" d="M363.91,-325.36C363.91,-325.36 101.62,-325.36 101.62,-325.36 95.62,-325.36 89.62,-319.36 89.62,-313.36 89.62,-313.36 89.62,-287.02 89.62,-287.02 89.62,-281.02 95.62,-275.02 101.62,-275.02 101.62,-275.02 363.91,-275.02 363.91,-275.02 369.91,-275.02 375.91,-281.02 375.91,-287.02 375.91,-287.02 375.91,-313.36 375.91,-313.36 375.91,-319.36 369.91,-325.36 363.91,-325.36" />
+<text text-anchor="middle" x="232.77" y="-304.14" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">Peek NIC RX-ring head</text>
+<text text-anchor="middle" x="232.77" y="-286.89" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">Select TCP owner / wgd / global driver</text>
+</g>
+
+<g id="edge1" class="edge">
+<title>tick-&gt;peek</title>
+<path fill="none" stroke="#94a3b8" stroke-width="1.2" d="M232.77,-358.13C232.77,-350.71 232.77,-342.44 232.77,-334.54" />
+<polygon fill="#94a3b8" stroke="#94a3b8" stroke-width="1.2" points="235.22,-334.67 232.77,-327.67 230.32,-334.67 235.22,-334.67" />
+</g>
+
+<g id="node3" class="node">
+<title>queue</title>
+<path fill="#1e293b" stroke="#60a5fa" stroke-width="1.4" d="M346.29,-242.02C346.29,-242.02 119.25,-242.02 119.25,-242.02 113.25,-242.02 107.25,-236.02 107.25,-230.02 107.25,-230.02 107.25,-203.68 107.25,-203.68 107.25,-197.68 113.25,-191.68 119.25,-191.68 119.25,-191.68 346.29,-191.68 346.29,-191.68 352.29,-191.68 358.29,-197.68 358.29,-203.68 358.29,-203.68 358.29,-230.02 358.29,-230.02 358.29,-236.02 352.29,-242.02 346.29,-242.02" />
+<text text-anchor="middle" x="232.77" y="-220.8" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">Reserve + copy into FRAME_BUF</text>
+<text text-anchor="middle" x="232.77" y="-203.55" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">Try enqueue + wake receiver</text>
+</g>
+
+<g id="edge2" class="edge">
+<title>peek-&gt;queue</title>
+<path fill="none" stroke="#94a3b8" stroke-width="1.2" d="M232.77,-274.79C232.77,-267.37 232.77,-259.1 232.77,-251.2" />
+<polygon fill="#94a3b8" stroke="#94a3b8" stroke-width="1.2" points="235.22,-251.33 232.77,-244.33 230.32,-251.33 235.22,-251.33" />
+</g>
+
+<g id="node4" class="node">
+<title>consume</title>
+<path fill="#1e293b" stroke="#2dd4bf" stroke-width="1.4" d="M242.29,-146.18C242.29,-146.18 75.25,-146.18 75.25,-146.18 69.25,-146.18 63.25,-140.18 63.25,-134.18 63.25,-134.18 63.25,-107.84 63.25,-107.84 63.25,-101.84 69.25,-95.84 75.25,-95.84 75.25,-95.84 242.29,-95.84 242.29,-95.84 248.29,-95.84 254.29,-101.84 254.29,-107.84 254.29,-107.84 254.29,-134.18 254.29,-134.18 254.29,-140.18 248.29,-146.18 242.29,-146.18" />
+<text text-anchor="middle" x="158.77" y="-124.96" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">Queued successfully</text>
+<text text-anchor="middle" x="158.77" y="-107.71" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">Consume NIC ring entry</text>
+</g>
+
+<g id="edge3" class="edge">
+<title>queue-&gt;consume</title>
+<path fill="none" stroke="#94a3b8" stroke-width="1.2" d="M213.33,-191.19C204.15,-179.56 193.1,-165.54 183.35,-153.17" />
+<polygon fill="#94a3b8" stroke="#94a3b8" stroke-width="1.2" points="185.47,-151.91 179.21,-147.93 181.62,-154.94 185.47,-151.91" />
+<text text-anchor="middle" x="221.95" y="-165.23" font-family="DejaVu Sans" font-size="11.00" fill="#cbd5e1">success</text>
+</g>
+
+<g id="node5" class="node">
+<title>hold</title>
+<path fill="#1e293b" stroke="#fbbf24" stroke-width="1.4" d="M537.79,-146.18C537.79,-146.18 313.75,-146.18 313.75,-146.18 307.75,-146.18 301.75,-140.18 301.75,-134.18 301.75,-134.18 301.75,-107.84 301.75,-107.84 301.75,-101.84 307.75,-95.84 313.75,-95.84 313.75,-95.84 537.79,-95.84 537.79,-95.84 543.79,-95.84 549.79,-101.84 549.79,-107.84 549.79,-107.84 549.79,-134.18 549.79,-134.18 549.79,-140.18 543.79,-146.18 537.79,-146.18" />
+<text text-anchor="middle" x="425.77" y="-124.96" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">Buffer / queue / lock unavailable</text>
+<text text-anchor="middle" x="425.77" y="-107.71" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">Hold ring head; retry next tick</text>
+</g>
+
+<g id="edge4" class="edge">
+<title>queue-&gt;hold</title>
+<path fill="none" stroke="#94a3b8" stroke-width="1.2" d="M258.42,-191.19C270.02,-181.08 284.34,-169.96 298.77,-162.18 307.19,-157.64 316.21,-153.52 325.41,-149.79" />
+<polygon fill="#94a3b8" stroke="#94a3b8" stroke-width="1.2" points="326.21,-152.11 331.84,-147.29 324.43,-147.55 326.21,-152.11" />
+<text text-anchor="middle" x="336.27" y="-165.23" font-family="DejaVu Sans" font-size="11.00" fill="#cbd5e1">cannot queue</text>
+</g>
+
+<g id="node7" class="node">
+<title>read</title>
+<path fill="#1e293b" stroke="#60a5fa" stroke-width="1.4" d="M279.54,-50.34C279.54,-50.34 12,-50.34 12,-50.34 6,-50.34 0,-44.34 0,-38.34 0,-38.34 0,-12 0,-12 0,-6 6,0 12,0 12,0 279.54,0 279.54,0 285.54,0 291.54,-6 291.54,-12 291.54,-12 291.54,-38.34 291.54,-38.34 291.54,-44.34 285.54,-50.34 279.54,-50.34" />
+<text text-anchor="middle" x="145.77" y="-29.12" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">Userland receive · syscall 0x35</text>
+<text text-anchor="middle" x="145.77" y="-11.87" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">Copy frame → release FRAME_BUF slot</text>
+</g>
+
+<g id="edge7" class="edge">
+<title>consume-&gt;read</title>
+<path fill="none" stroke="#94a3b8" stroke-width="1.2" d="M155.35,-95.35C153.82,-84.26 151.98,-70.99 150.33,-59.06" />
+<polygon fill="#94a3b8" stroke="#94a3b8" stroke-width="1.2" points="152.8,-59.06 149.41,-52.46 147.95,-59.73 152.8,-59.06" />
+</g>
+
+<g id="edge5" class="edge">
+<title>hold-&gt;peek</title>
+<path fill="none" stroke="#94a3b8" stroke-width="1.2" d="M420.08,-146.28C412.68,-172.98 397.31,-215.59 369.77,-242.02 357.46,-253.83 342.37,-263.35 326.74,-270.98" />
+<polygon fill="#94a3b8" stroke="#94a3b8" stroke-width="1.2" points="325.99,-268.63 320.69,-273.81 328.07,-273.07 325.99,-268.63" />
+<text text-anchor="middle" x="416.66" y="-213.15" font-family="DejaVu Sans" font-size="11.00" fill="#cbd5e1">retry</text>
+</g>
+
+<g id="node6" class="node">
+<title>drop</title>
+<path fill="#1e293b" stroke="#fbbf24" stroke-width="1.4" d="M551.54,-50.34C551.54,-50.34 326,-50.34 326,-50.34 320,-50.34 314,-44.34 314,-38.34 314,-38.34 314,-12 314,-12 314,-6 320,0 326,0 326,0 551.54,0 551.54,0 557.54,0 563.54,-6 563.54,-12 563.54,-12 563.54,-38.34 563.54,-38.34 563.54,-44.34 557.54,-50.34 551.54,-50.34" />
+<text text-anchor="middle" x="438.77" y="-29.12" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">Unresponsive receiver: 200 ticks</text>
+<text text-anchor="middle" x="438.77" y="-11.87" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">Drop held frame</text>
+</g>
+
+<g id="edge6" class="edge">
+<title>hold-&gt;drop</title>
+<path fill="none" stroke="#94a3b8" stroke-width="1.2" d="M429.19,-95.35C430.72,-84.26 432.56,-70.99 434.21,-59.06" />
+<polygon fill="#94a3b8" stroke="#94a3b8" stroke-width="1.2" points="436.59,-59.73 435.13,-52.46 431.74,-59.06 436.59,-59.73" />
+<text text-anchor="middle" x="454.42" y="-69.39" font-family="DejaVu Sans" font-size="11.00" fill="#cbd5e1">timeout</text>
+</g>
+</g>
+</svg>

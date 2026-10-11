@@ -1,0 +1,79 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="607pt" height="440pt" viewBox="0.00 0.00 607.49 440.15" role="img" aria-labelledby="memento-architecture-title memento-architecture-description">
+<title id="memento-architecture-title">Memento UI and hosted programs</title><desc id="memento-architecture-description">Memento's session and windows use the platform layer and r2 backend. Hosted applications run in separate processes and exchange input and frames through shared-heap blocks. Memento owns the desktop composition while each child owns its execution and runtime.</desc><g id="graph0" class="graph" transform="scale(1 1) rotate(0) translate(21.6 418.55)">
+<title>memento</title>
+<polygon fill="#0f172a" stroke="none" points="-21.6,21.6 -21.6,-418.55 585.89,-418.55 585.89,21.6 -21.6,21.6" />
+
+<g id="node1" class="node">
+<title>ui</title>
+<path fill="#1e293b" stroke="#60a5fa" stroke-width="1.4" d="M352.16,-396.95C352.16,-396.95 168.62,-396.95 168.62,-396.95 162.62,-396.95 156.62,-390.95 156.62,-384.95 156.62,-384.95 156.62,-358.61 156.62,-358.61 156.62,-352.61 162.62,-346.61 168.62,-346.61 168.62,-346.61 352.16,-346.61 352.16,-346.61 358.16,-346.61 364.16,-352.61 364.16,-358.61 364.16,-358.61 364.16,-384.95 364.16,-384.95 364.16,-390.95 358.16,-396.95 352.16,-396.95" />
+<text text-anchor="middle" x="260.39" y="-375.73" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">Session + window sources</text>
+<text text-anchor="middle" x="260.39" y="-358.48" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">main.cpp · windows/*.cpp</text>
+</g>
+
+<g id="node2" class="node">
+<title>platform</title>
+<path fill="#1e293b" stroke="#60a5fa" stroke-width="1.4" d="M402.04,-314.61C402.04,-314.61 118.75,-314.61 118.75,-314.61 112.75,-314.61 106.75,-308.61 106.75,-302.61 106.75,-302.61 106.75,-276.27 106.75,-276.27 106.75,-270.27 112.75,-264.27 118.75,-264.27 118.75,-264.27 402.04,-264.27 402.04,-264.27 408.04,-264.27 414.04,-270.27 414.04,-276.27 414.04,-276.27 414.04,-302.61 414.04,-302.61 414.04,-308.61 408.04,-314.61 402.04,-314.61" />
+<text text-anchor="middle" x="260.39" y="-293.39" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">Memento platform layer</text>
+<text text-anchor="middle" x="260.39" y="-276.14" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">Window · drawing context · bitmap · font</text>
+</g>
+
+<g id="edge1" class="edge">
+<title>ui-&gt;platform</title>
+<path fill="none" stroke="#94a3b8" stroke-width="1.2" d="M260.39,-346.24C260.39,-339.14 260.39,-331.27 260.39,-323.74" />
+<polygon fill="#94a3b8" stroke="#94a3b8" stroke-width="1.2" points="262.85,-323.92 260.4,-316.92 257.95,-323.92 262.85,-323.92" />
+</g>
+
+<g id="node3" class="node">
+<title>backend</title>
+<path fill="#1e293b" stroke="#60a5fa" stroke-width="1.4" d="M380.29,-232.27C380.29,-232.27 140.5,-232.27 140.5,-232.27 134.5,-232.27 128.5,-226.27 128.5,-220.27 128.5,-220.27 128.5,-193.93 128.5,-193.93 128.5,-187.93 134.5,-181.93 140.5,-181.93 140.5,-181.93 380.29,-181.93 380.29,-181.93 386.29,-181.93 392.29,-187.93 392.29,-193.93 392.29,-193.93 392.29,-220.27 392.29,-220.27 392.29,-226.27 386.29,-232.27 380.29,-232.27" />
+<text text-anchor="middle" x="260.39" y="-211.05" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">r2 backend + libc++r2</text>
+<text text-anchor="middle" x="260.39" y="-193.8" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">Window manager · drawing · input</text>
+</g>
+
+<g id="edge2" class="edge">
+<title>platform-&gt;backend</title>
+<path fill="none" stroke="#94a3b8" stroke-width="1.2" d="M260.39,-263.9C260.39,-256.8 260.39,-248.93 260.39,-241.4" />
+<polygon fill="#94a3b8" stroke="#94a3b8" stroke-width="1.2" points="262.85,-241.58 260.4,-234.58 257.95,-241.58 262.85,-241.58" />
+</g>
+
+<g id="node4" class="node">
+<title>display</title>
+<path fill="#1e293b" stroke="#fbbf24" stroke-width="1.4" d="M272.79,-58.97C272.79,-58.97 12,-58.97 12,-58.97 6,-58.97 0,-52.97 0,-46.97 0,-46.97 0,-20.62 0,-20.62 0,-14.62 6,-8.62 12,-8.62 12,-8.62 272.79,-8.62 272.79,-8.62 278.79,-8.62 284.79,-14.62 284.79,-20.62 284.79,-20.62 284.79,-46.97 284.79,-46.97 284.79,-52.97 278.79,-58.97 272.79,-58.97" />
+<text text-anchor="middle" x="142.4" y="-37.75" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">Display</text>
+<text text-anchor="middle" x="142.4" y="-20.5" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">VGA 640×400×16 / RGB framebuffer</text>
+</g>
+
+<g id="edge3" class="edge">
+<title>backend-&gt;display</title>
+<path fill="none" stroke="#94a3b8" stroke-width="1.2" d="M242.75,-181.58C235.74,-171.77 227.63,-160.35 220.4,-149.93 200.88,-121.84 179.08,-89.58 163.5,-66.37" />
+<polygon fill="#94a3b8" stroke="#94a3b8" stroke-width="1.2" points="165.61,-65.12 159.68,-60.67 161.54,-67.85 165.61,-65.12" />
+</g>
+
+<g id="node5" class="node">
+<title>host</title>
+<path fill="#1e293b" stroke="#2dd4bf" stroke-width="1.4" d="M515.79,-149.93C515.79,-149.93 243,-149.93 243,-149.93 237,-149.93 231,-143.93 231,-137.93 231,-137.93 231,-111.59 231,-111.59 231,-105.59 237,-99.59 243,-99.59 243,-99.59 515.79,-99.59 515.79,-99.59 521.79,-99.59 527.79,-105.59 527.79,-111.59 527.79,-111.59 527.79,-137.93 527.79,-137.93 527.79,-143.93 521.79,-149.93 515.79,-149.93" />
+<text text-anchor="middle" x="379.39" y="-128.71" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">Hosted-window bridge</text>
+<text text-anchor="middle" x="379.39" y="-111.46" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">Shared user-heap input + frame blocks</text>
+</g>
+
+<g id="edge4" class="edge">
+<title>backend-&gt;host</title>
+<path fill="none" stroke="#94a3b8" stroke-width="1.2" d="M296.75,-181.56C309.09,-173.23 323,-163.83 335.85,-155.16" />
+<polygon fill="#94a3b8" stroke="#94a3b8" stroke-width="1.2" points="336.92,-157.39 341.35,-151.44 334.18,-153.33 336.92,-157.39" />
+</g>
+
+<g id="node6" class="node">
+<title>children</title>
+<path fill="#1e293b" stroke="#60a5fa" stroke-width="1.4" d="M552.29,-67.59C552.29,-67.59 318.5,-67.59 318.5,-67.59 312.5,-67.59 306.5,-61.59 306.5,-55.59 306.5,-55.59 306.5,-12 306.5,-12 306.5,-6 312.5,0 318.5,0 318.5,0 552.29,0 552.29,0 558.29,0 564.29,-6 564.29,-12 564.29,-12 564.29,-55.59 564.29,-55.59 564.29,-61.59 558.29,-67.59 552.29,-67.59" />
+<text text-anchor="middle" x="435.39" y="-46.37" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">Separate child processes</text>
+<text text-anchor="middle" x="435.39" y="-29.12" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">sh · r2web · jug · tcpp · theM</text>
+<text text-anchor="middle" x="435.39" y="-11.87" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">c8 · mpegplay · spotify · telegram</text>
+</g>
+
+<g id="edge5" class="edge">
+<title>host-&gt;children</title>
+<path fill="none" stroke="#94a3b8" stroke-width="1.2" d="M394.7,-99.45C399.36,-92.04 404.62,-83.69 409.76,-75.51" />
+<polygon fill="#94a3b8" stroke="#94a3b8" stroke-width="1.2" points="411.82,-76.85 413.48,-69.62 407.67,-74.24 411.82,-76.85" />
+</g>
+</g>
+</svg>

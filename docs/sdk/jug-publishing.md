@@ -79,6 +79,12 @@ elsewhere. Configure Jug's `repo` to match if you change the public root.
 
 ## Publication order and recovery
 
+[![Jug publication snapshots and validates local ELF bytes, verifies SSH staging, locks and merges the catalog, flushes immutable versions, commits sums.txt last, then checks public HTTP downloads.](../assets/diagrams/jug-publication.svg)](../assets/diagrams/jug-publication.svg)
+
+*Publication order. Interruptions before the catalog rename leave the previous
+catalog live. Public verification runs after commit, so its failure does not
+undo a completed publication.*
+
 The publisher snapshots local bytes before connecting, computes SHA-256, and
 checks the ELF structure. The receiver stages and independently verifies the
 upload, then acquires `.jug-publish.lock` before reading and merging the current

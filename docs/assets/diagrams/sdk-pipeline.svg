@@ -1,0 +1,104 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="562pt" height="505pt" viewBox="0.00 0.00 562.12 505.24" role="img" aria-labelledby="sdk-pipeline-title sdk-pipeline-description">
+<title id="sdk-pipeline-title">SDK build and execution pipeline</title><desc id="sdk-pipeline-description">C, C++ and TinyGo programs use their libraries and target configuration to produce a static ELF64 image. The image is staged on a boot medium or downloaded by Jug, loaded into a slot's private frame, and calls the kernel through int 0x7f.</desc><g id="graph0" class="graph" transform="scale(1 1) rotate(0) translate(21.6 483.64)">
+<title>sdk</title>
+<polygon fill="#0f172a" stroke="none" points="-21.6,21.6 -21.6,-483.64 540.51,-483.64 540.51,21.6 -21.6,21.6" />
+
+<g id="node1" class="node">
+<title>c</title>
+<path fill="#1e293b" stroke="#60a5fa" stroke-width="1.4" d="M98.79,-462.04C98.79,-462.04 12,-462.04 12,-462.04 6,-462.04 0,-456.04 0,-450.04 0,-450.04 0,-423.7 0,-423.7 0,-417.7 6,-411.7 12,-411.7 12,-411.7 98.79,-411.7 98.79,-411.7 104.79,-411.7 110.79,-417.7 110.79,-423.7 110.79,-423.7 110.79,-450.04 110.79,-450.04 110.79,-456.04 104.79,-462.04 98.79,-462.04" />
+<text text-anchor="middle" x="55.39" y="-440.82" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">C</text>
+<text text-anchor="middle" x="55.39" y="-423.57" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">libcr2 + crt0</text>
+</g>
+
+<g id="node4" class="node">
+<title>elf</title>
+<path fill="#1e293b" stroke="#60a5fa" stroke-width="1.4" d="M330.66,-379.7C330.66,-379.7 96.12,-379.7 96.12,-379.7 90.12,-379.7 84.12,-373.7 84.12,-367.7 84.12,-367.7 84.12,-341.36 84.12,-341.36 84.12,-335.36 90.12,-329.36 96.12,-329.36 96.12,-329.36 330.66,-329.36 330.66,-329.36 336.66,-329.36 342.66,-335.36 342.66,-341.36 342.66,-341.36 342.66,-367.7 342.66,-367.7 342.66,-373.7 336.66,-379.7 330.66,-379.7" />
+<text text-anchor="middle" x="213.39" y="-358.48" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">Static ELF64 x86-64</text>
+<text text-anchor="middle" x="213.39" y="-341.23" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">Linked for the user image window</text>
+</g>
+
+<g id="edge1" class="edge">
+<title>c-&gt;elf</title>
+<path fill="none" stroke="#94a3b8" stroke-width="1.2" d="M103.66,-411.33C120.65,-402.69 139.89,-392.9 157.47,-383.97" />
+<polygon fill="#94a3b8" stroke="#94a3b8" stroke-width="1.2" points="158.13,-386.38 163.26,-381.02 155.91,-382.01 158.13,-386.38" />
+</g>
+
+<g id="node2" class="node">
+<title>cpp</title>
+<path fill="#1e293b" stroke="#60a5fa" stroke-width="1.4" d="M282.29,-462.04C282.29,-462.04 144.5,-462.04 144.5,-462.04 138.5,-462.04 132.5,-456.04 132.5,-450.04 132.5,-450.04 132.5,-423.7 132.5,-423.7 132.5,-417.7 138.5,-411.7 144.5,-411.7 144.5,-411.7 282.29,-411.7 282.29,-411.7 288.29,-411.7 294.29,-417.7 294.29,-423.7 294.29,-423.7 294.29,-450.04 294.29,-450.04 294.29,-456.04 288.29,-462.04 282.29,-462.04" />
+<text text-anchor="middle" x="213.39" y="-440.82" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">C++</text>
+<text text-anchor="middle" x="213.39" y="-423.57" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">libc++r2 + runtime</text>
+</g>
+
+<g id="edge2" class="edge">
+<title>cpp-&gt;elf</title>
+<path fill="none" stroke="#94a3b8" stroke-width="1.2" d="M213.39,-411.33C213.39,-404.23 213.39,-396.36 213.39,-388.83" />
+<polygon fill="#94a3b8" stroke="#94a3b8" stroke-width="1.2" points="215.85,-389.01 213.4,-382.01 210.95,-389.01 215.85,-389.01" />
+</g>
+
+<g id="node3" class="node">
+<title>go</title>
+<path fill="#1e293b" stroke="#60a5fa" stroke-width="1.4" d="M506.91,-462.04C506.91,-462.04 327.88,-462.04 327.88,-462.04 321.88,-462.04 315.88,-456.04 315.88,-450.04 315.88,-450.04 315.88,-423.7 315.88,-423.7 315.88,-417.7 321.88,-411.7 327.88,-411.7 327.88,-411.7 506.91,-411.7 506.91,-411.7 512.91,-411.7 518.91,-417.7 518.91,-423.7 518.91,-423.7 518.91,-450.04 518.91,-450.04 518.91,-456.04 512.91,-462.04 506.91,-462.04" />
+<text text-anchor="middle" x="417.39" y="-440.82" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">TinyGo</text>
+<text text-anchor="middle" x="417.39" y="-423.57" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">libgor2 + tinygo-r2 target</text>
+</g>
+
+<g id="edge3" class="edge">
+<title>go-&gt;elf</title>
+<path fill="none" stroke="#94a3b8" stroke-width="1.2" d="M354.8,-411.22C332.38,-402.39 306.96,-392.38 283.91,-383.3" />
+<polygon fill="#94a3b8" stroke="#94a3b8" stroke-width="1.2" points="284.97,-381.09 277.56,-380.8 283.18,-385.64 284.97,-381.09" />
+</g>
+
+<g id="node5" class="node">
+<title>media</title>
+<path fill="#1e293b" stroke="#60a5fa" stroke-width="1.4" d="M305.16,-297.36C305.16,-297.36 121.62,-297.36 121.62,-297.36 115.62,-297.36 109.62,-291.36 109.62,-285.36 109.62,-285.36 109.62,-259.02 109.62,-259.02 109.62,-253.02 115.62,-247.02 121.62,-247.02 121.62,-247.02 305.16,-247.02 305.16,-247.02 311.16,-247.02 317.16,-253.02 317.16,-259.02 317.16,-259.02 317.16,-285.36 317.16,-285.36 317.16,-291.36 311.16,-297.36 305.16,-297.36" />
+<text text-anchor="middle" x="213.39" y="-276.14" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">Stage in boot medium bin/</text>
+<text text-anchor="middle" x="213.39" y="-258.89" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">Or install with Jug</text>
+</g>
+
+<g id="edge4" class="edge">
+<title>elf-&gt;media</title>
+<path fill="none" stroke="#94a3b8" stroke-width="1.2" d="M213.39,-328.99C213.39,-321.89 213.39,-314.02 213.39,-306.49" />
+<polygon fill="#94a3b8" stroke="#94a3b8" stroke-width="1.2" points="215.85,-306.67 213.4,-299.67 210.95,-306.67 215.85,-306.67" />
+</g>
+
+<g id="node6" class="node">
+<title>loader</title>
+<path fill="#1e293b" stroke="#60a5fa" stroke-width="1.4" d="M342.29,-215.02C342.29,-215.02 84.5,-215.02 84.5,-215.02 78.5,-215.02 72.5,-209.02 72.5,-203.02 72.5,-203.02 72.5,-176.68 72.5,-176.68 72.5,-170.68 78.5,-164.68 84.5,-164.68 84.5,-164.68 342.29,-164.68 342.29,-164.68 348.29,-164.68 354.29,-170.68 354.29,-176.68 354.29,-176.68 354.29,-203.02 354.29,-203.02 354.29,-209.02 348.29,-215.02 342.29,-215.02" />
+<text text-anchor="middle" x="213.39" y="-193.8" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">r2 ELF loader</text>
+<text text-anchor="middle" x="213.39" y="-176.55" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">Allocate slot → load segments + argv</text>
+</g>
+
+<g id="edge5" class="edge">
+<title>media-&gt;loader</title>
+<path fill="none" stroke="#94a3b8" stroke-width="1.2" d="M213.39,-246.65C213.39,-239.55 213.39,-231.68 213.39,-224.15" />
+<polygon fill="#94a3b8" stroke="#94a3b8" stroke-width="1.2" points="215.85,-224.33 213.4,-217.33 210.95,-224.33 215.85,-224.33" />
+</g>
+
+<g id="node7" class="node">
+<title>process</title>
+<path fill="#1e293b" stroke="#2dd4bf" stroke-width="1.4" d="M325.79,-132.68C325.79,-132.68 101,-132.68 101,-132.68 95,-132.68 89,-126.68 89,-120.68 89,-120.68 89,-94.34 89,-94.34 89,-88.34 95,-82.34 101,-82.34 101,-82.34 325.79,-82.34 325.79,-82.34 331.79,-82.34 337.79,-88.34 337.79,-94.34 337.79,-94.34 337.79,-120.68 337.79,-120.68 337.79,-126.68 331.79,-132.68 325.79,-132.68" />
+<text text-anchor="middle" x="213.39" y="-111.46" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">Ring-3 program</text>
+<text text-anchor="middle" x="213.39" y="-94.21" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">Private 2 MiB image + slot stack</text>
+</g>
+
+<g id="edge6" class="edge">
+<title>loader-&gt;process</title>
+<path fill="none" stroke="#94a3b8" stroke-width="1.2" d="M213.39,-164.31C213.39,-157.21 213.39,-149.34 213.39,-141.81" />
+<polygon fill="#94a3b8" stroke="#94a3b8" stroke-width="1.2" points="215.85,-141.99 213.4,-134.99 210.95,-141.99 215.85,-141.99" />
+</g>
+
+<g id="node8" class="node">
+<title>abi</title>
+<path fill="#1e293b" stroke="#c4b5fd" stroke-width="1.4" d="M285.66,-50.34C285.66,-50.34 141.12,-50.34 141.12,-50.34 135.12,-50.34 129.12,-44.34 129.12,-38.34 129.12,-38.34 129.12,-12 129.12,-12 129.12,-6 135.12,0 141.12,0 141.12,0 285.66,0 285.66,0 291.66,0 297.66,-6 297.66,-12 297.66,-12 297.66,-38.34 297.66,-38.34 297.66,-44.34 291.66,-50.34 285.66,-50.34" />
+<text text-anchor="middle" x="213.39" y="-29.12" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">SDK syscall wrapper</text>
+<text text-anchor="middle" x="213.39" y="-11.87" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">int 0x7f → kernel ABI</text>
+</g>
+
+<g id="edge7" class="edge">
+<title>process-&gt;abi</title>
+<path fill="none" stroke="#94a3b8" stroke-width="1.2" d="M213.39,-81.97C213.39,-74.87 213.39,-67 213.39,-59.47" />
+<polygon fill="#94a3b8" stroke="#94a3b8" stroke-width="1.2" points="215.85,-59.65 213.4,-52.65 210.95,-59.65 215.85,-59.65" />
+</g>
+</g>
+</svg>

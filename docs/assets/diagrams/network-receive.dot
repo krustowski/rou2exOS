@@ -1,0 +1,19 @@
+// Title: NIC receive ownership and backpressure
+// Description: Every timer tick polls up to 16 frames. A frame is peeked, routed and copied to an owned buffer, then queued before the NIC ring is consumed. Queue failure holds the frame for retry; an unresponsive receiver has a 200-tick limit. Receive copies the frame and frees its buffer.
+digraph receive {
+  tick [label="PIT tick · 1000 Hz\nPoll up to 16 frames before scheduling"];
+  peek [label="Peek NIC RX-ring head\nSelect TCP owner / wgd / global driver"];
+  queue [label="Reserve + copy into FRAME_BUF\nTry enqueue + wake receiver"];
+  consume [label="Queued successfully\nConsume NIC ring entry", color="#2dd4bf"];
+  hold [label="Buffer / queue / lock unavailable\nHold ring head; retry next tick", color="#fbbf24"];
+  drop [label="Unresponsive receiver: 200 ticks\nDrop held frame", color="#fbbf24"];
+  read [label="Userland receive · syscall 0x35\nCopy frame → release FRAME_BUF slot"];
+  tick -> peek -> queue;
+  queue -> consume [label="success"];
+  queue -> hold [label="cannot queue"];
+  hold -> peek [label="retry", constraint=false];
+  hold -> drop [label="timeout"];
+  consume -> read;
+  { rank=same; consume; hold; }
+  { rank=same; read; drop; }
+}

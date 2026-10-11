@@ -1,0 +1,109 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="862pt" height="537pt" viewBox="0.00 0.00 861.76 536.74" role="img" aria-labelledby="network-transmit-title network-transmit-description">
+<title id="network-transmit-title">Ethernet transmit routing order</title><desc id="network-transmit-description">Raw Ethernet send checks tunnel routing before loopback and the physical NIC. A tunnel-selected frame is queued to wgd or returns Busy. A local frame is delivered without the NIC. Remaining frames go to the selected NIC backend.</desc><g id="graph0" class="graph" transform="scale(1 1) rotate(0) translate(21.6 515.14)">
+<title>transmit</title>
+<polygon fill="#0f172a" stroke="none" points="-21.6,21.6 -21.6,-515.14 840.16,-515.14 840.16,21.6 -21.6,21.6" />
+
+<g id="node1" class="node">
+<title>send</title>
+<path fill="#1e293b" stroke="#60a5fa" stroke-width="1.4" d="M286.93,-493.54C286.93,-493.54 86.14,-493.54 86.14,-493.54 80.14,-493.54 74.14,-487.54 74.14,-481.54 74.14,-481.54 74.14,-455.2 74.14,-455.2 74.14,-449.2 80.14,-443.2 86.14,-443.2 86.14,-443.2 286.93,-443.2 286.93,-443.2 292.93,-443.2 298.93,-449.2 298.93,-455.2 298.93,-455.2 298.93,-481.54 298.93,-481.54 298.93,-487.54 292.93,-493.54 286.93,-493.54" />
+<text text-anchor="middle" x="186.54" y="-472.32" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">Userland raw Ethernet frame</text>
+<text text-anchor="middle" x="186.54" y="-455.07" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">Syscall 0x34 · arg1 = 0x04</text>
+</g>
+
+<g id="node2" class="node">
+<title>tunnel</title>
+<path fill="#1e293b" stroke="#60a5fa" stroke-width="1.4" d="M174.95,-407.07C174.95,-407.07 11.59,-362.99 11.59,-362.99 5.79,-361.42 5.79,-358.3 11.59,-356.73 11.59,-356.73 174.95,-312.65 174.95,-312.65 180.75,-311.08 192.33,-311.08 198.13,-312.65 198.13,-312.65 361.49,-356.73 361.49,-356.73 367.29,-358.3 367.29,-361.42 361.49,-362.99 361.49,-362.99 198.13,-407.07 198.13,-407.07 192.33,-408.64 180.75,-408.64 174.95,-407.07" />
+<text text-anchor="middle" x="186.54" y="-363.81" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">Tunnel source +</text>
+<text text-anchor="middle" x="186.54" y="-346.56" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">AllowedIPs destination?</text>
+</g>
+
+<g id="edge1" class="edge">
+<title>send-&gt;tunnel</title>
+<path fill="none" stroke="#94a3b8" stroke-width="1.2" d="M186.54,-442.93C186.54,-435.73 186.54,-427.52 186.54,-419.15" />
+<polygon fill="#94a3b8" stroke="#94a3b8" stroke-width="1.2" points="188.99,-419.21 186.54,-412.21 184.09,-419.21 188.99,-419.21" />
+</g>
+
+<g id="node3" class="node">
+<title>wgd</title>
+<path fill="#1e293b" stroke="#c4b5fd" stroke-width="1.4" d="M256.43,-264.02C256.43,-264.02 70.64,-264.02 70.64,-264.02 64.64,-264.02 58.64,-258.02 58.64,-252.02 58.64,-252.02 58.64,-208.43 58.64,-208.43 58.64,-202.43 64.64,-196.43 70.64,-196.43 70.64,-196.43 256.43,-196.43 256.43,-196.43 262.43,-196.43 268.43,-202.43 268.43,-208.43 268.43,-208.43 268.43,-252.02 268.43,-252.02 268.43,-258.02 262.43,-264.02 256.43,-264.02" />
+<text text-anchor="middle" x="163.54" y="-242.8" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">Queue to wgd</text>
+<text text-anchor="middle" x="163.54" y="-225.55" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">Encrypt → send outer UDP</text>
+<text text-anchor="middle" x="163.54" y="-208.3" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">Queue failure returns Busy</text>
+</g>
+
+<g id="edge2" class="edge">
+<title>tunnel-&gt;wgd</title>
+<path fill="none" stroke="#94a3b8" stroke-width="1.2" d="M177.98,-311.33C175.71,-298.79 173.29,-285.34 171.09,-273.11" />
+<polygon fill="#94a3b8" stroke="#94a3b8" stroke-width="1.2" points="173.5,-272.7 169.85,-266.25 168.68,-273.57 173.5,-272.7" />
+<text text-anchor="middle" x="184.1" y="-283.07" font-family="DejaVu Sans" font-size="11.00" fill="#cbd5e1">yes</text>
+</g>
+
+<g id="node4" class="node">
+<title>loopback</title>
+<path fill="#1e293b" stroke="#60a5fa" stroke-width="1.4" d="M425.83,-260.69C425.83,-260.69 301.71,-232.85 301.71,-232.85 295.85,-231.54 295.85,-228.91 301.71,-227.6 301.71,-227.6 425.83,-199.76 425.83,-199.76 431.69,-198.45 443.39,-198.45 449.25,-199.76 449.25,-199.76 573.37,-227.6 573.37,-227.6 579.23,-228.91 579.23,-231.54 573.37,-232.85 573.37,-232.85 449.25,-260.69 449.25,-260.69 443.39,-262 431.69,-262 425.83,-260.69" />
+<text text-anchor="middle" x="437.54" y="-225.55" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">Local destination?</text>
+</g>
+
+<g id="edge3" class="edge">
+<title>tunnel-&gt;loopback</title>
+<path fill="none" stroke="#94a3b8" stroke-width="1.2" d="M250.53,-326.32C292.33,-305.06 346.23,-277.66 385.42,-257.73" />
+<polygon fill="#94a3b8" stroke="#94a3b8" stroke-width="1.2" points="386.3,-260.03 391.43,-254.67 384.08,-255.66 386.3,-260.03" />
+<text text-anchor="middle" x="341.27" y="-283.07" font-family="DejaVu Sans" font-size="11.00" fill="#cbd5e1">no</text>
+</g>
+
+<g id="node5" class="node">
+<title>local</title>
+<path fill="#1e293b" stroke="#2dd4bf" stroke-width="1.4" d="M436.18,-150.93C436.18,-150.93 290.89,-150.93 290.89,-150.93 284.89,-150.93 278.89,-144.93 278.89,-138.93 278.89,-138.93 278.89,-112.59 278.89,-112.59 278.89,-106.59 284.89,-100.59 290.89,-100.59 290.89,-100.59 436.18,-100.59 436.18,-100.59 442.18,-100.59 448.18,-106.59 448.18,-112.59 448.18,-112.59 448.18,-138.93 448.18,-138.93 448.18,-144.93 442.18,-150.93 436.18,-150.93" />
+<text text-anchor="middle" x="363.54" y="-129.71" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">Loopback delivery</text>
+<text text-anchor="middle" x="363.54" y="-112.46" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">Process frame queue</text>
+</g>
+
+<g id="edge4" class="edge">
+<title>loopback-&gt;local</title>
+<path fill="none" stroke="#94a3b8" stroke-width="1.2" d="M417.32,-201.23C407.7,-187.9 396.16,-171.93 386.24,-158.19" />
+<polygon fill="#94a3b8" stroke="#94a3b8" stroke-width="1.2" points="388.37,-156.95 382.28,-152.71 384.39,-159.82 388.37,-156.95" />
+<text text-anchor="middle" x="410.29" y="-169.98" font-family="DejaVu Sans" font-size="11.00" fill="#cbd5e1">yes</text>
+</g>
+
+<g id="node6" class="node">
+<title>nic</title>
+<path fill="#1e293b" stroke="#fbbf24" stroke-width="1.4" d="M742.93,-150.93C742.93,-150.93 482.14,-150.93 482.14,-150.93 476.14,-150.93 470.14,-144.93 470.14,-138.93 470.14,-138.93 470.14,-112.59 470.14,-112.59 470.14,-106.59 476.14,-100.59 482.14,-100.59 482.14,-100.59 742.93,-100.59 742.93,-100.59 748.93,-100.59 754.93,-106.59 754.93,-112.59 754.93,-112.59 754.93,-138.93 754.93,-138.93 754.93,-144.93 748.93,-150.93 742.93,-150.93" />
+<text text-anchor="middle" x="612.54" y="-129.71" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">Physical NIC</text>
+<text text-anchor="middle" x="612.54" y="-112.46" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">Pad to ≥60 bytes → selected backend</text>
+</g>
+
+<g id="edge5" class="edge">
+<title>loopback-&gt;nic</title>
+<path fill="none" stroke="#94a3b8" stroke-width="1.2" d="M477.69,-205.72C503.05,-190.87 536.02,-171.57 563,-155.76" />
+<polygon fill="#94a3b8" stroke="#94a3b8" stroke-width="1.2" points="564.07,-157.98 568.88,-152.33 561.6,-153.75 564.07,-157.98" />
+<text text-anchor="middle" x="547.46" y="-169.98" font-family="DejaVu Sans" font-size="11.00" fill="#cbd5e1">no</text>
+</g>
+
+<g id="node7" class="node">
+<title>rtl</title>
+<path fill="#1e293b" stroke="#60a5fa" stroke-width="1.4" d="M614.56,-67.59C614.56,-67.59 366.52,-67.59 366.52,-67.59 360.52,-67.59 354.52,-61.59 354.52,-55.59 354.52,-55.59 354.52,-12 354.52,-12 354.52,-6 360.52,0 366.52,0 366.52,0 614.56,0 614.56,0 620.56,0 626.56,-6 626.56,-12 626.56,-12 626.56,-55.59 626.56,-55.59 626.56,-61.59 620.56,-67.59 614.56,-67.59" />
+<text text-anchor="middle" x="490.54" y="-46.37" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">RTL8139</text>
+<text text-anchor="middle" x="490.54" y="-29.12" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">Copy TX buffer → TxAddr / TxStatus</text>
+<text text-anchor="middle" x="490.54" y="-11.87" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">Advance one of 4 descriptors</text>
+</g>
+
+<g id="edge6" class="edge">
+<title>nic-&gt;rtl</title>
+<path fill="none" stroke="#94a3b8" stroke-width="1.2" d="M579.2,-100.18C567.77,-91.75 554.7,-82.11 542.17,-72.87" />
+<polygon fill="#94a3b8" stroke="#94a3b8" stroke-width="1.2" points="543.83,-71.04 536.74,-68.86 540.92,-74.99 543.83,-71.04" />
+</g>
+
+<g id="node8" class="node">
+<title>intel</title>
+<path fill="#1e293b" stroke="#60a5fa" stroke-width="1.4" d="M806.56,-58.97C806.56,-58.97 660.52,-58.97 660.52,-58.97 654.52,-58.97 648.52,-52.97 648.52,-46.97 648.52,-46.97 648.52,-20.62 648.52,-20.62 648.52,-14.62 654.52,-8.62 660.52,-8.62 660.52,-8.62 806.56,-8.62 806.56,-8.62 812.56,-8.62 818.56,-14.62 818.56,-20.62 818.56,-20.62 818.56,-46.97 818.56,-46.97 818.56,-52.97 812.56,-58.97 806.56,-58.97" />
+<text text-anchor="middle" x="733.54" y="-37.75" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">Intel backend</text>
+<text text-anchor="middle" x="733.54" y="-20.5" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">Submit TX descriptor</text>
+</g>
+
+<g id="edge7" class="edge">
+<title>nic-&gt;intel</title>
+<path fill="none" stroke="#94a3b8" stroke-width="1.2" d="M645.6,-100.18C660.41,-89.17 678,-76.09 693.54,-64.54" />
+<polygon fill="#94a3b8" stroke="#94a3b8" stroke-width="1.2" points="694.9,-66.58 699.06,-60.43 691.98,-62.64 694.9,-66.58" />
+</g>
+</g>
+</svg>

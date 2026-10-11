@@ -33,6 +33,11 @@ All values passed into a syscall are 64-bit.
 
 ### Entry Stub
 
+[![The SDK supplies syscall registers, int 0x7f enters ring 0, the stub dispatches to syscall_inner, and iretq returns with the result in RAX and R9 clobbered.](../assets/diagrams/syscall-roundtrip.svg)](../assets/diagrams/syscall-roundtrip.svg)
+
+*The ring-3 to ring-0 round trip. The dispatcher can be preempted after it
+re-enables interrupts; the caller resumes when the stub returns.*
+
 The interrupt gate for `0x7f` is a naked stub (`syscall_handler` in `src/abi/syscall.rs`) that saves the general-purpose registers, calls the dispatcher `syscall_inner(arg1, arg2, syscall_no, arg3)` and returns with `iretq`:
 
 ```

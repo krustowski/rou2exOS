@@ -1,0 +1,130 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="771pt" height="369pt" viewBox="0.00 0.00 770.82 368.57" role="img" aria-labelledby="process-states-title process-states-description">
+<title id="process-states-title">Process states and slot reuse</title><desc id="process-states-description">A free slot becomes Ready, then Running. Preemption returns it to Ready; sleep or receive blocks it; a foreground launcher waits Idle. Exit or kill marks Dead and reaps the slot. A crash retains a Crashed slot until reused when the table is full.</desc><g id="graph0" class="graph" transform="scale(1 1) rotate(0) translate(21.6 346.97)">
+<title>states</title>
+<polygon fill="#0f172a" stroke="none" points="-21.6,21.6 -21.6,-346.97 749.22,-346.97 749.22,21.6 -21.6,21.6" />
+
+<g id="node1" class="node">
+<title>free</title>
+<path fill="#1e293b" stroke="#94a3b8" stroke-width="1.4" d="M68.79,-237.37C68.79,-237.37 12,-237.37 12,-237.37 6,-237.37 0,-231.37 0,-225.37 0,-225.37 0,-199.03 0,-199.03 0,-193.03 6,-187.03 12,-187.03 12,-187.03 68.79,-187.03 68.79,-187.03 74.79,-187.03 80.79,-193.03 80.79,-199.03 80.79,-199.03 80.79,-225.37 80.79,-225.37 80.79,-231.37 74.79,-237.37 68.79,-237.37" />
+<text text-anchor="middle" x="40.39" y="-216.15" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">Free slot</text>
+<text text-anchor="middle" x="40.39" y="-198.9" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">None</text>
+</g>
+
+<g id="node2" class="node">
+<title>ready</title>
+<path fill="#1e293b" stroke="#60a5fa" stroke-width="1.4" d="M201.83,-230.2C201.83,-230.2 160.04,-230.2 160.04,-230.2 154.04,-230.2 148.04,-224.2 148.04,-218.2 148.04,-218.2 148.04,-206.2 148.04,-206.2 148.04,-200.2 154.04,-194.2 160.04,-194.2 160.04,-194.2 201.83,-194.2 201.83,-194.2 207.83,-194.2 213.83,-200.2 213.83,-206.2 213.83,-206.2 213.83,-218.2 213.83,-218.2 213.83,-224.2 207.83,-230.2 201.83,-230.2" />
+<text text-anchor="middle" x="180.93" y="-207.53" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">Ready</text>
+</g>
+
+<g id="edge1" class="edge">
+<title>free-&gt;ready</title>
+<path fill="none" stroke="#94a3b8" stroke-width="1.2" d="M81.1,-212.2C99.24,-212.2 120.71,-212.2 138.99,-212.2" />
+<polygon fill="#94a3b8" stroke="#94a3b8" stroke-width="1.2" points="138.87,-214.65 145.87,-212.2 138.87,-209.75 138.87,-214.65" />
+<text text-anchor="middle" x="114.41" y="-215.25" font-family="DejaVu Sans" font-size="11.00" fill="#cbd5e1">create</text>
+</g>
+
+<g id="node3" class="node">
+<title>running</title>
+<path fill="#1e293b" stroke="#2dd4bf" stroke-width="1.4" d="M422.35,-230.2C422.35,-230.2 365.56,-230.2 365.56,-230.2 359.56,-230.2 353.56,-224.2 353.56,-218.2 353.56,-218.2 353.56,-206.2 353.56,-206.2 353.56,-200.2 359.56,-194.2 365.56,-194.2 365.56,-194.2 422.35,-194.2 422.35,-194.2 428.35,-194.2 434.35,-200.2 434.35,-206.2 434.35,-206.2 434.35,-218.2 434.35,-218.2 434.35,-224.2 428.35,-230.2 422.35,-230.2" />
+<text text-anchor="middle" x="393.95" y="-207.53" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">Running</text>
+</g>
+
+<g id="edge2" class="edge">
+<title>ready-&gt;running</title>
+<path fill="none" stroke="#94a3b8" stroke-width="1.2" d="M213.98,-212.2C248.71,-212.2 304.52,-212.2 344.59,-212.2" />
+<polygon fill="#94a3b8" stroke="#94a3b8" stroke-width="1.2" points="344.58,-214.65 351.58,-212.2 344.58,-209.75 344.58,-214.65" />
+<text text-anchor="middle" x="276.33" y="-215.25" font-family="DejaVu Sans" font-size="11.00" fill="#cbd5e1">selected</text>
+</g>
+
+<g id="edge3" class="edge">
+<title>running-&gt;ready</title>
+<path fill="none" stroke="#94a3b8" stroke-width="1.2" d="M353.26,-199.83C343.41,-197.29 332.82,-195 322.83,-193.7 281.84,-188.39 270.46,-186.13 229.83,-193.7 227.41,-194.16 224.95,-194.73 222.49,-195.38" />
+<polygon fill="#94a3b8" stroke="#94a3b8" stroke-width="1.2" points="221.91,-193 215.92,-197.38 223.33,-197.69 221.91,-193" />
+<text text-anchor="middle" x="276.33" y="-196.75" font-family="DejaVu Sans" font-size="11.00" fill="#cbd5e1">preempted</text>
+</g>
+
+<g id="node4" class="node">
+<title>blocked</title>
+<path fill="#1e293b" stroke="#60a5fa" stroke-width="1.4" d="M694.24,-325.37C694.24,-325.37 593.95,-325.37 593.95,-325.37 587.95,-325.37 581.95,-319.37 581.95,-313.37 581.95,-313.37 581.95,-287.03 581.95,-287.03 581.95,-281.03 587.95,-275.03 593.95,-275.03 593.95,-275.03 694.24,-275.03 694.24,-275.03 700.24,-275.03 706.24,-281.03 706.24,-287.03 706.24,-287.03 706.24,-313.37 706.24,-313.37 706.24,-319.37 700.24,-325.37 694.24,-325.37" />
+<text text-anchor="middle" x="644.1" y="-304.15" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">Blocked</text>
+<text text-anchor="middle" x="644.1" y="-286.9" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">Sleep / receive</text>
+</g>
+
+<g id="edge4" class="edge">
+<title>running-&gt;blocked</title>
+<path fill="none" stroke="#94a3b8" stroke-width="1.2" d="M434.49,-228.43C444.43,-232.39 455.11,-236.54 465.08,-240.2 500.63,-253.28 540.57,-266.84 573.6,-277.76" />
+<polygon fill="#94a3b8" stroke="#94a3b8" stroke-width="1.2" points="572.7,-280.04 580.12,-279.91 574.23,-275.39 572.7,-280.04" />
+<text text-anchor="middle" x="504.83" y="-270.55" font-family="DejaVu Sans" font-size="11.00" fill="#cbd5e1">wait</text>
+</g>
+
+<g id="node5" class="node">
+<title>idle</title>
+<path fill="#1e293b" stroke="#60a5fa" stroke-width="1.4" d="M715.62,-253.37C715.62,-253.37 572.58,-253.37 572.58,-253.37 566.58,-253.37 560.58,-247.37 560.58,-241.37 560.58,-241.37 560.58,-215.03 560.58,-215.03 560.58,-209.03 566.58,-203.03 572.58,-203.03 572.58,-203.03 715.62,-203.03 715.62,-203.03 721.62,-203.03 727.62,-209.03 727.62,-215.03 727.62,-215.03 727.62,-241.37 727.62,-241.37 727.62,-247.37 721.62,-253.37 715.62,-253.37" />
+<text text-anchor="middle" x="644.1" y="-232.15" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">Idle</text>
+<text text-anchor="middle" x="644.1" y="-214.9" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">Foreground launcher</text>
+</g>
+
+<g id="edge6" class="edge">
+<title>running-&gt;idle</title>
+<path fill="none" stroke="#94a3b8" stroke-width="1.2" d="M434.82,-214.77C466.22,-216.8 511.24,-219.7 551.4,-222.29" />
+<polygon fill="#94a3b8" stroke="#94a3b8" stroke-width="1.2" points="551.2,-224.73 558.34,-222.74 551.51,-219.84 551.2,-224.73" />
+<text text-anchor="middle" x="504.83" y="-224.69" font-family="DejaVu Sans" font-size="11.00" fill="#cbd5e1">launch fg child</text>
+</g>
+
+<g id="node6" class="node">
+<title>dead</title>
+<path fill="#1e293b" stroke="#fbbf24" stroke-width="1.4" d="M690.87,-181.37C690.87,-181.37 597.33,-181.37 597.33,-181.37 591.33,-181.37 585.33,-175.37 585.33,-169.37 585.33,-169.37 585.33,-143.03 585.33,-143.03 585.33,-137.03 591.33,-131.03 597.33,-131.03 597.33,-131.03 690.87,-131.03 690.87,-131.03 696.87,-131.03 702.87,-137.03 702.87,-143.03 702.87,-143.03 702.87,-169.37 702.87,-169.37 702.87,-175.37 696.87,-181.37 690.87,-181.37" />
+<text text-anchor="middle" x="644.1" y="-160.15" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">Dead</text>
+<text text-anchor="middle" x="644.1" y="-142.9" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">Awaiting reap</text>
+</g>
+
+<g id="edge8" class="edge">
+<title>running-&gt;dead</title>
+<path fill="none" stroke="#94a3b8" stroke-width="1.2" d="M434.82,-203.21C473.05,-194.58 531.47,-181.4 576.71,-171.18" />
+<polygon fill="#94a3b8" stroke="#94a3b8" stroke-width="1.2" points="577.23,-173.58 583.52,-169.65 576.15,-168.8 577.23,-173.58" />
+<text text-anchor="middle" x="504.83" y="-198.71" font-family="DejaVu Sans" font-size="11.00" fill="#cbd5e1">exit / kill</text>
+</g>
+
+<g id="node7" class="node">
+<title>crashed</title>
+<path fill="#1e293b" stroke="#fbbf24" stroke-width="1.4" d="M703.99,-109.37C703.99,-109.37 584.2,-109.37 584.2,-109.37 578.2,-109.37 572.2,-103.37 572.2,-97.37 572.2,-97.37 572.2,-71.03 572.2,-71.03 572.2,-65.03 578.2,-59.03 584.2,-59.03 584.2,-59.03 703.99,-59.03 703.99,-59.03 709.99,-59.03 715.99,-65.03 715.99,-71.03 715.99,-71.03 715.99,-97.37 715.99,-97.37 715.99,-103.37 709.99,-109.37 703.99,-109.37" />
+<text text-anchor="middle" x="644.1" y="-88.15" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">Crashed</text>
+<text text-anchor="middle" x="644.1" y="-70.9" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">Visible in task list</text>
+</g>
+
+<g id="edge9" class="edge">
+<title>running-&gt;crashed</title>
+<path fill="none" stroke="#94a3b8" stroke-width="1.2" d="M423.57,-193.71C431.96,-188.01 441.04,-181.55 449.08,-175.2 456.61,-169.26 457.01,-165.89 465.08,-160.7 495.61,-141.09 532.01,-124.43 563.92,-111.7" />
+<polygon fill="#94a3b8" stroke="#94a3b8" stroke-width="1.2" points="564.62,-114.06 570.24,-109.22 562.83,-109.5 564.62,-114.06" />
+<text text-anchor="middle" x="504.83" y="-163.75" font-family="DejaVu Sans" font-size="11.00" fill="#cbd5e1">fault</text>
+</g>
+
+<g id="edge5" class="edge">
+<title>blocked-&gt;ready</title>
+<path fill="none" stroke="#94a3b8" stroke-width="1.2" d="M581.82,-282.5C573.61,-277.75 566.13,-271.76 560.58,-264.2 541,-237.54 569.2,-138.3 544.58,-116.2 447.32,-28.89 279.69,-137.47 211.79,-188.47" />
+<polygon fill="#94a3b8" stroke="#94a3b8" stroke-width="1.2" points="210.31,-186.51 206.22,-192.7 213.27,-190.42 210.31,-186.51" />
+<text text-anchor="middle" x="393.95" y="-113.45" font-family="DejaVu Sans" font-size="11.00" fill="#cbd5e1">deadline / delivery</text>
+</g>
+
+<g id="edge7" class="edge">
+<title>idle-&gt;ready</title>
+<path fill="none" stroke="#94a3b8" stroke-width="1.2" d="M570.71,-202.6C566.94,-199.51 563.51,-196.06 560.58,-192.2 529.64,-151.46 583.19,-111.77 544.58,-78.2 491.69,-32.22 284.9,-54.85 229.83,-98.2 212.16,-112.11 222.3,-125.37 213.83,-146.2 208.42,-159.52 201.58,-173.93 195.62,-185.88" />
+<polygon fill="#94a3b8" stroke="#94a3b8" stroke-width="1.2" points="193.45,-184.74 192.48,-192.09 197.82,-186.95 193.45,-184.74" />
+<text text-anchor="middle" x="393.95" y="-63.57" font-family="DejaVu Sans" font-size="11.00" fill="#cbd5e1">child exits / crashes</text>
+</g>
+
+<g id="edge10" class="edge">
+<title>dead-&gt;free</title>
+<path fill="none" stroke="#94a3b8" stroke-width="1.2" d="M585.06,-139.29C575.82,-134.4 567.15,-128.16 560.58,-120.2 539.98,-95.27 569.68,-69.6 544.58,-49.2 487.48,-2.8 287.14,-24.01 229.83,-45.7 227.47,-46.6 130.13,-133.13 76.31,-181.08" />
+<polygon fill="#94a3b8" stroke="#94a3b8" stroke-width="1.2" points="74.92,-179.03 71.33,-185.52 78.18,-182.69 74.92,-179.03" />
+<text text-anchor="middle" x="276.33" y="-48.75" font-family="DejaVu Sans" font-size="11.00" fill="#cbd5e1">reap</text>
+</g>
+
+<g id="edge11" class="edge">
+<title>crashed-&gt;free</title>
+<path fill="none" stroke="#94a3b8" stroke-width="1.2" stroke-dasharray="5,2" d="M613.83,-58.8C595.3,-44.35 570.1,-27.53 544.58,-19.2 484.49,0.4 286.16,6.19 229.83,-8.7 189.4,-19.39 178.8,-26.88 148.04,-55.2 118.34,-82.55 119.48,-96.81 96.79,-130.2 85.75,-146.45 73.53,-164.53 63.38,-179.57" />
+<polygon fill="#94a3b8" stroke="#94a3b8" stroke-width="1.2" points="61.48,-178.01 59.59,-185.19 65.54,-180.75 61.48,-178.01" />
+<text text-anchor="middle" x="276.33" y="-11.75" font-family="DejaVu Sans" font-size="11.00" fill="#cbd5e1">reuse if table full</text>
+</g>
+</g>
+</svg>

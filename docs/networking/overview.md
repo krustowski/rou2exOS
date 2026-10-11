@@ -2,29 +2,10 @@
 
 ## Stack Layers
 
-```
-  Userland process
-       │  syscalls 0x33–0x37
-       ▼
-  ┌───────────────────────────────────────┐
-  │  Syscall dispatcher (abi/syscall.rs)  │
-  └───────────────┬───────────────────────┘
-                  │
-       ┌──────────▼──────────┐
-       │   netdrv.rs         │  routing table, driver/port registry
-       └──────────┬──────────┘
-                  │                        ┌────────────┐
-        ┌─────────▼──────────┐             │ serial.rs  │
-        │   nic.rs           │             │ + slip.rs  │  UART path
-        │ RTL8139 / Intel    │             └────────────┘
-        └─────────┬──────────┘
-                  │
-        ┌─────────▼───────────────────────────────────────┐
-        │  Protocol helpers (stateless, no global state)  │
-        │   ethernet.rs  arp.rs  ipv4.rs                  │
-        │   icmp.rs  tcp.rs  udp.rs                       │
-        └─────────────────────────────────────────────────┘
-```
+[![Userland TCP/IP stacks use packet syscalls; the kernel routes Ethernet to tunnel, loopback or physical NIC delivery, with a separate legacy serial SLIP path and stateless protocol helpers.](../assets/diagrams/network-layers.svg)](../assets/diagrams/network-layers.svg)
+
+*Stack responsibilities and transports. The kernel parses and routes packets;
+userland stacks own TCP connections and protocol state.*
 
 There are two hardware transport paths. A [userspace WireGuard tunnel](wireguard.md) can run over Ethernet alongside the physical network:
 
@@ -33,25 +14,16 @@ There are two hardware transport paths. A [userspace WireGuard tunnel](wireguard
 | **Ethernet** | RTL8139 or supported Intel PCI NIC | Ethernet II → IPv4/ARP | TX and RX |
 | **Serial/SLIP** | UART COM1 | SLIP-framed IPv4 | TX only (active), RX (loop-based) |
 
-![network-frame-routing](../assets/r2-network-frame-routing.png)
-
 ---
 
 ## Receive Path (Ethernet)
 
 Frames arrive via polling, not IRQ. On every PIT tick (1000 Hz) the scheduler calls `netdrv::poll_and_deliver()` before selecting the next runnable process:
 
-```
-PIT tick
-  → scheduler_schedule()
-    → netdrv::poll_and_deliver()
-      → nic::peek_frame()             the frame at the front of the RX ring, left there
-      → tcp_dest_port() / lookup_port()   whose it is: a bound service, else the driver
-      → a free FRAME_BUF slot             the frame is copied into a buffer of its own
-      → scheduler::try_push_msg(pid, msg) queued, and the target woken
-      → nic::consume_frame()          only now taken off the ring
-    (repeated for up to 16 frames a tick)
-```
+[![Each PIT tick peeks and routes the NIC ring head, reserves an owned frame buffer, queues it before consuming the NIC entry, and retries held frames when delivery is unavailable.](../assets/diagrams/network-receive.svg)](../assets/diagrams/network-receive.svg)
+
+*Buffer ownership and backpressure. Successful enqueue precedes NIC consumption;
+syscall `0x35` releases the owned frame buffer after copying it to userland.*
 
 Each queued frame has a 2 KiB buffer of its own, one of the 64 in `FRAME_BUF`, held for the receiving process until it copies the frame out with syscall `0x35`, which then frees it (so does the process's death, `release_process`). The `Message` carries the buffer's address in `buf_addr` and the frame length in `port_id`. Up to 16 frames are delivered per tick.
 
@@ -63,19 +35,13 @@ Until v0.11 there was one shared 2 KiB buffer, `NET_FRAME_BUF`, and one frame pe
 
 For Ethernet, userland calls syscall `0x34` with arg1 `0x04` (raw Ethernet). Argument 1 `0x01` uses the legacy serial/SLIP path instead:
 
-```
-syscall 0x34
-  → derive frame length from EtherType / IP total_length field
-  → tunnel::transmit(data, pid)     (tunnel-source frames to AllowedIPs go to wgd)
-  → loopback::transmit(data, pid)   (frames for this machine stop here)
-  → nic::send_frame(data, len)
-    → selected RTL8139 or Intel backend
-    (RTL8139 continues below)
-    → copy into TX_BUFFERS[TX_INDEX]
-    → write physical buffer address to TxAddr register
-    → write send_len to TxStatus register
-    → advance TX_INDEX (round-robin over 4 TX descriptors)
-```
+[![Raw Ethernet transmission checks tunnel routing first, then loopback, and finally the selected NIC; RTL8139 cycles through four TX descriptors.](../assets/diagrams/network-transmit.svg)](../assets/diagrams/network-transmit.svg)
+
+*Transmit routing order. Tunnel queue failure returns `Busy`; the selected inner
+packet does not fall through to a plaintext NIC send.*
+
+Before routing, the kernel derives the frame length from EtherType and the IPv4
+total-length field.
 
 Minimum Ethernet frame size (60 bytes) is enforced by zero-padding in `send_frame`.
 

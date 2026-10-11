@@ -1,0 +1,24 @@
+// Title: Process states and slot reuse
+// Description: A free slot becomes Ready, then Running. Preemption returns it to Ready; sleep or receive blocks it; a foreground launcher waits Idle. Exit or kill marks Dead and reaps the slot. A crash retains a Crashed slot until reused when the table is full.
+digraph states {
+  rankdir=LR;
+  free [label="Free slot\nNone", color="#94a3b8"];
+  ready [label="Ready"];
+  running [label="Running", color="#2dd4bf"];
+  blocked [label="Blocked\nSleep / receive"];
+  idle [label="Idle\nForeground launcher"];
+  dead [label="Dead\nAwaiting reap", color="#fbbf24"];
+  crashed [label="Crashed\nVisible in task list", color="#fbbf24"];
+  free -> ready [label="create"];
+  ready -> running [label="selected"];
+  running -> ready [label="preempted", constraint=false];
+  running -> blocked [label="wait"];
+  blocked -> ready [label="deadline / delivery", constraint=false];
+  running -> idle [label="launch fg child"];
+  idle -> ready [label="child exits / crashes", constraint=false];
+  running -> dead [label="exit / kill"];
+  running -> crashed [label="fault"];
+  dead -> free [label="reap", constraint=false];
+  crashed -> free [label="reuse if table full", style=dashed, constraint=false];
+  { rank=same; blocked; idle; dead; crashed; }
+}

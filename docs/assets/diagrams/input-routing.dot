@@ -1,0 +1,17 @@
+// Title: PS/2 input fan-out
+// Description: Keyboard IRQ1 feeds the shell scancode buffer and userland keyboard subscriptions. Mouse IRQ12 reassembles three-byte packets and feeds mouse subscriptions. Applications poll their subscribed buffers.
+digraph input {
+  keyboard [label="PS/2 keyboard\nIRQ1 → vector 0x21"];
+  mouse [label="PS/2 mouse\nIRQ12 → vector 0x2c"];
+  kh [label="keyboard_handler\nRead 8042 data port 0x60"];
+  mh [label="mouse_handler\nRead 8042 data port 0x60"];
+  shell [label="SCANCODE_BUF\nKernel shell", color="#c4b5fd"];
+  keys [label="Keyboard subscriber rings\nUp to 5 userland subscribers"];
+  packet [label="Reassemble 3-byte packet"];
+  mice [label="Mouse subscriber rings\nUp to 5 userland subscribers"];
+  app [label="Userland application\nPoll input pipes via syscall 0x03", color="#2dd4bf"];
+  { rank=same; keyboard; mouse; }
+  keyboard -> kh; mouse -> mh;
+  kh -> shell; kh -> keys; mh -> packet -> mice;
+  keys -> app; mice -> app;
+}

@@ -246,9 +246,18 @@ Lists the USB host controllers on the PCI bus (UHCI, OHCI, EHCI, xHCI) and wheth
 SMIs since power-on: 5214
 ```
 
-r2 has no USB stack: a USB keyboard and mouse work only because the firmware emulates PS/2 ones from System Management Mode, and it keeps every USB controller to do so. Each event on those controllers is an SMI, which stops the whole machine and which no PIC mask can stop. Pulling out a USB stick is one such event, and some firmware takes seconds over it. If the SMI count jumps across such a freeze, the freeze happened in the firmware.
+R2 has a native [xHCI USB keyboard driver](input/keyboard.md#usb-keyboards-xhci),
+enabled automatically on EFI boots or explicitly with `usb=xhci`. Other USB
+input still depends on firmware PS/2 emulation from System Management Mode.
+Events handled by that firmware can raise SMIs, stopping the whole machine
+regardless of PIC masks. If the SMI count jumps across a USB-related freeze,
+the freeze happened in the firmware.
 
-`usb take` takes every controller from the firmware the way Linux does at boot (`src/usb/`): it asks for ownership and waits up to a second, takes it anyway if the firmware does not answer (`taken by force`), turns the SMIs off and stops the controller. After that, pulling out a stick does nothing, and **a USB keyboard or mouse stops working until the next boot**. The `usb=os` kernel option does the same at boot (see [Taking USB from the Firmware](build.md#taking-usb-from-the-firmware)).
+`usb take` stops the native keyboard driver, asks for controller ownership and
+waits up to a second, takes it anyway if the firmware does not answer
+(`taken by force`), disables SMIs, and stops every controller. **USB input stops
+until the next boot.** The `usb=os` kernel option performs the same ownership-only
+handoff at boot (see [Taking USB from the Firmware](build.md#taking-usb-from-the-firmware)).
 
 ### `kill <pid>`
 

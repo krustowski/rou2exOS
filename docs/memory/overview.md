@@ -34,6 +34,14 @@ All addresses are 64-bit (x86-64) but the kernel only uses the lower 4 GiB. The 
 
 A drawing of all of this is in [memory-map.pdf](memory-map.pdf).
 
+### Fixed Pool Capacities
+
+[![Reserved capacities on a linear MiB scale: ELF frames 64 MiB, user stacks 4 MiB, base user heap 4 MiB, kernel stacks 1 MiB and page tables 0.5 MiB.](../assets/diagrams/memory-budget.svg)](../assets/diagrams/memory-budget.svg)
+
+*Capacity of the fixed pools in the current tree, including all 32 slots. This is
+not total RAM usage: the kernel image, boot archive, RAM disk and heap extension
+are excluded. Pools inside kernel `.bss` also belong to the kernel image.*
+
 ---
 
 ## Paging Model
@@ -60,6 +68,11 @@ P4[0] → P3       (cloned for each user process)
 ```
 
 ### Kernel page table vs. user page table
+
+[![Slots 4 and 5 see the same virtual ELF image window backed by separate physical frames; stack pages and the user heap are shared user mappings, while kernel mappings are supervisor-only.](../assets/diagrams/memory-mapping.svg)](../assets/diagrams/memory-mapping.svg)
+
+*Private image mappings versus shared user memory. Each process receives its own
+stack slice, but the stack pages remain accessible to every user process.*
 
 At `init_processes`, `save_kernel_cr3()` snapshots the current CR3 as `KERNEL_CR3`. This is the reference from which all per-process tables are cloned.
 

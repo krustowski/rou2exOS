@@ -1,0 +1,66 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="639pt" height="275pt" viewBox="0.00 0.00 638.87 275.47" role="img" aria-labelledby="memento-network-mux-title memento-network-mux-description">
+<title id="memento-network-mux-title">Memento's single-reader network mux</title><desc id="memento-network-mux-description">Only netmux reads Memento's kernel frame queue. It routes to the embedded web networking stack, libcr2's Chat and IRC stack, and the Network window's probe client. ARP is copied to interested clients. Hosted applications such as r2web have their own process queues.</desc><g id="graph0" class="graph" transform="scale(1 1) rotate(0) translate(21.6 253.87)">
+<title>mux</title>
+<polygon fill="#0f172a" stroke="none" points="-21.6,21.6 -21.6,-253.87 617.26,-253.87 617.26,21.6 -21.6,21.6" />
+
+<g id="node1" class="node">
+<title>queue</title>
+<path fill="#1e293b" stroke="#60a5fa" stroke-width="1.4" d="M419.29,-232.27C419.29,-232.27 204.25,-232.27 204.25,-232.27 198.25,-232.27 192.25,-226.27 192.25,-220.27 192.25,-220.27 192.25,-193.93 192.25,-193.93 192.25,-187.93 198.25,-181.93 204.25,-181.93 204.25,-181.93 419.29,-181.93 419.29,-181.93 425.29,-181.93 431.29,-187.93 431.29,-193.93 431.29,-193.93 431.29,-220.27 431.29,-220.27 431.29,-226.27 425.29,-232.27 419.29,-232.27" />
+<text text-anchor="middle" x="311.77" y="-211.05" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">Memento's kernel frame queue</text>
+<text text-anchor="middle" x="311.77" y="-193.8" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">Syscall 0x35</text>
+</g>
+
+<g id="node2" class="node">
+<title>mux</title>
+<path fill="#1e293b" stroke="#2dd4bf" stroke-width="1.4" d="M459.04,-149.93C459.04,-149.93 164.5,-149.93 164.5,-149.93 158.5,-149.93 152.5,-143.93 152.5,-137.93 152.5,-137.93 152.5,-94.34 152.5,-94.34 152.5,-88.34 158.5,-82.34 164.5,-82.34 164.5,-82.34 459.04,-82.34 459.04,-82.34 465.04,-82.34 471.04,-88.34 471.04,-94.34 471.04,-94.34 471.04,-137.93 471.04,-137.93 471.04,-143.93 465.04,-149.93 459.04,-149.93" />
+<text text-anchor="middle" x="311.77" y="-128.71" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">netmux.cpp · single reader</text>
+<text text-anchor="middle" x="311.77" y="-111.46" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">Route by claimed ports + probe identifiers</text>
+<text text-anchor="middle" x="311.77" y="-94.21" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">Copy ARP to interested clients</text>
+</g>
+
+<g id="edge1" class="edge">
+<title>queue-&gt;mux</title>
+<path fill="none" stroke="#94a3b8" stroke-width="1.2" d="M311.77,-181.79C311.77,-174.76 311.77,-166.88 311.77,-159.11" />
+<polygon fill="#94a3b8" stroke="#94a3b8" stroke-width="1.2" points="314.22,-159.24 311.77,-152.24 309.32,-159.24 314.22,-159.24" />
+</g>
+
+<g id="node3" class="node">
+<title>web</title>
+<path fill="#1e293b" stroke="#60a5fa" stroke-width="1.4" d="M201.54,-50.34C201.54,-50.34 12,-50.34 12,-50.34 6,-50.34 0,-44.34 0,-38.34 0,-38.34 0,-12 0,-12 0,-6 6,0 12,0 12,0 201.54,0 201.54,0 207.54,0 213.54,-6 213.54,-12 213.54,-12 213.54,-38.34 213.54,-38.34 213.54,-44.34 207.54,-50.34 201.54,-50.34" />
+<text text-anchor="middle" x="106.77" y="-29.12" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">NETMUX_WEB</text>
+<text text-anchor="middle" x="106.77" y="-11.87" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">Embedded web networking</text>
+</g>
+
+<g id="edge2" class="edge">
+<title>mux-&gt;web</title>
+<path fill="none" stroke="#94a3b8" stroke-width="1.2" d="M235.14,-81.88C214.16,-72.78 191.63,-63 171.39,-54.21" />
+<polygon fill="#94a3b8" stroke="#94a3b8" stroke-width="1.2" points="172.52,-52.04 165.13,-51.5 170.57,-56.53 172.52,-52.04" />
+</g>
+
+<g id="node4" class="node">
+<title>cr2</title>
+<path fill="#1e293b" stroke="#60a5fa" stroke-width="1.4" d="M375.79,-50.34C375.79,-50.34 247.75,-50.34 247.75,-50.34 241.75,-50.34 235.75,-44.34 235.75,-38.34 235.75,-38.34 235.75,-12 235.75,-12 235.75,-6 241.75,0 247.75,0 247.75,0 375.79,0 375.79,0 381.79,0 387.79,-6 387.79,-12 387.79,-12 387.79,-38.34 387.79,-38.34 387.79,-44.34 381.79,-50.34 375.79,-50.34" />
+<text text-anchor="middle" x="311.77" y="-29.12" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">NETMUX_CR2</text>
+<text text-anchor="middle" x="311.77" y="-11.87" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">libcr2 · Chat + IRC</text>
+</g>
+
+<g id="edge3" class="edge">
+<title>mux-&gt;cr2</title>
+<path fill="none" stroke="#94a3b8" stroke-width="1.2" d="M311.77,-82.01C311.77,-74.55 311.77,-66.64 311.77,-59.19" />
+<polygon fill="#94a3b8" stroke="#94a3b8" stroke-width="1.2" points="314.22,-59.52 311.77,-52.52 309.32,-59.52 314.22,-59.52" />
+</g>
+
+<g id="node5" class="node">
+<title>nsk</title>
+<path fill="#1e293b" stroke="#60a5fa" stroke-width="1.4" d="M583.66,-50.34C583.66,-50.34 421.88,-50.34 421.88,-50.34 415.88,-50.34 409.88,-44.34 409.88,-38.34 409.88,-38.34 409.88,-12 409.88,-12 409.88,-6 415.88,0 421.88,0 421.88,0 583.66,0 583.66,0 589.66,0 595.66,-6 595.66,-12 595.66,-12 595.66,-38.34 595.66,-38.34 595.66,-44.34 589.66,-50.34 583.66,-50.34" />
+<text text-anchor="middle" x="502.77" y="-29.12" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">NETMUX_NSK</text>
+<text text-anchor="middle" x="502.77" y="-11.87" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">Scan · ping · traceroute</text>
+</g>
+
+<g id="edge4" class="edge">
+<title>mux-&gt;nsk</title>
+<path fill="none" stroke="#94a3b8" stroke-width="1.2" d="M383.16,-81.88C402.54,-72.86 423.33,-63.17 442.06,-54.45" />
+<polygon fill="#94a3b8" stroke="#94a3b8" stroke-width="1.2" points="442.99,-56.72 448.3,-51.54 440.92,-52.27 442.99,-56.72" />
+</g>
+</g>
+</svg>

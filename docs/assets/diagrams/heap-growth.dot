@@ -1,0 +1,18 @@
+// Title: Shared user-heap growth
+// Description: Allocations first search the 4 MiB base heap. If no block fits, a one-time extension is placed using usable RAM, avoiding the boot archive and RAM disk, and mapped USER plus WRITE into kernel and live process page tables. Allocation retries over both regions or fails if no usable space remains.
+digraph heap {
+  alloc [label="malloc / realloc request\nShared user heap"];
+  scan [label="Find a fitting free block\nInitially in the 4 MiB base region"];
+  fit [label="Block fits?", shape=diamond];
+  result [label="Allocate + tag owning slot\nReturn user pointer", color="#2dd4bf"];
+  growth [label="First exhaustion: try one extension\nTarget RAM / 8, rounded to 2 MiB pages\nHalve if needed; avoid archive + RAM disk"];
+  patch [label="Usable region found\nMap USER + WRITE in kernel + live tables\nRetry allocation across both regions"];
+  fail [label="No fitting block / usable extension\nAllocation fails", color="#fbbf24"];
+  alloc -> scan -> fit;
+  fit -> result [label="yes"];
+  fit -> growth [label="no; not yet grown"];
+  fit -> fail [label="no; already grown"];
+  growth -> patch [label="space found"];
+  growth -> fail [label="no space"];
+  patch -> scan [label="retry", constraint=false];
+}

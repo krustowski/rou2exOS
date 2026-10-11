@@ -37,13 +37,20 @@ protects Jug itself. **Remove** restores the shipped copy
 for subsequent launches.
 
 Memento uses a coordinated relaunch instead of the ordinary instance restart.
+
+[![Jug verifies and requests a Memento update; Memento closes its windows and children, exits cooperatively, and the parked init_rc supervisor launches the replacement with preserved arguments.](../assets/diagrams/desktop-relaunch.svg)](../assets/diagrams/desktop-relaunch.svg)
+
+*Desktop handoff after confirmation. RAM-disk files and background services
+survive; open windows and their unsaved state do not.*
+
 After downloading its update, Jug offers **Y / N** to relaunch it; **Restart/R**
 offers the same confirmation later. Save work first: all Memento windows close,
 and their hosted processes stop before the desktop exits. The graphics kernel's
 session launcher then starts `/mnt/tmp/jug/MEMENTO.ELF`, preserving its arguments
 and adding `--relaunch`. The RAM disk, Jug registry, downloads and
 `/mnt/tmp/SESSION.CFG` survive; the replacement reads those credentials and
-returns to login. Open windows and unsaved buffers are not restored. Other
+returns to the Locked dialog when saved credentials exist, or Login otherwise.
+Open windows and unsaved buffers are not restored. Other
 background services continue running, and `INIT.RC` is not run again.
 
 This requires the updated graphics kernel and a running Memento that supports

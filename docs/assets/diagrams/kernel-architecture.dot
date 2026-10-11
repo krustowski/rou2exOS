@@ -1,0 +1,17 @@
+// Title: Kernel and userland responsibilities
+// Description: Applications and userland TCP/IP stacks use SDK libraries and the int 0x7f ABI. The kernel owns scheduling, memory, filesystems and device access. Hardware interrupts also enter the kernel.
+digraph kernel {
+  rankdir=TB;
+  apps [label="Userland applications\nMemento · shells · hosted programs"];
+  stacks [label="Userland network services\nTCP/IP stacks · eth · wgd"];
+  sdk [label="SDK libraries\nC · C++ · Go bindings"];
+  abi [label="Kernel ABI\nint 0x7f", color="#2dd4bf"];
+  tasks [label="Tasks + memory\nScheduler · IPC · paging · heaps"];
+  fs [label="Filesystems\nVFS · FAT · ISO9660 · tar"];
+  io [label="Device access\nNIC · input · video · audio"];
+  hardware [label="Hardware\nCPU / PIT · RAM · disks · peripherals", color="#fbbf24"];
+  { rank=same; apps; stacks; }
+  apps -> sdk; stacks -> sdk; sdk -> abi;
+  abi -> tasks; abi -> fs; abi -> io;
+  tasks -> hardware; fs -> hardware; io -> hardware;
+}

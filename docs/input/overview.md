@@ -1,6 +1,10 @@
 # Input Overview
 
-The input subsystem handles all human-interface device input: PS/2 keyboard (IRQ1) and PS/2 mouse (IRQ12). Both are routed through the 8042 PS/2 controller. Port I/O primitives live in `input/port.rs` and are used throughout the kernel.
+The input subsystem handles PS/2 keyboards (IRQ1), PS/2 mice (IRQ12), and USB
+HID boot keyboards on xHCI controllers. PS/2 devices use the 8042 controller;
+USB keyboards use a native driver polled from the timer interrupt. Both keyboard
+paths deliver Set 1 scancodes to the shell and existing userland subscribers.
+Port I/O primitives live in `input/port.rs`.
 
 ---
 
@@ -13,24 +17,20 @@ The input subsystem handles all human-interface device input: PS/2 keyboard (IRQ
 
 Both are registered in `abi/idt.rs` by `install_isrs()`.
 
+USB input uses IRQ0's scheduler timer to poll the xHCI event ring, before the
+scheduler acquires its lock. It does not require an xHCI interrupt handler.
+See [USB keyboard support](keyboard.md#usb-keyboards-xhci).
+
 The 8042 controller shares a single data register (port `0x60`) between keyboard and mouse. The status register (port `0x64`) bit 5 distinguishes the source: `0` = keyboard, `1` = mouse.
 
 ---
 
 ## Data Flow
 
-```
-PS/2 keyboard
-  → IRQ1 → keyboard_handler (idt.rs)
-      → keyboard::push_scancode(sc)     → SCANCODE_BUF  (shell)
-      → irq::Subscriber::push_irq(sc)   → RECEPTORS[0..5] (userland subscribers)
+[![Keyboard IRQ1 fans out to the kernel shell and keyboard subscriber rings; mouse IRQ12 builds packets for mouse subscriber rings; user applications poll both input pipes.](../assets/diagrams/input-routing.svg)](../assets/diagrams/input-routing.svg)
 
-PS/2 mouse
-  → IRQ12 → mouse_handler (idt.rs)
-      → mouse::push_byte(b)
-          → reassemble 3-byte packet
-          → MouseSubscriber::push(pkt)  → MOUSE_RECEPTORS[0..5] (userland subscribers)
-```
+*Keyboard scancodes and mouse packets use separate subscriber buffers. Reading
+those buffers through syscall `0x03` is non-blocking.*
 
 ---
 
@@ -40,6 +40,8 @@ PS/2 mouse
 |--------|------|---------|
 | `keyboard` | `input/keyboard.rs` | Scancode buffer, shell loop, scancode→ASCII, tab completion |
 | `irq` | `input/irq.rs` | Keyboard fan-out to up to 5 userland subscribers |
+| `xhci` | `usb/xhci.rs` | Controller ownership, DMA rings, USB enumeration and keyboard polling |
+| `hid` | `usb/hid.rs` | HID boot reports, Set 1 translation and held-key repeat |
 | `mouse` | `input/mouse.rs` | PS/2 mouse init, packet reassembly, subscriber ring buffers |
 | `port` | `input/port.rs` | Raw x86 I/O port primitives (IN/OUT for u8/u16/u32) |
 | `cmd` | `input/cmd.rs` | Shell built-in command dispatcher |

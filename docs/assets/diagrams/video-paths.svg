@@ -1,0 +1,101 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="793pt" height="312pt" viewBox="0.00 0.00 792.62 311.88" role="img" aria-labelledby="video-paths-title video-paths-description">
+<title id="video-paths-title">Text and framebuffer session paths</title><desc id="video-paths-description">Boot information selects the output path. A graphics kernel with an RGB framebuffer starts supervised Memento and uses palette-indexed blits to the linear framebuffer. Text sessions run the shell and clock in VGA text memory; manually launched Memento changes VGA to planar graphics and writes the mapped VRAM.</desc><g id="graph0" class="graph" transform="scale(1 1) rotate(0) translate(21.6 290.28)">
+<title>video</title>
+<polygon fill="#0f172a" stroke="none" points="-21.6,21.6 -21.6,-290.28 771.01,-290.28 771.01,21.6 -21.6,21.6" />
+
+<g id="node1" class="node">
+<title>boot</title>
+<path fill="#1e293b" stroke="#60a5fa" stroke-width="1.4" d="M391.41,-268.68C391.41,-268.68 147.12,-268.68 147.12,-268.68 141.12,-268.68 135.12,-262.68 135.12,-256.68 135.12,-256.68 135.12,-244.68 135.12,-244.68 135.12,-238.68 141.12,-232.68 147.12,-232.68 147.12,-232.68 391.41,-232.68 391.41,-232.68 397.41,-232.68 403.41,-238.68 403.41,-244.68 403.41,-244.68 403.41,-256.68 403.41,-256.68 403.41,-262.68 397.41,-268.68 391.41,-268.68" />
+<text text-anchor="middle" x="269.27" y="-246" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">Multiboot2 framebuffer information</text>
+</g>
+
+<g id="node2" class="node">
+<title>graphics</title>
+<path fill="#1e293b" stroke="#60a5fa" stroke-width="1.4" d="M287.16,-200.68C287.16,-200.68 41.38,-200.68 41.38,-200.68 35.38,-200.68 29.37,-194.68 29.37,-188.68 29.37,-188.68 29.37,-176.68 29.37,-176.68 29.37,-170.68 35.37,-164.68 41.37,-164.68 41.37,-164.68 287.16,-164.68 287.16,-164.68 293.16,-164.68 299.16,-170.68 299.16,-176.68 299.16,-176.68 299.16,-188.68 299.16,-188.68 299.16,-194.68 293.16,-200.68 287.16,-200.68" />
+<text text-anchor="middle" x="164.27" y="-178" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">Graphics kernel + RGB framebuffer</text>
+</g>
+
+<g id="edge1" class="edge">
+<title>boot-&gt;graphics</title>
+<path fill="none" stroke="#94a3b8" stroke-width="1.2" d="M241.68,-232.34C228.76,-224.22 213.22,-214.45 199.47,-205.8" />
+<polygon fill="#94a3b8" stroke="#94a3b8" stroke-width="1.2" points="200.81,-203.75 193.58,-202.1 198.2,-207.9 200.81,-203.75" />
+</g>
+
+<g id="node3" class="node">
+<title>text</title>
+<path fill="#1e293b" stroke="#60a5fa" stroke-width="1.4" d="M431.79,-200.68C431.79,-200.68 348.75,-200.68 348.75,-200.68 342.75,-200.68 336.75,-194.68 336.75,-188.68 336.75,-188.68 336.75,-176.68 336.75,-176.68 336.75,-170.68 342.75,-164.68 348.75,-164.68 348.75,-164.68 431.79,-164.68 431.79,-164.68 437.79,-164.68 443.79,-170.68 443.79,-176.68 443.79,-176.68 443.79,-188.68 443.79,-188.68 443.79,-194.68 437.79,-200.68 431.79,-200.68" />
+<text text-anchor="middle" x="390.27" y="-178" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">Text session</text>
+</g>
+
+<g id="edge2" class="edge">
+<title>boot-&gt;text</title>
+<path fill="none" stroke="#94a3b8" stroke-width="1.2" d="M301.06,-232.34C316.23,-224.07 334.52,-214.09 350.59,-205.33" />
+<polygon fill="#94a3b8" stroke="#94a3b8" stroke-width="1.2" points="351.7,-207.51 356.68,-202 349.36,-203.2 351.7,-207.51" />
+</g>
+
+<g id="node4" class="node">
+<title>gui</title>
+<path fill="#1e293b" stroke="#60a5fa" stroke-width="1.4" d="M243.91,-132.68C243.91,-132.68 50.62,-132.68 50.62,-132.68 44.62,-132.68 38.62,-126.68 38.62,-120.68 38.62,-120.68 38.62,-94.34 38.62,-94.34 38.62,-88.34 44.62,-82.34 50.62,-82.34 50.62,-82.34 243.91,-82.34 243.91,-82.34 249.91,-82.34 255.91,-88.34 255.91,-94.34 255.91,-94.34 255.91,-120.68 255.91,-120.68 255.91,-126.68 249.91,-132.68 243.91,-132.68" />
+<text text-anchor="middle" x="147.27" y="-111.46" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">init_rc supervises Memento</text>
+<text text-anchor="middle" x="147.27" y="-94.21" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">256-colour indexed desktop</text>
+</g>
+
+<g id="edge3" class="edge">
+<title>graphics-&gt;gui</title>
+<path fill="none" stroke="#94a3b8" stroke-width="1.2" d="M160.24,-164.34C158.64,-157.45 156.74,-149.29 154.9,-141.36" />
+<polygon fill="#94a3b8" stroke="#94a3b8" stroke-width="1.2" points="157.32,-140.96 153.35,-134.69 152.55,-142.07 157.32,-140.96" />
+</g>
+
+<g id="node6" class="node">
+<title>console</title>
+<path fill="#1e293b" stroke="#fbbf24" stroke-width="1.4" d="M491.04,-132.68C491.04,-132.68 289.5,-132.68 289.5,-132.68 283.5,-132.68 277.5,-126.68 277.5,-120.68 277.5,-120.68 277.5,-94.34 277.5,-94.34 277.5,-88.34 283.5,-82.34 289.5,-82.34 289.5,-82.34 491.04,-82.34 491.04,-82.34 497.04,-82.34 503.04,-88.34 503.04,-94.34 503.04,-94.34 503.04,-120.68 503.04,-120.68 503.04,-126.68 497.04,-132.68 491.04,-132.68" />
+<text text-anchor="middle" x="390.27" y="-111.46" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">Kernel shell + clock</text>
+<text text-anchor="middle" x="390.27" y="-94.21" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">80×25 cells at VGA 0xb8000</text>
+</g>
+
+<g id="edge5" class="edge">
+<title>text-&gt;console</title>
+<path fill="none" stroke="#94a3b8" stroke-width="1.2" d="M390.27,-164.34C390.27,-157.52 390.27,-149.46 390.27,-141.61" />
+<polygon fill="#94a3b8" stroke="#94a3b8" stroke-width="1.2" points="392.72,-141.74 390.27,-134.74 387.82,-141.74 392.72,-141.74" />
+</g>
+
+<g id="node7" class="node">
+<title>manual</title>
+<path fill="#1e293b" stroke="#60a5fa" stroke-width="1.4" d="M735.16,-132.68C735.16,-132.68 537.38,-132.68 537.38,-132.68 531.38,-132.68 525.38,-126.68 525.38,-120.68 525.38,-120.68 525.38,-94.34 525.38,-94.34 525.38,-88.34 531.38,-82.34 537.38,-82.34 537.38,-82.34 735.16,-82.34 735.16,-82.34 741.16,-82.34 747.16,-88.34 747.16,-94.34 747.16,-94.34 747.16,-120.68 747.16,-120.68 747.16,-126.68 741.16,-132.68 735.16,-132.68" />
+<text text-anchor="middle" x="636.27" y="-111.46" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">fg memento</text>
+<text text-anchor="middle" x="636.27" y="-94.21" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">Switch VGA to 640×400×16</text>
+</g>
+
+<g id="edge6" class="edge">
+<title>text-&gt;manual</title>
+<path fill="none" stroke="#94a3b8" stroke-width="1.2" d="M444.26,-165.62C473.85,-156.82 511.32,-145.68 545.29,-135.57" />
+<polygon fill="#94a3b8" stroke="#94a3b8" stroke-width="1.2" points="545.63,-138.03 551.64,-133.68 544.24,-133.33 545.63,-138.03" />
+</g>
+
+<g id="node5" class="node">
+<title>blit</title>
+<path fill="#1e293b" stroke="#2dd4bf" stroke-width="1.4" d="M282.54,-50.34C282.54,-50.34 12,-50.34 12,-50.34 6,-50.34 0,-44.34 0,-38.34 0,-38.34 0,-12 0,-12 0,-6 6,0 12,0 12,0 282.54,0 282.54,0 288.54,0 294.54,-6 294.54,-12 294.54,-12 294.54,-38.34 294.54,-38.34 294.54,-44.34 288.54,-50.34 282.54,-50.34" />
+<text text-anchor="middle" x="147.27" y="-29.12" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">Video syscalls</text>
+<text text-anchor="middle" x="147.27" y="-11.87" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">Indexed blits → linear RGB framebuffer</text>
+</g>
+
+<g id="edge4" class="edge">
+<title>gui-&gt;blit</title>
+<path fill="none" stroke="#94a3b8" stroke-width="1.2" d="M147.27,-81.97C147.27,-74.87 147.27,-67 147.27,-59.47" />
+<polygon fill="#94a3b8" stroke="#94a3b8" stroke-width="1.2" points="149.72,-59.65 147.27,-52.65 144.82,-59.65 149.72,-59.65" />
+</g>
+
+<g id="node8" class="node">
+<title>vram</title>
+<path fill="#1e293b" stroke="#c4b5fd" stroke-width="1.4" d="M737.41,-50.34C737.41,-50.34 535.12,-50.34 535.12,-50.34 529.12,-50.34 523.12,-44.34 523.12,-38.34 523.12,-38.34 523.12,-12 523.12,-12 523.12,-6 529.12,0 535.12,0 535.12,0 737.41,0 737.41,0 743.41,0 749.41,-6 749.41,-12 749.41,-12 749.41,-38.34 749.41,-38.34 749.41,-44.34 743.41,-50.34 737.41,-50.34" />
+<text text-anchor="middle" x="636.27" y="-29.12" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">map_vram · syscall 0x14</text>
+<text text-anchor="middle" x="636.27" y="-11.87" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">Write four planar VGA planes</text>
+</g>
+
+<g id="edge7" class="edge">
+<title>manual-&gt;vram</title>
+<path fill="none" stroke="#94a3b8" stroke-width="1.2" d="M636.27,-81.97C636.27,-74.87 636.27,-67 636.27,-59.47" />
+<polygon fill="#94a3b8" stroke="#94a3b8" stroke-width="1.2" points="638.72,-59.65 636.27,-52.65 633.82,-59.65 638.72,-59.65" />
+</g>
+</g>
+</svg>

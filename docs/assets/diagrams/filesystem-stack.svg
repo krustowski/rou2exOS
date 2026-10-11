@@ -1,0 +1,129 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="782pt" height="423pt" viewBox="0.00 0.00 781.62 422.90" role="img" aria-labelledby="filesystem-stack-title filesystem-stack-description">
+<title id="filesystem-stack-title">VFS mounts and storage backends</title><desc id="filesystem-stack-description">Filesystem syscalls resolve through the VFS. Writable floppy and RAM disk mounts use FatDev and the FAT implementation over BlockDevice. Read-only CD and boot archive mounts share RoFs; tar is read directly from memory.</desc><g id="graph0" class="graph" transform="scale(1 1) rotate(0) translate(21.6 401.3)">
+<title>filesystem</title>
+<polygon fill="#0f172a" stroke="none" points="-21.6,21.6 -21.6,-401.3 760.01,-401.3 760.01,21.6 -21.6,21.6" />
+
+<g id="node1" class="node">
+<title>calls</title>
+<path fill="#1e293b" stroke="#60a5fa" stroke-width="1.4" d="M486.66,-379.7C486.66,-379.7 249.88,-379.7 249.88,-379.7 243.88,-379.7 237.87,-373.7 237.87,-367.7 237.87,-367.7 237.87,-341.36 237.87,-341.36 237.87,-335.36 243.87,-329.36 249.87,-329.36 249.87,-329.36 486.66,-329.36 486.66,-329.36 492.66,-329.36 498.66,-335.36 498.66,-341.36 498.66,-341.36 498.66,-367.7 498.66,-367.7 498.66,-373.7 492.66,-379.7 486.66,-379.7" />
+<text text-anchor="middle" x="368.27" y="-358.48" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">Filesystem syscalls</text>
+<text text-anchor="middle" x="368.27" y="-341.23" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">Read · write · list · rename · usage</text>
+</g>
+
+<g id="node2" class="node">
+<title>vfs</title>
+<path fill="#1e293b" stroke="#60a5fa" stroke-width="1.4" d="M525.66,-297.36C525.66,-297.36 210.88,-297.36 210.88,-297.36 204.88,-297.36 198.87,-291.36 198.87,-285.36 198.87,-285.36 198.87,-259.02 198.87,-259.02 198.87,-253.02 204.87,-247.02 210.87,-247.02 210.87,-247.02 525.66,-247.02 525.66,-247.02 531.66,-247.02 537.66,-253.02 537.66,-259.02 537.66,-259.02 537.66,-285.36 537.66,-285.36 537.66,-291.36 531.66,-297.36 525.66,-297.36" />
+<text text-anchor="middle" x="368.27" y="-276.14" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">VFS</text>
+<text text-anchor="middle" x="368.27" y="-258.89" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">Normalize path + select longest mount prefix</text>
+</g>
+
+<g id="edge1" class="edge">
+<title>calls-&gt;vfs</title>
+<path fill="none" stroke="#94a3b8" stroke-width="1.2" d="M368.27,-328.99C368.27,-321.89 368.27,-314.02 368.27,-306.49" />
+<polygon fill="#94a3b8" stroke="#94a3b8" stroke-width="1.2" points="370.72,-306.67 368.27,-299.67 365.82,-306.67 370.72,-306.67" />
+</g>
+
+<g id="node3" class="node">
+<title>fat</title>
+<path fill="#1e293b" stroke="#2dd4bf" stroke-width="1.4" d="M345.91,-215.02C345.91,-215.02 182.62,-215.02 182.62,-215.02 176.62,-215.02 170.62,-209.02 170.62,-203.02 170.62,-203.02 170.62,-176.68 170.62,-176.68 170.62,-170.68 176.62,-164.68 182.62,-164.68 182.62,-164.68 345.91,-164.68 345.91,-164.68 351.91,-164.68 357.91,-170.68 357.91,-176.68 357.91,-176.68 357.91,-203.02 357.91,-203.02 357.91,-209.02 351.91,-215.02 345.91,-215.02" />
+<text text-anchor="middle" x="264.27" y="-193.8" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">Writable mounts</text>
+<text text-anchor="middle" x="264.27" y="-176.55" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">FatDev → FAT12 / FAT16</text>
+</g>
+
+<g id="edge2" class="edge">
+<title>vfs-&gt;fat</title>
+<path fill="none" stroke="#94a3b8" stroke-width="1.2" d="M336.5,-246.65C325.92,-238.47 314,-229.27 302.95,-220.73" />
+<polygon fill="#94a3b8" stroke="#94a3b8" stroke-width="1.2" points="304.68,-218.97 297.64,-216.63 301.68,-222.85 304.68,-218.97" />
+</g>
+
+<g id="node4" class="node">
+<title>ro</title>
+<path fill="#1e293b" stroke="#c4b5fd" stroke-width="1.4" d="M554.91,-215.02C554.91,-215.02 391.62,-215.02 391.62,-215.02 385.62,-215.02 379.62,-209.02 379.62,-203.02 379.62,-203.02 379.62,-176.68 379.62,-176.68 379.62,-170.68 385.62,-164.68 391.62,-164.68 391.62,-164.68 554.91,-164.68 554.91,-164.68 560.91,-164.68 566.91,-170.68 566.91,-176.68 566.91,-176.68 566.91,-203.02 566.91,-203.02 566.91,-209.02 560.91,-215.02 554.91,-215.02" />
+<text text-anchor="middle" x="473.27" y="-193.8" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">Read-only mounts</text>
+<text text-anchor="middle" x="473.27" y="-176.55" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">RoFs → ISO9660 / ustar</text>
+</g>
+
+<g id="edge3" class="edge">
+<title>vfs-&gt;ro</title>
+<path fill="none" stroke="#94a3b8" stroke-width="1.2" d="M400.34,-246.65C411.03,-238.47 423.06,-229.27 434.22,-220.73" />
+<polygon fill="#94a3b8" stroke="#94a3b8" stroke-width="1.2" points="435.52,-222.82 439.59,-216.62 432.54,-218.93 435.52,-222.82" />
+</g>
+
+<g id="node5" class="node">
+<title>floppy</title>
+<path fill="#1e293b" stroke="#60a5fa" stroke-width="1.4" d="M138.54,-132.68C138.54,-132.68 12,-132.68 12,-132.68 6,-132.68 0,-126.68 0,-120.68 0,-120.68 0,-94.34 0,-94.34 0,-88.34 6,-82.34 12,-82.34 12,-82.34 138.54,-82.34 138.54,-82.34 144.54,-82.34 150.54,-88.34 150.54,-94.34 150.54,-94.34 150.54,-120.68 150.54,-120.68 150.54,-126.68 144.54,-132.68 138.54,-132.68" />
+<text text-anchor="middle" x="75.27" y="-111.46" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">/mnt/fat · FAT12</text>
+<text text-anchor="middle" x="75.27" y="-94.21" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">Floppy → ISA DMA</text>
+</g>
+
+<g id="edge4" class="edge">
+<title>fat-&gt;floppy</title>
+<path fill="none" stroke="#94a3b8" stroke-width="1.2" d="M206.28,-164.2C185.69,-155.45 162.37,-145.53 141.16,-136.52" />
+<polygon fill="#94a3b8" stroke="#94a3b8" stroke-width="1.2" points="142.22,-134.31 134.82,-133.82 140.31,-138.82 142.22,-134.31" />
+</g>
+
+<g id="node6" class="node">
+<title>ram</title>
+<path fill="#1e293b" stroke="#60a5fa" stroke-width="1.4" d="M356.41,-132.68C356.41,-132.68 184.12,-132.68 184.12,-132.68 178.12,-132.68 172.12,-126.68 172.12,-120.68 172.12,-120.68 172.12,-94.34 172.12,-94.34 172.12,-88.34 178.12,-82.34 184.12,-82.34 184.12,-82.34 356.41,-82.34 356.41,-82.34 362.41,-82.34 368.41,-88.34 368.41,-94.34 368.41,-94.34 368.41,-120.68 368.41,-120.68 368.41,-126.68 362.41,-132.68 356.41,-132.68" />
+<text text-anchor="middle" x="270.27" y="-111.46" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">/mnt/tmp · usually FAT16</text>
+<text text-anchor="middle" x="270.27" y="-94.21" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">MemDisk → RAM</text>
+</g>
+
+<g id="edge5" class="edge">
+<title>fat-&gt;ram</title>
+<path fill="none" stroke="#94a3b8" stroke-width="1.2" d="M266.1,-164.31C266.63,-157.21 267.22,-149.34 267.78,-141.81" />
+<polygon fill="#94a3b8" stroke="#94a3b8" stroke-width="1.2" points="270.21,-142.15 268.29,-134.99 265.33,-141.79 270.21,-142.15" />
+</g>
+
+<g id="node7" class="node">
+<title>cd</title>
+<path fill="#1e293b" stroke="#60a5fa" stroke-width="1.4" d="M532.04,-132.68C532.04,-132.68 402.5,-132.68 402.5,-132.68 396.5,-132.68 390.5,-126.68 390.5,-120.68 390.5,-120.68 390.5,-94.34 390.5,-94.34 390.5,-88.34 396.5,-82.34 402.5,-82.34 402.5,-82.34 532.04,-82.34 532.04,-82.34 538.04,-82.34 544.04,-88.34 544.04,-94.34 544.04,-94.34 544.04,-120.68 544.04,-120.68 544.04,-126.68 538.04,-132.68 532.04,-132.68" />
+<text text-anchor="middle" x="467.27" y="-111.46" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">/mnt/iso · ISO9660</text>
+<text text-anchor="middle" x="467.27" y="-94.21" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">Atapi → PIO</text>
+</g>
+
+<g id="edge6" class="edge">
+<title>ro-&gt;cd</title>
+<path fill="none" stroke="#94a3b8" stroke-width="1.2" d="M471.44,-164.31C470.91,-157.21 470.32,-149.34 469.76,-141.81" />
+<polygon fill="#94a3b8" stroke="#94a3b8" stroke-width="1.2" points="472.21,-141.79 469.25,-134.99 467.33,-142.15 472.21,-141.79" />
+</g>
+
+<g id="node8" class="node">
+<title>tar</title>
+<path fill="#1e293b" stroke="#60a5fa" stroke-width="1.4" d="M726.41,-132.68C726.41,-132.68 578.12,-132.68 578.12,-132.68 572.12,-132.68 566.12,-126.68 566.12,-120.68 566.12,-120.68 566.12,-94.34 566.12,-94.34 566.12,-88.34 572.12,-82.34 578.12,-82.34 578.12,-82.34 726.41,-82.34 726.41,-82.34 732.41,-82.34 738.41,-88.34 738.41,-94.34 738.41,-94.34 738.41,-120.68 738.41,-120.68 738.41,-126.68 732.41,-132.68 726.41,-132.68" />
+<text text-anchor="middle" x="652.27" y="-111.46" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">/mnt/tar · ustar</text>
+<text text-anchor="middle" x="652.27" y="-94.21" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">GRUB module in RAM</text>
+</g>
+
+<g id="edge7" class="edge">
+<title>ro-&gt;tar</title>
+<path fill="none" stroke="#94a3b8" stroke-width="1.2" d="M527.95,-164.31C547.37,-155.59 569.39,-145.71 589.44,-136.71" />
+<polygon fill="#94a3b8" stroke="#94a3b8" stroke-width="1.2" points="590.27,-139.02 595.65,-133.92 588.26,-134.55 590.27,-139.02" />
+</g>
+
+<g id="node9" class="node">
+<title>block</title>
+<path fill="#1e293b" stroke="#fbbf24" stroke-width="1.4" d="M341.04,-50.34C341.04,-50.34 199.5,-50.34 199.5,-50.34 193.5,-50.34 187.5,-44.34 187.5,-38.34 187.5,-38.34 187.5,-12 187.5,-12 187.5,-6 193.5,0 199.5,0 199.5,0 341.04,0 341.04,0 347.04,0 353.04,-6 353.04,-12 353.04,-12 353.04,-38.34 353.04,-38.34 353.04,-44.34 347.04,-50.34 341.04,-50.34" />
+<text text-anchor="middle" x="270.27" y="-29.12" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">BlockDevice</text>
+<text text-anchor="middle" x="270.27" y="-11.87" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">Sector reads / writes</text>
+</g>
+
+<g id="edge8" class="edge">
+<title>floppy-&gt;block</title>
+<path fill="none" stroke="#94a3b8" stroke-width="1.2" d="M135.1,-81.86C156.44,-73.07 180.62,-63.1 202.57,-54.06" />
+<polygon fill="#94a3b8" stroke="#94a3b8" stroke-width="1.2" points="203.33,-56.4 208.87,-51.47 201.47,-51.87 203.33,-56.4" />
+</g>
+
+<g id="edge9" class="edge">
+<title>ram-&gt;block</title>
+<path fill="none" stroke="#94a3b8" stroke-width="1.2" d="M270.27,-81.97C270.27,-74.87 270.27,-67 270.27,-59.47" />
+<polygon fill="#94a3b8" stroke="#94a3b8" stroke-width="1.2" points="272.72,-59.65 270.27,-52.65 267.82,-59.65 272.72,-59.65" />
+</g>
+
+<g id="edge10" class="edge">
+<title>cd-&gt;block</title>
+<path fill="none" stroke="#94a3b8" stroke-width="1.2" d="M406.82,-81.86C385.27,-73.07 360.84,-63.1 338.66,-54.06" />
+<polygon fill="#94a3b8" stroke="#94a3b8" stroke-width="1.2" points="339.69,-51.83 332.28,-51.46 337.84,-56.37 339.69,-51.83" />
+</g>
+</g>
+</svg>

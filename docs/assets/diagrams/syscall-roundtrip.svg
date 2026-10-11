@@ -1,0 +1,80 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="358pt" height="540pt" viewBox="0.00 0.00 357.99 539.74" role="img" aria-labelledby="syscall-roundtrip-title syscall-roundtrip-description">
+<title id="syscall-roundtrip-title">int 0x7f syscall round trip</title><desc id="syscall-roundtrip-description">A ring-3 SDK wrapper supplies RAX, RDI, RSI and optional RCX. The interrupt gate enters ring 0 on the process kernel stack; the entry stub calls syscall_inner, which validates and dispatches the request. The stub restores registers and returns with iretq; RAX carries the result and R9 is clobbered.</desc><g id="graph0" class="graph" transform="scale(1 1) rotate(0) translate(21.6 518.14)">
+<title>syscall</title>
+<polygon fill="#0f172a" stroke="none" points="-21.6,21.6 -21.6,-518.14 336.39,-518.14 336.39,21.6 -21.6,21.6" />
+
+<g id="node1" class="node">
+<title>wrapper</title>
+<path fill="#1e293b" stroke="#60a5fa" stroke-width="1.4" d="M294.54,-496.54C294.54,-496.54 20.25,-496.54 20.25,-496.54 14.25,-496.54 8.25,-490.54 8.25,-484.54 8.25,-484.54 8.25,-440.95 8.25,-440.95 8.25,-434.95 14.25,-428.95 20.25,-428.95 20.25,-428.95 294.54,-428.95 294.54,-428.95 300.54,-428.95 306.54,-434.95 306.54,-440.95 306.54,-440.95 306.54,-484.54 306.54,-484.54 306.54,-490.54 300.54,-496.54 294.54,-496.54" />
+<text text-anchor="middle" x="157.4" y="-475.32" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">Ring 3 · application / SDK wrapper</text>
+<text text-anchor="middle" x="157.4" y="-458.07" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">RAX = number · RDI / RSI = arguments</text>
+<text text-anchor="middle" x="157.4" y="-440.82" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">RCX = optional third argument</text>
+</g>
+
+<g id="node2" class="node">
+<title>gate</title>
+<path fill="#1e293b" stroke="#60a5fa" stroke-width="1.4" d="M302.79,-396.95C302.79,-396.95 12,-396.95 12,-396.95 6,-396.95 0,-390.95 0,-384.95 0,-384.95 0,-358.61 0,-358.61 0,-352.61 6,-346.61 12,-346.61 12,-346.61 302.79,-346.61 302.79,-346.61 308.79,-346.61 314.79,-352.61 314.79,-358.61 314.79,-358.61 314.79,-384.95 314.79,-384.95 314.79,-390.95 308.79,-396.95 302.79,-396.95" />
+<text text-anchor="middle" x="157.4" y="-375.73" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">int 0x7f interrupt gate</text>
+<text text-anchor="middle" x="157.4" y="-358.48" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">Enter ring 0 on this process's kernel stack</text>
+</g>
+
+<g id="edge1" class="edge">
+<title>wrapper-&gt;gate</title>
+<path fill="none" stroke="#94a3b8" stroke-width="1.2" d="M157.4,-428.62C157.4,-421.16 157.4,-413.25 157.4,-405.8" />
+<polygon fill="#94a3b8" stroke="#94a3b8" stroke-width="1.2" points="159.85,-406.13 157.4,-399.13 154.95,-406.13 159.85,-406.13" />
+</g>
+
+<g id="node3" class="node">
+<title>stub</title>
+<path fill="#1e293b" stroke="#60a5fa" stroke-width="1.4" d="M297.17,-314.61C297.17,-314.61 17.62,-314.61 17.62,-314.61 11.62,-314.61 5.62,-308.61 5.62,-302.61 5.62,-302.61 5.62,-276.27 5.62,-276.27 5.62,-270.27 11.62,-264.27 17.62,-264.27 17.62,-264.27 297.17,-264.27 297.17,-264.27 303.17,-264.27 309.17,-270.27 309.17,-276.27 309.17,-276.27 309.17,-302.61 309.17,-302.61 309.17,-308.61 303.17,-314.61 297.17,-314.61" />
+<text text-anchor="middle" x="157.4" y="-293.39" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">syscall_handler entry stub</text>
+<text text-anchor="middle" x="157.4" y="-276.14" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">Save registers · align stack · RDX ← RAX</text>
+</g>
+
+<g id="edge2" class="edge">
+<title>gate-&gt;stub</title>
+<path fill="none" stroke="#94a3b8" stroke-width="1.2" d="M157.4,-346.24C157.4,-339.14 157.4,-331.27 157.4,-323.74" />
+<polygon fill="#94a3b8" stroke="#94a3b8" stroke-width="1.2" points="159.85,-323.92 157.4,-316.92 154.95,-323.92 159.85,-323.92" />
+</g>
+
+<g id="node4" class="node">
+<title>dispatch</title>
+<path fill="#1e293b" stroke="#60a5fa" stroke-width="1.4" d="M300.54,-232.27C300.54,-232.27 14.25,-232.27 14.25,-232.27 8.25,-232.27 2.25,-226.27 2.25,-220.27 2.25,-220.27 2.25,-193.93 2.25,-193.93 2.25,-187.93 8.25,-181.93 14.25,-181.93 14.25,-181.93 300.54,-181.93 300.54,-181.93 306.54,-181.93 312.54,-187.93 312.54,-193.93 312.54,-193.93 312.54,-220.27 312.54,-220.27 312.54,-226.27 306.54,-232.27 300.54,-232.27" />
+<text text-anchor="middle" x="157.4" y="-211.05" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">syscall_inner(arg1, arg2, number, arg3)</text>
+<text text-anchor="middle" x="157.4" y="-193.8" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">Validate buffers + dispatch to subsystem</text>
+</g>
+
+<g id="edge3" class="edge">
+<title>stub-&gt;dispatch</title>
+<path fill="none" stroke="#94a3b8" stroke-width="1.2" d="M157.4,-263.9C157.4,-256.8 157.4,-248.93 157.4,-241.4" />
+<polygon fill="#94a3b8" stroke="#94a3b8" stroke-width="1.2" points="159.85,-241.58 157.4,-234.58 154.95,-241.58 159.85,-241.58" />
+</g>
+
+<g id="node5" class="node">
+<title>restore</title>
+<path fill="#1e293b" stroke="#60a5fa" stroke-width="1.4" d="M279.17,-149.93C279.17,-149.93 35.62,-149.93 35.62,-149.93 29.62,-149.93 23.62,-143.93 23.62,-137.93 23.62,-137.93 23.62,-94.34 23.62,-94.34 23.62,-88.34 29.62,-82.34 35.62,-82.34 35.62,-82.34 279.17,-82.34 279.17,-82.34 285.17,-82.34 291.17,-88.34 291.17,-94.34 291.17,-94.34 291.17,-137.93 291.17,-137.93 291.17,-143.93 285.17,-149.93 279.17,-149.93" />
+<text text-anchor="middle" x="157.4" y="-128.71" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">Entry stub return</text>
+<text text-anchor="middle" x="157.4" y="-111.46" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">Keep result in R9 · restore registers</text>
+<text text-anchor="middle" x="157.4" y="-94.21" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">RAX ← result · iretq</text>
+</g>
+
+<g id="edge4" class="edge">
+<title>dispatch-&gt;restore</title>
+<path fill="none" stroke="#94a3b8" stroke-width="1.2" d="M157.4,-181.79C157.4,-174.76 157.4,-166.88 157.4,-159.11" />
+<polygon fill="#94a3b8" stroke="#94a3b8" stroke-width="1.2" points="159.85,-159.24 157.4,-152.24 154.95,-159.24 159.85,-159.24" />
+</g>
+
+<g id="node6" class="node">
+<title>caller</title>
+<path fill="#1e293b" stroke="#2dd4bf" stroke-width="1.4" d="M253.67,-50.34C253.67,-50.34 61.12,-50.34 61.12,-50.34 55.12,-50.34 49.13,-44.34 49.13,-38.34 49.13,-38.34 49.13,-12 49.13,-12 49.13,-6 55.13,0 61.13,0 61.13,0 253.67,0 253.67,0 259.67,0 265.67,-6 265.67,-12 265.67,-12 265.67,-38.34 265.67,-38.34 265.67,-44.34 259.67,-50.34 253.67,-50.34" />
+<text text-anchor="middle" x="157.4" y="-29.12" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">Ring 3 · caller resumes</text>
+<text text-anchor="middle" x="157.4" y="-11.87" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">RAX = result · R9 clobbered</text>
+</g>
+
+<g id="edge5" class="edge">
+<title>restore-&gt;caller</title>
+<path fill="none" stroke="#94a3b8" stroke-width="1.2" d="M157.4,-82.01C157.4,-74.55 157.4,-66.64 157.4,-59.19" />
+<polygon fill="#94a3b8" stroke="#94a3b8" stroke-width="1.2" points="159.85,-59.52 157.4,-52.52 154.95,-59.52 159.85,-59.52" />
+</g>
+</g>
+</svg>

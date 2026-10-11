@@ -18,6 +18,11 @@ Nothing happens at boot. The first `0x3f` call, or the shell's `hda` command, do
 
 ## Playing
 
+[![Userland writes PCM through syscall 0x3f into the kernel ring; controller DMA feeds the codec, while timer ticks and syscall calls zero samples already played.](../assets/diagrams/audio-pcm.svg)](../assets/diagrams/audio-pcm.svg)
+
+*PCM playback and reclamation. Writers supply samples without waiting; clearing
+the played region turns a stalled producer into silence.*
+
 The stream is the first output stream descriptor (after the input ones). It plays a ring of **128 KiB** in the kernel's `.bss` (about 0.68 s at 48 kHz), described by a 4-entry buffer descriptor list, round and round. Opening sets the format (16-bit, 2 channels, and the rate as a base of 48 or 44.1 kHz with a multiplier and divisor), clears the ring and starts the DMA.
 
 There are no interrupts. The timer tick and every `0x3f` call read the stream's position register (`LPIB`) with interrupts off. **What has just been played is zeroed at once.** So a program that stops writing, or dies, leaves silence going round the ring, not the last bit of sound over and over. A write takes as many whole samples as there is room for, never waits, and keeps 1 KiB clear of the play position.

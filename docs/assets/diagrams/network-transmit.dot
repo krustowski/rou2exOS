@@ -1,0 +1,18 @@
+// Title: Ethernet transmit routing order
+// Description: Raw Ethernet send checks tunnel routing before loopback and the physical NIC. A tunnel-selected frame is queued to wgd or returns Busy. A local frame is delivered without the NIC. Remaining frames go to the selected NIC backend.
+digraph transmit {
+  send [label="Userland raw Ethernet frame\nSyscall 0x34 · arg1 = 0x04"];
+  tunnel [label="Tunnel source +\nAllowedIPs destination?", shape=diamond];
+  wgd [label="Queue to wgd\nEncrypt → send outer UDP\nQueue failure returns Busy", color="#c4b5fd"];
+  loopback [label="Local destination?", shape=diamond];
+  local [label="Loopback delivery\nProcess frame queue", color="#2dd4bf"];
+  nic [label="Physical NIC\nPad to ≥60 bytes → selected backend", color="#fbbf24"];
+  rtl [label="RTL8139\nCopy TX buffer → TxAddr / TxStatus\nAdvance one of 4 descriptors"];
+  intel [label="Intel backend\nSubmit TX descriptor"];
+  send -> tunnel;
+  tunnel -> wgd [label="yes"];
+  tunnel -> loopback [label="no"];
+  loopback -> local [label="yes"];
+  loopback -> nic [label="no"];
+  nic -> rtl; nic -> intel;
+}

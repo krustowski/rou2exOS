@@ -1,0 +1,13 @@
+// Title: HD Audio PCM playback and silence reclamation
+// Description: Programs submit 16-bit stereo samples through nonblocking syscall 0x3f writes. The kernel copies accepted samples into a 128 KiB ring, leaving a 1 KiB guard; a four-entry descriptor list feeds controller DMA and the codec. Timer ticks and syscall calls poll LPIB and zero already played samples.
+digraph audio {
+  program [label="Userland audio producer\n16-bit stereo PCM"];
+  write [label="Syscall 0x3f · nonblocking write\nAccept whole samples that fit"];
+  ring [label="Kernel PCM ring · 128 KiB\nKeep 1 KiB clear of the play position"];
+  dma [label="HD Audio controller DMA\n4 buffer descriptors", color="#fbbf24"];
+  codec [label="Codec DAC → output pins\nSpeakers / headphones / line out"];
+  poll [label="Timer tick + 0x3f calls\nPoll LPIB; zero already played samples", color="#2dd4bf"];
+  program -> write -> ring -> dma -> codec;
+  dma -> poll [label="play position", style=dashed];
+  poll -> ring [label="silence reclaimed region", constraint=false];
+}

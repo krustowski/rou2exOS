@@ -1,0 +1,94 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="329pt" height="639pt" viewBox="0.00 0.00 328.74 639.33" role="img" aria-labelledby="boot-flow-title boot-flow-description">
+<title id="boot-flow-title">From GRUB to scheduled tasks</title><desc id="boot-flow-description">GRUB loads the kernel and archive; the 32-bit assembly entry sets up paging and the GDT, enters long mode, and calls kernel_main. Rust adopts the archive, initializes subsystems and starts scheduling.</desc><g id="graph0" class="graph" transform="scale(1 1) rotate(0) translate(21.6 617.73)">
+<title>boot</title>
+<polygon fill="#0f172a" stroke="none" points="-21.6,21.6 -21.6,-617.73 307.14,-617.73 307.14,21.6 -21.6,21.6" />
+
+<g id="node1" class="node">
+<title>grub</title>
+<path fill="#1e293b" stroke="#60a5fa" stroke-width="1.4" d="M265.29,-596.13C265.29,-596.13 20.25,-596.13 20.25,-596.13 14.25,-596.13 8.25,-590.13 8.25,-584.13 8.25,-584.13 8.25,-540.54 8.25,-540.54 8.25,-534.54 14.25,-528.54 20.25,-528.54 20.25,-528.54 265.29,-528.54 265.29,-528.54 271.29,-528.54 277.29,-534.54 277.29,-540.54 277.29,-540.54 277.29,-584.13 277.29,-584.13 277.29,-590.13 271.29,-596.13 265.29,-596.13" />
+<text text-anchor="middle" x="142.77" y="-574.91" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">GRUB / Multiboot2</text>
+<text text-anchor="middle" x="142.77" y="-557.66" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">Load kernel + usb.tar module</text>
+<text text-anchor="middle" x="142.77" y="-540.41" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">Pass magic and information pointer</text>
+</g>
+
+<g id="node2" class="node">
+<title>start</title>
+<path fill="#1e293b" stroke="#60a5fa" stroke-width="1.4" d="M273.54,-496.54C273.54,-496.54 12,-496.54 12,-496.54 6,-496.54 0,-490.54 0,-484.54 0,-484.54 0,-440.95 0,-440.95 0,-434.95 6,-428.95 12,-428.95 12,-428.95 273.54,-428.95 273.54,-428.95 279.54,-428.95 285.54,-434.95 285.54,-440.95 285.54,-440.95 285.54,-484.54 285.54,-484.54 285.54,-490.54 279.54,-496.54 273.54,-496.54" />
+<text text-anchor="middle" x="142.77" y="-475.32" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">_start · 32-bit protected mode</text>
+<text text-anchor="middle" x="142.77" y="-458.07" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">Save boot information</text>
+<text text-anchor="middle" x="142.77" y="-440.82" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">Build 0–4 GiB page tables + load GDT</text>
+</g>
+
+<g id="edge1" class="edge">
+<title>grub-&gt;start</title>
+<path fill="none" stroke="#94a3b8" stroke-width="1.2" d="M142.77,-528.3C142.77,-520.98 142.77,-513.14 142.77,-505.53" />
+<polygon fill="#94a3b8" stroke="#94a3b8" stroke-width="1.2" points="145.22,-505.57 142.77,-498.57 140.32,-505.57 145.22,-505.57" />
+</g>
+
+<g id="node3" class="node">
+<title>long</title>
+<path fill="#1e293b" stroke="#60a5fa" stroke-width="1.4" d="M243.54,-396.95C243.54,-396.95 42,-396.95 42,-396.95 36,-396.95 30,-390.95 30,-384.95 30,-384.95 30,-341.36 30,-341.36 30,-335.36 36,-329.36 42,-329.36 42,-329.36 243.54,-329.36 243.54,-329.36 249.54,-329.36 255.54,-335.36 255.54,-341.36 255.54,-341.36 255.54,-384.95 255.54,-384.95 255.54,-390.95 249.54,-396.95 243.54,-396.95" />
+<text text-anchor="middle" x="142.77" y="-375.73" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">Enable PAE + LME + paging</text>
+<text text-anchor="middle" x="142.77" y="-358.48" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">Far jump to long_mode_entry</text>
+<text text-anchor="middle" x="142.77" y="-341.23" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">Set 64-bit boot stack</text>
+</g>
+
+<g id="edge2" class="edge">
+<title>start-&gt;long</title>
+<path fill="none" stroke="#94a3b8" stroke-width="1.2" d="M142.77,-428.71C142.77,-421.39 142.77,-413.55 142.77,-405.94" />
+<polygon fill="#94a3b8" stroke="#94a3b8" stroke-width="1.2" points="145.22,-405.98 142.77,-398.98 140.32,-405.98 145.22,-405.98" />
+</g>
+
+<g id="node4" class="node">
+<title>main</title>
+<path fill="#1e293b" stroke="#60a5fa" stroke-width="1.4" d="M255.17,-297.36C255.17,-297.36 30.38,-297.36 30.38,-297.36 24.38,-297.36 18.38,-291.36 18.38,-285.36 18.38,-285.36 18.38,-259.02 18.38,-259.02 18.38,-253.02 24.38,-247.02 30.38,-247.02 30.38,-247.02 255.17,-247.02 255.17,-247.02 261.17,-247.02 267.17,-253.02 267.17,-259.02 267.17,-259.02 267.17,-285.36 267.17,-285.36 267.17,-291.36 261.17,-297.36 255.17,-297.36" />
+<text text-anchor="middle" x="142.77" y="-276.14" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">kernel_main</text>
+<text text-anchor="middle" x="142.77" y="-258.89" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">Adopt / relocate the boot archive</text>
+</g>
+
+<g id="edge3" class="edge">
+<title>long-&gt;main</title>
+<path fill="none" stroke="#94a3b8" stroke-width="1.2" d="M142.77,-329.03C142.77,-321.57 142.77,-313.66 142.77,-306.21" />
+<polygon fill="#94a3b8" stroke="#94a3b8" stroke-width="1.2" points="145.22,-306.54 142.77,-299.54 140.32,-306.54 145.22,-306.54" />
+</g>
+
+<g id="node5" class="node">
+<title>init</title>
+<path fill="#1e293b" stroke="#60a5fa" stroke-width="1.4" d="M272.04,-215.02C272.04,-215.02 13.5,-215.02 13.5,-215.02 7.5,-215.02 1.5,-209.02 1.5,-203.02 1.5,-203.02 1.5,-176.68 1.5,-176.68 1.5,-170.68 7.5,-164.68 13.5,-164.68 13.5,-164.68 272.04,-164.68 272.04,-164.68 278.04,-164.68 284.04,-170.68 284.04,-176.68 284.04,-176.68 284.04,-203.02 284.04,-203.02 284.04,-209.02 278.04,-215.02 272.04,-215.02" />
+<text text-anchor="middle" x="142.77" y="-193.8" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">init::check::init</text>
+<text text-anchor="middle" x="142.77" y="-176.55" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">Initialize subsystems and initial tasks</text>
+</g>
+
+<g id="edge4" class="edge">
+<title>main-&gt;init</title>
+<path fill="none" stroke="#94a3b8" stroke-width="1.2" d="M142.77,-246.65C142.77,-239.55 142.77,-231.68 142.77,-224.15" />
+<polygon fill="#94a3b8" stroke="#94a3b8" stroke-width="1.2" points="145.22,-224.33 142.77,-217.33 140.32,-224.33 145.22,-224.33" />
+</g>
+
+<g id="node6" class="node">
+<title>pit</title>
+<path fill="#1e293b" stroke="#2dd4bf" stroke-width="1.4" d="M261.17,-132.68C261.17,-132.68 24.38,-132.68 24.38,-132.68 18.38,-132.68 12.38,-126.68 12.38,-120.68 12.38,-120.68 12.38,-94.34 12.38,-94.34 12.38,-88.34 18.38,-82.34 24.38,-82.34 24.38,-82.34 261.17,-82.34 261.17,-82.34 267.17,-82.34 273.17,-88.34 273.17,-94.34 273.17,-94.34 273.17,-120.68 273.17,-120.68 273.17,-126.68 267.17,-132.68 261.17,-132.68" />
+<text text-anchor="middle" x="142.77" y="-111.46" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">Enable PIT interrupts</text>
+<text text-anchor="middle" x="142.77" y="-94.21" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">Scheduler can run the initial tasks</text>
+</g>
+
+<g id="edge5" class="edge">
+<title>init-&gt;pit</title>
+<path fill="none" stroke="#94a3b8" stroke-width="1.2" d="M142.77,-164.31C142.77,-157.21 142.77,-149.34 142.77,-141.81" />
+<polygon fill="#94a3b8" stroke="#94a3b8" stroke-width="1.2" points="145.22,-141.99 142.77,-134.99 140.32,-141.99 145.22,-141.99" />
+</g>
+
+<g id="node7" class="node">
+<title>idle</title>
+<path fill="#1e293b" stroke="#c4b5fd" stroke-width="1.4" d="M224.42,-50.34C224.42,-50.34 61.12,-50.34 61.12,-50.34 55.12,-50.34 49.13,-44.34 49.13,-38.34 49.13,-38.34 49.13,-12 49.13,-12 49.13,-6 55.13,0 61.13,0 61.13,0 224.42,0 224.42,0 230.42,0 236.42,-6 236.42,-12 236.42,-12 236.42,-38.34 236.42,-38.34 236.42,-44.34 230.42,-50.34 224.42,-50.34" />
+<text text-anchor="middle" x="142.77" y="-29.12" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">kernel_main idle path</text>
+<text text-anchor="middle" x="142.77" y="-11.87" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">Or kernel_test self-tests</text>
+</g>
+
+<g id="edge6" class="edge">
+<title>pit-&gt;idle</title>
+<path fill="none" stroke="#94a3b8" stroke-width="1.2" d="M142.77,-81.97C142.77,-74.87 142.77,-67 142.77,-59.47" />
+<polygon fill="#94a3b8" stroke="#94a3b8" stroke-width="1.2" points="145.22,-59.65 142.77,-52.65 140.32,-59.65 145.22,-59.65" />
+</g>
+</g>
+</svg>

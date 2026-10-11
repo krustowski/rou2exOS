@@ -1,0 +1,117 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="476pt" height="670pt" viewBox="0.00 0.00 476.49 669.92" role="img" aria-labelledby="init-sequence-title init-sequence-description">
+<title id="init-sequence-title">Ordered subsystem initialization</title><desc id="init-sequence-description">The 18 initialization steps run in order: console and CPU, interrupts and boot tags, USB and PS/2, memory and video, mounts and splash, processes and debug log, then PIT interrupts. INIT.RC runs as a scheduled task afterwards.</desc><g id="graph0" class="graph" transform="scale(1 1) rotate(0) translate(21.6 648.32)">
+<title>init</title>
+<polygon fill="#0f172a" stroke="none" points="-21.6,21.6 -21.6,-648.32 454.89,-648.32 454.89,21.6 -21.6,21.6" />
+
+<g id="node1" class="node">
+<title>console</title>
+<path fill="#1e293b" stroke="#60a5fa" stroke-width="1.4" d="M347.04,-626.72C347.04,-626.72 75,-626.72 75,-626.72 69,-626.72 63,-620.72 63,-614.72 63,-614.72 63,-588.38 63,-588.38 63,-582.38 69,-576.38 75,-576.38 75,-576.38 347.04,-576.38 347.04,-576.38 353.04,-576.38 359.04,-582.38 359.04,-588.38 359.04,-588.38 359.04,-614.72 359.04,-614.72 359.04,-620.72 353.04,-626.72 347.04,-626.72" />
+<text text-anchor="middle" x="211.02" y="-605.5" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">1–3 · Console + CPU</text>
+<text text-anchor="middle" x="211.02" y="-588.25" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">VGA writer → clear screen → CPU setup</text>
+</g>
+
+<g id="node2" class="node">
+<title>interrupts</title>
+<path fill="#1e293b" stroke="#60a5fa" stroke-width="1.4" d="M332.04,-544.38C332.04,-544.38 90,-544.38 90,-544.38 84,-544.38 78,-538.38 78,-532.38 78,-532.38 78,-506.04 78,-506.04 78,-500.04 84,-494.04 90,-494.04 90,-494.04 332.04,-494.04 332.04,-494.04 338.04,-494.04 344.04,-500.04 344.04,-506.04 344.04,-506.04 344.04,-532.38 344.04,-532.38 344.04,-538.38 338.04,-544.38 332.04,-544.38" />
+<text text-anchor="middle" x="211.02" y="-523.16" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">4–5 · Interrupts + boot information</text>
+<text text-anchor="middle" x="211.02" y="-505.91" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">GDT / TSS / IDT → Multiboot2 tags</text>
+</g>
+
+<g id="edge1" class="edge">
+<title>console-&gt;interrupts</title>
+<path fill="none" stroke="#94a3b8" stroke-width="1.2" d="M211.02,-576.01C211.02,-568.91 211.02,-561.04 211.02,-553.51" />
+<polygon fill="#94a3b8" stroke="#94a3b8" stroke-width="1.2" points="213.47,-553.69 211.02,-546.69 208.57,-553.69 213.47,-553.69" />
+</g>
+
+<g id="node3" class="node">
+<title>devices</title>
+<path fill="#1e293b" stroke="#60a5fa" stroke-width="1.4" d="M402.17,-462.04C402.17,-462.04 19.88,-462.04 19.88,-462.04 13.88,-462.04 7.88,-456.04 7.88,-450.04 7.88,-450.04 7.88,-423.7 7.88,-423.7 7.88,-417.7 13.88,-411.7 19.88,-411.7 19.88,-411.7 402.17,-411.7 402.17,-411.7 408.17,-411.7 414.17,-417.7 414.17,-423.7 414.17,-423.7 414.17,-450.04 414.17,-450.04 414.17,-456.04 408.17,-462.04 402.17,-462.04" />
+<text text-anchor="middle" x="211.02" y="-440.82" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">6–8 · Input + RAM validation</text>
+<text text-anchor="middle" x="211.02" y="-423.57" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">Optional USB handoff → mouse → process-frame check</text>
+</g>
+
+<g id="edge2" class="edge">
+<title>interrupts-&gt;devices</title>
+<path fill="none" stroke="#94a3b8" stroke-width="1.2" d="M211.02,-493.67C211.02,-486.57 211.02,-478.7 211.02,-471.17" />
+<polygon fill="#94a3b8" stroke="#94a3b8" stroke-width="1.2" points="213.47,-471.35 211.02,-464.35 208.57,-471.35 213.47,-471.35" />
+</g>
+
+<g id="node4" class="node">
+<title>memory</title>
+<path fill="#1e293b" stroke="#60a5fa" stroke-width="1.4" d="M410.04,-379.7C410.04,-379.7 12,-379.7 12,-379.7 6,-379.7 0,-373.7 0,-367.7 0,-367.7 0,-341.36 0,-341.36 0,-335.36 6,-329.36 12,-329.36 12,-329.36 410.04,-329.36 410.04,-329.36 416.04,-329.36 422.04,-335.36 422.04,-341.36 422.04,-341.36 422.04,-367.7 422.04,-367.7 422.04,-373.7 416.04,-379.7 410.04,-379.7" />
+<text text-anchor="middle" x="211.02" y="-358.48" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">9–11 · Heap + display</text>
+<text text-anchor="middle" x="211.02" y="-341.23" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">Kernel heap → video selection → framebuffer cache mode</text>
+</g>
+
+<g id="edge3" class="edge">
+<title>devices-&gt;memory</title>
+<path fill="none" stroke="#94a3b8" stroke-width="1.2" d="M211.02,-411.33C211.02,-404.23 211.02,-396.36 211.02,-388.83" />
+<polygon fill="#94a3b8" stroke="#94a3b8" stroke-width="1.2" points="213.47,-389.01 211.02,-382.01 208.57,-389.01 213.47,-389.01" />
+</g>
+
+<g id="node5" class="node">
+<title>mounts</title>
+<path fill="#1e293b" stroke="#60a5fa" stroke-width="1.4" d="M376.67,-297.36C376.67,-297.36 45.38,-297.36 45.38,-297.36 39.38,-297.36 33.38,-291.36 33.38,-285.36 33.38,-285.36 33.38,-259.02 33.38,-259.02 33.38,-253.02 39.38,-247.02 45.38,-247.02 45.38,-247.02 376.67,-247.02 376.67,-247.02 382.67,-247.02 388.67,-253.02 388.67,-259.02 388.67,-259.02 388.67,-285.36 388.67,-285.36 388.67,-291.36 382.67,-297.36 376.67,-297.36" />
+<text text-anchor="middle" x="211.02" y="-276.14" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">12–15 · Filesystems + splash</text>
+<text text-anchor="middle" x="211.02" y="-258.89" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">Floppy probe → VFS mounts → colours → splash</text>
+</g>
+
+<g id="edge4" class="edge">
+<title>memory-&gt;mounts</title>
+<path fill="none" stroke="#94a3b8" stroke-width="1.2" d="M211.02,-328.99C211.02,-321.89 211.02,-314.02 211.02,-306.49" />
+<polygon fill="#94a3b8" stroke="#94a3b8" stroke-width="1.2" points="213.47,-306.67 211.02,-299.67 208.57,-306.67 213.47,-306.67" />
+</g>
+
+<g id="node6" class="node">
+<title>tasks</title>
+<path fill="#1e293b" stroke="#2dd4bf" stroke-width="1.4" d="M350.79,-215.02C350.79,-215.02 71.25,-215.02 71.25,-215.02 65.25,-215.02 59.25,-209.02 59.25,-203.02 59.25,-203.02 59.25,-176.68 59.25,-176.68 59.25,-170.68 65.25,-164.68 71.25,-164.68 71.25,-164.68 350.79,-164.68 350.79,-164.68 356.79,-164.68 362.79,-170.68 362.79,-176.68 362.79,-176.68 362.79,-203.02 362.79,-203.02 362.79,-209.02 356.79,-215.02 350.79,-215.02" />
+<text text-anchor="middle" x="211.02" y="-193.8" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">16–18 · Start multitasking</text>
+<text text-anchor="middle" x="211.02" y="-176.55" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">Initial tasks → KERNDBG.LOG → PIC / PIT</text>
+</g>
+
+<g id="edge5" class="edge">
+<title>mounts-&gt;tasks</title>
+<path fill="none" stroke="#94a3b8" stroke-width="1.2" d="M211.02,-246.65C211.02,-239.55 211.02,-231.68 211.02,-224.15" />
+<polygon fill="#94a3b8" stroke="#94a3b8" stroke-width="1.2" points="213.47,-224.33 211.02,-217.33 208.57,-224.33 213.47,-224.33" />
+</g>
+
+<g id="node7" class="node">
+<title>script</title>
+<path fill="#1e293b" stroke="#60a5fa" stroke-width="1.4" d="M286.67,-132.68C286.67,-132.68 135.38,-132.68 135.38,-132.68 129.38,-132.68 123.38,-126.68 123.38,-120.68 123.38,-120.68 123.38,-94.34 123.38,-94.34 123.38,-88.34 129.38,-82.34 135.38,-82.34 135.38,-82.34 286.67,-82.34 286.67,-82.34 292.67,-82.34 298.67,-88.34 298.67,-94.34 298.67,-94.34 298.67,-120.68 298.67,-120.68 298.67,-126.68 292.67,-132.68 286.67,-132.68" />
+<text text-anchor="middle" x="211.02" y="-111.46" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">Scheduled init_rc task</text>
+<text text-anchor="middle" x="211.02" y="-94.21" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">Run INIT.RC</text>
+</g>
+
+<g id="edge6" class="edge">
+<title>tasks-&gt;script</title>
+<path fill="none" stroke="#94a3b8" stroke-width="1.2" d="M211.02,-164.31C211.02,-157.21 211.02,-149.34 211.02,-141.81" />
+<polygon fill="#94a3b8" stroke="#94a3b8" stroke-width="1.2" points="213.47,-141.99 211.02,-134.99 208.57,-141.99 213.47,-141.99" />
+</g>
+
+<g id="node8" class="node">
+<title>text</title>
+<path fill="#1e293b" stroke="#60a5fa" stroke-width="1.4" d="M170.42,-50.34C170.42,-50.34 35.62,-50.34 35.62,-50.34 29.62,-50.34 23.63,-44.34 23.63,-38.34 23.63,-38.34 23.63,-12 23.63,-12 23.63,-6 29.63,0 35.63,0 35.63,0 170.42,0 170.42,0 176.42,0 182.42,-6 182.42,-12 182.42,-12 182.42,-38.34 182.42,-38.34 182.42,-44.34 176.42,-50.34 170.42,-50.34" />
+<text text-anchor="middle" x="103.02" y="-29.12" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">Text session</text>
+<text text-anchor="middle" x="103.02" y="-11.87" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">Kernel shell + clock</text>
+</g>
+
+<g id="edge7" class="edge">
+<title>script-&gt;text</title>
+<path fill="none" stroke="#94a3b8" stroke-width="1.2" d="M178.03,-81.97C167.04,-73.79 154.67,-64.59 143.19,-56.05" />
+<polygon fill="#94a3b8" stroke="#94a3b8" stroke-width="1.2" points="144.72,-54.13 137.64,-51.92 141.79,-58.07 144.72,-54.13" />
+</g>
+
+<g id="node9" class="node">
+<title>gui</title>
+<path fill="#1e293b" stroke="#c4b5fd" stroke-width="1.4" d="M421.29,-50.34C421.29,-50.34 216.75,-50.34 216.75,-50.34 210.75,-50.34 204.75,-44.34 204.75,-38.34 204.75,-38.34 204.75,-12 204.75,-12 204.75,-6 210.75,0 216.75,0 216.75,0 421.29,0 421.29,0 427.29,0 433.29,-6 433.29,-12 433.29,-12 433.29,-38.34 433.29,-38.34 433.29,-44.34 427.29,-50.34 421.29,-50.34" />
+<text text-anchor="middle" x="319.02" y="-29.12" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">Graphics framebuffer session</text>
+<text text-anchor="middle" x="319.02" y="-11.87" font-family="DejaVu Sans" font-size="14.00" fill="#e2e8f0">init_rc supervises Memento</text>
+</g>
+
+<g id="edge8" class="edge">
+<title>script-&gt;gui</title>
+<path fill="none" stroke="#94a3b8" stroke-width="1.2" d="M244.01,-81.97C255,-73.79 267.37,-64.59 278.85,-56.05" />
+<polygon fill="#94a3b8" stroke="#94a3b8" stroke-width="1.2" points="280.25,-58.07 284.4,-51.92 277.32,-54.13 280.25,-58.07" />
+</g>
+</g>
+</svg>

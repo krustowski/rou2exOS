@@ -5,9 +5,13 @@ repo_url: "https://github.com/krustowski/rou2exOS"
 repo_name: krustowski/rou2exOS
 dev_addr: 0.0.0.0:8009
 
+# Theme templates live under docs but are not published as static pages.
+exclude_docs: |
+  /docs_theme/
+
 theme:
   name: material
-  custom_dir: docs_theme
+  custom_dir: docs/docs_theme
   language: en
   palette:
     scheme: slate

@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+
+{% block content %}
+  {% if page and not page.is_homepage %}
+    <nav class="r2-breadcrumb" aria-label="Breadcrumb">
+      <ol>
+        <li><a href="{{ nav.homepage.url | url }}">Home</a></li>
+        {% for section in page.ancestors | reverse %}
+          {% set entry = section.children | first %}
+          <li>
+            {% if entry.is_page and entry.file.name in ["index", "overview", "kernel", "syscall_specification", "apps"] %}
+              <a href="{{ entry.url | url }}">{{ section.title }}</a>
+            {% else %}
+              <span>{{ section.title }}</span>
+            {% endif %}
+          </li>
+        {% endfor %}
+        <li><span aria-current="page">{{ page.title }}</span></li>
+      </ol>
+    </nav>
+  {% endif %}
+  {{ super() }}
+{% endblock %}

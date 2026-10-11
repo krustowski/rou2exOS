@@ -436,7 +436,7 @@ Nginx examples in `docs/assets/configs/` mirror `configs/jug-*.nginx.example`;
 refresh them when those source snippets change. Strict validation reports
 missing navigation entries, missing files and broken heading anchors.
 
-`docs_theme/main.html` adds the breadcrumb trail, with styles in
+`docs/docs_theme/main.html` adds the breadcrumb trail, with styles in
 `docs/assets/stylesheets/navigation.css`. Section overview files keep their
 existing URLs; the sidebar, tabs and previous/next links come from the Material
 theme and `nav`.

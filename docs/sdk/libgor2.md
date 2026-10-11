@@ -135,7 +135,9 @@ A program built with `-tags=r2largeheap` takes its collector arena from the user
 
 A failing syscall returns an `Errno`, which implements `error` (`libgor2.EFileNotFound`, `libgor2.EInvalidInput`, …). Calls that answer with a count or handle (`Ticks`, `ListTasks`, `Run`, `Receive`) return it directly.
 
-`ReadSysInfo` and `ReadMemInfo` return `EBusy` when the kernel was holding a lock; ask again. `Send` always transmits 512 bytes, padding a shorter buffer with zeroes, and `NewPacket` refuses a buffer shorter than 512 bytes. Give `Receive` a 2048-byte buffer, because the kernel copies the whole frame without being told the buffer's size.
+`ReadSysInfo` and `ReadMemInfo` return `EBusy` when the kernel was holding a lock; ask again. `Send` passes 512 bytes, padding a shorter buffer with zeroes, but the current
+[legacy send path](../multitasking/IPC.md#legacy-send-path) does not reliably
+deliver them. `NewPacket` refuses a buffer shorter than 512 bytes. Give `Receive` a 2048-byte buffer, because the kernel copies the whole frame without being told the buffer's size.
 
 Go has no `packed`, so the three ABI structures with a wide field at an odd offset (`RTC.Year`, `VfsDirEntry.Size`, `TaskInfo.RIP`) hold that field as bytes behind an accessor. Each structure's size is asserted at compile time.
 
@@ -150,6 +152,16 @@ Go has no `packed`, so the three ABI structures with a wide field at an odd offs
 ### Capture metadata
 
 `CaptureFramebufferRGB24ScaledIfNew` is syscall `0x1d` with its [metadata](../abi/syscalls/video_audio.md#metadata-bit-63-of-argument-2), through `Syscall3`. It takes a `*FBCaptureInfo`: leave `FrameID` at zero to always copy, or pass the last ID accepted to get `EUnchanged`, with the pixels left as they were, while the 640×480 snapshot has not changed. On the way out the struct names the frame and its time in milliseconds, and `Flags & FBCaptureInfoSnapshot` says it came from a stable snapshot in RAM. An older kernel does an ordinary capture and leaves the flags and timestamp at zero.
+
+### Network monitoring
+
+`ReadNetStats(&stats)` reads physical NIC totals and their millisecond timestamp
+(`0x45`, `NetStats`). `ReadNetPorts(&table)` reads TCP port owners with full
+64-bit PIDs, bounded 16-byte process names and the global driver's PID
+(`0x46`, `NetPortTable`). `NetPortOwner(port)` returns `(binding, found, error)`.
+`EInvalidSyscall` indicates an older kernel; `EBusy` from the port table means
+retry. See [network monitoring](../abi/syscalls/port_networking.md#0x45-network-throughput-statistics)
+for the layouts and byte accounting rules.
 
 ### Testing the binding
 
@@ -219,3 +231,7 @@ Measured by `routtest`:
 - **Taking the address of a local costs an allocation.** Passing `uintptr(unsafe.Pointer(&v))` to a syscall makes TinyGo move `v` to the heap on every call. In a loop, hoist the variable to a package-level cell, as `libgor2` does.
 - **Mode 13h must be left explicitly** with `SetVideoMode(Mode03Text)`, and `Clear()` (syscall `0x11`) clears only the text writer.
 - **A reported framebuffer may be the text buffer.** On the text-mode kernel `GetFBInfo` reports 80×25 at 16 bpp; check for 32 bpp before blitting.
+
+---
+
+Related documentation: [SDK Overview](index.md), [Application Suite](apps.md), [Networking Overview](../networking/overview.md), [ABI Specification](../abi/syscall_specification.md).

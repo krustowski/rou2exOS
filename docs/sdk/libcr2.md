@@ -80,7 +80,7 @@ int main(int argc, char **argv) {
 | Memory | `malloc`, `realloc`, `free` — on the kernel's shared userland heap, its extension included; `shared_heap_contains(ptr, size)` says whether a whole range lies in it without touching it (syscall `0x43`; on older kernels only the original 4 MiB can be checked) |
 | Ports, serial | `read_port`, `write_port`, `serial_init`, `serial_read`, `serial_write` |
 | IPC | `send_data`, `receive_data`, `receive_data_nb` (syscalls `0x36`, `0x35`) |
-| Networking | `new_packet`, `send_packet`, `send_eth_frame`, `net_register`, `net_bind_port`, `net_unbind_port`, `get_net_status`, `get_net_config`, `set_net_config`, `net_*`; sockets: `bind`, `listen`, `tcp_read`, `tcp_write`, `tcp_close` (also `read`, `write`, `close`), `on_tcp_packet` |
+| Networking | `new_packet`, `send_packet`, `send_eth_frame`, `net_register`, `net_bind_port`, `net_unbind_port`, `get_net_status`, `get_net_stats`, `get_net_ports`, `net_port_owner`, `get_net_config`, `set_net_config`, `net_*`; sockets: `bind`, `listen`, `tcp_read`, `tcp_write`, `tcp_close` (also `read`, `write`, `close`), `on_tcp_packet` |
 
 For bigger files, prefer `read_file_at` / `write_file_at` (syscalls `0x39` / `0x3a`): `read_file` is never told the size of its buffer, and `write_file` always writes exactly one 512-byte block.
 
@@ -90,11 +90,24 @@ For bigger files, prefer `read_file_at` / `write_file_at` (syscalls `0x39` / `0x
 
 `net.c` implements, on top of the raw packet syscalls, everything a server needs: SLIP decoding for the serial link, ARP, ICMP echo, a DHCP client and a passive TCP socket pool. The [`ETH`](apps.md) driver uses it to register as the machine's Ethernet driver and obtain an address; [`GARN`](apps.md), [`TNT`](apps.md) and [`CHAT`](apps.md) bind TCP ports on top of it.
 
-By default the Ethernet driver reads frames from the process's kernel queue (syscall `0x35`). A process has only one queue, so a program that runs a second network stack next to libcr2's cannot let both read it: each would take and discard the other's frames. Such a program reads the queue itself and passes libcr2 its frames through `net_set_frame_source(fn)`. The callback fills a buffer with one frame and returns its length, or 0 when no frame is waiting; a blocking call waits for one. Passing `NULL` returns libcr2 to the kernel queue. [Memento](memento.md) does this so that its web browser and its Chat and IRC windows can share one queue. libcr2's frame buffer is 1518 bytes, because the kernel delivers frames with the card's 4-byte CRC still attached.
+By default the Ethernet driver reads frames from the process's kernel queue (syscall `0x35`). A process has only one queue, so a program that runs a second network stack next to libcr2's cannot let both read it: each would take and discard the other's frames. Such a program reads the queue itself and passes libcr2 its frames through `net_set_frame_source(fn)`. The callback fills a buffer with one frame and returns its length, or 0 when no frame is waiting; a blocking call waits for one. Passing `NULL` returns libcr2 to the kernel queue. [Memento](memento.md) uses this to share its own browser-engine networking
+with Chat, IRC and network tools; hosted Web and Telegram processes have their
+own queues. libcr2's frame buffer is 1518 bytes to accommodate the RTL8139's
+attached 4-byte FCS; the Intel backend strips it in hardware.
 
 Current TCP sockets keep the incoming local destination address and use it as the reply source, allowing services to answer connections made to the [WireGuard tunnel address](../networking/wireguard.md). Relink older server binaries to get the fix. New outbound tunnel connections require the network stack to select that source address explicitly; the physical configuration read by `get_net_config` remains the Ethernet configuration.
 
 The kernel-side model (driver registration, port binding, per-tick frame delivery and tunnel routing) is described in [Networking Overview](../networking/overview.md).
+
+### Network monitoring
+
+`get_net_stats(&stats)` reads system physical NIC totals and their millisecond
+timestamp (`0x45`, `NetStats_T`, 40 bytes). `get_net_ports(&table)` reads full
+64-bit TCP owner PIDs, 16-byte process names and the global driver's PID
+(`0x46`, `NetPortTable_T`, 528 bytes). `net_port_owner(port, &owner)` scans a
+fresh table and returns `0` if found, `0xfe` if unbound, or a syscall error.
+Reads return `0` on success, `0xff` on older kernels; `get_net_ports` may
+return `0xfa` (busy, retry). See the [counter semantics and ABI layouts](../abi/syscalls/port_networking.md#0x45-network-throughput-statistics).
 
 ---
 
@@ -119,3 +132,7 @@ The names on the right exist in every build, so the apps here, built with `-nost
 - **`memcpy` takes a `uint16_t` length** and silently truncates copies over 65535 bytes. Programs on the TCC port's C library get that library's `memcpy` instead.
 
 `syscall()` loads the number into both `RAX` (what the kernel reads) and `RDX` (what older kernels read), passes its third argument in `RCX` (read by [`0x1d`](../abi/syscalls/video_audio.md#metadata-bit-63-of-argument-2) with its opt-in bit, and by [`0x44`](../abi/syscalls/port_networking.md#0x44-userspace-ipv4-tunnel), which requires a frame length for operation 3 and zero otherwise), and lists `R9` as clobbered. Earlier versions loaded `RDX` only and left `R9` out of the clobbers; programs built against them should be rebuilt.
+
+---
+
+Related documentation: [SDK Overview](index.md), [C++ Library](libcxxr2.md), [TCC](tcc.md), [Ports and Networking ABI](../abi/syscalls/port_networking.md).

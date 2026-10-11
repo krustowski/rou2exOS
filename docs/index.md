@@ -1,8 +1,22 @@
-# Intro
+# rou2exOS Documentation
 
  A second iteration of a DOS-inspired hobby OS. Written in Rust and x86 assembly. It boots, runs, executes, schedules, renders and does networking.
 
- Check it out on [Github](https://github.com/krustowski/rou2exOS)!
+ Check it out on [GitHub](https://github.com/krustowski/rou2exOS)!
+
+## Where to Start
+
+| If you want to… | Read |
+|-----------------|------|
+| Build or boot the system | [Build and Run](build.md) |
+| Use the text-mode rescue shell | [Kernel Shell](shell.md) |
+| Use the desktop or install updates | [Memento](sdk/memento.md), [Jug](sdk/jug.md) |
+| Write a program | [SDK Overview](sdk/index.md), [C](sdk/libcr2.md), [C++](sdk/libcxxr2.md), [Go](sdk/libgor2.md), [TCC on r2](sdk/tcc.md) |
+| Publish programs to Jug | [Publishing Jug Programs](sdk/jug-publishing.md) |
+| Call the kernel directly | [ABI Specification](abi/syscall_specification.md), [Type Definitions](abi/type_definitions.md) |
+| Understand or debug the kernel | [Kernel Internals](kernel.md) |
+
+## System at a Glance
 
 ![memento-welcome](assets/r2-memento-start-screen.png)
 
@@ -32,14 +46,26 @@ The kernel speaks directly to the hardware:
 
 + ISA DMA for floppy I/O (FAT12, read/write, with a track cache), 
 + ATAPI PIO for CD-ROM (ISO9660, read-only; carries the shipped programs in `/bin`), 
-+ an RTL8139 NIC for Ethernet/TCP networking, 
++ an RTL8139 or supported Intel NIC for Ethernet, with TCP/IP stacks in userland,
 + a VESA framebuffer or VGA text mode for output, plus VGA mode 13h for userland,
 + a PS/2 keyboard and mouse,
-+ the PC speaker (tones and Standard MIDI Files). 
++ the PC speaker (tones and Standard MIDI Files), and HD Audio for stereo PCM.
+
+The current tree supports 32 scheduler slots, a shared user heap that grows
+past its initial 4 MiB, and a writable [RAM disk](filesystem/overview.md#ram-disk-mnttmp-fsmemdisk).
+GRUB also loads a [boot archive](filesystem/overview.md#boot-medium-archive-mnttar)
+so programs remain available when booted from USB. The graphics kernel starts
+[Memento](sdk/memento.md) as its supervised desktop; [Jug](sdk/jug.md) can update
+and relaunch it without rebooting. [WireGuard](networking/wireguard.md) supplies
+an optional userland IPv4 tunnel, and [network monitoring](networking/overview.md#network-monitoring)
+reports NIC totals and TCP port owners.
 
 ## Releases
 
-To run the latest release of the kernel (`r2.iso`) and the aux floppy image (`fat.img`), just visit link below and download both files to your machine. The ISO carries the kernel and the userland programs; the floppy carries the startup script, configuration and data.
+Download `r2.iso` and, when supplied, the optional `fat.img` from a release.
+The ISO carries the kernel, programs and boot archive; the floppy supplies
+writable configuration and data. Release images can lag behind the behavior
+documented for the current source tree.
 
 + [Releases on github.com](https://github.com/krustowski/rou2exOS/releases)
 
@@ -53,17 +79,6 @@ qemu-system-x86_64 -boot d -cdrom r2.iso -fda fat.img
 
 + [rou2exOS kernel](https://github.com/krustowski/rou2exOS) — this kernel and its documentation
 + [rou2exOS-apps](https://github.com/krustowski/rou2exOS-apps) — the SDK (`libcr2`, `libc++r2`, `libgor2`, `r2net`) and the [application suite](sdk/apps.md)
-
-## Where to Start
-
-| If you want to… | Read |
-|-----------------|------|
-| Run the system | [Build & Run](build.md) |
-| Use the kernel shell | [Shell](shell.md) |
-| Write a program for `r2` | [SDK Overview](sdk/index.md) |
-| Call the kernel directly | [Syscall Specification](abi/syscall_specification.md) |
-| Understand the kernel | [Boot / Init](init/overview.md), [Scheduler](multitasking/scheduler.md), [Memory](memory/overview.md), [HD Audio](audio/hda.md) |
-
 
 ## Blog posts
 

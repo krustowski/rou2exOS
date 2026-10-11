@@ -8,14 +8,16 @@ Run `make init` once to install the toolchain:
 make init
 ```
 
-This installs:
+This installs the Rust tools listed below. The other host utilities must be
+installed separately:
 
 - Rust nightly via `rustup`
 - Target `x86_64-unknown-none`
 - Components `rust-src` and `llvm-tools-preview`
 - `bootimage` cargo subcommand
-- `grub2-mkrescue` must be present on the host (package: `grub2-tools-extra` or equivalent)
-- `mtools` (`mmd`, `mcopy`) for floppy image creation
+- `grub2-mkrescue`, `xorriso`, GNU Make and `tar` for ISO/archive creation
+- QEMU (`qemu-system-x86_64`) for the run targets
+- `mtools` (`mmd`, `mcopy`) and `mkfs.fat` for floppy image creation
 
 ---
 
@@ -34,7 +36,9 @@ Produces `r2.iso`. Internally runs two cargo invocations (with `-Z build-std=cor
 | `kernel_text` | `iso/boot/kernel_text.elf` | VGA text-mode path |
 | `kernel_graphics` | `iso/boot/kernel_graphics.elf` | VESA framebuffer path |
 
-The two are the same kernel apart from the multiboot header: the graphics one asks GRUB for a 32-bit framebuffer of no particular size, so GRUB takes its own choice (with the BIOS VBE driver, the monitor's preferred mode from its EDID). The framebuffer is mapped write-combining at boot (`src/video/wc.rs`); uncached, as the firmware leaves it, drawing on it on real hardware cost a bus transaction per pixel. The kernel's console still writes to VGA text memory, which is not shown in a framebuffer mode, so the graphics kernel's desktop is Memento instead: once `INIT.RC` has run, `init_rc` starts `fg memento`. The graphics kernel starts no kernel shell (`kshell`): nothing it prints could be seen, and it reads the same keys as the programs do, so what was typed into Memento would have been run as commands too. Its `INIT.RC` comes from the floppy when there is one, and otherwise from `/mnt/tar/opt/init.rc` (then `/mnt/iso/opt/init.rc`), which `build_iso` copies from `configs/init.rc`: booted from a USB stick there is no floppy, and that is where `bg eth` comes from. On either kernel only the file's own length is run, not the stale bytes after it in its last cluster. Memento fills the screen: its desktop is the framebuffer's size divided by the largest whole number that leaves at least 640x400 (1920x1080 is a 960x540 desktop drawn at 2x), in 256 colours, and only the rows that changed are sent (syscall [`0x19`](abi/syscalls/video_audio.md#0x19-blit-an-8-bit-indexed-frame)). If GRUB picks a mode other than the monitor's own, name it in `grub.cfg`'s graphics entry, before `multiboot2`: `set gfxpayload=1920x1080x32`. When Memento ends (Esc on its first screen) the machine restarts, by ACPI (see [`reboot`](shell.md#reboot)); a Memento that ran for less than five seconds, one that could not start, does not restart it. Leave `fg memento` out of `INIT.RC` for this boot, or it starts twice. The text kernel is unchanged: its shell, and Memento in 640x400x16 on the VGA.
+The feature selects the Multiboot2 header and graphics-session startup policy.
+The graphics header requests a 32-bit framebuffer without a fixed resolution;
+GRUB chooses the mode. Both builds share the same kernel subsystems.
 
 Both ELFs are placed inside `iso/boot/`. `build_iso` then copies the userland binaries from the [apps repository](sdk/index.md) (expected at `../r2_app`) into `iso/bin/`, and `grub2-mkrescue` assembles the `iso/` tree into `r2.iso` with the modules `multiboot2 video video_bochs video_cirrus gfxterm all_video`.
 
@@ -45,8 +49,48 @@ The resulting ISO is mounted at `/mnt/iso` at boot:
 | `/boot` | `kernel_text.elf`, `kernel_graphics.elf`, GRUB config |
 | `/bin` | Userland programs (`eth`, `wgd`, `garn`, `tnt`, `chat`, `sh`, `fsck`, `nsk`, `them`, `hellofs`, `hello`, `dish`, `gfxdemo`, `routtest`, `snake`, …). Searched by `bg`/`fg` when a binary is not in the working directory. |
 | `/games` | Optional DOS games for the `THEM` emulator (not part of the repository) |
+| `/opt` | Startup script, application configurations, CA bundle, bsh examples and C8 ROMs |
+| `/include`, `/lib` | TCC headers, startup objects and libraries |
+| `/sound`, `/pics`, `/video` | Staged MIDI files, images and films |
 
-Build the apps first (see [SDK](sdk/index.md)); `build_iso` fails if a listed binary is missing.
+The current `build_iso` target rebuilds Memento through `build_desktop`, plus
+selected C applications (`cube`, `c8`, `r2sh`, `tnt`, `wgd`, `chat`). It copies
+other prebuilt binaries from `../r2_app` and stages TCC's sysroot, configurations,
+media and application data. Build those dependencies first; missing inputs
+stop the target. Some inputs are machine-specific, including `../../tcpp/r2`
+and game directories under the developer's `Downloads` directory.
+
+Everything outside `iso/boot/` is also packed as `iso/boot/usb.tar`, which GRUB
+loads as a module. The kernel mounts that archive at `/mnt/tar`; it is the
+source of programs and data when booted from USB without a storage driver.
+See [Boot Medium Archive](filesystem/overview.md#boot-medium-archive-mnttar).
+
+### Graphics session
+
+The graphics kernel maps the framebuffer write-combining at boot. When GRUB
+provides an RGB framebuffer, it starts neither `kshell` nor `kclock`; Memento
+provides the visible desktop, shell window and clock.
+
+`init_rc` runs the startup script and then starts Memento in the foreground.
+Use the floppy's `INIT.RC` when present; an empty or missing script on the
+graphics build falls back to `/mnt/tar/opt/init.rc`, then `/mnt/iso/opt/init.rc`.
+The build copies `configs/init.rc` to both boot-medium copies. Keep `fg memento`
+out of the graphics startup script, since the session launcher starts it itself.
+
+Memento scales its desktop by the largest whole number that leaves at least
+640×400 pixels (1920×1080 gives 960×540 at 2×), uses 256 colours, and sends
+changed rows through [indexed blitting](abi/syscalls/video_audio.md#0x19-blit-an-8-bit-indexed-frame).
+To request a particular GRUB mode, add `set gfxpayload=1920x1080x32` before
+`multiboot2` in the graphics menu entry.
+
+The launcher stays alive as the desktop supervisor. After a cooperative
+[Jug relaunch](sdk/jug.md), it preserves Memento's arguments, adds `--relaunch`
+and starts the updated copy without rerunning the script or rebooting. An
+ordinary exit, kill or crash restarts the machine if that desktop ran for at
+least five seconds; a failed or shorter launch ends the supervisor without
+restarting. See [desktop relaunch ABI](abi/syscalls/sysinfo_mem_mgmt.md#0x42-coordinated-desktop-relaunch).
+On the text kernel, use `fg memento` to run the 640×400 VGA desktop and return
+to the rescue shell when it exits.
 
 ### WireGuard applications
 
@@ -55,6 +99,9 @@ The image build rebuilds the C `wgd`, `sh` and `tnt` applications and relinks `c
 Rebuild and boot the kernel too: `wgd` and the shell's subnet `ping`/`traceroute` commands require [syscall `0x44` ABI 2](abi/syscalls/port_networking.md#0x44-userspace-ipv4-tunnel). Relink other libcr2 TCP servers to preserve the tunnel destination as their reply source. See [WireGuard](networking/wireguard.md) for configuration, physical network prerequisites, diagnostics and entropy fallback.
 
 ### Debug build
+
+Build both release kernels once before making a debug image: the debug target
+replaces only `kernel_text.elf`, while GRUB still includes the graphics entry.
 
 ```
 make build_debug
@@ -106,10 +153,11 @@ The kernel is linked starting at physical address `0x100000` (1 MiB).
 | `.bss` | follows | Zero-initialised statics |
 | `.gdt` | follows | GDT descriptor (assembly) |
 | `.idt` | follows | IDT descriptor (assembly) |
-| `__stack_bottom/top` | follows + 64 KiB | Kernel boot stack |
-| `__heap_start/end` | follows + 64 KiB | Kernel linked-list heap |
-| `p4_table` | 4 KiB aligned | PML4 page table |
-| `p3_fb_table` | 4 KiB | P3 table for framebuffer mapping |
+| `.boot_reserved` (`NOLOAD`) | follows, 16-byte aligned | Covers stack, heap and page tables so GRUB does not place a module over them |
+| `__stack_bottom/top` | 64 KiB in `.boot_reserved` | Kernel boot stack |
+| `__heap_start/end` | 64 KiB in `.boot_reserved` | Kernel linked-list heap |
+| `p4_table` | 4 KiB aligned, in `.boot_reserved` | PML4 page table |
+| `p3_fb_table` | 4 KiB in `.boot_reserved` | P3 table for framebuffer mapping |
 | `.user_task` | `0x650000` | Unused user-task section placeholder |
 | `.dma` (DMA buffer) | `0x80000` (512-byte aligned) | Physical DMA target for ISA DMA channel 2 |
 
@@ -146,8 +194,9 @@ long_mode_entry  (boot.asm, 64-bit long mode)
   └── call kernel_main(multiboot_magic, multiboot_ptr)
   ▼
 kernel_main  (src/main.rs)
-  ├── init::check::init(multiboot_ptr)   — 14-step boot sequence
-  │     (see docs/init/overview.md)
+  ├── fs::ustar::module::adopt(multiboot_ptr) — relocate boot archive if needed
+  ├── init::check::init(multiboot_ptr)        — subsystem initialization
+  │     (see Boot and Initialization)
   └── task::scheduler::idle(0xff)        — enters scheduler; never returns
 ```
 
@@ -184,7 +233,7 @@ make build_floppy FLOPPY_IMAGE=my.img
 |-------------|--------|
 | `INIT.RC` | `configs/init.rc` |
 | `GARN/GARN.CFG`, `GARN/INDEX.HTM`, `GARN/HELLO.TXT`, `GARN/FAVICON.ICO`, `GARN/SOCKETS.JSN` | GARN web server config and content |
-| `GFX/CUBE.ELF`, `GFX/GFXTEST.ELF`, `GFX/MEMENTO.ELF` | Graphics demos |
+| `GFX/CUBE.ELF`, `GFX/GFXTEST.ELF` | Graphics demos; Memento is in the boot medium's `bin/` |
 | `SLIP/ICMPR.ELF` | ICMP responder over SLIP |
 | `SOUND/*.MID` | MIDI files for syscall `0x1b` |
 | `THEM/PRG0.BIN`, `THEM/VLAK.COM` | Real-mode programs for the `THEM` emulator |
@@ -197,9 +246,14 @@ The `INIT.RC` file is the startup script parsed by `init_rc` at boot (see below)
 
 ## Startup Script (`configs/init.rc`)
 
-`INIT.RC` is read from the FAT12 root directory by the `init_rc` task during boot. Each non-blank, non-comment line is dispatched through `cmd::handle` — the same function used by the interactive shell.
+`init_rc` reads up to 1024 bytes of `INIT.RC` from the floppy root. On the
+graphics build, an empty or missing script falls back to the boot medium's
+`opt/init.rc` as described in [Graphics Session](#graphics-session). Each
+non-blank, non-comment line goes through `cmd::handle`, the same dispatcher
+used by the rescue shell. Only the file's actual length is interpreted.
 
-Example `configs/init.rc`:
+Example startup script (the checked-in `configs/init.rc` also contains local
+working-directory choices):
 
 ```sh
 # Start network driver
@@ -209,7 +263,7 @@ bg eth
 bg tnt eth
 
 # Start GARN web server
-bg garn --config /mnt/fat/GARN/GARN.CFG
+bg garn --config /mnt/tar/opt/garn/garn.cfg
 
 echo INIT.RC done
 ```
@@ -233,9 +287,9 @@ Use it on real hardware when pulling out the USB stick freezes the machine. The 
 | Make target | Description |
 |---|---|
 | `make run_iso` | QEMU with CD-ROM only, 2 GB RAM, VGA std, serial PTY |
-| `make run_iso_floppy` | + FAT12 floppy + PC speaker audio |
+| `make run_iso_floppy` | Recreates `fat.img`, then boots with the floppy and PC speaker audio; existing image data is overwritten |
 | `make run_iso_net` | CD + floppy + RTL8139 NIC on `tap0` + PC speaker audio, GTK display, serial PTY |
-| `make run_iso_debug` | CD + floppy, serial → stdio, audio, no-reboot |
+| `make run_iso_debug` | CD + floppy, 4 GB RAM, serial → stdio, audio, no-reboot/no-shutdown |
 | `make run_iso_debug_int` | Same + `-d int,cpu_reset,page` (interrupt tracing) |
 | `make run_iso_pty PTY_NUMBER=ptyN` | CD only, serial on specific PTY |
 | `make run_iso_usb` | CD replaced by `/dev/sdb` (USB stick) |
@@ -267,7 +321,36 @@ Before starting QEMU, `run_iso_net` also runs a few best-effort host tweaks with
 make test_kernel
 ```
 
-Builds with features `kernel_test,kernel_text` into `target/ktest`, then boots headless QEMU with the `isa-debug-exit` device (`iobase=0xf4`) and serial on stdio. With `kernel_test` enabled, `kernel_main` runs `ktest::run_tests()` right after `init::check::init` instead of entering the idle loop. Each check uses `kassert!`, which exits QEMU on the first failure. QEMU exit code `33` (`0x10 << 1 | 1`) means all tests passed and prints `TESTS PASSED`; anything else prints `TESTS FAILED`.
+Builds with features `kernel_test,kernel_text` into `target/ktest`, then boots
+the existing `r2.iso` in headless QEMU with the `isa-debug-exit` device (`iobase=0xf4`) and serial on stdio. With `kernel_test` enabled, `kernel_main` runs `ktest::run_tests()` right after `init::check::init` instead of entering the idle loop. Each check uses `kassert!`, which exits QEMU on the first failure. QEMU exit code `33` (`0x10 << 1 | 1`) means all tests passed and prints `TESTS PASSED`; anything else prints `TESTS FAILED`.
+
+The target currently does not copy the test ELF into the ISO, and the checked-in
+GRUB default selects the graphics kernel. For a self-test run, build a separate
+ISO with a single text-kernel entry. Start after a normal `make build` has
+created `iso/boot/usb.tar`:
+
+```sh
+cargo build --features kernel_test,kernel_text --target-dir target/ktest \
+  -Z build-std=core,compiler_builtins -Z json-target-spec --target x86_64-r2.json
+mkdir -p /tmp/r2-selftest/boot/grub
+cp target/ktest/x86_64-r2/debug/kernel.elf /tmp/r2-selftest/boot/kernel_text.elf
+cp iso/boot/usb.tar /tmp/r2-selftest/boot/usb.tar
+cat > /tmp/r2-selftest/boot/grub/grub.cfg <<'EOF'
+set timeout=0
+set default=0
+menuentry "r2 kernel self-test" {
+    multiboot2 /boot/kernel_text.elf
+    module2 /boot/usb.tar usb
+    boot
+}
+EOF
+grub2-mkrescue -o /tmp/r2-selftest.iso /tmp/r2-selftest
+qemu-system-x86_64 -boot d -m 256M -cdrom /tmp/r2-selftest.iso -fda fat.img \
+  -device isa-debug-exit,iobase=0xf4,iosize=0x04 -serial stdio -display none -no-reboot
+```
+
+Check QEMU's exit status (`33` for success). These temporary files leave the
+regular release ISO and GRUB menu intact.
 
 The timer is already running when the tests start, so the processes the floppy's `INIT.RC` starts (`eth`, `tnt`, `garn`) run alongside them, and a run can fail now and then because of it. A floppy whose `INIT.RC` is a single NUL byte gives a quiet run. The tests also expect a floppy: `test_vfs_resolve` needs `/mnt/fat`, which is mounted only when one is found.
 
@@ -285,6 +368,8 @@ Tests in `src/ktest.rs`:
 | `test_memdisk_place` | the RAM disk is a sixteenth of the RAM in 2 MiB pages, in usable memory below 4 GiB, clear of the fixed regions and the archive |
 | `test_memdisk` | the RAM disk at `/mnt/tmp` is FAT16 (with clusters of several sectors from 64 MiB): a file over three clusters read whole and from inside its second, a subdirectory grown past its first cluster, `write_file_at` appending and leaving a gap that reads back as zeros, delete |
 | `test_small_disks` | disks carved out of the RAM disk's memory: FAT12 at 2 MiB, FAT16 at 4 MiB; a file across the FAT12 entry that straddles two FAT sectors, and a full disk that keeps earlier files intact |
+| `test_slot_layout` | all 32 user stacks avoid the image window, frame addresses match slots, and the kernel ends below user memory |
+| `scheduler::test_desktop_relaunch` | capability registration, request/poll, one-shot commit, parent identity and unsupported-launch handling |
 
 ### Host unit tests
 
@@ -292,13 +377,28 @@ Tests in `src/ktest.rs`:
 make test
 ```
 
-Compiles and runs `tests/unit/main.rs` as a standard Rust test binary on the host (no QEMU). The MIDI and path modules depend only on `core` and are included directly by `#[path]`, so the tests exercise the same code that runs in the kernel:
+Compiles and runs `tests/unit/main.rs` and `tests/network/main.rs` as host Rust
+test binaries (no QEMU). Pure modules are included directly by `#[path]`; the
+network suite runs the production NIC/accounting and registry code with
+hardware and scheduler stand-ins:
 
 | File | Covers |
 |------|--------|
 | `tests/unit/fat12.rs` | 8.3 name conversion (a copy of `fat83`) |
 | `tests/unit/midi.rs` | Standard MIDI File parsing and the monophonic sequencer (`src/audio/smf.rs`) |
 | `tests/unit/path.rs` | Path normalisation (`src/fs/vfs/path.rs`) |
+| `tests/unit/elf_path.rs` | Bare names, absolute executable paths, invalid input and length limits |
+| `tests/unit/desktop.rs` | Preserving desktop arguments, adding `--relaunch` once, invalid and oversized commands |
+| `tests/network/main.rs` | NIC byte accounting, held frames, failed TX, registry ownership/fullness, release and layout sizes |
+
+### Jug publisher tests
+
+```sh
+PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tests/jug_publish -v
+```
+
+Exercises the SSH publication receiver through a local substitute. See
+[Development checks](sdk/jug-publishing.md#development-checks) for coverage.
 
 ---
 
@@ -308,3 +408,39 @@ Compiles and runs `tests/unit/main.rs` as a standard Rust test binary on the hos
 make clippy          # cargo clippy --release, all warnings as errors
 make sonar_check     # SonarQube scan (requires SONAR_HOST_URL + SONAR_TOKEN env vars)
 ```
+
+---
+
+## Documentation Site
+
+From the repository root, install the documentation dependencies and preview:
+
+```sh
+python3 -m pip install -r docs/requirements.txt
+mkdocs serve
+```
+
+Open `http://localhost:8009`; `mkdocs.yml` sets the preview port to 8009.
+Build and validate the site without writing generated files into the checkout:
+
+```sh
+mkdocs build --strict --clean --site-dir /tmp/r2-docs-site
+```
+
+Every Markdown page belongs in `mkdocs.yml`'s `nav`. Use relative `.md` links
+between pages, with heading fragments when useful, so links work both in the
+repository and after rendering. Link back to the section overview and to the
+relevant ABI or SDK guide. Downloads and images must live under `docs/`;
+paths to `../configs` or `../src` do not become site assets. The downloadable
+Nginx examples in `docs/assets/configs/` mirror `configs/jug-*.nginx.example`;
+refresh them when those source snippets change. Strict validation reports
+missing navigation entries, missing files and broken heading anchors.
+
+`docs_theme/main.html` adds the breadcrumb trail, with styles in
+`docs/assets/stylesheets/navigation.css`. Section overview files keep their
+existing URLs; the sidebar, tabs and previous/next links come from the Material
+theme and `nav`.
+
+---
+
+Related documentation: [Documentation home](index.md), [Kernel Shell](shell.md), [SDK Overview](sdk/index.md), [Boot and Initialization](init/overview.md).

@@ -72,3 +72,7 @@ generates a catalog with `SHA-256 bytes path` lines; paths are relative to the
 list. Plain `sha256sum` output is accepted too. Set `list = list.txt` to use
 that filename instead. See the apps repository's `cpp/jug/README.md` for
 configuration, window shortcuts and tests.
+
+---
+
+Related documentation: [SDK Overview](index.md), [Publishing Jug Programs](jug-publishing.md), [Memento](memento.md), [Desktop Relaunch ABI](../abi/syscalls/sysinfo_mem_mgmt.md#0x42-coordinated-desktop-relaunch).

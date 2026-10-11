@@ -1,4 +1,4 @@
-# Overview
+# Input Overview
 
 The input subsystem handles all human-interface device input: PS/2 keyboard (IRQ1) and PS/2 mouse (IRQ12). Both are routed through the 8042 PS/2 controller. Port I/O primitives live in `input/port.rs` and are used throughout the kernel.
 
@@ -44,6 +44,7 @@ PS/2 mouse
 | `port` | `input/port.rs` | Raw x86 I/O port primitives (IN/OUT for u8/u16/u32) |
 | `cmd` | `input/cmd.rs` | Shell built-in command dispatcher |
 | `elf` | `input/elf.rs` | ELF loader (`run_elf`) called by shell and syscall 0x2A |
+| `elf_path` | `input/elf_path.rs` | Validate bare names and explicit absolute executable paths |
 
 ---
 
@@ -74,3 +75,7 @@ All hardware access goes through these wrappers around the `IN`/`OUT` x86 instru
 `read` and `write` are aliases for the u8 variants and are used throughout the codebase.
 
 Userland accesses port I/O through syscalls `0x30` (write) and `0x31` (read), which call these functions indirectly.
+
+---
+
+Related documentation: [Kernel Internals](../kernel.md), [Keyboard](keyboard.md), [Mouse](mouse.md), [Input Syscalls](../abi/syscalls/sysinfo_mem_mgmt.md#0x03-pipe-handling).

@@ -10,7 +10,7 @@ The programs built with the [SDK](index.md) and shipped with kernel releases. So
 |------------------|----------|
 | `/` | `INIT.RC` |
 | `GARN/` | `GARN.CFG`, `INDEX.HTM`, `HELLO.TXT`, `FAVICON.ICO`, `SOCKETS.JSN` |
-| `GFX/` | `CUBE.ELF`, `GFXTEST.ELF`, `MEMENTO.ELF` |
+| `GFX/` | `CUBE.ELF`, `GFXTEST.ELF`; Memento is shipped in the boot medium's `bin/` |
 | `SLIP/` | `ICMPR.ELF` |
 | `SOUND/` | MIDI files for syscall `0x1b` |
 | `THEM/` | Real-mode programs for the `THEM` emulator |
@@ -51,6 +51,8 @@ Programs that use Ethernet need the [`ETH`](#networking) driver running first, s
 | [`JUG`](jug.md) | C++ | Program manager with a hosted Memento window and console commands: CDN catalog, verified ELF downloads, checksum registry, updates and instance restarts. |
 | [`R2WEB`](https://github.com/krustowski/rou2exOS-apps/tree/master/cpp/r2web) | C++ | The browser behind Memento's Web window, one process per window: HTTP/1.1 and HTTPS (BearSSL), HTML/CSS layout, forms, pictures and a little ES5 JavaScript (MuJS). See [Memento](memento.md#notes-on-individual-windows). |
 | [`MPEGPLAY`](https://github.com/krustowski/rou2exOS-apps/tree/master/cpp/mpegplay) | C++ | MPEG-1 video with MP2 sound through HD Audio, from files in `/mnt/tar/video` or HLS streams: in Memento's Video window, or full screen in true colour on the graphics kernel (F). |
+| [`C8`](https://github.com/krustowski/rou2exOS-apps/tree/master/c/c8) | C | CHIP-8 emulator hosted by Memento. Open a `.CH8` ROM from Files with Enter or **Run in C8**; the ISO build stages the binary and twelve ROMs under `/opt/c8`. See [C8 windows](memento.md#notes-on-individual-windows). |
+| [`TELEGRAM`](https://github.com/krustowski/rou2exOS-apps/tree/master/go/telegram) | Go | Bot API client in its own process, hosted by Memento; uses r2net/r2tls for HTTPS and shares clipboard, screenshots and notifications with the desktop. |
 | [`TCPP`](memento.md#notes-on-individual-windows) | C++ | Turbo C++ 23, the text-mode IDE, in Memento's Editor window or full screen; builds and runs `.C` files with [TCC](tcc.md). |
 | [`SPOTIFY`](https://github.com/krustowski/rou2exOS-apps/tree/master/go/spotify) | Go | Spotify client hosted in Memento (experimental): playlists from the Web API, and Premium tracks streamed, decrypted and decoded (Ogg Vorbis) to HD Audio on `r2`, over r2net and r2tls. Offers generated test tones without an account. |
 | [`SNAKE`](https://github.com/krustowski/rou2exOS-apps/tree/master/cpp/libc++r2/examples/snake) | C++ | Snake, built on libc++r2; keeps the score on the floppy. |
@@ -67,4 +69,8 @@ Programs that use Ethernet need the [`ETH`](#networking) driver running first, s
 | [`hello`](https://github.com/krustowski/rou2exOS-apps/tree/master/cpp/libc++r2/examples/hello) | C++ | Console, containers, filesystem and system info with libc++r2. |
 | [`SELFTEST`](https://github.com/krustowski/rou2exOS-apps/tree/master/cpp/libc++r2/tests/target) | C++ | libc++r2 on-target test suite; writes `CXXTEST.TXT`. |
 | [`hello-world`](https://github.com/krustowski/rou2exOS-apps/tree/master/c/hello-world) | C | Minimal C program. |
-| [`ipc`](https://github.com/krustowski/rou2exOS-apps/tree/master/c/ipc) | C | Message passing between processes (syscalls `0x35`/`0x36`). |
+| [`ipc`](https://github.com/krustowski/rou2exOS-apps/tree/master/c/ipc) | C | Legacy message-passing example (syscalls `0x35`/`0x36`); see the current [send-path limitations](../multitasking/IPC.md#legacy-send-path). |
+
+---
+
+Related documentation: [SDK Overview](index.md), [Memento](memento.md), [Jug](jug.md), [Build and Run](../build.md).

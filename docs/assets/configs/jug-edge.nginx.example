@@ -1,0 +1,17 @@
+# Include/adapt inside the public cdn.vxn.dev server {}.
+# Replace cdn_backend with your existing file-serving upstream.
+location = /jug/sums.txt {
+    proxy_pass http://cdn_backend;
+    proxy_set_header Host $host;
+    proxy_cache off;
+    proxy_hide_header Cache-Control;
+    expires off;
+    add_header Cache-Control "no-store" always;
+}
+
+location ^~ /jug/.jug {
+    deny all;
+}
+
+# Your existing /jug/ proxy can serve /jug/v/ unchanged. Preserve its origin
+# Cache-Control header and avoid caching 404 responses for future versions.

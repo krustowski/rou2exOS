@@ -1,4 +1,4 @@
-# Overview
+# Memory Overview
 
 ## Physical Memory Model
 
@@ -12,18 +12,18 @@ The Multiboot2 memory map tag (type 6) is parsed at boot and reports usable RAM 
 
 All addresses are 64-bit (x86-64) but the kernel only uses the lower 4 GiB. The page table is a 4-level (PML4) structure; P2 entries use 2 MiB huge pages everywhere except the VGA VRAM window (which uses 4 KiB P1 entries).
 
-| Virtual address   ||        Size   |   Description |
-|-------------------||--------------|---------------|
+| Start / symbol | End / symbol | Size | Description |
+|----------------|--------------|------|-------------|
 | `0x000_000` | `0x0FF_FFF` |     1 MiB  |   Real-mode legacy (not used at runtime) |
 | `0x100_000` | ~            |   varies  |  Kernel image: `.text` `.rodata` `.data` `.bss`; placed by linker at `0x100_000` |
 |  `__stack_bottom` | `__stack_top` |  64 KiB |  Boot stack (inside kernel image) |
 |  `__heap_start`  | `__heap_end`   | 64 KiB |  Kernel linked-list heap (legacy) |
-| `p4_table` / `p3_fb_table` ||    8 KiB  |  Static page tables in `.data` |
-| `0x400_000` | `0x5FF_FFF`  |    2 MiB  |   User stacks of slots 16–31 (128 KiB each). Mapped user-accessible in every process (`boot.asm` P2[2]), so the kernel image has to end below `0x400_000`: anything of the kernel's here could be read and written by any program. `linker.ld` asserts it; the release kernel ends near `0x3D8_000` |
-| `0x600_000` | `0x7FF_FFF`  |    2 MiB  |   ELF userland load region. Each slot's private 2 MiB physical frame is identity-mapped here by `create_user_page_table` |
+| `p4_table` / `p3_fb_table` ||    8 KiB  |  Static page tables in `.boot_reserved` (`NOLOAD`) |
+| `0x400_000` | `0x5FF_FFF`  |    2 MiB  |   User stacks of slots 16–31 (128 KiB each). Mapped user-accessible in every process (`boot.asm` P2[2]), so the kernel image has to end below `0x400_000`: anything of the kernel's here could be read and written by any program. `linker.ld` asserts it; the exact image end depends on the build |
+| `0x600_000` | `0x7FF_FFF`  |    2 MiB  |   ELF userland load region. Each slot's private 2 MiB physical frame is mapped here by `create_user_page_table` |
 | `0x800_000` | `0x9FF_FFF` |     2 MiB  |   User stacks of slots 0–15 (128 KiB each) |
-| `0xA00_000` | `0xAFF_FFF` |    64 KiB  |   VGA graphics RAM window (mapped on demand by syscall `0x14` / `map_vram`). |
-| `0xB00_000` | `0xBFF_FFF` |      1 MiB  |   (unmapped; sits between VGA and heap) |
+| `0xA00_000` | `0xA0F_FFF` |    64 KiB  |   VGA graphics RAM window (mapped on demand by syscall `0x14` / `map_vram`). |
+| `0xA10_000` | `0xBFF_FFF` | 1984 KiB | Supervisor-only identity mapping initially; not present in a process after its VGA window replaces P2[5] |
 | `0xC00_000` | `0xFFF_FFF` |      4 MiB   |  Userland heap (shared, uheap) |
 | `0x1000_000` | `0x4FFF_FFF` |   64 MiB |   Per-process ELF physical frames: slot 0 → 0x1000_000, slot 1 → 0x1200_000, ... slot 31 → 0x4E00_000. Checked to be usable RAM at boot |
 | `0xA00_0000` | + RAM/8 |   varies |   Userland heap extension, mapped USER+WRITE only once the 4 MiB are full (past the tar archive if that is here; see allocators.md) |
@@ -40,13 +40,16 @@ A drawing of all of this is in [memory-map.pdf](memory-map.pdf).
 
 ### P4 / P3 / P2 structure
 
-The kernel uses a single-level P3 (P4[0] → P3[0] → P2). P2 entries are 2 MiB huge pages (bit 7 set):
+P4[0] points to a P3 with four populated entries covering 0–4 GiB. P3[0]
+points to the low-memory P2; P3[1..3] point to the high-memory identity-map
+tables. P2 entries use 2 MiB huge pages (bit 7 set), except the per-process VGA
+window after `map_vram`:
 
 ```
-P4[0] → P3       (kernel P3, shared by all processes)
-  P3[0] → P2     (kernel P2, cloned per process)
+P4[0] → P3       (cloned for each user process)
+  P3[0] → P2     (low-memory P2, cloned per process)
     P2[0]  → 0x000_000  (2 MiB, kernel image + legacy)
-    P2[1]  → 0x200_000  (2 MiB, kernel image to 0x3D8_000)
+    P2[1]  → 0x200_000  (2 MiB, kernel image, ending below 0x400_000)
     P2[2]  → 0x400_000  (2 MiB, user stacks of slots 16-31)
     P2[3]  → per-slot phys frame  (overridden in user tables)
     P2[4]  → 0x800_000  (2 MiB, user stacks of slots 0-15)
@@ -63,7 +66,7 @@ At `init_processes`, `save_kernel_cr3()` snapshots the current CR3 as `KERNEL_CR
 `create_user_page_table(slot)` allocates new P4/P3/P2 tables from `PAGE_TABLE_POOL`, copies all 512 entries from the kernel tables, then overrides P2[3] to point at the slot's private 2 MiB physical frame (`0x1000_000 + slot * 0x200_000`). The result is a process that sees:
 
 - its own ELF code/data at virtual `0x600_000` (private frame)
-- all kernel mappings everywhere else (shared read-only-ish)
+- supervisor-only kernel mappings elsewhere (inaccessible from ring 3)
 - the shared userland heap at `0xC00_000–0xFFF_FFF` (U/S + R/W, inherited from kernel P2[6/7])
 
 ### TLB management
@@ -124,3 +127,7 @@ With ten slots, slots 8 and 9 had their initial stacks at `0x7F0_000` and `0x7D0
 ## C Library Intrinsics (`c.rs`)
 
 `memcpy`, `memset`, `memmove`, and `memcmp` are provided as `#[no_mangle] extern "C"` functions. They are required by the compiler for struct copies, zero-inits, and `copy_nonoverlapping` fallbacks in `no_std` + `no_libc` builds. All are byte-loop implementations with no SIMD.
+
+---
+
+Related documentation: [Kernel Internals](../kernel.md), [Allocators](allocators.md), [Processes](../multitasking/process.md).

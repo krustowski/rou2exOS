@@ -223,3 +223,7 @@ WireGuard is implemented by the standalone C daemon `wgd`, alongside `eth`. Its 
 The kernel does not perform cryptography: `tunnel.rs` supplies one owned registration, prefix routing, authenticated-frame injection and shell ICMP probe delivery through syscall `0x44`. `AllowedIPs` contains up to 16 IPv4 prefixes and checks outgoing destinations and authenticated incoming sources. The daemon supports replay protection, preshared keys, endpoint roaming, keepalives, rekeying and expiry.
 
 See [WireGuard](wireguard.md) for setup, `ping`/`traceroute`, entropy on CPUs without RDSEED/RDRAND, and the fixed 1420-byte MTU. Inner UDP, IPv6, fragmented IP reassembly, forwarding and NAT are not implemented.
+
+---
+
+Related documentation: [Networking Overview](overview.md), [Kernel Internals](../kernel.md), [Hardware Layer](hardware.md), [Ports and Networking ABI](../abi/syscalls/port_networking.md).

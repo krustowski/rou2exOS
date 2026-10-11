@@ -47,17 +47,26 @@ For raw Ethernet IPv4 transmission, a frame from the registered tunnel source ad
 
 Pops a message from the calling process' MQ. Non-blocking returns `0` immediately if the queue is empty; blocking suspends the process until a frame arrives.
 
+An empty blocking call can return `0` after waking; retry to consume the queued
+frame. The kernel is not given a destination capacity and copies the message's
+frame length (or 512 bytes for a legacy message); reserve 2 KiB for Ethernet.
+See [Receiving](../../multitasking/IPC.md#receiving-syscall-0x35-receive_data).
+
 | Argument 1 | Argument 2 | Implemented |
 |------------|------------|-------------|
 | `0x00` = non-blocking, non-zero = blocking | pointer to buffer | ✅  |
 
 ## 0x36 (Socket send)
 
-Copies 512 bytes from the buffer and pushes a message to the target process' MQ, then wakes the target.
+The legacy implementation copies 512 bytes to `MSG_BUF[0]`, attempts to queue
+a message and wakes the target. Argument 1 currently indexes a scheduler slot,
+rather than resolving a public PID. It also enqueues `buf_addr = 512` instead
+of the payload address and does not report queue failure. This path does not
+provide reliable payload delivery; see [IPC limitations](../../multitasking/IPC.md#legacy-send-path).
 
 | Argument 1 | Argument 2 | Implemented |
 |------------|------------|-------------|
-| target process PID | pointer to buffer | ✅  |
+| target scheduler slot | pointer to 512-byte buffer | ✅ (legacy limitations above) |
 
 ## 0x37 (Register Ethernet driver, bind TCP port)
 
@@ -65,7 +74,15 @@ Ethernet driver registration, or port binding. Both are released when the callin
 
 | Argument 1 | Argument 2 | Implemented |
 |------------|------------|-------------|
-| TCP port number (0 for global driver) | unused | ✅ |
+| `0` for global driver | ignored | ✅ |
+| TCP port number (`1`–`65535`) | `0` to bind, `1` to unbind | ✅ |
+
+Binding a port already owned by the caller is idempotent. Binding another
+process's port or binding when all 16 entries are occupied returns `Busy`
+(`0xfa`), leaving existing bindings intact. Unbinding an absent port succeeds;
+unbinding another process's port returns `Busy`. Unknown operations return
+`InvalidInput`. Global registration returns `NotImplemented` when no supported
+NIC is found. See [Driver and Port Registry](../../networking/overview.md#driver-and-port-registry).
 
 ## 0x38 (Get networking status)
 
@@ -79,7 +96,12 @@ Returns `InvalidInput` on invalid pointer, `Ok` otherwise.
 
 ## 0x3d (Network configuration)
 
-The machine's network configuration: IPv4 address, netmask, gateway, the gateway's MAC, DNS and the card's MAC, as the global Ethernet driver (`eth`) got them by DHCP or was given them. Every network stack reads it rather than assuming addresses of its own. The gateway's MAC matters most: a process that is not the global driver cannot ARP for it, because the replies go to the driver.
+The machine's network configuration: IPv4 address, netmask, gateway, the
+gateway's MAC, DNS and the card's MAC, as the global Ethernet driver (`eth`)
+got them by DHCP or was given them. Every network stack can read it instead of
+assuming addresses of its own. The published gateway MAC avoids repeating ARP
+discovery; [ARP replies](../../networking/overview.md#frame-routing) also reach
+processes with bound TCP ports.
 
 With Argument 1 `0x01` the kernel fills the [`NetConfig`](../type_definitions.md#netconfig-syscall-0x3d) at Argument 2; the IP and MAC come from the system configuration (the same ones `0x01` and `0x38` report), the rest is what the driver last set. Unset fields are zero.
 
@@ -157,3 +179,90 @@ For operation 4, fill `target` with the desired IPv4 address; the other input fi
 The target must match a registered prefix, differ from the local address, and have a first octet neither 0 nor 127 and below 224. A tunnel must be attached and the caller must differ from its owner. Only one process can reserve a probe at a time; the same process may replace its reservation. Failure returns `Busy`.
 
 Authenticated echo replies match the target and identifier. ICMP time-exceeded and destination-unreachable replies match the quoted original IPv4/ICMP request's source, target and identifier. The shell additionally verifies checksums, sequence and echo payload. Reply source addresses, including intermediate routers, must pass the tunnel's normal source-prefix check. See [Ping and traceroute](../../networking/wireguard.md#ping-and-traceroute-through-subnets) for user-facing commands.
+
+
+## 0x45 (Network throughput statistics)
+
+Read-only, coherent [NetStats](../type_definitions.md#netstats-syscall-0x45)
+snapshot of the physical NIC's traffic since boot, on
+RTL8139 and E1000. Argument 1 points to a **40-byte** `NetStats`; arguments 2
+and 3 are unused (SDK wrappers pass zero). No driver/card is required: totals
+are zero before traffic starts and survive driver restarts/NIC reinitialization.
+
+```c
+typedef struct {
+    uint64_t timestamp_ms;
+    uint64_t rx_frames;
+    uint64_t rx_bytes;
+    uint64_t tx_frames;
+    uint64_t tx_bytes;
+} NetStats;                         /* 40 bytes */
+```
+
+Fields are native little-endian u64 values at offsets 0, 8, 16, 24 and 32.
+`timestamp_ms` uses the same millisecond clock as syscall `0x04`. A consumer
+computes bytes/second as `(new_bytes - old_bytes) * 1000 / (new_ms - old_ms)`
+when time advanced, and starts a fresh baseline if counters decreased.
+
+RX counts each valid frame when consumed from the NIC ring, including frames
+discarded by routing or by an unresponsive receiver. Peeking/retrying a held
+frame and copying an ARP reply to several processes do not multiply the count.
+Malformed descriptors discarded internally by the card driver and frames lost
+before software reads them are excluded. TX counts frames successfully submitted
+to the card, not completion or peer delivery; failed submissions are excluded.
+Bytes include the Ethernet header and padding (at least 60 bytes for TX), but
+exclude the FCS, preamble and inter-frame gap. RTL8139's attached RX FCS is
+subtracted; E1000 strips it in hardware. Loopback, serial SLIP and tunnel inner
+frames are excluded; physical tunnel outer frames count normally. Totals wrap
+modulo 2^64 and reads never reset them.
+
+Returns `Okay` (`0`) or `InvalidInput` (`0xfc`) if the entire output buffer
+is not in a user region. The kernel writes nothing on error. An older kernel
+returns `InvalidSyscall` (`0xff`).
+
+## 0x46 (TCP port owners)
+
+Read-only atomic [NetPortTable](../type_definitions.md#netporttable-syscall-0x46)
+snapshot of the TCP destination port registry and process
+identities. Argument 1 points to a **528-byte** `NetPortTable`; arguments 2
+and 3 are unused. This includes client reply ports as well as service ports.
+
+```c
+typedef struct {
+    uint16_t port;
+    uint8_t reserved[6];
+    uint64_t pid;
+    uint8_t name[16];
+} NetPortBinding;                   /* 32 bytes */
+
+typedef struct {
+    uint64_t driver_pid;
+    uint8_t n_ports;
+    uint8_t reserved[7];
+    NetPortBinding bindings[16];
+} NetPortTable;                     /* 528 bytes */
+```
+
+The header has `driver_pid` at offset 0, `n_ports` at 8 and `bindings` at 16.
+Each entry has `port` at offset 0, `pid` at 8 and `name` at 16. Integer fields
+are native little-endian. `driver_pid == UINT64_MAX` means no global driver.
+Only `bindings[0..n_ports]` are live (at most 16); unused entries and reserved
+bytes are zero. Names contain up to 16 bytes and need not have a trailing NUL.
+
+The internal routing registry stores reusable scheduler slots. This call
+resolves them under the scheduler lock with interrupts disabled to expose full
+64-bit `Process::id` values and names, rather than slots or the truncated u8
+IDs in legacy `0x2f`. Binding release and exit/kill/crash cleanup are reflected
+in the next snapshot. Readers may scan the table for one port.
+
+Returns `Okay` (`0`), `Busy` (`0xfa`) if the scheduler lock is held (retry),
+or `InvalidInput` (`0xfc`) for an invalid output buffer. Errors leave the
+buffer untouched; an older kernel returns `InvalidSyscall` (`0xff`).
+
+SDKs provide `get_net_stats`, `get_net_ports`, `net_port_owner` (C);
+`r2::net::stats`, `ports`, `port_owner` (C++); and `ReadNetStats`,
+`ReadNetPorts`, `NetPortOwner` (Go).
+
+---
+
+Related documentation: [ABI Specification](../syscall_specification.md), [Type Definitions](../type_definitions.md), [Networking Overview](../../networking/overview.md), [IPC](../../multitasking/IPC.md).

@@ -95,3 +95,7 @@ make test     # tcct, libct and tcc on r2, each in QEMU
 - The host tcc is built without bounds checking and backtraces: their runtime does not build out of tree.
 - `tcc -run` is compiled in but untested.
 - On the graphics kernel, `sleep_ms` returns after one tick whatever it is asked for (`r2ct` reports it); the text kernel sleeps as long as it should.
+
+---
+
+Related documentation: [SDK Overview](index.md), [C Library](libcr2.md), [Memento Editor](memento.md#notes-on-individual-windows).

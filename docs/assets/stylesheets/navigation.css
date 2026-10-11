@@ -1,0 +1,23 @@
+.md-typeset .r2-breadcrumb {
+  margin-bottom: 1rem;
+  color: var(--md-default-fg-color--light);
+  font-size: 0.7rem;
+}
+
+.md-typeset .r2-breadcrumb ol {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 0.4rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.md-typeset .r2-breadcrumb li {
+  margin: 0;
+}
+
+.r2-breadcrumb li + li::before {
+  margin-right: 0.4rem;
+  content: "/";
+}

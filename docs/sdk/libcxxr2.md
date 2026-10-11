@@ -70,7 +70,7 @@ Copy `examples/hello/.clangd` next to a new program too: without it clangd parse
 | `r2/input.hpp` | Keyboard and mouse, with `Mouse::set_speed()` |
 | `r2/time.hpp` | Ticks, sleep, the RTC, `Stopwatch`, `FrameTimer` |
 | `r2/process.hpp` | Arguments, `exit`, sysinfo, the task table, `spawn`, `kill` (`0x3b`), `meminfo` (`0x3c`), `reboot` and `power_off` (`0x3e`) |
-| `r2/net.hpp` | Addresses, byte order, frames, port binding |
+| `r2/net.hpp` | Addresses, byte order, frames, port binding, NIC statistics and TCP owner snapshots |
 | `r2/audio.hpp` | PC speaker, and PCM through HD Audio (`0x3f`: `open`, `write`, `queued`, `pause`, `resume`, `close`) |
 | `r2/math.hpp` | `sqrt`, `sin`, `cos`, `floor`, `fmod`, … (there is no libm) |
 | `r2/panic.hpp`, `r2/source_location.hpp` | `panic`, `R2_ASSERT` |
@@ -144,6 +144,17 @@ The structures in `r2/syscall.hpp` follow the current kernel layout: `TaskInfo` 
 
 ---
 
+## Network monitoring
+
+`r2::net::stats()` reads physical NIC totals with a coherent millisecond
+timestamp (`0x45`, `NetStats`). `r2::net::ports()` reads an atomic table of
+TCP ports, full 64-bit owner PIDs and bounded 16-byte process names, plus the
+global driver PID (`0x46`, `NetPortTable`); `r2::net::port_owner(port)` looks
+up one binding. They return `nullopt` on syscall errors/older kernels; the
+port table can be temporarily unavailable while the scheduler is busy.
+See [network monitoring](../abi/syscalls/port_networking.md#0x45-network-throughput-statistics)
+for byte accounting and the shared C/C++/Go layouts.
+
 ## Graphics
 
 Two display paths, chosen at run time:
@@ -189,3 +200,7 @@ g++ ... $(OBJS) libc++r2.a -lstdc++ libc++r2compat.a -lgcc ...
 - `fs::size_of()` lists the directory, since there is no stat syscall.
 - `sin`, `cos` and `atan` are approximations.
 - No `shared_ptr`, no `map`, no iostreams.
+
+---
+
+Related documentation: [SDK Overview](index.md), [C Library](libcr2.md), [Memento](memento.md), [ABI Specification](../abi/syscall_specification.md).

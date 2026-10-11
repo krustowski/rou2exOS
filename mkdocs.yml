@@ -1,21 +1,28 @@
 site_name: rou2exOS Rusted Edition Documentation
 site_url: "https://r2.krusty.space"
+site_description: "Build, use and develop rou2exOS, with SDK and kernel ABI references."
+repo_url: "https://github.com/krustowski/rou2exOS"
+repo_name: krustowski/rou2exOS
 dev_addr: 0.0.0.0:8009
-
-lang: "en"
 
 theme:
   name: material
+  custom_dir: docs_theme
+  language: en
   palette:
     scheme: slate
-    primary: 0x0000a8
-    accent: 0x0000a8
-  #icon:
-  #  repo: fontawesome/brands/gitlab
+    primary: blue
+    accent: blue
   features:
-  #  - content.action.edit
+    - navigation.tabs
+    - navigation.sections
+    - navigation.indexes
+    - navigation.top
+    - navigation.footer
+    - toc.follow
     - search.suggest
     - search.highlight
+    - search.share
 
 copyright: "@krusty.space 2026 --- Note: Some portions of this documentation have been generated from the original source code by AI."
 
@@ -26,56 +33,79 @@ extra:
       link: "https://github.com/krustowski/rou2exOS"
 
 plugins:
-  #- git-revision-date-localized:
-      #enable_creation_date: true
-      #type: date
   - search
-  #- offline
+
+markdown_extensions:
+  - toc:
+      permalink: true
+  - tables
+  - fenced_code
+
+# Keep missing pages, downloads and heading links visible in strict builds.
+validation:
+  nav:
+    omitted_files: warn
+    not_found: warn
+  links:
+    not_found: warn
+    anchors: warn
+    unrecognized_links: warn
 
 extra_javascript:
   - assets/js/umami.js
 
+extra_css:
+  - assets/stylesheets/navigation.css
+
 nav:
-  - Intro: index.md
-  - Build & Run: build.md
-  - Shell (Text Mode): shell.md
+  - Home: index.md
+  - Getting Started:
+    - Build & Run: build.md
+    - Kernel Shell: shell.md
   - SDK:
-    - Overview: sdk/index.md
-    - C (libcr2): sdk/libcr2.md
-    - C++ (libc++r2): sdk/libcxxr2.md
-    - Go (libgor2): sdk/libgor2.md
-    - Application Suite: sdk/apps.md
-    - Memento (GUI): sdk/memento.md
-    - Jug (program manager): sdk/jug.md
-    - Publishing Jug programs: sdk/jug-publishing.md
+    - sdk/index.md
+    - Languages & Libraries:
+      - C (libcr2): sdk/libcr2.md
+      - C++ (libc++r2): sdk/libcxxr2.md
+      - Go (libgor2): sdk/libgor2.md
+      - TCC (C on r2): sdk/tcc.md
+    - Applications:
+      - Application Suite: sdk/apps.md
+      - Memento Desktop: sdk/memento.md
+      - Jug Program Manager: sdk/jug.md
+      - Publishing Jug Programs: sdk/jug-publishing.md
   - Kernel Internals:
+    - kernel.md
     - Boot / Init:
-      - Overview: init/overview.md
+      - init/overview.md
       - Subsystems: init/subsystems.md
     - Multitasking:
       - Scheduler: multitasking/scheduler.md
       - Processes: multitasking/process.md
       - IPC: multitasking/IPC.md
     - Memory:
-      - Overview: memory/overview.md
+      - memory/overview.md
       - Allocators: memory/allocators.md
     - Filesystems:
-      - Overview: filesystem/overview.md
-      - FAT12: filesystem/fat12.md
+      - filesystem/overview.md
+      - FAT12 & FAT16: filesystem/fat12.md
       - ISO9660: filesystem/iso9660.md
     - Networking:
-      - Overview: networking/overview.md
+      - networking/overview.md
       - Hardware: networking/hardware.md
       - Protocols: networking/protocols.md
+      - WireGuard: networking/wireguard.md
     - Video:
-      - Overview: video/overview.md
+      - video/overview.md
       - VGA: video/vga.md
+    - Audio:
+      - HD Audio: audio/hda.md
     - Input:
-      - Overview: input/overview.md
+      - input/overview.md
       - Keyboard: input/keyboard.md
       - Mouse: input/mouse.md
   - ABI / Syscalls:
-    - Specification: abi/syscall_specification.md
+    - abi/syscall_specification.md
     - Type Definitions: abi/type_definitions.md
     - Syscalls:
       - System, Processes & Memory: abi/syscalls/sysinfo_mem_mgmt.md

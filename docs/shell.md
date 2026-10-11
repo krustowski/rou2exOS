@@ -63,11 +63,12 @@ Nothing is completed while the working directory is on no FAT12 volume: `/`, `/m
 | Path | Filesystem | Mounted |
 |------|------------|---------|
 | `/mnt/fat` | the FAT12 floppy | only when a FAT12 floppy was found at boot |
-| `/mnt/tmp` | the RAM disk, FAT16, a sixteenth of the RAM | always (empty at every boot) |
+| `/mnt/tmp` | the RAM disk, FAT16, a sixteenth of the RAM | when at least 2 MiB can be placed (empty at every boot; FAT12 at 2 MiB) |
 | `/mnt/iso` | the CD, ISO9660, read-only | when a CD is found |
 | `/mnt/tar` | the boot medium archive, read-only | when GRUB loaded one |
 
-A bare path under `/` used to name the floppy's root: `dir` at `/` listed the floppy, and `write` there wrote to it. Booted from a USB stick, with no floppy, that was a directory that could only answer with disk errors. User programs still see it that way; see [Filesystem syscalls](abi/syscalls/filesystem.md).
+A bare path under `/` used to name the floppy's root: `dir` at `/` listed the floppy, and `write` there wrote to it. Booted from a USB stick, with no floppy, that was a directory that could only answer with disk errors. The filesystem syscalls now use the same mount-based resolution; see
+[Filesystem Overview](filesystem/overview.md#syscall-dispatch-pattern).
 
 ---
 
@@ -81,7 +82,16 @@ Plays the built-in MIDI melody via the PC speaker (`audio::midi::play_melody`), 
 
 ### `bg <binary>`
 
-Loads and runs an ELF binary in the **background** (shell remains interactive). The binary name must be ≤ 8 characters; `.elf` is appended when no extension is given. The binary is looked up in the current working directory first (when that is on a FAT12 volume, the ISO or the archive; `/` and `/mnt` hold no files), then in `/mnt/tar/bin` and `/mnt/iso/bin`, so the programs shipped on the boot medium can be started from anywhere.
+Loads and runs an ELF binary in the **background** (shell remains interactive).
+A bare name searches `/mnt/tmp/jug` first for [Jug](sdk/jug.md) updates, then the
+working directory, `/mnt/tar/bin` and `/mnt/iso/bin`. `.elf` is appended when
+there is no extension; use an 8-character program basename.
+
+The rescue shell limits the executable token to 8 characters, including any
+extension, so use the short program name here. The underlying ELF loader and
+[syscall `0x2a`](abi/syscalls/filesystem.md#0x2a-execute-elf64-executable) also
+support absolute paths up to 63 characters, without changing the working
+directory; use that interface from userland for explicit path selection.
 
 ```
 bg eth
@@ -183,7 +193,8 @@ Lists all non-hidden commands with their one-line descriptions.
 
 ### `heap`
 
-Prints the userland heap (4 MiB at `0xC00000`): used and free bytes, the largest free block, block counts, and the bytes held per scheduler slot (`-` for untagged blocks). A slot with bytes here but no entry in `ts` is a leak that outlived its process.
+Prints the userland heap (initially 4 MiB at `0xC00000`, plus its extension
+when it has grown; see [Allocators](memory/allocators.md#growing-the-extension)): used and free bytes, the largest free block, block counts, and the bytes held per scheduler slot (`-` for untagged blocks). A slot with bytes here but no entry in `ts` is a leak that outlived its process.
 
 When the heap lock is busy the command prints which slot holds it instead — a heap that stays busy is one whose holder died holding it.
 
@@ -308,7 +319,9 @@ rm OLD.TXT
 
 ### `run <binary>` *(hidden)*
 
-Alias for `fg` with a slightly different length limit (12 bytes). Loads and runs an ELF binary in the foreground.
+Runs an ELF binary in the foreground. Unlike `fg`'s 8-character limit, `run`
+accepts an executable token of up to 12 characters. Arguments after the token
+do not count towards that limit.
 
 ### `time`
 
@@ -377,11 +390,15 @@ Falls back to `$ ` if the config lock is contended.
 
 `bg` and `fg` both delegate to `input::elf::run_elf(filename, args, mode)`:
 
-1. Asks the scheduler which slot the program will occupy (`next_free_slot`); fails with `no free process slot` when all ten are held by live processes.
-2. Finds the ELF file — `/mnt/tmp/jug` first for [Jug](sdk/jug.md) downloads, then the current working directory (on FAT, ISO9660 or the archive), then `/mnt/tar/bin` and `/mnt/iso/bin` — and stages it in a temporary user-heap buffer.
+1. Asks the scheduler which slot the program will occupy (`next_free_slot`); fails with `no free process slot` when all 32 are held by live processes (including kernel tasks).
+2. Finds the ELF file: an absolute path selects it directly; a bare name searches `/mnt/tmp/jug`, the working directory, `/mnt/tar/bin`, then `/mnt/iso/bin`. Stages it in a temporary user-heap buffer.
 3. Copies the `PT_LOAD` segments into the slot's private 2 MiB physical frame and builds a page table that maps it at `0x600_000`.
 4. Pushes the argv frame onto the slot's initial user stack and creates the scheduler task at the ELF entry point.
 5. `Foreground`: the launcher (the shell, or `init_rc`) is recorded as the child's waiter and parked until the child ends.
 6. `Background`: returns immediately; the shell stays interactive.
 
 Userland processes communicate with the kernel via interrupt `0x7F` (syscall gate). See [Syscall specification](abi/syscall_specification.md) for the full syscall interface, and the [SDK](sdk/index.md) for building programs.
+
+---
+
+Related documentation: [Build and Run](build.md), [Application Suite](sdk/apps.md), [Keyboard](input/keyboard.md), [Scheduler](multitasking/scheduler.md).

@@ -52,6 +52,20 @@ A process started with `fg` records its launcher in `Process::waiter` (slot plus
 
 When the child is killed or crashes, `wake_waiter` sets the launcher back to `Ready` (only if it is still `Idle` and still the same PID) and clears the link. A background process has no waiter, and its exit no longer wakes the kernel shell.
 
+## Desktop Supervision
+
+On the graphics framebuffer, `init_rc` stays resident as Memento's foreground
+launcher. [Syscall `0x42`](../abi/syscalls/sysinfo_mem_mgmt.md#0x42-coordinated-desktop-relaunch)
+lets a capable Memento register support, poll for requests and accept a relaunch
+requested by PID. The child must still point to the same parked supervisor
+(slot and PID); an ordinary `fg memento` from another launcher is unsupported.
+
+Only a pending request followed by exit code `0x4d52` commits a one-shot
+command. The cooperative exit releases the old process's heap, network and
+capture ownership before waking the supervisor. The next launch preserves
+arguments and adds `--relaunch` once. Ordinary exit, kill and crash use the
+[graphics-session reboot policy](../build.md#graphics-session).
+
 ## Termination
 
 | Path | Effect |
@@ -68,7 +82,7 @@ Termination also releases network driver/port registrations and queued frame buf
 | Slot | Name | Mode | Purpose |
 |------|------|------|---------|
 | 0 | `kmain` | Kernel | Sentinel/idle — absorbs the boot RSP on the first PIT tick, then loops on `hlt` |
-| 1 | `init_rc` | Kernel | Reads `INIT.RC` from FAT12 root and dispatches each line through the shell command handler; exits when done |
+| 1 | `init_rc` | Kernel | Runs the startup script; exits on the text kernel, supervises Memento on the graphics framebuffer |
 | 2 | `kclock` | Kernel | Renders a live HH:MM:SS clock in the top-left VGA text buffer corner (text screens only) |
 | 3 | `kshell` | Kernel | Kernel interactive shell; keyboard input loop; PID stored in `SHELL_PID` (text screens only) |
 | 4+ | *(userland)* | User | ELF processes on the text kernel; user processes start at slot 2 on the graphics kernel |
@@ -81,10 +95,14 @@ On the graphics kernel with a framebuffer, neither `kclock` nor `kshell` is star
 
 | Resource | Value |
 |----------|-------|
-| Max concurrent processes | 10 |
+| Max concurrent processes | 32, including kernel tasks |
 | Kernel stack per process | 32 KiB |
 | Message queue depth | 64 messages |
 | `MSG_BUF` payload size | 512 bytes |
 | Pipe buffer size | ~14 KiB |
 | Scheduler tick rate | 1000 Hz (1 ms resolution) |
 | PID namespace | monotonic `usize`, never reused |
+
+---
+
+Related documentation: [Kernel Internals](../kernel.md), [Processes](process.md), [IPC](IPC.md), [Memory Overview](../memory/overview.md).

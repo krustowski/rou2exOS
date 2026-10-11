@@ -1,5 +1,9 @@
 # Type Definitions
 
+These layouts are shared by the kernel and the [SDK libraries](../sdk/index.md).
+Use the [ABI Specification](syscall_specification.md) for the calling convention
+and the syscall reference for each structure's inputs, outputs and return codes.
+
 ## SysInfo
 
 `system_uptime` holds the number of seconds since boot, derived from the PIT tick counter (`TICKS_PER_SECOND`, currently 1000 Hz). `system_path` holds the working directory and is NUL-terminated when shorter than 32 bytes; a working directory can never be longer than 32 bytes (`PATH_MAX`).
@@ -306,6 +310,43 @@ typedef struct {
 } __attribute__((packed)) NetConfig_T;
 ```
 
+## NetStats (syscall `0x45`)
+
+A 40-byte, naturally aligned structure of five little-endian `uint64_t` fields:
+
+| Offset | Field | Meaning |
+|--------|-------|---------|
+| 0 | `timestamp_ms` | Sample time on the syscall `0x04` clock |
+| 8 | `rx_frames` | Valid frames consumed from the physical NIC ring |
+| 16 | `rx_bytes` | Received bytes, excluding FCS |
+| 24 | `tx_frames` | Frames successfully submitted to the physical NIC |
+| 32 | `tx_bytes` | Submitted bytes, including padding and excluding FCS |
+
+See [Network throughput statistics](syscalls/port_networking.md#0x45-network-throughput-statistics)
+for the C layout, rate calculation and accounting rules. Loopback, SLIP and
+tunnel inner frames are excluded. SDK names are `NetStats_T` in C, `r2::NetStats`
+in C++, and `libgor2.NetStats` in Go.
+
+## NetPortTable (syscall `0x46`)
+
+A 528-byte, naturally aligned structure. Integer fields are little-endian:
+
+| Offset | Size | Field |
+|--------|------|-------|
+| 0 | 8 | `driver_pid`: full process ID; `UINT64_MAX` when no global driver is registered |
+| 8 | 1 | `n_ports`: number of live bindings, at most 16 |
+| 9 | 7 | Reserved, zero |
+| 16 | 512 | `bindings[16]`: 32-byte `NetPortBinding` entries |
+
+Each binding has a `uint16_t port` at offset 0, six reserved zero bytes at
+offset 2, a `uint64_t pid` at offset 8, and a 16-byte `name` at offset 16. Names
+can fill all 16 bytes and need not be NUL-terminated. Only the first `n_ports`
+entries are live; unused entries are zeroed.
+
+See [TCP port owners](syscalls/port_networking.md#0x46-tcp-port-owners) for
+snapshot and retry semantics. SDK names are `NetPortTable_T` in C,
+`r2::NetPortTable` in C++, and `libgor2.NetPortTable` in Go.
+
 ## VfsDirEntry (syscall `0x2d`)
 
 Each entry describes one item in a directory.  The kernel writes up to 64 entries and returns the count, or `u64::MAX` (`-1` as `int64_t`) on error.  `name` is **not** NUL-terminated; use `name_len`.
@@ -453,3 +494,7 @@ typedef struct {
     uint8_t  slot_task[32];
 } __attribute__((packed)) MemInfo2_T;
 ```
+
+---
+
+Related documentation: [ABI Specification](syscall_specification.md), [SDK Overview](../sdk/index.md), [System and Memory Syscalls](syscalls/sysinfo_mem_mgmt.md), [Ports and Networking Syscalls](syscalls/port_networking.md).

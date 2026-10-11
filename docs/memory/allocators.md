@@ -182,6 +182,14 @@ If a process dies holding the lock anyway, `free_owned` takes it back (`reclaim_
 
 ### Pointer Validation in Syscalls
 
-Syscall handlers accept a buffer that lies wholly inside the program image (`USERLAND_START 0x600_000` to `USERLAND_END 0xA00_000`) or wholly inside this heap (`user_buf_ok` in `src/abi/syscall.rs`). Heap memory can therefore be passed straight to syscalls such as `0x10 print` or `0x17 blit`, with no copy into image buffers first.
+Syscall handlers accept buffers wholly inside the image and initial stacks
+(`0x400_000..0xA00_000`), the initial shared heap or its mapped extension.
+Buffers may not cross gaps between regions. See
+[Pointer Arguments](../abi/syscall_specification.md#pointer-arguments). Heap
+memory can be passed directly to `0x10 print` or `0x17 blit`.
 
-The `malloc`/`realloc`/`free` syscalls themselves (`0x0a`, `0x0b`, `0x0f`) do not check pointers against the userland range — `uheap::free` validates against `HEAP_START/HEAP_END` instead.
+The `malloc`/`realloc`/`free` syscalls themselves (`0x0a`, `0x0b`, `0x0f`) do not check pointers against the userland range — `uheap::free` validates against its active heap regions instead.
+
+---
+
+Related documentation: [Memory Overview](overview.md), [Kernel Internals](../kernel.md), [Memory Syscalls](../abi/syscalls/sysinfo_mem_mgmt.md), [C++ Heap](../sdk/libcxxr2.md#memory-map).

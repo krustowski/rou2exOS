@@ -137,3 +137,7 @@ Physical NIC input with r2's tunnel address as source or destination is dropped 
 | TCP service answers over Ethernet but not the tunnel | Relink it with current libcr2 so its replies use the tunnel address; check MTU 1420. |
 
 Host crypto/protocol tests, kernel routing tests, entropy failure tests and QEMU interoperability commands are maintained in the [daemon's development guide](https://github.com/krustowski/rou2exOS-apps/tree/master/c/wgd#verification).
+
+---
+
+Related documentation: [Networking Overview](overview.md), [Kernel Internals](../kernel.md), [Application Suite](../sdk/apps.md#networking), [Tunnel ABI](../abi/syscalls/port_networking.md#0x44-userspace-ipv4-tunnel).

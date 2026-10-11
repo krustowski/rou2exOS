@@ -1,52 +1,13 @@
 # System, Processes and Memory Management
 
-## 0x42 (Coordinated desktop relaunch)
-
-Coordinates replacement of the graphics session's foreground `MEMENTO.ELF`.
-The kernel's `init_rc` desktop launcher registers as its supervisor. A Memento
-started through another launcher is not eligible.
-
-| Argument 1 | Argument 2 | Meaning |
-|------------|------------|---------|
-| `0` | Memento PID from `0x2f` | Request a relaunch; requires registered support. |
-| `1` | `0` | Poll from Memento: returns `1` for a pending request, `0` otherwise. |
-| `2` | `0` | Memento registers that it supports this protocol. |
-
-Registration and requests return `0` on success. Errors are `0xfa` (scheduler
-busy), `0xfb` (unsupported desktop/supervisor), `0xfc` (invalid operation or
-command line), and `0xfe` (unknown PID). An older kernel returns `0xff`.
-libc++r2 provides `register_desktop_relaunch()`,
-`desktop_relaunch_pending()` and `request_desktop_relaunch(pid)`.
-
-A request does not kill or spawn a process. Memento polls outside window
-callbacks, closes its desktop and destroys the UI root, stopping hosted children
-before their shared memory is released. It then exits through `0x00` with
-return code `0x4d52` (`r2::DesktopRelaunchExit`). Only this graceful exit with a
-pending request commits a one-shot command to the supervising launcher. An
-ordinary exit, kill or crash retains the normal graphics reboot policy.
-
-The launcher starts Memento again through executable lookup, preferring the
-Jug download, with its original arguments and one `--relaunch` flag. This
-skips the welcome screen and returns to login. Neither `INIT.RC` nor the boot
-initialization runs again, so the RAM disk and `SESSION.CFG` remain available.
-
-## 0x41 (Process command line)
-
-Returns the saved command line of a process, including `argv[0]`. Jug uses it
-to restart every instance with its original arguments. Kernel tasks have an
-empty command line.
-
-| Argument 1 | Argument 2 | Implemented |
-|------------|------------|-------------|
-| PID from `0x2f` | pointer to a 128-byte output buffer | ✅ |
-
-The return value is the byte length (`0..128`); the output is not
-NUL-terminated. Returns `FileNotFound` (`0xfe`) for an unknown PID, `Busy`
-(`0xfa`) when the scheduler is locked, or `InvalidInput` for an invalid buffer.
-
 ## 0x00 (Graceful Program Exit)
 
 The process'/task's ID is resolved by the kernel scheduler automatically. The process is killed, its page tables and any heap blocks it still owns are released, and a launcher waiting on it (`fg`) is woken.
+
+Return code `0x4d52` commits a pending
+[coordinated desktop relaunch](#0x42-coordinated-desktop-relaunch) when the caller
+is a capable Memento under the graphics supervisor. Otherwise it follows the
+ordinary exit path.
 
 | Argument 1 | Argument 2 | Implemented |
 |------------|------------|-------------|
@@ -156,6 +117,51 @@ Memento uses it when its login dialog is left: that is the end of the session on
 |------------|------------|-------------|
 | `0x01` restart, `0x02` power off | *unused* | ✅ |
 
+## 0x41 (Process command line)
+
+Returns the saved command line of a process, including `argv[0]`. Jug uses it
+to restart every instance with its original arguments. Kernel tasks have an
+empty command line.
+
+| Argument 1 | Argument 2 | Implemented |
+|------------|------------|-------------|
+| PID from `0x2f` | pointer to a 128-byte output buffer | ✅ |
+
+The return value is the byte length (`0`–`128` inclusive); the output is not
+NUL-terminated. Returns `FileNotFound` (`0xfe`) for an unknown PID, `Busy`
+(`0xfa`) when the scheduler is locked, or `InvalidInput` for an invalid buffer.
+
+## 0x42 (Coordinated desktop relaunch)
+
+Coordinates replacement of the graphics session's foreground `MEMENTO.ELF`.
+The kernel's `init_rc` desktop launcher registers as its supervisor. A Memento
+started through another launcher is not eligible.
+
+| Argument 1 | Argument 2 | Meaning |
+|------------|------------|---------|
+| `0` | Memento PID from `0x2f` | Request a relaunch; requires registered support. |
+| `1` | `0` | Poll from Memento: returns `1` for a pending request, `0` otherwise. |
+| `2` | `0` | Memento registers that it supports this protocol. |
+
+Registration and requests return `0` on success. Errors are `0xfa` (scheduler
+busy), `0xfb` (unsupported desktop/supervisor), `0xfc` (invalid operation or
+command line), and `0xfe` (unknown PID). An older kernel returns `0xff`.
+libc++r2 provides `register_desktop_relaunch()`,
+`desktop_relaunch_pending()` and `request_desktop_relaunch(pid)`.
+
+A request does not kill or spawn a process. Memento polls outside window
+callbacks, closes its desktop and destroys the UI root, stopping hosted children
+before their shared memory is released. It then exits through `0x00` with
+return code `0x4d52` (`r2::DesktopRelaunchExit`). Only this graceful exit with a
+pending request commits a one-shot command to the supervising launcher. An
+ordinary exit, kill or crash retains the normal graphics reboot policy.
+
+The launcher starts Memento again through executable lookup, preferring the
+[Jug download](../../sdk/jug.md), with its original arguments and one
+`--relaunch` flag. See [Desktop Supervision](../../multitasking/scheduler.md#desktop-supervision). This
+skips the welcome screen and returns to login. Neither `INIT.RC` nor the boot
+initialization runs again, so the RAM disk and `SESSION.CFG` remain available.
+
 ## `0x43` — Check a shared heap range
 
 `arg1` is the address and `arg2` is a nonzero length in bytes. Returns `1`
@@ -165,3 +171,7 @@ write the memory and does not check allocation ownership or lifetime. It rejects
 private image/stack addresses, gaps between regions, and ranges crossing a region
 boundary. Older kernels return `InvalidSyscall` (`0xff`); callers can then check
 only the original `[0xC00000, 0x1000000)` heap region.
+
+---
+
+Related documentation: [ABI Specification](../syscall_specification.md), [Type Definitions](../type_definitions.md), [Scheduler](../../multitasking/scheduler.md), [Allocators](../../memory/allocators.md).

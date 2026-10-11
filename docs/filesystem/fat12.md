@@ -289,12 +289,12 @@ Exposed via syscall `0x2B`. Returns four `u64` values written to a userland `Fsc
 
 | Resource | Value |
 |----------|-------|
-| Disk size | 1.44 MB (80 cyl × 2 heads × 18 sectors × 512 B) |
-| Max root directory entries | 224 (from BPB; not expandable) |
+| Floppy size | 1.44 MB (80 cyl × 2 heads × 18 sectors × 512 B); RAM disks use their formatted volume size |
+| Max root directory entries | From BPB, fixed; 224 on the standard floppy |
 | Sector size | 512 bytes |
-| Max cluster index | 4084 (FAT12) |
-| FAT copy sectors | 9 sectors per copy, 2 copies |
-| Max file size | Limited by available clusters × 512 B |
+| Data cluster count | FAT12: fewer than 4085; FAT16: fewer than 65525 |
+| FAT copy sectors | From BPB; 9 sectors per copy, 2 copies on the standard floppy |
+| Max file size | Limited by available clusters × sectors per cluster × 512 B |
 | Max directory depth (fsck) | 64 |
 
 ---
@@ -312,3 +312,7 @@ Exposed via syscall `0x2B`. Returns four `u64` values written to a userland `Fsc
 One reserved sector, two FATs sized to cover the data area they describe, media byte `0xF8`, and the `"FAT12"` or `"FAT16"` type string at offset 54 that `Filesystem::new` looks for; a volume of more than 65535 sectors keeps its size in the 32-bit field. It refuses a device too small for any data or too large for FAT16 (about 2 GiB), and the narrow band of sizes just past FAT12 that FAT16 at 512 B clusters cannot take.
 
 Only the boot sector, the FATs and the root directory are cleared. The data area is left as it is: no cluster in it is reachable until the FAT hands it out, and whatever takes one clears what it needs to. Clearing it all took as long as writing every sector of the disk, a long pause at every boot on a RAM disk of a sixteenth of the memory.
+
+---
+
+Related documentation: [Filesystem Overview](overview.md), [Kernel Internals](../kernel.md), [ISO9660](iso9660.md), [Filesystem Syscalls](../abi/syscalls/filesystem.md).

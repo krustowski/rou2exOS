@@ -1,4 +1,4 @@
-# Overview
+# Filesystem Overview
 
 ## Filesystem Stack
 
@@ -19,7 +19,10 @@ fs/vfs — mount table, path dispatch
     BlockDevice trait (fs/block.rs)
 ```
 
-Both filesystems implement the same `BlockDevice` trait. All higher-level logic (directory walks, FAT chains, ISO records) is built on top of that single abstraction.
+The floppy, RAM disk and ATAPI device implement `BlockDevice`. FAT directory
+and chain logic runs over that abstraction; ISO9660 uses ATAPI block reads,
+while tar walks a GRUB-loaded memory archive through the shared read-only
+`RoFs` interface.
 
 ---
 
@@ -232,3 +235,7 @@ Booted from a USB stick, the kernel has no driver to read the medium it came fro
 - **Relocation** (`fs/ustar/module.rs`): GRUB usually places a module just past the kernel image, where the kernel keeps things at fixed physical addresses (process stacks, the userland heap at `0xC00000`, user frames from `0x1000000` to `0x5000000`). `module::adopt()` runs first thing in `kernel_main` and moves the archive to `0x5400000` (or past the boot information, if that is in the way), after checking the memory map says the target is usable RAM. A module already above `0x5000000` is used in place. Both addresses follow from `MAX_PROCESSES`. The kernel's stack, heap and boot page tables live in the linker's `.boot_reserved` NOLOAD section, so the loaded segment covers them and GRUB will not put the module there.
 - **Lookup** (`fs/ustar/mod.rs`): a linear scan over the headers, in memory. `IsoEntry::lba` is the index of an entry's 512-byte header (`ROOT` = `u32::MAX` for the root). Names compare case-insensitively. Directories must have their own entries in the archive, which GNU tar writes.
 - **Limits**: read-only, a snapshot taken at boot, and the archive stays in RAM for the life of the system.
+
+---
+
+Related documentation: [Kernel Internals](../kernel.md), [FAT12 and FAT16](fat12.md), [ISO9660](iso9660.md), [Filesystem Syscalls](../abi/syscalls/filesystem.md).

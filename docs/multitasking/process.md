@@ -15,6 +15,9 @@ struct Process {
     cr3:          u64,           // physical address of P4 page table (0 = kernel CR3)
     sleep_until:  u64,           // PIT tick to wake from sleep (0 = not sleeping)
     waiter:       Option<Waiter>,// launcher parked until this process ends (fg)
+    cmdline:      [u8; 128],     // original launch command, argv[0] first
+    cmdline_len:  usize,         // used bytes; kernel tasks have an empty line
+    desktop:      desktop::State,// supervisor/capability/request/one-shot command
 }
 
 struct Waiter {
@@ -82,12 +85,12 @@ When the scheduler switches to a new process for the first time, it loads this R
 
 ## Page Tables (CR3)
 
-User processes get a dedicated P4 page table created by `elf::create_user_page_table`, which clones the kernel mappings and adds user-accessible entries for:
+User processes get a dedicated P4 page table created by `mem::pages::create_user_page_table`, which clones the kernel mappings and adds user-accessible entries for:
 
 - `0x600_000–0x7FF_FFF` — ELF load region
 - `0x400_000–0x5FF_FFF` and `0x800_000–0x9FF_FFF` — initial user stacks, 128 KiB per slot (slots 16–31 and 0–15, see [Memory Overview](../memory/overview.md#user-stack-tops-by-slot))
-- `0xA00_000–0xAFF_FFF` — optional VGA window (mapped on demand by syscall `0x14`)
-- `0xC00_000–0xFFF_FFF` — shared userland heap (4 MiB, mapped at `uheap::init`)
+- `0xA00_000–0xA0F_FFF` — optional 64 KiB VGA window (mapped on demand by syscall `0x14`)
+- `0xC00_000–0xFFF_FFF` — initial shared userland heap (4 MiB, mapped at `uheap::init`), plus the [extension](../memory/allocators.md#growing-the-extension) after growth
 
 Kernel processes set `cr3 = 0`; the scheduler falls back to `KERNEL_CR3`.
 
@@ -100,3 +103,5 @@ When `kill(pid)` is called, the scheduler calls `mem::pages::free_user_page_tabl
 If the process being released is the one currently running (it is inside the syscall that ends it), the CPU is first switched to `KERNEL_CR3`: a freed page is zeroed on its next allocation, which would otherwise unmap the code being executed.
 
 ---
+
+Related documentation: [Kernel Internals](../kernel.md), [Scheduler](scheduler.md), [Memory Overview](../memory/overview.md), [Process Syscalls](../abi/syscalls/sysinfo_mem_mgmt.md).

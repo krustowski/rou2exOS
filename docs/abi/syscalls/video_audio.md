@@ -189,3 +189,7 @@ Sound through the Intel HD Audio controller: 16-bit signed stereo PCM, left then
 | `0x06` resume | *unused* | `0x00` |
 
 libc++r2 wraps it in `r2/audio.hpp` (`r2::audio::open`, `write`, `queued`, `close`, `pause`, `resume`).
+
+---
+
+Related documentation: [ABI Specification](../syscall_specification.md), [Type Definitions](../type_definitions.md), [Video Overview](../../video/overview.md), [HD Audio](../../audio/hda.md).

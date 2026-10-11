@@ -33,7 +33,7 @@ Called once by `netdrv::register_driver` when the global Ethernet driver process
 
 The RX buffer is a 32 KiB ring plus a 1 500-byte tail overrun guard (`RX_BUFFER: [u8; 32768 + 16 + 1500]`). The extra 16 bytes are the RTL8139 header prefix; the extra 1 500 are for frames that wrap across the ring boundary.
 
-The driver does **not** register an IRQ handler. Instead, `receive_frame` is polled every PIT tick and acknowledges `ROK` in the ISR register (`+0x3E`) manually.
+The driver does **not** register an IRQ handler. Instead, `nic::peek_frame`/`consume_frame` are polled every PIT tick and acknowledges `ROK` in the ISR register (`+0x3E`) manually.
 
 ### RX Ring (`receive_frame`)
 
@@ -45,9 +45,16 @@ offset +2: u16 frame_len  (includes 4-byte CRC)
 offset +4: frame data (frame_len bytes)
 ```
 
-`receive_frame` checks `CAPR+16 != CBR` (not empty), reads the header at `RX_OFFSET & 0x7FFF`, copies `frame_len` bytes into the caller-supplied buffer, advances `RX_OFFSET` (aligned to 4 bytes), and writes the new read pointer to `CAPR` (`+0x38`) as `RX_OFFSET - 16` (RTL8139 datasheet quirk).
+`peek_frame` checks `CAPR+16 != CBR`, reads the header at
+`RX_OFFSET & 0x7FFF`, and returns a borrowed slice including the attached FCS.
+It leaves the ring position unchanged so a receiver with no queue space can
+retry. `consume_frame(len)` advances `RX_OFFSET`, aligns it to four bytes, and
+writes `RX_OFFSET - 16` to `CAPR` (`+0x38`). Invalid lengths below 14 or above
+2048 advance past the bad header. The copying `receive_frame` helper leaves a
+frame queued if its destination buffer is too small.
 
-Frames shorter than 14 bytes or larger than the caller's buffer are dropped.
+`nic.rs` counts RX once on consumption, subtracting the RTL8139 FCS from the
+byte total. See [Network Monitoring](overview.md#network-monitoring).
 
 ### TX Descriptors (`send_frame`)
 
@@ -116,3 +123,7 @@ COM1 base address: `0x3F8`.
 | `write(b: u8)` | Spin on LSR bit 5 (TX FIFO empty), then write to `+0` |
 
 The UART is used as the transport for the SLIP path (see [protocols.md](protocols.md)).
+
+---
+
+Related documentation: [Networking Overview](overview.md), [Kernel Internals](../kernel.md), [NIC Diagnostics](../shell.md#nic), [Build and Run](../build.md#run-targets).

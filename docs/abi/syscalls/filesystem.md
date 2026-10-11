@@ -97,7 +97,7 @@ Execute a flat binary executable (`.BIN` usually).
 
 Execute an ELF64 executable (`.ELF`). Auto-appends `.elf`/`.ELF` if no extension given. Returns the new process PID on success, `0` on failure.
 
-The file is looked up in `/mnt/tmp/jug` first, then in the caller's working directory (on FAT, ISO9660 or the archive), then in `/mnt/tar/bin` and `/mnt/iso/bin`. Jug's downloaded updates therefore take precedence even when the working directory holds a shipped copy. The program is started in the background; it fails when all 32 process slots are held by live processes.
+A bare file name (up to 12 characters) is looked up in `/mnt/tmp/jug` first, then in the caller's working directory (on FAT, ISO9660 or the archive), then in `/mnt/tar/bin` and `/mnt/iso/bin`. Jug's downloaded updates therefore take precedence even when the working directory holds a shipped copy. An absolute path (up to 63 characters, without spaces) selects the file directly on FAT, ISO9660 or tar, without search fallback or changing the working directory. `.` and `..` directory components are normalized. The basename supplies the process name and gets `.elf` appended when needed. The program is started in the background; it fails when all 32 process slots are held by live processes.
 
 | Argument 1 | Argument 2 | Implemented |
 |------------|------------|-------------|
@@ -188,3 +188,7 @@ Returns the number of bytes written, which is short if the disk fills up, or `u6
 | Argument 1 | Argument 2 | Implemented |
 |------------|------------|-------------|
 | pointer to NUL-terminated file name | pointer to [`WriteRange`](../type_definitions.md#readrange-writerange-syscalls-0x39-0x3a) | ✅ |
+
+---
+
+Related documentation: [ABI Specification](../syscall_specification.md), [Type Definitions](../type_definitions.md), [Filesystem Overview](../../filesystem/overview.md), [SDK Overview](../../sdk/index.md).

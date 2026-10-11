@@ -43,3 +43,7 @@ qemu-system-x86_64 ... -device intel-hda -device hda-output,audiodev=snd0 \
 ```
 
 `hda tone` there gives a second of 440 Hz at a quarter of full scale in `out.wav`, and a film with MP2 audio in Memento's Video window gives its sound.
+
+---
+
+Related documentation: [Kernel Internals](../kernel.md), [Audio ABI](../abi/syscalls/video_audio.md#0x3f-hd-audio-pcm), [Shell Diagnostics](../shell.md#hda), [Memento Video](../sdk/memento.md#notes-on-individual-windows).

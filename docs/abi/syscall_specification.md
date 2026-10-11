@@ -1,4 +1,4 @@
-# Overview
+# ABI Specification
 
 This overview document presents the rou2exOS (aka `r2`) kernel interface for external applications. Applications should use one of the language libraries from [the apps repository](https://github.com/krustowski/rou2exOS-apps) and link it statically: [libcr2](../sdk/libcr2.md) for C, [libc++r2](../sdk/libcxxr2.md) for C++, or [libgor2](../sdk/libgor2.md) for Go. See the [SDK Overview](../sdk/index.md) for the rules every program has to follow.
 
@@ -68,7 +68,7 @@ Most syscalls return one of these codes. Syscalls that return a count, an addres
 |---------------|---------|
 | `0x00` | `Okay` |
 | `0xf9` | `Unchanged` — nothing new since the caller last asked; nothing was copied (`0x1d` with metadata) |
-| `0xfa` | `Busy` — a kernel lock could not be taken in time; retry |
+| `0xfa` | `Busy` — lock contention or a resource/ownership conflict; consult the call before retrying |
 | `0xfb` | `NotImplemented` |
 | `0xfc` | `InvalidInput` |
 | `0xfd` | `FilesystemError` |
@@ -79,7 +79,11 @@ Most syscalls return one of these codes. Syscalls that return a count, an addres
 
 | Range | Group | Page |
 |-------|-------|------|
-| `0x00`–`0x0f`, `0x41`–`0x43` | Exit, system information, pipes, time, heap, kill (`0x3b`), memory information (`0x3c`), power (`0x3e`), command lines (`0x41`), desktop relaunch (`0x42`), shared heap range check (`0x43`) | [System, Processes & Memory](syscalls/sysinfo_mem_mgmt.md) |
+| `0x00`–`0x0f`, `0x3b`–`0x3c`, `0x3e`, `0x41`–`0x43` | Exit, system information, pipes, time, heap, kill (`0x3b`), memory information (`0x3c`), power (`0x3e`), command lines (`0x41`), desktop relaunch (`0x42`), shared heap range check (`0x43`) | [System, Processes & Memory](syscalls/sysinfo_mem_mgmt.md) |
 | `0x10`–`0x1f`, `0x3f` | Console, graphics, framebuffer capture (`0x1c`, `0x1d`), audio (HD Audio PCM `0x3f`) | [Video & Audio](syscalls/video_audio.md) |
 | `0x20`–`0x2f`, `0x39`–`0x3a`, `0x40` | Files, directories, VFS, program execution, task list, mount sizes (`0x40`) | [Filesystem](syscalls/filesystem.md) |
-| `0x30`–`0x38`, `0x3d`, `0x44` | I/O ports, serial, packets, IPC, network configuration (`0x3d`), userspace IPv4 tunnel and ICMP probes (`0x44`) | [Ports & Networking](syscalls/port_networking.md) |
+| `0x30`–`0x38`, `0x3d`, `0x44`–`0x46` | I/O ports, serial, packets, IPC, network configuration (`0x3d`), userspace IPv4 tunnel and ICMP probes (`0x44`), NIC throughput counters (`0x45`), TCP port owners (`0x46`) | [Ports & Networking](syscalls/port_networking.md) |
+
+---
+
+Related documentation: [SDK Overview](../sdk/index.md), [Type Definitions](type_definitions.md), [Kernel Internals](../kernel.md).

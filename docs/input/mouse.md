@@ -131,3 +131,7 @@ Maximum 5 simultaneous mouse subscribers. Subscribing when all slots are full re
 | Packet ring size per subscriber | 64 packets (192 bytes) |
 | Max bytes per drain call | 15 (5 × 3-byte packets) |
 | Packet reassembly buffer | 3 bytes (global, shared across all subscribers) |
+
+---
+
+Related documentation: [Input Overview](overview.md), [Kernel Internals](../kernel.md), [Keyboard](keyboard.md), [Memento](../sdk/memento.md).

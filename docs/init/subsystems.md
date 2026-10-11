@@ -116,13 +116,14 @@ sti                                    enable interrupts
 
 | Type | Content |
 |------|---------|
-| `1` | Boot command line (logged to debug) |
-| `3` | Module tag (logged to debug) |
-| `6` | Memory map — iterates entries, logs usable regions (type 1) |
+| `1` | Retain the boot command line for options such as `usb=os`; log it |
+| `3` | Log the module tag; the boot archive was already adopted in `kernel_main` |
+| `6` | Sum usable RAM and retain up to 32 usable regions for frame checks, archive, RAM disk and heap placement |
 | `8` | Framebuffer — copies the tag into `fb_tag`; draws debug rectangles and PSF text to the framebuffer |
-| `14` | ACPI v1 RSDP (logged) |
+| `14`, `15` | Retain ACPI v1/v2 RSDP for reset and shutdown tables |
 
-The framebuffer tag (type 8) is the only one that produces a side-effect beyond logging: it fills `FRAMEBUFFER_PTR`, which is subsequently used by all video syscalls.
+These tags initialize the state used by later subsystems. Framebuffer parsing
+also writes the early debug log; see [Boot and Initialization](overview.md#debug-log).
 
 ### `FramebufferTag` struct
 
@@ -208,7 +209,13 @@ init_processes()
 
 **`kernel_idle` (slot 0):** Absorbs the kernel's boot-time RSP on the first PIT tick (the scheduler saves the current RSP into `slot 0` before switching away). Loops on `hlt` forever. Required as a sentinel — without it the scheduler's first context save would corrupt the iretq frame of a real process.
 
-**`init_rc` (slot 1):** Reads `INIT.RC` from FAT12 root directory. Parses it line by line (NUL or `\n` terminated; strips trailing `\r`; ignores blank lines and lines starting with `#`). Each non-comment line is dispatched through `cmd::handle()` — the same function used by the interactive shell. After the file is fully processed the task kills itself and loops on `hlt`.
+**`init_rc` (slot 1):** Reads the floppy's `INIT.RC`, up to its actual file size
+or 1024 bytes. On the graphics build, an empty/missing script falls back to
+`opt/init.rc` on tar, then ISO. Each non-comment line goes through `cmd::handle`;
+NUL tails and trailing CR are removed. On the text kernel the task exits when
+done. On the graphics framebuffer it remains as the
+[Memento supervisor](../multitasking/scheduler.md#desktop-supervision), which
+can accept a cooperative Jug relaunch without rerunning the startup script.
 
 **`kclock` (slot 2):** Reads the RTC (`h:m:s`) in a tight poll loop and renders the time to a fixed VGA text position. Uses the legacy `vga/write.rs` module (separate from `video/vga.rs`). Not started by the graphics kernel on a framebuffer, where VGA text memory is not what is on the screen; Memento's taskbar shows the time there.
 
@@ -284,3 +291,7 @@ The same font data is returned to userland via syscall `0x18` (glyph data starti
 ```
 
 **`color_demo()`** — iterates VGA color attributes 0–15, prints two-space blocks using each as the background color, arranged in two rows of 8, to confirm the palette is functional.
+
+---
+
+Related documentation: [Boot and Initialization](overview.md), [Kernel Internals](../kernel.md), [Scheduler](../multitasking/scheduler.md), [Input Overview](../input/overview.md).

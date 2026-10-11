@@ -1,4 +1,4 @@
-# Architecture Overview
+# Networking Overview
 
 ## Stack Layers
 
@@ -13,10 +13,11 @@
        ┌──────────▼──────────┐
        │   netdrv.rs         │  routing table, driver/port registry
        └──────────┬──────────┘
-                  │                        ┌──────────┐
-        ┌─────────▼──────────┐             │  serial  │
-        │   nic.rs           │  RTL8139 / Intel PCI NIC    │  + SLIP  │  UART path
-        └─────────┬──────────┘             └──────────┘
+                  │                        ┌────────────┐
+        ┌─────────▼──────────┐             │ serial.rs  │
+        │   nic.rs           │             │ + slip.rs  │  UART path
+        │ RTL8139 / Intel    │             └────────────┘
+        └─────────┬──────────┘
                   │
         ┌─────────▼───────────────────────────────────────┐
         │  Protocol helpers (stateless, no global state)  │
@@ -123,13 +124,14 @@ The userland `sh`/TNT builtins `ping` and `traceroute` select that source to rea
 
 | Table | Size | Contents |
 |-------|------|----------|
-| `NET_DRV_PID` | 1 entry | PID of the global Ethernet driver (ARP, ICMP, unbound TCP) |
-| `PORT_REGISTRY` | 16 entries | `(tcp_dest_port, pid)` for TCP port-specific services |
+| `NET_DRV_PID` | 1 entry | Scheduler slot of the global Ethernet driver (ARP, ICMP, unbound TCP) |
+| `PORT_REGISTRY` | 16 entries | `(tcp_dest_port, slot)` for services and client reply ports |
 
 ### Registration (syscall `0x37`)
 
 - `arg1 = 0`: register as global driver. Probes RTL8139 first, then supported Intel controllers through `nic::init`, and reads and caches the MAC address in `SYSTEM_CONFIG`. Idempotent — no-op if a driver is already registered.
-- `arg1 = N > 0`: bind TCP destination port `N` to the calling process. If an entry for that port already exists it is updated (to support restart/handover). If the table is full, slot 0 is overwritten.
+- `arg1 = N > 0`, `arg2 = 0`: bind TCP destination port `N` to the caller. Binding a port it already owns succeeds; a port owned by another process or a full table returns `Busy` without changing existing entries.
+- `arg1 = N > 0`, `arg2 = 1`: release the caller's binding. Releasing an unbound port succeeds; releasing another process's port returns `Busy`. Other `arg2` values return `InvalidInput`.
 
 Registrations last as long as the process. When it exits, is killed or crashes, `scheduler::kill`/`crash` call `netdrv::release_process(slot)`: the global driver slot is freed if the process held it, its port bindings are dropped, and so are the buffers of frames still queued to it. The next process to register becomes the driver; the NIC stays initialised. Until then, frames for bound ports are still delivered, and frames nobody is registered for are dropped.
 
@@ -138,6 +140,32 @@ Registrations last as long as the process. When it exits, is killed or crashes, 
 On each incoming frame `poll_and_deliver` first rejects physical input using the local tunnel address. Delivery checks the registered tunnel's UDP port before calling `tcp_dest_port(frame)` and `lookup_port(port)` against `PORT_REGISTRY`. A tunnel UDP match goes to its daemon, a TCP port match to that service's PID, and everything else (ARP, ICMP, unregistered ports) to `NET_DRV_PID`.
 
 ARP replies are the exception to one destination: besides the driver, every other process with a TCP port bound gets a copy (once per process, best effort: a copy that finds no free frame buffer is not made). Those processes run TCP/IP stacks of their own, like Memento's browser, video player and chat, and ARP for hosts on the local network themselves. Without the copy they could reach the gateway, whose MAC the driver publishes (syscall `0x3d`), but never a machine beside them on the LAN.
+
+---
+
+## Network Monitoring
+
+Two read-only syscalls expose system-wide network state:
+
+| Syscall | Snapshot | Reference |
+|---------|----------|-----------|
+| `0x45` | Physical NIC RX/TX frame and byte totals since boot, with a millisecond timestamp | [NetStats](../abi/type_definitions.md#netstats-syscall-0x45), [counter semantics](../abi/syscalls/port_networking.md#0x45-network-throughput-statistics) |
+| `0x46` | TCP destination ports, full 64-bit owner PIDs, bounded process names and the global driver's PID | [NetPortTable](../abi/type_definitions.md#netporttable-syscall-0x46), [return codes](../abi/syscalls/port_networking.md#0x46-tcp-port-owners) |
+
+RX counts a frame when software consumes it from the NIC ring; retrying a held
+frame or copying an ARP reply to several queues does not count it again. TX
+counts successful submissions, including Ethernet padding. Bytes exclude the
+FCS, preamble and inter-frame gap. Loopback, SLIP and tunnel inner traffic are
+excluded; encrypted tunnel traffic on the physical NIC counts normally.
+Counters survive driver restarts and NIC reinitialization.
+
+The owner table resolves the registry's reusable slots to process identities
+under the scheduler lock. A busy scheduler returns `Busy`; retry the snapshot.
+The [C](../sdk/libcr2.md#network-monitoring),
+[C++](../sdk/libcxxr2.md#network-monitoring) and
+[Go](../sdk/libgor2.md#network-monitoring) bindings provide wrappers.
+[Memento's Net window](../sdk/memento.md#network-tools) displays these snapshots
+and falls back to its own traffic counters and port numbers on older kernels.
 
 ---
 
@@ -155,3 +183,7 @@ ARP replies are the exception to one destination: besides the driver, every othe
 | SLIP encode/decode buffer | 4 KiB |
 | Serial baud rate | 38 400 (COM1, divisor 3) |
 | Poll rate | 1000 Hz, up to 16 frames per PIT tick |
+
+---
+
+Related documentation: [Kernel Internals](../kernel.md), [Hardware Layer](hardware.md), [Protocol Layer](protocols.md), [WireGuard](wireguard.md).

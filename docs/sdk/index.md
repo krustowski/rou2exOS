@@ -14,6 +14,13 @@ The SDK lives in the [rou2exOS-apps](https://github.com/krustowski/rou2exOS-apps
 
 The programs shipped with the kernel are listed on the [Application Suite](apps.md) page.
 
+Use [Memento](memento.md) for the desktop, [Jug](jug.md) for installing and
+restarting programs, and [Publishing Jug Programs](jug-publishing.md) for the
+SSH publication workflow. Kernel implementations are indexed in
+[Kernel Internals](../kernel.md); request layouts are in the
+[ABI Specification](../abi/syscall_specification.md) and
+[Type Definitions](../abi/type_definitions.md).
+
 ---
 
 ## Repository Layout
@@ -70,7 +77,9 @@ The initial stack is small and sits in memory shared with other processes, so ev
 
 ### Memory map
 
-Each process gets a **private 2 MiB frame mapped at `0x600_000`**, which has to hold code, data, `.bss`, the private stack and (for C++ and Go) the heap. The kernel refuses to load a segment that ends past `0xA00_000`.
+Each process gets a **private 2 MiB frame mapped at `0x600_000`**, which has to hold code, data, `.bss`, the private stack and (for C++ and Go) the heap. The loader skips segments outside `0x600_000..0xA00_000`, but only
+`0x600_000..0x800_000` is private image memory; keep image segments below
+`0x800_000` to avoid the shared initial stacks.
 
 ```
 0x400_000  ┌──────────────────────────────┐
@@ -91,7 +100,16 @@ See [Memory Overview](../memory/overview.md) for how the frame is backed physica
 
 ### Pointers passed to syscalls
 
-Every syscall that takes a pointer checks the whole buffer it will touch. The buffer must lie wholly inside the process image and the initial stacks (`0x400_000–0xA00_000`) or wholly inside the kernel's user heap (syscall `0x0a`, `0xC00_000–0xFFF_FFF`); otherwise the call returns `InvalidInput` (`0xfc`). Heap memory can be handed to syscalls directly, so a program too large to keep its heap in the image can move it to the user heap (libc++r2's `R2_HEAP_ARENA_KERNEL` and `R2_HEAP_ARENA_GROWING`; [Memento](memento.md) uses the latter), and Go can hand a `KMalloc` block to any syscall through `libgor2.KBytes`. Kernels before this check accepted only the image, and such a program will not run on them.
+Every syscall that takes a pointer checks the whole buffer it will touch. The
+buffer must lie wholly inside the process image and initial stacks
+(`0x400_000..0xA00_000`), the initial shared user heap
+(`0xC00_000..0x1000_000`), or its mapped extension; otherwise the call returns
+`InvalidInput` (`0xfc`) or its documented error value. A buffer cannot cross a
+gap between regions. Heap memory can be handed to syscalls directly, so a
+program too large to keep its heap in the image can use libc++r2's
+`R2_HEAP_ARENA_KERNEL` or `R2_HEAP_ARENA_GROWING` ([Memento](memento.md) uses the
+latter), or `KMalloc` with `libgor2.KBytes` in Go. See
+[Pointer Arguments](../abi/syscall_specification.md#pointer-arguments).
 
 ### Calling convention
 
@@ -100,13 +118,17 @@ Every syscall that takes a pointer checks the whole buffer it will touch. The bu
 | `RAX` | syscall number in, return value out |
 | `RDI` | argument 1 |
 | `RSI` | argument 2 |
+| `RCX` | optional argument 3: capture metadata or tunnel frame length |
 | `R9`  | **clobbered** by every syscall |
 
-The kernel's dispatcher takes two arguments. `RCX` is passed on as an optional third, read only by a syscall that asks for it when the caller sets its opt-in bit (`0x1d`'s metadata); every other register but `R9` and `RAX` is preserved. See the [Syscall Specification](../abi/syscall_specification.md) for details.
+Most syscalls take two arguments. `0x1d` reads `RCX` as a metadata pointer only
+with its opt-in bit set; `0x44` always reads it and requires a frame length for
+operation 3 and zero otherwise. Every register except `R9` and `RAX` is
+preserved. See the [Syscall Specification](../abi/syscall_specification.md).
 
 ### Other constraints
 
-- **8.3 file names.** The shell's `bg`/`fg` take a name of at most 8 characters without the extension. Files on the floppy use FAT 8.3 names.
+- **8.3 file names.** Use program basenames of at most 8 characters without the extension. The ELF loader and syscall `0x2a` also accept an absolute path of at most 63 characters with a basename of at most 12; relative paths containing `/` are rejected. The rescue shell restricts `bg`/`fg` executable tokens to 8 characters and `run` tokens to 12. Files on FAT volumes use 8.3 names.
 - **Floating point is saved across a context switch.** The timer interrupt saves each process's x87/MMX/XMM state with `fxsave64` and restores it with `fxrstor64`, and a new process starts with a clean state (exceptions masked, round to nearest), so SSE and x87 code, including what `gcc -O2` emits, is safe in any number of processes. AVX is not enabled (`CR4.OSXSAVE` stays off), so AVX instructions fault. See [Scheduler](../multitasking/scheduler.md).
 - **At most 32 processes** exist at once, including the kernel's own tasks (`kmain`, `kclock`, `kshell`, and `init_rc` while it runs; the graphics kernel on a framebuffer starts neither `kclock` nor `kshell`).
 - **No threads, no signals, no `mmap`, no file descriptors.**
@@ -120,6 +142,13 @@ The kernel's dispatcher takes two arguments. `RCX` is passed on as an optional t
 1. `/mnt/tmp/jug`, where [Jug](jug.md) installs downloaded updates,
 2. the shell's working directory (on a FAT volume, ISO, or tar archive),
 3. `/mnt/tar/bin`, then `/mnt/iso/bin`.
+
+An absolute path selects that file directly on FAT, ISO9660 or tar, bypassing
+the search and leaving the working directory unchanged. `.` and `..` directory
+components are normalized. For example, syscall `0x2a` with
+`/mnt/tar/bin/hello.elf` selects the shipped copy even if Jug has installed an
+update. See
+[Execute ELF](../abi/syscalls/filesystem.md#0x2a-execute-elf64-executable) for argument limits.
 
 So a program can either be copied onto the floppy image:
 
@@ -148,3 +177,7 @@ Programs started from `INIT.RC` at boot use the same commands (see [Build & Run]
 | Docker | Go — the TinyGo image is built from `go/tinygo-r2` |
 | `mtools` | copying files onto `fat.img` |
 | `qemu-system-x86_64` | running |
+
+---
+
+Related documentation: [Documentation home](../index.md), [Build and Run](../build.md), [ABI Specification](../abi/syscall_specification.md).

@@ -133,9 +133,9 @@ when the serving tasks actually see that shared content. The SSH path is a
 host path; a container's mount path can differ.
 
 Use the server-context snippets in
-[`configs/jug-origin.nginx.example`](../../configs/jug-origin.nginx.example)
+[`configs/jug-origin.nginx.example`](../assets/configs/jug-origin.nginx.example)
 on the service reading files and
-[`configs/jug-edge.nginx.example`](../../configs/jug-edge.nginx.example)
+[`configs/jug-edge.nginx.example`](../assets/configs/jug-edge.nginx.example)
 on the public proxy. Adjust the origin mount path and upstream name to your
 deployment, and integrate the locations with your existing configuration.
 Test with `nginx -t` before reloading each service.
@@ -171,3 +171,7 @@ quoting, and public CDN verification. No real node is contacted.
 bash -n utils/jug-publish.sh
 PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tests/jug_publish -v
 ```
+
+---
+
+Related documentation: [SDK Overview](index.md), [Jug Program Manager](jug.md), [Build and Run](../build.md), [Memento](memento.md).

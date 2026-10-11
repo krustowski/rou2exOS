@@ -13,14 +13,16 @@
 
 ## Running It
 
-`make build_floppy` in the kernel tree puts the program on the floppy as `GFX/MEMENTO.ELF`:
+`make build` rebuilds Memento and stages it as `iso/bin/memento.elf`, available
+in `/mnt/tar/bin` and, on CD boots, `/mnt/iso/bin`. Start it from the text kernel:
 
 ```
-cd /mnt/fat/GFX
-fg MEMENTO
+fg memento
 ```
 
-It can also start at boot from `INIT.RC` (see the commented-out lines at the end of `configs/init.rc`).
+The graphics kernel starts it automatically after `INIT.RC`; keep `fg memento`
+out of that script on graphics boots. On the text kernel you can add it to
+`INIT.RC` to start the desktop. See [Graphics Session](../build.md#graphics-session).
 
 Some windows need things that live outside the program:
 
@@ -29,17 +31,22 @@ Some windows need things that live outside the program:
 | A PS/2 mouse | Everything. The cursor is the main way around the desktop. |
 | [`ETH`](apps.md#networking) running (`bg eth`) | Net, Chat, IRC and Web |
 | `/mnt/tar/opt/memento/cacerts.bin` | HTTPS in the Web and Telegram windows. `make build` in the kernel tree copies it onto the ISO and into `usb.tar`. |
-| `tcpp.elf` in `/mnt/iso/bin` | The Editor |
+| `tcpp.elf` in `/mnt/tar/bin` or `/mnt/iso/bin` | The Editor |
 | `them.elf` in `/mnt/tar/bin` | Running DOS programs from the file manager (the theM window) |
 | `mpegplay.elf` in `/mnt/tar/bin`, films in `/mnt/tar/video` | Video |
 | `r2web.elf` in `/mnt/tar/bin` or `/mnt/iso/bin` | Web |
 | `spotify.elf` in `/mnt/tar/bin` or `/mnt/iso/bin`, an HD Audio controller, and for streaming a Premium account in `SPOTIFY.CFG` | Spotify |
-| A bot token in `/mnt/tar/opt/memento/telegram.txt` (or typed in) | Telegram |
+| `telegram.elf` in the boot medium's `bin/`, plus a bot token in `/mnt/tar/opt/memento/telegram.txt` (or typed in) | Telegram |
+| `c8.elf` in the boot medium's `bin/`, ROMs under `/mnt/tar/opt/c8` or `/mnt/iso/opt/c8` | CHIP-8 programs opened from Files |
 | `/mnt/tmp` (the RAM disk) or a writable floppy | Saving screenshots |
-| `sh.elf` in `/mnt/iso/bin` | The Shell icon |
+| `sh.elf` in `/mnt/tar/bin` or `/mnt/iso/bin` | The Shell icon |
 | MIDI files in `/mnt/fat/SOUND` | Music |
 
-Esc on the desktop logs out to the login dialog, and leaving the login dialog restarts the machine (syscall `0x3e`); see [The Session](#the-session). Esc on the landing screen still ends the program, and on the text kernel it switches the VGA back to text mode and returns to the shell.
+Esc on the desktop locks the session, and leaving the login dialog restarts
+the machine (syscall `0x3e`); see [The Session](#the-session). Esc on the landing
+screen ends the program; on the text kernel it restores text mode and returns
+to the shell. The graphics supervisor applies its normal reboot policy unless
+this was a coordinated Jug relaunch.
 
 ---
 
@@ -87,8 +94,8 @@ One clipboard serves every window: a line of text, or the last screenshot, which
 |------|--------|--------------|------------------|
 | Clock | Clock | Analog clock | RTC, `0x02` |
 | Shell | Shell | The userland shell (`sh.elf --host`) as an 80x25 terminal with 200 lines of scrollback (PageUp/PageDown) | spawn `0x2A`, shared user-heap block |
-| Net | Network | IP, MAC, driver state and the bound TCP ports (up to 16, laid out to the window's width) | `0x38` |
-| Mount | Files | Two-pane file manager in the style of Norton Commander. Its top level is the mount list: each mount with its type and size, and on the info line the one under the bar in full (`/mnt/tmp: memdisk, fat16, 126 MiB, 125 MiB free`), read again after anything that changes a disk. F5 copy and F6 move to the other pane (F6 renames when both show one directory), F7 new folder, F8 delete (a folder only when empty), F3 view, F4 edit. Enter on an `.EXE` or `.COM` runs it in theM; Alt+Space, Shift+F10 or a right click opens a menu of the same for the entry under the bar. On a `.PNG` the menu has **Set as wallpaper**: the picture covers the whole screen behind every window (and the login dialog) until Memento ends; `/mnt/tar/pics/warp.png` is one made for it. Enter on `/` walks the tree from the root (`mnt`, then the mounts), so every file has its full path; the root, like the CD and the archive, is read-only. Copies go a chunk per idle turn with progress shown | `0x2C`, `0x2D`, `0x39`, `0x3A`, `0x22`, `0x23`, `0x27`, `0x40` |
+| Net | Network | Stats, subnet scan, ping, traceroute and charts; physical NIC throughput and TCP ports with owner PIDs and names | `0x38`, `0x45`, `0x46` |
+| Mount | Files | Two-pane file manager in the style of Norton Commander. Its top level is the mount list: each mount with its type and size, and on the info line the one under the bar in full (`/mnt/tmp: memdisk, fat16, 126 MiB, 125 MiB free`), read again after anything that changes a disk. F5 copy and F6 move to the other pane (F6 renames when both show one directory), F7 new folder, F8 delete (a folder only when empty), F3 view, F4 edit. Enter on an `.EXE` or `.COM` runs it in theM; Enter on a `.CH8` ROM runs it in C8; Alt+Space, Shift+F10 or a right click opens a menu of the same for the entry under the bar. On a `.PNG` the menu has **Set as wallpaper**: the picture covers the whole screen behind every window (and the login dialog) until Memento ends; `/mnt/tar/pics/warp.png` is one made for it. Enter on `/` walks the tree from the root (`mnt`, then the mounts), so every file has its full path; the root, like the CD and the archive, is read-only. Copies go a chunk per idle turn with progress shown | `0x2C`, `0x2D`, `0x39`, `0x3A`, `0x22`, `0x23`, `0x27`, `0x40` |
 | Tasks | Tasks | Live task table: PID, mode, status, name, RIP; kill by row or typed PID. A **Memory** tab (Tab or M) shows the user heap, each program's frame and heap share, and Memento's own arena | `0x2F`, `0x3B`, `0x3C` |
 | Chat | Chat | Client for the [`CHAT`](apps.md#networking) server on TCP/9000 | libcr2 TCP/IP |
 | Calc | Calculator | Four-function calculator | none |
@@ -99,7 +106,7 @@ One clipboard serves every window: a line of text, or the last screenshot, which
 | Editor | Editor | Turbo C++ 23 (`tcpp.elf`) in a window | spawn `0x2A`, shared user-heap block |
 | Snake | Snake | libc++r2's snake example in a window, sharing its rules (`examples/snake/game.hpp`) and its high score (`/mnt/fat/SNAKE.HSC`) | PC speaker beeps, file `0x21` |
 | Mines | Minesweeper | Beginner, intermediate and expert boards (1/2/3); a safe first click, flags on the right button or F, chording on open numbers, best times in `/mnt/fat/MINES.HSC` | PC speaker beeps, file `0x21` |
-| Telegram | Telegram | A Telegram bot of your own as a chat client: people who write to the bot are chats on the left, and you answer as the bot. Photos they send are shown; a pasted screenshot goes out as a photo | The browser's TCP/IP and TLS, the Bot API over HTTPS |
+| Telegram | Telegram | A Telegram bot of your own as a chat client: people who write to the bot are chats on the left, and you answer as the bot. Photos they send are shown; a pasted screenshot goes out as a photo | hosted `telegram.elf` (Go), shared user-heap block, r2net and r2tls; the Bot API over HTTPS |
 | Video | Video | MPEG-1 films from `/mnt/tar/video`, with their MP2 sound through HD Audio, played by `mpegplay.elf` in a process of its own; and HLS streams (an `.m3u8`, a `.url` file, or an address typed with U) of MPEG-1 video and MP2 audio. Up/Down set the volume while one plays | spawn `0x2A`, shared user-heap block, `0x3f` |
 | Spotify | Spotify / Go | Spotify client in Go (`spotify.elf`, a process of its own): playlists from the Web API, and Premium tracks streamed, decrypted and decoded (Ogg Vorbis, through Tremor) to HD Audio inside r2. Without an account it offers two generated test tones | spawn `0x2A`, shared user-heap block; in the child r2net, r2tls (BearSSL), `0x3f` |
 
@@ -111,6 +118,20 @@ The file manager opens a **File** viewer on the selected file (`0x20`).
 
 *Fig. 4: The Clock window.*
 
+### Network tools
+
+The Net window has **Stats**, **Scan**, **Ping**, **Trace** and **Charts** tabs.
+Stats reads [physical NIC counters](../networking/overview.md#network-monitoring)
+and the TCP owner table: both services and client reply ports are listed with
+their full PIDs and bounded process names. RX/TX rates use successive timestamped
+samples. Charts keeps a history of the rates. On older kernels, traffic figures
+cover Memento's own frame mux and the port list shows numbers without owners.
+
+Scan accepts a subnet in CIDR form; Ping and Trace take numeric IPv4 addresses.
+They share Memento's frame mux with its other stacks. Closing the window stops
+its tools and releases their port. For encrypted subnet probes from Shell or
+TNT, see the separate [WireGuard commands](../networking/wireguard.md#ping-and-traceroute-through-subnets).
+
 ### Notes on individual windows
 
 **Shell** runs `sh.elf` as a process of its own, started with `--host` and the address of a block on the user heap: the shell writes its output into a ring in the block and reads typed characters from another, and the window is the terminal between them (`c/r2sh/host.h` has the layout). Programs the shell starts with `run` print to the console, not the window. `exit`, or the close box, ends the shell; if Memento stops beating, the shell leaves on its own after ten seconds. For [WireGuard](../networking/wireguard.md), `bg wgd <config>` displays a startup log snapshot and the path `/mnt/tmp/WGD.LOG`, so daemon failures remain readable in the window. The shell's `ping <IPv4>` and `traceroute <IPv4>` builtins write their tunnel-probe results directly into the window.
@@ -121,11 +142,25 @@ The file manager opens a **File** viewer on the selected file (`0x20`).
 
 **Web** is described in its engine's [README](https://github.com/krustowski/rou2exOS-apps/tree/master/cpp/memento-hello/web). In short: the browser never blocks, pages are cut at 768 KiB, CSS is limited to what a grid of 16-colour character cells can show, and text is mapped to CP437. Pictures are fetched after the page and its style sheets, the first 16 of a page, and each takes a line of its own in the screen's colours. Ctrl+Space, Shift+F10 or a right click opens a menu (open, open in a new window, copy a link or its text, paste and go, back, reload, find, dark mode); `:img off` turns pictures off. An address answering with a picture shows the picture, and a path (`/mnt/tmp/SCR00001.PNG`) opens a file from a disk.
 
-The Web window is a host for `r2web.elf`, a separate process started with `--host` and a block on the user heap, the way the Editor and the Shell are. The browser, with its navigation, layout, forms, pictures, TLS and networking, runs in the child. Memento owns the outer window, passes it keys, mouse and clipboard text, and composites the frames it draws. Each browser window is a process of its own with its own page and script state, on eight TCP ports from `48000 + slot × 32` (and a DNS port at base + 10). The engine in `web/` stays in Memento too, because Telegram uses its loader, TLS and picture code.
+The Web window is a host for `r2web.elf`, a separate process started with `--host` and a block on the user heap, the way the Editor and the Shell are. The browser, with its navigation, layout, forms, pictures, TLS and networking, runs in the child. Memento owns the outer window, passes it keys, mouse and clipboard text, and composites the frames it draws. Each browser window is a process of its own with its own page and script state, on eight TCP ports from `48000 + slot × 32` (and a DNS port at base + 10). The engine in `web/` also supplies Memento's own image loading and the Video
+window's HLS loader; the Telegram client now runs in a separate Go process.
 
 JavaScript is [MuJS](https://mujs.com/) (ES5): the first 16 classic `<script>` elements run in document order, before the page's style sheets and pictures load, with `document.write`, `getElementById`, element `innerHTML`/`textContent`/`value`, inline `onclick`, `location` and `console.log`/`alert` (to the status line). There are no timers, event listeners, `fetch`, storage or modules. Each script gets at most a 2 MiB heap and one million steps or 250 ms. `:js off` and `:js on` turn scripts off and on. See [r2web's README](https://github.com/krustowski/rou2exOS-apps/tree/master/cpp/r2web).
 
-**Telegram** is a bot's side of the Bot API: `getUpdates` as a long poll, `sendMessage` for what you type, `getFile` and a download for each photo someone sends (the size nearest 320 pixels wide, the last eight kept), and `sendPhoto` for a pasted screenshot, with what is typed as its caption. The token comes from `/mnt/tar/opt/memento/telegram.txt`, or is typed in and kept in `/mnt/fat/TELEGRAM.CFG`.
+**Telegram** runs as `telegram.elf` (`go/telegram`) in its own process. Memento
+forwards input and clipboard content, displays its frames, and presents its
+notification bubbles. The child uses r2net and r2tls for the bot's side of the
+Bot API: `getUpdates` as a long poll, `sendMessage` for what you type, `getFile` and a download for each photo someone sends (the size nearest 320 pixels wide, the last eight kept), and `sendPhoto` for a pasted screenshot, with what is typed as its caption. The token comes from `/mnt/tar/opt/memento/telegram.txt`, then
+`/mnt/fat/TELEGRAM.CFG`, or is typed in and saved there. Ctrl+T changes it.
+See the [Telegram source guide](https://github.com/krustowski/rou2exOS-apps/tree/master/go/telegram)
+for keys, media support and notification settings.
+
+**C8** opens a `.CH8` ROM from Files with Enter or **Run in C8**, one hosted
+`c8.elf` process per window. The ISO build installs twelve ROMs under `/opt/c8`
+on both tar and ISO. Space pauses/resumes, F5 resets, and Esc closes. The PC
+keys `1234`, `QWER`, `ASDF`, `ZXCV` map to the CHIP-8 keypad. Rendering keeps
+the 64×32 aspect ratio; only original CHIP-8 is supported. See the
+[C8 source guide](https://github.com/krustowski/rou2exOS-apps/tree/master/c/c8).
 
 **Video** decodes the film's MP2 audio in the player (in integers: it was written before the kernel saved SSE state across task switches, and is still built with `-mgeneral-regs-only`) and plays it through the [HD Audio driver](../audio/hda.md); the sound is then the clock the pictures keep to. For a stream, the window fetches the HLS playlist and its MPEG-TS segments with the browser's loader and hands the bytes to the player through a 1 MiB ring on the user heap; only MPEG-1 video with MP2 audio plays, which is what `ffmpeg -c:v mpeg1video -c:a mp2 -f hls` makes. See the player's [README](https://github.com/krustowski/rou2exOS-apps/tree/master/cpp/mpegplay).
 
@@ -242,3 +277,7 @@ To add a window to the desktop:
 Every allocation can fail, since there are no exceptions. Check each `new` and each `Create*` call for `nullptr`, as the existing windows do.
 
 A window that writes pixels straight into its bitmap (`R2_BitmapImpl::GetPixels()`, one palette index a pixel, rows `GetRealWidth()` apart), as the picture windows do, takes the pixels a unit from the DPI: `wnd->GetEffectiveDPI() / 96.0`. Not from the bitmap's width over the window's: Memento allocates bitmaps in steps of 150 pixels, so a bitmap is often wider than its window, and a scale worked out that way puts everything too far right and down.
+
+---
+
+Related documentation: [SDK Overview](index.md), [Application Suite](apps.md), [Jug](jug.md), [Video Overview](../video/overview.md).

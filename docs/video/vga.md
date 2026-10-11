@@ -142,7 +142,7 @@ Called after every character write that changes the cursor position.
 
 ## VGA VRAM Window
 
-The VGA VRAM window (`0xA00_000` virtual, `0xA00_000` physical) is mapped on demand by syscall `0x14` (`map_vram`). The mapping uses fine-grained 4 KiB pages (a P1 table allocated from `PAGE_TABLE_POOL`) rather than the 2 MiB huge pages used elsewhere.
+The VGA VRAM window (`0xA00_000` virtual, `0xA0000` physical, 64 KiB) is mapped on demand by syscall `0x14` (`map_vram`). The mapping uses fine-grained 4 KiB pages (a P1 table allocated from `PAGE_TABLE_POOL`) rather than the 2 MiB huge pages used elsewhere.
 
 The P1 table is allocated once per process on the first `map_vram` call. Repeated calls are idempotent — the same P1 is reused. After mapping, userland can write directly to `0xA00_000` as Mode 13h VRAM (320×200, one byte per pixel, 64000 bytes).
 
@@ -159,3 +159,7 @@ An older VGA module lives under `src/vga/` (distinct from `src/video/`). It cont
 - `src/vga/screen.rs` — screen helper
 
 This module predates the current `video/` subsystem. The canonical implementation is `src/video/vga.rs`.
+
+---
+
+Related documentation: [Video Overview](overview.md), [Kernel Internals](../kernel.md), [Video and Audio ABI](../abi/syscalls/video_audio.md).

@@ -1,4 +1,4 @@
-# Overview
+# Video Overview
 
 ## Two Output Paths
 
@@ -9,7 +9,10 @@ The kernel supports two independent video paths selected at boot based on what t
 | **VESA framebuffer** | Multiboot2 framebuffer tag | Linear pixel buffer | `video/mode.rs` |
 | **VGA text mode** | Always available | 80×25 character cells | `video/vga.rs` |
 
-Both paths can be active simultaneously — the framebuffer is used by userland (pixel syscalls), while the VGA text buffer at `0xB8000` is used by the kernel itself for boot-status output.
+The kernel console writes boot status to VGA text memory at `0xB8000`. When
+GRUB selects an RGB framebuffer that text memory is not visible; Memento
+provides the graphics session instead of the kernel shell and clock. See
+[Graphics Session](../build.md#graphics-session).
 
 ---
 
@@ -39,7 +42,11 @@ pub static mut FRAMEBUFFER_PTR: FramebufferTag = FramebufferTag {
 | `bpp` | `u8` | Bits per pixel (16 or 32) |
 | `fb_type` | `u8` | 1 = RGB, 2 = EGA text |
 
-After parsing, `VIDEO_MODE` is set once and stays fixed for the lifetime of the kernel.
+After parsing, `VIDEO_MODE` is set once and stays fixed for the lifetime of the
+kernel. For an RGB framebuffer, `video::wc::map_write_combining` changes PAT
+entry 1 to write-combining and selects it on the framebuffer's 2 MiB pages.
+This happens before process page tables are created. See
+[Boot and Initialization](../init/overview.md#boot-sequence).
 
 ---
 
@@ -152,3 +159,7 @@ A complete 8×16 pixel CP850 font (256 glyphs × 16 rows × 1 byte per row = 409
 
 1. By `restore_font()` when switching back to VGA text mode (mode 0x03) — loaded into VGA plane 2 via planar write mode.
 2. Via syscall `0x18` — returned to userland for software font rendering in pixel modes.
+
+---
+
+Related documentation: [Kernel Internals](../kernel.md), [VGA](vga.md), [Video and Audio ABI](../abi/syscalls/video_audio.md), [Memento](../sdk/memento.md).

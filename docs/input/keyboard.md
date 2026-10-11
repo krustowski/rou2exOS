@@ -161,3 +161,7 @@ Both paths are written on every IRQ1 event for every active subscriber.
 | `0x03` | `0x03` | `copy_to_user(arg2, 16)` — drain up to 16 bytes from ring buffer |
 
 `pipe_subscribe` finds the first slot where `pid == 0`, sets `pid` and `buf_ptr`, and clears the ring buffer. `pipe_unsubscribe` clears the slot by PID. Maximum 5 simultaneous subscribers.
+
+---
+
+Related documentation: [Input Overview](overview.md), [Kernel Internals](../kernel.md), [Kernel Shell](../shell.md), [IPC](../multitasking/IPC.md#keyboard-pipe-irq-1-userland).

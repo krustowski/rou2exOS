@@ -66,6 +66,34 @@ loads as a module. The kernel mounts that archive at `/mnt/tar`; it is the
 source of programs and data when booted from USB without a storage driver.
 See [Boot Medium Archive](filesystem/overview.md#boot-medium-archive-mnttar).
 
+### Legacy BIOS USB boot
+
+Use `r2.iso` for a PC booting in legacy BIOS mode. `make image_iso` requires
+GRUB's `i386-pc` modules and produces a hybrid image with BIOS boot code and
+an active MBR partition marker. If `x86_64-efi` modules are also installed,
+the same image includes EFI boot support.
+
+The active marker is forced with xorriso's `--mbr-force-bootable` option.
+Without it, adding EFI modules to the build host can change the image to a
+GPT layout whose protective MBR has no active entry. Some BIOS firmware then
+omits the USB stick from its boot menu or reports it as unbootable, even though
+the image still boots through EFI on a Mac or as a CD in QEMU.
+
+To rebuild an already staged image after this fix:
+
+```sh
+make image_iso
+xorriso -indev r2.iso -report_el_torito plain -report_system_area plain
+```
+
+Expect a `BIOS` boot image, `grub2-mbr` in the system area, and an MBR
+partition with status `0x80`. An additional small active entry can accompany
+the GPT protective entry; it does not replace the EFI partition.
+Write the rebuilt `r2.iso` as an image to the **whole USB disk**, replacing
+its contents, rather than to one partition or as a copied file. Select the
+legacy USB boot entry in the PC's firmware. `r2-efi.iso` is EFI-only and
+cannot boot a BIOS machine.
+
 ### Intel Mac USB boot (including MacBook Pro 2012)
 
 `grub2-mkrescue` includes boot support for the GRUB platforms installed on the

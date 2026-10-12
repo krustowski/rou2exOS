@@ -1,5 +1,12 @@
 # Port I/O and Networking
 
+## 0x47 (RNTP network disk bridge)
+
+Attach/mount a remote FAT12/16 volume, poll and complete sector requests,
+detach/unmount, or format a server RAM image. See the complete
+[RNTP bridge ABI](../../networking/rntp.md#kernel-bridge-syscall-0x47),
+structures and ownership rules. Argument 3 (`RCX`) must be set explicitly.
+
 ## 0x30 (Send value to port)
 
 Write one byte to a hardware I/O port. Both args are pointers — the kernel dereferences them.
@@ -33,6 +40,20 @@ UART port COM1.
 | `0x01` | pointer to buffer | Create an IPv4 packet. | ✅ |
 | `0x02` | pointer to buffer | Create an ICMP packet. | ✅ |
 | `0x03` | pointer to buffer | Create a TCP packet. | ✅ |
+
+IPv4 requests include the header in `total_length`. A complete 1,500-byte
+packet fits; the builder validates the header and total lengths before copying.
+
+TCP requests use the packed 30-byte `TcpPacketRequest` (`TcpHeader`, source
+IPv4, destination IPv4, native `length: u16`), followed by the declared body.
+Header fields are native endian. The returned segment is in network order,
+including its checksum and the requested receive window. Data-offset values
+zero (legacy) and five select a plain 20-byte header; six through fifteen
+select TCP options at the start of the body, followed by application data.
+`length` includes those options. The body limit is 1,460 bytes. Invalid data
+offsets, truncated options or oversized requests return `InvalidInput`.
+Allocate enough space for the request and output, with a minimum of 512 bytes
+for the existing output-clearing behavior.
 
 ## 0x34 (Send frame/packet)
 

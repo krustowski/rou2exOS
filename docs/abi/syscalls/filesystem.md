@@ -1,5 +1,10 @@
 # Filesystem (VFS / FAT12 / ISO9660)
 
+An [RNTP/TCP connection](../../networking/rntp.md) mounts a remote FAT12/16
+RAM volume at `/mnt/net`. The FAT file/directory calls below work there;
+disconnect or client-daemon exit removes the mount. Network I/O failures return
+`FilesystemError`, or `u64::MAX` for calls using that error convention.
+
 File name arguments accept either a bare name relative to the current working directory (e.g. `FOO.TXT`) or an absolute VFS path (e.g. `/mnt/fat/FOO.TXT`, `/mnt/tmp/FOO.TXT`, `/mnt/iso/grub/grub.cfg`). Both forms are resolved through the VFS mount table. ISO9660 is mounted read-only at `/mnt/iso`.
 
 `/mnt/tmp` is a FAT16 RAM disk (a sixteenth of the RAM, 126 MiB under QEMU's 2 GiB; FAT12 when that comes to only 2 MiB; empty at every boot but for the kernel's `KERNDBG.LOG`). Every FAT12 syscall below works on it exactly as on the floppy at `/mnt/fat`, which makes it the scratch space for programs booted without a floppy: `/mnt/fat` is mounted only when a FAT12 floppy is found at boot. A bare name goes to whichever of the two volumes the working directory is on. `/` is the root of the mount table, as in the kernel shell: it and `/mnt` only lead to the mounts and hold no files, so a bare name in either, or an absolute path under no mount (`/FOO.TXT`), names nothing and the call reports `FileNotFound`.
@@ -121,10 +126,14 @@ List VFS mount points. Returns the number of active mounts as a u64. `fs_type`:
 + `3` = iso9660
 + `4` = tar (the boot medium archive at `/mnt/tar`)
 + `5` = memdisk (the RAM disk at `/mnt/tmp`: FAT16, or FAT12 when it is only 2 MiB; [`0x40`](#0x40-size-of-the-filesystem-a-path-is-on) says which).
++ `6` = netdisk (RNTP remote FAT12/16 at `/mnt/net`, while connected).
 
 | Argument 1 | Argument 2 | Implemented |
 |------------|------------|-------------|
 | *unused* | pointer to array of up to 8 `MountInfo_T` | ✅ |
+
+Mount type `6` is `netdisk` (RNTP remote FAT12/16). Syscall `0x40` reports
+the FAT format separately.
 
 ## 0x2d (List VFS directory)
 
@@ -146,12 +155,18 @@ Change working directory. Updates `SYSTEM_CONFIG` path and cluster. Verifies the
 
 ## 0x40 (Size of the filesystem a path is on)
 
+For an RNTP netdisk, this reads a kernel cache immediately, without network I/O
+or a filesystem operation lock. The RNTP client initializes it before mounting
+and refreshes free space in the background every two seconds. It can briefly
+show the previous free-space count after a write; disconnect clears the cache.
+
 Fills an [`FsStat_T`](../type_definitions.md#fsstat-syscall-0x40) with the size of the filesystem the path is on: the whole volume and the bytes still free for files, the mount's type (numbered as [`0x2c`](#0x2c-list-vfs-mounts) numbers it) and the format on the medium (`0` none, `1` fat12, `2` fat16, `3` iso9660, `4` tar). The path is absolute or relative to the working directory. The root is no filesystem: everything is 0. On the read-only mounts the free bytes are 0.
 
 | Mount | `total_bytes` | `free_bytes` |
 |-------|---------------|--------------|
 | `/` | 0 | 0 |
 | `/mnt/fat`, `/mnt/tmp` | the whole volume | the free clusters |
+| `/mnt/net` | cached volume size | cached free-space snapshot |
 | `/mnt/iso` | the volume space size from the primary volume descriptor | 0 |
 | `/mnt/tar` | the archive's length | 0 |
 

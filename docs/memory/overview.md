@@ -10,11 +10,14 @@ The Multiboot2 memory map tag (type 6) is parsed at boot and reports usable RAM 
 
 ## Virtual Address Space Layout
 
-All addresses are 64-bit (x86-64) but the kernel only uses the lower 4 GiB. The page table is a 4-level (PML4) structure; P2 entries use 2 MiB huge pages everywhere except the VGA VRAM window (which uses 4 KiB P1 entries).
+All addresses are 64-bit (x86-64). The boot identity map covers the lower 4 GiB;
+xHCI can add supervisor-only MMIO mappings above 4 GiB for a 64-bit PCI BAR.
+The page table is a 4-level (PML4) structure; P2 entries use 2 MiB huge pages
+except the VGA VRAM window, which uses 4 KiB P1 entries.
 
 | Start / symbol | End / symbol | Size | Description |
 |----------------|--------------|------|-------------|
-| `0x000_000` | `0x0FF_FFF` |     1 MiB  |   Real-mode legacy (not used at runtime) |
+| `0x000_000` | `0x0FF_FFF` |     1 MiB  | Firmware/legacy ranges, physical VGA memory and the floppy write-DMA bounce buffer at `0x1000–0x11FF` |
 | `0x100_000` | ~            |   varies  |  Kernel image: `.text` `.rodata` `.data` `.bss`; placed by linker at `0x100_000` |
 |  `__stack_bottom` | `__stack_top` |  64 KiB |  Boot stack (inside kernel image) |
 |  `__heap_start`  | `__heap_end`   | 64 KiB |  Kernel linked-list heap (legacy) |
@@ -26,13 +29,41 @@ All addresses are 64-bit (x86-64) but the kernel only uses the lower 4 GiB. The 
 | `0xA10_000` | `0xBFF_FFF` | 1984 KiB | Supervisor-only identity mapping initially; not present in a process after its VGA window replaces P2[5] |
 | `0xC00_000` | `0xFFF_FFF` |      4 MiB   |  Userland heap (shared, uheap) |
 | `0x1000_000` | `0x4FFF_FFF` |   64 MiB |   Per-process ELF physical frames: slot 0 → 0x1000_000, slot 1 → 0x1200_000, ... slot 31 → 0x4E00_000. Checked to be usable RAM at boot |
+| Runtime-selected within `0x500_0000–0x53FF_FFF` | | `size_of::<xhci::Dma>()` | xHCI rings, contexts, scratchpads and up to four additional MMIO page tables; 4 KiB-aligned, supervisor-only RAM outside kernel `.bss` |
+| Runtime-selected within `0x500_0000–0x53FF_FFF` | | `size_of::<bcm57765::hw::Dma>()` | Broadcom descriptor rings and packet buffers; 4 KiB-aligned, avoids the xHCI reservation and boot archive |
 | `0xA00_0000` | + RAM/8 |   varies |   Userland heap extension, mapped USER+WRITE only once the 4 MiB are full (past the tar archive if that is here; see allocators.md) |
 | `KSTACK_POOL` (`.bss`) ||    1 MiB | One 32 KiB kernel stack per slot |
 | `PAGE_TABLE_POOL` (`.bss`) ||    512 KiB | Static pool for dynamically allocated P4/P3/P2/P1 tables, 4 pages per slot |
 | HD Audio ring, CORB, RIRB (`.bss`) ||    131 KiB | The PCM ring the controller plays (128 KiB) and the codec command rings (`audio/hda.rs`) |
 | top of usable RAM below 4 GiB || RAM/16 | The `/mnt/tmp` RAM disk: a FAT16 volume formatted at boot, gone at power-off (`fs/memdisk`). Placed at boot, clear of everything below `0x5000_000` and of the boot archive; 126 MiB at `0x7800_0000` under QEMU's 2 GiB. Kernel-only, like all of the identity map outside the user windows. See [RAM Disk](../filesystem/overview.md#ram-disk-mnttmp-fsmemdisk) |
 
-A drawing of all of this is in [memory-map.pdf](memory-map.pdf).
+The RAM disk also avoids xHCI and Broadcom DMA reservations. Their placement
+checks the usable-memory map and excludes the boot archive and boot information.
+xHCI's BAR can be above 4 GiB; its register window uses supervisor-only, uncached
+2 MiB identity mappings installed before process page tables are cloned.
+
+Download [memory-map.pdf](memory-map.pdf) for four diagrams: the address space
+at three zoom levels (down to one row per 2 MiB page), the linked kernel image
+to scale, boot-selected placement with a worked 2 GiB QEMU example, and kernel
+versus process page tables. The linked addresses identify the graphics-kernel
+ELF snapshot recorded in the PDF; runtime addresses depend on the machine and
+boot medium. Each figure says whether it is to scale, and all PDF ranges use an
+exclusive end address.
+
+Regenerate after rebuilding the graphics kernel, using ReportLab and GNU
+binutils (`readelf` and `nm`):
+
+```sh
+python3 utils/memmap.py docs/memory/memory-map.pdf \
+  --elf target/kernel_graphics/x86_64-r2/release/kernel.elf --as-of 2026-10-12
+```
+
+Use the source-review date for `--as-of`. The renderer reads fixed pool sizes
+from Rust source and section/symbol addresses from the chosen ELF; it checks
+that the selected kernel pools match the source sizes. Boot page-table
+addresses come from the `.bss` layout in `boot.asm`, checked against `nm`:
+`nm`'s `p4_table` is the unused linker-script copy in `.boot_reserved`, not the
+table loaded into CR3.
 
 ### Fixed Pool Capacities
 

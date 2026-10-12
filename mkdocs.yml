@@ -95,6 +95,7 @@ nav:
       - FAT12 & FAT16: filesystem/fat12.md
       - ISO9660: filesystem/iso9660.md
     - Networking:
+      - RNTP network disk: networking/rntp.md
       - networking/overview.md
       - Hardware: networking/hardware.md
       - Protocols: networking/protocols.md

@@ -7,7 +7,7 @@
 *Filesystem dispatch and storage backends. Mounts appear only when their backing
 device or archive is available; `/` and `/mnt` are synthesized from the mount table.*
 
-The floppy, RAM disk and ATAPI device implement `BlockDevice`. FAT directory
+The floppy, RAM disk, RNTP network disk and ATAPI device implement `BlockDevice`. FAT directory
 and chain logic runs over that abstraction; ISO9660 uses ATAPI block reads,
 while tar walks a GRUB-loaded memory archive through the shared read-only
 `RoFs` interface.
@@ -20,10 +20,15 @@ while tar walks a GRUB-loaded memory archive through the shared read-only
 pub trait BlockDevice {
     fn read_sector(&self, lba: u64, buffer: &mut [u8]);
     fn write_sector(&self, lba: u64, buffer: &[u8; 512]);
+    fn try_read_sector(&self, lba: u64, buffer: &mut [u8]) -> Result<(), &'static str>;
+    fn try_write_sector(&self, lba: u64, buffer: &[u8; 512]) -> Result<(), &'static str>;
+    fn begin_io(&self) -> Result<(), &'static str>;
+    fn end_io(&self);
+    fn sector_count(&self) -> Option<u64>;
 }
 ```
 
-One sector = 512 bytes for FAT12/floppy. ISO9660 uses 2048-byte logical blocks but maps them to the same interface internally. Implementors: `Floppy`, `Atapi` (write is a no-op), `MemDisk`.
+One sector = 512 bytes for FAT12/floppy. ISO9660 uses 2048-byte logical blocks but maps them to the same interface internally. Implementors: `Floppy`, `Atapi` (write is a no-op), `MemDisk`, `NetDisk` (RNTP/TCP).
 
 ---
 
@@ -68,6 +73,7 @@ Set up by `init::fs::vfs_init()`:
 | `/` | `Root` | Always |
 | `/mnt/fat` | `Fat12` | Only if `floppy_check_init()` found a FAT12 volume; an empty mount would answer everything below it with a disk error |
 | `/mnt/tmp` | `MemDisk` | When `memdisk::place_tmp()` finds it memory, which takes 2 MiB of free RAM; formatted empty at every boot |
+| `/mnt/net` | `NetDisk` | While an RNTP client is connected to a FAT12/16 RAM export |
 | `/mnt/iso` | `Iso9660` | Only if `Iso9660::probe()` succeeds |
 | `/mnt/tar` | `Tar` | Only if GRUB loaded a tar archive as a module |
 
@@ -88,7 +94,7 @@ Example: path `b"/mnt/fat/SUBDIR/FILE.TXT"` → `(Fat12, b"SUBDIR/FILE.TXT")`.
 |----------|-------------|
 | `try_fat12_absolute(path)` | Returns `Some(rel)` if `path` resolves under the Fat12 mount |
 | `try_iso9660_absolute(path)` | Returns `Some(rel)` if `path` resolves under the Iso9660 mount |
-| `try_fat_absolute(path)` | Returns `Some((fs_type, rel))` if `path` resolves under a writable FAT12 mount (Fat12 or MemDisk) |
+| `try_fat_absolute(path)` | Returns `Some((fs_type, rel))` if `path` resolves under a writable FAT12 mount (Fat12, MemDisk or NetDisk) |
 | `try_readonly_absolute(path)` | Returns `Some((fs_type, rel))` if `path` resolves under a read-only mount (Iso9660 or Tar) |
 | `mount_dir(dir)` | Returns the names directly below `dir` when it is `/` or on the way to a mount (see below) |
 | `mount(path, fs_type)` | Add a mount entry |
@@ -98,7 +104,7 @@ Example: path `b"/mnt/fat/SUBDIR/FILE.TXT"` → `(Fat12, b"SUBDIR/FILE.TXT")`.
 
 These are the primary VFS entry points used by syscall handlers in `abi/syscall.rs`. Both wait (bounded spin) for the mount table lock instead of giving up at the first contention: a missed lock used to make an absolute path look relative and be resolved in the wrong directory.
 
-`FsType::name()` gives the name `mount` and `dir` print for a type (`rootfs`, `fat12`, `iso9660`, `tar`, `memdisk`).
+`FsType::name()` gives the name `mount` and `dir` print for a type (`rootfs`, `fat12`, `iso9660`, `tar`, `memdisk`, `netdisk`).
 
 ### Directories Made of Mounts
 
@@ -132,11 +138,17 @@ Syscall `0x2D` lists `/` and `/mnt` from the mount table (`vfs::mount_dir`), sys
 
 ### `FatDev` (`fs/fatdev.rs`)
 
-The floppy and the RAM disk run the same `fat12::Filesystem`, which is generic over `BlockDevice`. `FatDev` is an enum (`Floppy`, `Mem`) that implements `BlockDevice` by forwarding to one or the other, so every FAT12 code path opens `Filesystem::new(&dev)` and does not care which disk it has.
+The floppy, RAM disk and [RNTP network disk](../networking/rntp.md) run the same `fat12::Filesystem`, which is generic over `BlockDevice`. `FatDev` is an enum (`Floppy`, `Mem`, `Net`) that forwards I/O to the selected device. `/mnt/net` appears after an RNTP/TCP handshake and disappears on disconnect. FAT12/16 reads and writes use fallible device calls; a failed sector invalidates the operation and stops further writes. A network filesystem operation holds an ownership guard while scheduling remains active for its client daemon. Shared RNTP sessions also acquire a server operation lock, invalidate metadata on foreign revision changes and commit their writes before releasing the lock. Multiple R2 instances and Linux FUSE mounts can access the same export. Sequential RNTP reads use a separate 32-sector buffer inside the current FAT operation, with batched TCP fetches and kernel completions. This speeds up fmimage and other range readers without evicting cached FAT metadata.
+
+Memento uses background processes for file copies (`fmcopy.elf`) and image
+previews (`fmimage.elf`). The image loader performs file lookup, reads and
+decoding while the desktop paints progress and handles input. A slow or
+stalled RNTP read therefore leaves the Image window closable and the desktop
+responsive.
 
 | Function | Description |
 |----------|-------------|
-| `FatDev::of(fs_type)` | The device behind a `Fat12` or `MemDisk` mount |
+| `FatDev::of(fs_type)` | The device behind a `Fat12`, `MemDisk` or `NetDisk` mount |
 | `FatDev::for_path(abs)` | The volume an absolute path lies on, and the path below the mount |
 | `FatDev::cwd_mounted()` | The working directory's volume and cluster, or `None` when it is on no FAT volume (`/`, `/mnt`, the ISO, the archive) |
 

@@ -18,7 +18,7 @@ The Go workspace has these parts:
 
 The only host dependency is Docker.
 
-```
+```sh
 cd go/tinygo-r2 && make image     # once; builds tinygo-r2:0.38.0
 cd ../hello && make               # produces hello.elf
 ```

@@ -14,7 +14,7 @@ There are three distinct allocators in the kernel, each serving a different purp
 
 Each allocation is preceded by an inline `HeapNode` header (4 pointer-sized fields, ~32 bytes on x86-64):
 
-```
+```rust
 struct HeapNode {
     size:     usize,           // data bytes available after this header
     status:   HeapNodeStatus,  // Free | Used | Unknown

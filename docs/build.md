@@ -4,7 +4,7 @@
 
 Run `make init` once to install the toolchain:
 
-```
+```sh
 make init
 ```
 
@@ -26,7 +26,7 @@ installed separately:
 
 ### Release build (both video modes)
 
-```
+```sh
 make build
 ```
 
@@ -48,7 +48,7 @@ The resulting ISO is mounted at `/mnt/iso` at boot:
 | ISO path | Contents |
 |----------|----------|
 | `/boot` | `kernel_text.elf`, `kernel_graphics.elf`, GRUB config |
-| `/bin` | Userland programs (`eth`, `wgd`, `garn`, `tnt`, `chat`, `sh`, `fsck`, `nsk`, `them`, `hellofs`, `hello`, `dish`, `gfxdemo`, `routtest`, `snake`, …). Searched by `bg`/`fg` when a binary is not in the working directory. |
+| `/bin` | Userland programs (`eth`, `wgd`, `garn`, `tnt`, `chat`, `sh`, `fsck`, `nsk`, `them`, `hellofs`, `hello`, `dish`, `gfxdemo`, `routtest`, `snake`, `mines`, …). Searched by `bg`/`fg` when a binary is not in the working directory. |
 | `/games` | Optional DOS games for the `THEM` emulator (not part of the repository) |
 | `/opt` | Startup script, application configurations, CA bundle, bsh examples and C8 ROMs |
 | `/include`, `/lib` | TCC headers, startup objects and libraries |
@@ -69,15 +69,19 @@ See [Boot Medium Archive](filesystem/overview.md#boot-medium-archive-mnttar).
 ### Legacy BIOS USB boot
 
 Use `r2.iso` for a PC booting in legacy BIOS mode. `make image_iso` requires
-GRUB's `i386-pc` modules and produces a hybrid image with BIOS boot code and
-an active MBR partition marker. If `x86_64-efi` modules are also installed,
-the same image includes EFI boot support.
+GRUB's `i386-pc` modules and explicitly selects that platform. It produces a
+BIOS-only CD/USB hybrid image with BIOS boot code and one active MBR partition,
+without GPT or Apple partition tables. Installing `x86_64-efi` modules does
+not change this layout. Use `r2-efi.iso` for EFI machines and Intel Macs.
 
-The active marker is forced with xorriso's `--mbr-force-bootable` option.
-Without it, adding EFI modules to the build host can change the image to a
-GPT layout whose protective MBR has no active entry. Some BIOS firmware then
-omits the USB stick from its boot menu or reports it as unbootable, even though
-the image still boots through EFI on a Mac or as a CD in QEMU.
+Leaving GRUB's platform selection automatic previously allowed installing EFI
+modules to change `r2.iso` to a GPT/APM image with a protective MBR. Forcing
+an active marker alone left that layout in place. A BIOS that rejects it can
+still omit the stick from its boot menu or report it as unbootable, even when
+QEMU boots it successfully. Selecting `--directory=/usr/lib/grub/i386-pc`
+restores the simpler legacy layout; `--mbr-force-bootable` retains the active
+marker. To use modules installed elsewhere, set
+`GRUB_BIOS_DIR=/path/to/i386-pc`.
 
 To rebuild an already staged image after this fix:
 
@@ -87,8 +91,8 @@ xorriso -indev r2.iso -report_el_torito plain -report_system_area plain
 ```
 
 Expect a `BIOS` boot image, `grub2-mbr` in the system area, and an MBR
-partition with status `0x80`. An additional small active entry can accompany
-the GPT protective entry; it does not replace the EFI partition.
+partition with status `0x80` and type `0xcd`. There should be no GPT, APM,
+UEFI boot image, or dummy active entry of type `0x00` in this BIOS image.
 Write the rebuilt `r2.iso` as an image to the **whole USB disk**, replacing
 its contents, rather than to one partition or as a copied file. Select the
 legacy USB boot entry in the PC's firmware. `r2-efi.iso` is EFI-only and
@@ -96,11 +100,10 @@ cannot boot a BIOS machine.
 
 ### Intel Mac USB boot (including MacBook Pro 2012)
 
-`grub2-mkrescue` includes boot support for the GRUB platforms installed on the
-build host. Installing `grub2-tools` alone can produce a BIOS-only `r2.iso`.
-That image has no EFI loader for the Intel Mac's native USB boot path, even
-though it boots in QEMU's default BIOS. `make image_iso` warns when the host's
-standard `x86_64-efi` module directory is missing.
+`make image_iso` deliberately produces a BIOS-only `r2.iso`. For the Intel
+Mac's native USB boot path, `make image_efi` selects the `x86_64-efi` modules
+and produces `r2-efi.iso` separately. Installing `grub2-tools` alone may not
+provide those EFI modules; the EFI target checks them before creating an image.
 
 Install the EFI modules on the Linux build host:
 
@@ -126,9 +129,21 @@ instructions if EFI modules are missing. For modules extracted elsewhere, use
 `make image_efi GRUB_EFI_DIR=/path/to/x86_64-efi`; `GRUB_MKRESCUE` can override
 the selected host command.
 
+The EFI target also converts `docs/assets/favicon.ico` into
+`docs/assets/r2-boot.icns` and installs it as `.VolumeIcon.icns` in both the FAT
+EFI partition and the ISO/HFS+ volume root. The green r2 lettering keeps its
+transparency and pixel edges. Classic RGB resources and alpha masks are included
+for older Intel Mac firmware, alongside PNG resources for newer pickers. See
+[Mac boot picker icon compatibility](https://dortania.github.io/OpenCore-Legacy-Patcher/ICNS.html#custom-mac-boot-picker-icons).
+Icon generation needs Python 3 and Pillow (`python3-pillow` on Fedora and
+Debian/Ubuntu); the EFI image step also uses GRUB's existing `mtools` dependency.
+`make image_efi` regenerates the icon when the favicon changes. The BIOS image
+target remains independent of this icon step.
+
 Flash **`r2-efi.iso` as a disk image** to the USB stick, replacing its contents;
 copying the ISO file onto a filesystem is insufficient. On the Mac, power on
-while holding **Option (⌥)** and select **EFI Boot**, then choose the ordinary
+while holding **Option (⌥)** and select the green **r2** icon (the entry may still
+be called **EFI Boot** on some firmware), then choose the ordinary
 **graphics** GRUB entry. See [Apple's startup key
 instructions](https://support.apple.com/en-gb/102603).
 
@@ -145,17 +160,32 @@ verify which image was flashed and how it was written: the boot picker entry
 alone does not establish that R2's loader was reached. A failure after the GRUB
 menu is a different stage; record its exact message.
 
-EFI boots initialize native xHCI USB keyboard support automatically. Connect an
-external USB keyboard before booting; the **USB keyboard via xHCI** graphics
-entry enables the same driver explicitly. It supports HID boot keyboards,
-including keyboards behind USB2 hubs, and routes the switchable USB2 ports on
-Intel's 2012 Panther Point controller to xHCI.
+EFI boots initialize native USB input automatically. The PCI xHCI driver handles
+switchable external USB ports; the EHCI driver handles USB2 ports and internal
+hubs, including the MacBook's keyboard/trackpad path. On BIOS, select the
+**USB input (xHCI + EHCI)** entry or add `usb=xhci` to the kernel command line.
+This option enables both drivers; `usb=firmware` keeps firmware input instead.
 
-The built-in keyboard may be on an EHCI-only port. USB trackpads, USB mice, and
-runtime keyboard attachment are not supported. See
-[USB keyboard support](input/keyboard.md#usb-keyboards-xhci).
-Avoid the **PS/2 input only** entries (`usb=os`) on a Mac: they stop the USB
-controllers without starting the keyboard driver.
+HID boot mice and keyboards connected before boot are supported. The Apple
+Wellspring trackpad driver recognizes the 2011/2012 MacBook Pro USB IDs, including
+June 2012 Retina models. It enables native touch reports and provides relative
+pointer movement, physical click/drag, and a right click when two fingers are
+present at click-down. Keyboard and trackpad interfaces are initialized together.
+Tap-to-click, scrolling/gestures, and runtime device attachment are not implemented.
+See [USB mouse and MacBook trackpad support](input/mouse.md#usb-mice-and-macbook-trackpads)
+and [USB keyboard support](input/keyboard.md#usb-keyboards-xhci).
+
+After changing drivers, rebuild the kernels and the EFI image:
+
+```sh
+make compile_kernel
+make image_efi
+```
+
+The ordinary graphics entry then starts Memento with native USB input. These
+paths have host and QEMU tests; the built-in trackpad still needs verification
+on a physical Mid-2012 MacBook Pro. Avoid the **PS/2 input only** entries
+(`usb=os`) on a Mac: they stop USB controllers without starting native input.
 
 On EFI, the **text mode** entries use the framebuffer-capable kernel with
 `console=fb`. R2 draws an 80x25 text console on the RGB framebuffer and starts
@@ -163,7 +193,7 @@ the kernel shell instead of Memento. This avoids GRUB's “no console will be
 available” warning for a VGA-only kernel and makes commands such as `nic`
 visible. BIOS text entries continue to use the VGA text kernel.
 
-If ETH exits immediately, boot **text mode, USB keyboard via xHCI** and run
+If ETH exits immediately, boot **text mode, USB input (xHCI + EHCI)** and run
 `nic`. It now lists PCI network controllers even when no Ethernet driver is
 registered, including vendor/device IDs and available R2 backends. In Memento,
 open `/mnt/tmp/NETINFO.TXT` in the file browser or run
@@ -222,7 +252,7 @@ Rebuild and boot the kernel too: `wgd` and the shell's subnet `ping`/`traceroute
 Build both release kernels once before making a debug image: the debug target
 replaces only `kernel_text.elf`, while GRUB still includes the graphics entry.
 
-```
+```sh
 make build_debug
 ```
 
@@ -230,13 +260,13 @@ Runs `compile_kernel_debug` and `build_iso`. Builds the text-mode kernel with fe
 
 Optional extra features:
 
-```
+```sh
 make build_debug EXTRA_FEATURES=serial_debug
 ```
 
 ### Clean
 
-```
+```sh
 make clean    # cargo clean
 ```
 
@@ -344,7 +374,7 @@ The TSS descriptor at `0x28` is initially a placeholder; `init::idt::setup_tss_d
 
 Creates a 1.44 MB FAT12 floppy image (`fat.img` by default, override with `FLOPPY_IMAGE=`):
 
-```
+```sh
 make build_floppy
 make build_floppy FLOPPY_IMAGE=my.img
 ```
@@ -403,11 +433,11 @@ Lines starting with `#` are ignored. Trailing `\r` is stripped (DOS line endings
 
 With `usb=os` on the kernel's command line, the kernel takes the USB host controllers from the firmware at boot, before it sets up the PS/2 mouse (`src/usb/`, the boot line *Taking the USB controllers from the firmware*). `grub.cfg` has a text and a graphics entry with it, marked *PS/2 input only*. In the GRUB menu you can also press `e` and add `usb=os` to the `multiboot2` line.
 
-Use it on real hardware when pulling out the USB stick freezes the machine. The firmware's SMM code still drives the controllers to emulate a PS/2 keyboard and mouse. A stick pulled out is an SMI the firmware may spend seconds on, and the kernel cannot mask it. This ownership-only mode stops the controllers, leaving input to real PS/2 devices. The boot line reads `FAIL` if a controller's registers were out of reach, or if the firmware did not let go and had to be overruled. In that case, look for *XHCI/EHCI Hand-off* in the firmware setup and turn it on. The kernel shell's [`usb`](shell.md#usb) command shows the state of each controller, and `usb take` does the same handoff later, also stopping the native keyboard driver.
+Use it on real hardware when pulling out the USB stick freezes the machine. The firmware's SMM code still drives the controllers to emulate a PS/2 keyboard and mouse. A stick pulled out is an SMI the firmware may spend seconds on, and the kernel cannot mask it. This ownership-only mode stops the controllers, leaving input to real PS/2 devices. The boot line reads `FAIL` if a controller's registers were out of reach, or if the firmware did not let go and had to be overruled. In that case, look for *XHCI/EHCI Hand-off* in the firmware setup and turn it on. The kernel shell's [`usb`](shell.md#usb) command shows the state of each controller, and `usb take` does the same handoff later, also stopping both native USB input drivers.
 
-For native USB keyboard input, use `usb=xhci` instead. EFI boots enable it
+For native USB keyboard/mouse/trackpad input, use `usb=xhci` instead. EFI boots enable it
 automatically unless `usb=os` or `usb=firmware` is present. BIOS boots retain
-firmware input by default. See [USB keyboard support](input/keyboard.md#usb-keyboards-xhci)
+firmware input by default. See [USB input support](input/mouse.md#usb-mice-and-macbook-trackpads)
 for device support and current limits.
 
 ---
@@ -427,13 +457,13 @@ for device support and current limits.
 
 Standard run with networking:
 
-```
+```sh
 make run_iso_net
 ```
 
 QEMU network setup assumes `tap0` is already created on the host. The kernel probes RTL8139 first, then supported Intel controllers, then BCM57765 via PCI scan. To test Intel in QEMU, replace the target's `-device rtl8139,netdev=net0` with `-device e1000,netdev=net0` or `-device e1000e,netdev=net0`; see [Hardware Layer](networking/hardware.md#nic-selection-and-intel-driver-nicrs-e1000rs).
 
-```
+```sh
 sudo ip tuntap add dev tap0 mode tap
 sudo ip link set tap0 up
 sudo ip addr add 10.3.4.1/24 dev tap0
@@ -447,7 +477,7 @@ Before starting QEMU, `run_iso_net` also runs a few best-effort host tweaks with
 
 ### Kernel self-test (QEMU)
 
-```
+```sh
 make test_kernel
 ```
 
@@ -503,7 +533,7 @@ Tests in `src/ktest.rs`:
 
 ### Host unit tests
 
-```
+```sh
 make test
 ```
 
@@ -518,6 +548,7 @@ hardware and scheduler stand-ins:
 | `tests/unit/midi.rs` | Standard MIDI File parsing and the monophonic sequencer (`src/audio/smf.rs`) |
 | `tests/unit/path.rs` | Path normalisation (`src/fs/vfs/path.rs`) |
 | `tests/unit/elf_path.rs` | Bare names, absolute executable paths, invalid input and length limits |
+| `tests/unit/usb_hid.rs` | Composite USB descriptors, boot mouse packets, Wellspring touch reports, clicks, keyboard codes and repeat |
 | `tests/unit/desktop.rs` | Preserving desktop arguments, adding `--relaunch` once, invalid and oversized commands |
 | `tests/unit/bcm57765.rs` | BCM57765 descriptor ownership/wraparound, PCI power state, MAC validation, bounded reset/PHY waits and copper link resolution with a register model |
 | `tests/unit/calendar_clock.rs` | Gregorian dates and CMOS decoding, clock adjustments, midnight rollover and independent uptime |
@@ -550,7 +581,7 @@ Exercises the SSH publication receiver through a local substitute. See
 
 ## Code Analysis
 
-```
+```sh
 make clippy          # cargo clippy --release, all warnings as errors
 make sonar_check     # SonarQube scan (requires SONAR_HOST_URL + SONAR_TOKEN env vars)
 ```
@@ -581,6 +612,11 @@ paths to `../configs` or `../src` do not become site assets. The downloadable
 Nginx examples in `docs/assets/configs/` mirror `configs/jug-*.nginx.example`;
 refresh them when those source snippets change. Strict validation reports
 missing navigation entries, missing files and broken heading anchors.
+
+Code blocks are highlighted by Pygments. Tag every fence with its language
+(` ```rust `, ` ```c `, ` ```nasm `, ` ```sh ` for host shell commands); leave
+diagrams, register tables, kernel shell sessions and pseudocode untagged or
+` ```text `, which renders them plain.
 
 `docs/docs_theme/main.html` adds the breadcrumb trail, with styles in
 `docs/assets/stylesheets/navigation.css`. Section overview files keep their

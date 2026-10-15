@@ -24,11 +24,11 @@ int main(int argc, char **argv) {
 
 ## Building
 
-```
+```sh
 cd cpp/libc++r2
 make            # libc++r2.a, libc++r2compat.a, _crt0.o
 make check      # host-side tests
-make examples   # examples/hello, examples/gfxdemo, examples/snake
+make examples   # examples/hello, examples/gfxdemo (Snake is cpp/snake now)
 ```
 
 An application needs a two-line Makefile:
@@ -186,7 +186,7 @@ Put `libc++r2.a` first (both define `memcpy`; `libcr2`'s truncates at 64 KiB). M
 
 **`libc++r2compat.a`** adds the C allocation names (`malloc`, `free`, …, on the arena) and `snprintf`, for code written against a C library. [Memento](memento.md) links it after `libc++r2.a` and builds entirely freestanding. A program that links the host's libstdc++ also needs it after `-lstdc++`, because it supplies the glibc symbols libstdc++ references but never calls on this target and the `_Unwind_*` stubs:
 
-```
+```sh
 g++ ... $(OBJS) libc++r2.a -lstdc++ libc++r2compat.a -lgcc ...
 ```
 

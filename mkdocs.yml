@@ -23,6 +23,7 @@ theme:
     - navigation.indexes
     - navigation.top
     - navigation.footer
+    - content.code.copy
     - toc.follow
     - search.suggest
     - search.highlight
@@ -43,7 +44,13 @@ markdown_extensions:
   - toc:
       permalink: true
   - tables
-  - fenced_code
+  # Pygments highlighting for fenced blocks (```rust) and inline code (`#!rust Option<T>`).
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.superfences
 
 # Keep missing pages, downloads and heading links visible in strict builds.
 validation:

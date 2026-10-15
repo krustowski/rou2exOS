@@ -40,7 +40,7 @@ re-enables interrupts; the caller resumes when the stub returns.*
 
 The interrupt gate for `0x7f` is a naked stub (`syscall_handler` in `src/abi/syscall.rs`) that saves the general-purpose registers, calls the dispatcher `syscall_inner(arg1, arg2, syscall_no, arg3)` and returns with `iretq`:
 
-```
+```nasm
 cld                 ; Rust expects forward string operations
 push rax ... r15     ; every GPR except R9
 sub rsp, 8          ; align the stack for the Rust call

@@ -1,8 +1,9 @@
 # Input Overview
 
 The input subsystem handles PS/2 keyboards (IRQ1), PS/2 mice (IRQ12), and USB
-HID boot keyboards on xHCI controllers. PS/2 devices use the 8042 controller;
-USB keyboards use a native driver polled from the timer interrupt. Both keyboard
+HID boot keyboards/mice and Apple Wellspring trackpads on PCI xHCI/EHCI
+controllers. PS/2 devices use the 8042 controller;
+USB input uses native drivers polled from the timer interrupt. Both keyboard
 paths deliver Set 1 scancodes to the shell and existing userland subscribers.
 Port I/O primitives live in `input/port.rs`.
 
@@ -17,8 +18,9 @@ Port I/O primitives live in `input/port.rs`.
 
 Both are registered in `abi/idt.rs` by `install_isrs()`.
 
-USB input uses IRQ0's scheduler timer to poll the xHCI event ring, before the
-scheduler acquires its lock. It does not require an xHCI interrupt handler.
+USB input uses IRQ0's scheduler timer to poll xHCI events and EHCI transfers,
+before the scheduler acquires its lock. It does not require a USB controller
+interrupt handler.
 See [USB keyboard support](keyboard.md#usb-keyboards-xhci).
 
 The 8042 controller shares a single data register (port `0x60`) between keyboard and mouse. The status register (port `0x64`) bit 5 distinguishes the source: `0` = keyboard, `1` = mouse.
@@ -40,8 +42,9 @@ those buffers through syscall `0x03` is non-blocking.*
 |--------|------|---------|
 | `keyboard` | `input/keyboard.rs` | Scancode buffer, shell loop, scancode→ASCII, tab completion |
 | `irq` | `input/irq.rs` | Keyboard fan-out to up to 5 userland subscribers |
-| `xhci` | `usb/xhci.rs` | Controller ownership, DMA rings, USB enumeration and keyboard polling |
-| `hid` | `usb/hid.rs` | HID boot reports, Set 1 translation and held-key repeat |
+| `xhci` | `usb/xhci.rs` | Controller ownership, DMA rings, USB enumeration and keyboard/mouse/trackpad polling |
+| `ehci` | `usb/ehci.rs` | USB2 hub enumeration, split transactions and input polling |
+| `hid` | `usb/hid.rs` | Boot keyboard/mouse and Wellspring reports, Set 1 translation and held-key repeat |
 | `mouse` | `input/mouse.rs` | PS/2 mouse init, packet reassembly, subscriber ring buffers |
 | `port` | `input/port.rs` | Raw x86 I/O port primitives (IN/OUT for u8/u16/u32) |
 | `cmd` | `input/cmd.rs` | Shell built-in command dispatcher |

@@ -1,5 +1,67 @@
 # Mouse
 
+## USB Mice and MacBook Trackpads
+
+EFI boots start native input on the first PCI xHCI controller and up to two
+EHCI controllers. `usb=xhci` enables both paths explicitly on BIOS or EFI;
+`usb=firmware` disables automatic native input, and `usb=os` only takes and
+stops controllers. Connect devices before booting.
+
+The xHCI driver supports USB2/USB3 root ports and USB2 hubs. EHCI supports
+high-speed root devices and USB2 hubs, with split transactions for full/low-speed
+children behind a high-speed hub. This covers Intel Panther Point internal
+rate-matching hubs, whose ports cannot all be switched to xHCI. Full/low-speed
+devices connected directly to an EHCI root port require a companion driver and
+are not supported. EHCI currently requires a MMIO BAR below 4 GiB.
+
+Ordinary mice must advertise a HID boot mouse interface (class 3, subclass 1,
+protocol 2). The driver selects boot protocol and translates the three-byte
+report into the existing mouse packet API. It reverses USB Y, preserves the
+three buttons, and splits movement that exceeds the signed eight-bit ABI.
+Report-only mice, tablets, wheel events, and extra buttons are not supported.
+
+For Apple vendor `05ac`, products `0245–0247`, `0252–0254` and `0262–0264`
+use the Wellspring type-2 trackpad path (ANSI/ISO/JIS variants of the 2011/2012
+MacBook Pro, including June 2012 Retina). Initialization reads feature report
+`0300`, changes the mode byte to `1`, writes the report back, and polls endpoint
+`81`. Keyboard and trackpad interfaces on the same device each have their own
+DMA buffer and state. The wire format is documented by the upstream
+[Linux BCM5974 driver](https://github.com/torvalds/linux/blob/master/drivers/input/mouse/bcm5974.c).
+
+The trackpad provides relative movement, physical click/drag, and a right click
+when two contacts are present at click-down. Finger lift/landing rebases the
+position to avoid cursor jumps; small movements retain their fractional counts.
+Tap-to-click and scrolling/gestures are not implemented. The Apple mode switch
+and EHCI transaction-translator path need validation on physical hardware.
+
+Both drivers are polled by the scheduler timer without allocations or blocking
+waits. USB packets enter `mouse::dispatch_packet`, so Memento and existing
+applications keep using syscall `0x03`. Endpoint errors, root-port disconnects
+and hub-port disconnects release held buttons/keys. Runtime attachment and
+reconnection are not supported; reboot after connecting a new device.
+
+Host tests cover composite descriptors, boot mouse conversion, native trackpad
+reports, finger rebasing, clicks and release behavior. QEMU tests exercise real
+USB transfers into a Memento subscriber, including movement, buttons, ring
+wrap, keyboard coexistence and disconnect releases:
+
+```sh
+rustc tests/unit/main.rs --test --edition 2021 -o /tmp/r2-unit-tests
+/tmp/r2-unit-tests
+python3 tests/usb/qemu_mouse.py
+python3 tests/usb/qemu_mouse.py --hub
+python3 tests/usb/qemu_mouse.py --controller ehci
+python3 tests/usb/qemu_mouse.py --ps2
+```
+
+The VM tests require QEMU, OVMF, `nm`, and a freshly rebuilt `r2-efi.iso`
+matching the staged `iso/boot/kernel_graphics.elf`. QEMU's built-in hub is USB1,
+so it tests the xHCI hub path; the EHCI test uses high-speed root devices.
+Controller layouts follow the [Intel EHCI specification](https://www.intel.com/content/dam/www/public/us/en/documents/technical-specifications/ehci-specification-for-usb.pdf)
+and [xHCI specification](https://www.intel.com/content/dam/www/public/us/en/documents/technical-specifications/extensible-host-controler-interface-usb-xhci.pdf).
+
+---
+
 ## Initialization (`mouse::init`)
 
 `mouse::init()` must be called after the IDT is installed (so IRQ12 is handled). It configures the 8042 controller and the slave PIC to enable PS/2 mouse data reporting.

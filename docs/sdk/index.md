@@ -157,7 +157,7 @@ update. See
 
 So a program can either be copied onto the floppy image:
 
-```
+```sh
 mcopy -o -i fat.img hello.elf ::HELLO.ELF
 ```
 

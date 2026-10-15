@@ -49,6 +49,7 @@ Some windows need things that live outside the program:
 | `spotify.elf` in `/mnt/tar/bin` or `/mnt/iso/bin`, an HD Audio controller, and for streaming a Premium account in `SPOTIFY.CFG` | Spotify |
 | `telegram.elf` in the boot medium's `bin/`, plus a bot token in `/mnt/tar/opt/memento/telegram.txt` (or typed in) | Telegram |
 | `c8.elf` in the boot medium's `bin/`, ROMs under `/mnt/tar/opt/c8` or `/mnt/iso/opt/c8` | CHIP-8 programs opened from Files |
+| `snake.elf` and `mines.elf` in the boot medium's `bin/` | The Snake and Mines icons |
 | `/mnt/tmp` (the RAM disk) or a writable floppy | Saving screenshots |
 | `sh.elf` in `/mnt/tar/bin` or `/mnt/iso/bin` | The Shell icon |
 | MIDI files in `/mnt/fat/SOUND` | Music |
@@ -123,8 +124,8 @@ One clipboard serves every window: a line of text, or the last screenshot, which
 | Web | Web | HTTP/1.1 and HTTPS (TLS 1.2) browser with pictures (PNG, JPEG, GIF, BMP) and a little JavaScript (ES5 through MuJS, a small DOM; `:js off` turns it off); also opens files from the disks (`/mnt/...` in the address bar). Runs as `r2web.elf`, a process of its own per window | spawn `0x2A`, shared user-heap block; in the child its own TCP/IP, BearSSL, stb_image |
 | Jug | [Jug](jug.md) | CDN program catalog with timestamp, size, SHA-256 and running PIDs; downloads verified ELF updates to `/mnt/tmp/jug`, restarts programs with saved arguments, and coordinates Memento's own relaunch | hosted `jug.elf`, `0x2A`, `0x2F`, `0x3B`, `0x41`, `0x42` |
 | Editor | Editor | Turbo C++ 23 (`tcpp.elf`) in a window | spawn `0x2A`, shared user-heap block |
-| Snake | Snake | libc++r2's snake example in a window, sharing its rules (`examples/snake/game.hpp`) and its high score (`/mnt/fat/SNAKE.HSC`) | PC speaker beeps, file `0x21` |
-| Mines | Minesweeper | Beginner, intermediate and expert boards (1/2/3); a safe first click, flags on the right button or F, chording on open numbers, best times in `/mnt/fat/MINES.HSC` | PC speaker beeps, file `0x21` |
+| Snake | Snake | The Snake game (`snake.elf`, C++), which also runs full screen from the shell; an arrow key starts, P pauses, high score in `/mnt/fat/SNAKE.HSC` | hosted `snake.elf`, shared user-heap block; in the child PC speaker beeps, file `0x21` |
+| Mines | Minesweeper | Beginner, intermediate and expert boards (1/2/3); a safe first click, flags on the right button or F, chording on open numbers, best times in `/mnt/fat/MINES.HSC` | hosted `mines.elf` (Go), shared user-heap block; in the child PC speaker beeps, file `0x21` |
 | Telegram | Telegram | A Telegram bot of your own as a chat client: people who write to the bot are chats on the left, and you answer as the bot. Photos they send are shown; a pasted screenshot goes out as a photo | hosted `telegram.elf` (Go), shared user-heap block, r2net and r2tls; the Bot API over HTTPS |
 | Video | Video | MPEG-1 films from `/mnt/tar/video`, with their MP2 sound through HD Audio, played by `mpegplay.elf` in a process of its own; and HLS streams (an `.m3u8`, a `.url` file, or an address typed with U) of MPEG-1 video and MP2 audio. Up/Down set the volume while one plays | spawn `0x2A`, shared user-heap block, `0x3f` |
 | Spotify | Spotify / Go | Spotify client in Go (`spotify.elf`, a process of its own): playlists from the Web API, and Premium tracks streamed, decrypted and decoded (Ogg Vorbis, through Tremor) to HD Audio inside r2. Without an account it offers two generated test tones | spawn `0x2A`, shared user-heap block; in the child r2net, r2tls (BearSSL), `0x3f` |
@@ -228,6 +229,16 @@ keys `1234`, `QWER`, `ASDF`, `ZXCV` map to the CHIP-8 keypad. Rendering keeps
 the 64×32 aspect ratio; only original CHIP-8 is supported. See the
 [C8 source guide](https://github.com/krustowski/rou2exOS-apps/tree/master/c/c8).
 
+**Snake** and **Minesweeper** are programs of their own, hosted like Telegram:
+the icons start `snake.elf` ([`cpp/snake`](https://github.com/krustowski/rou2exOS-apps/tree/master/cpp/snake))
+and `mines.elf` ([`go/mines`](https://github.com/krustowski/rou2exOS-apps/tree/master/go/mines))
+with `--host`, and each draws its whole window into the shared block, growing
+with a maximised window. Settings → Programs → Games executables names the
+ELFs (`snake_exe`, `mines_exe`; bare names follow the usual search order).
+Both carry window metadata, so Files' **Run in new window** opens them too,
+and `fg snake` from a shell plays Snake full screen with the same high score.
+Minesweeper remembers its level in `/mnt/tmp/MINES.CFG` until reboot.
+
 **Video** decodes the film's MP2 audio in the player (in integers: it was written before the kernel saved SSE state across task switches, and is still built with `-mgeneral-regs-only`) and plays it through the [HD Audio driver](../audio/hda.md); the sound is then the clock the pictures keep to. For a stream, the window fetches the HLS playlist and its MPEG-TS segments with the browser's loader and hands the bytes to the player through a 1 MiB ring on the user heap; only MPEG-1 video with MP2 audio plays, which is what `ffmpeg -c:v mpeg1video -c:a mp2 -f hls` makes. See the player's [README](https://github.com/krustowski/rou2exOS-apps/tree/master/cpp/mpegplay).
 
 **theM** runs a DOS program in `them.elf`, the emulator, as a process of its own, started with `--host` and a block on the user heap (`c/them/winhost.h`). The emulator then leaves the screen and the keyboard alone: it puts each picture in the block in the screen's colours, text mode included, and takes its keys from the block as the scancodes the keyboard sent. DOS console output goes into the guest's own text screen. The window scales the picture to 4:3 and hands every key on; F12 ends the program, and Enter runs it again once it has ended. The program starts in its own directory, as on DOS.
@@ -271,7 +282,7 @@ This only works because the kernel accepts user-heap pointers in syscalls: every
 
 The Makefile expects a checkout of Memento beside the two repositories, at `../../../Memento` from `cpp/memento-hello`.
 
-```
+```sh
 cd cpp/memento-hello
 make build      # memento-hello.elf and memento-hello.bin
 make install    # copies it onto fat.img as MEMENTO.ELF

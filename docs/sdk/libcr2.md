@@ -19,7 +19,7 @@
 
 In the `c/` directory:
 
-```
+```sh
 make libcr2
 ```
 
@@ -29,7 +29,7 @@ produces the static archive `c/libcr2.a`. Programs link it with `-lcr2`.
 
 The kernel has no C runtime, so every program is linked with `_crt0.o`, assembled from `c/libcr2/_crt0.asm`:
 
-```
+```sh
 nasm -f elf64 -o _crt0.o c/libcr2/_crt0.asm
 ```
 

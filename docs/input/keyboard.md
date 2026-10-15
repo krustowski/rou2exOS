@@ -13,8 +13,9 @@ The handler runs in interrupt context with interrupts disabled and no scheduler 
 
 ## USB Keyboards (xHCI)
 
-EFI boots initialize the first PCI xHCI controller automatically. Add `usb=xhci`
-to the GRUB `multiboot2` line to enable it explicitly, including on BIOS boots;
+EFI boots initialize the first PCI xHCI controller and up to two EHCI
+controllers automatically. Add `usb=xhci` to the GRUB `multiboot2` line to
+enable both drivers explicitly, including on BIOS boots;
 `usb=firmware` disables automatic initialization. The driver takes controller
 ownership, disables firmware SMIs, resets the host, reserves DMA memory, and
 enumerates devices connected before boot. Intel Panther Point (`8086:1e31`)
@@ -27,19 +28,21 @@ eight-byte reports into Set 1 make/break codes, including modifiers and `E0`
 navigation keys. It repeats held keys after 500 ms, at approximately 30 Hz,
 and releases held keys when a device disconnects or its endpoint fails.
 
-`usb::xhci::poll()` runs from the PIT interrupt and sends bytes through
+`usb::poll()` runs from the PIT interrupt and sends bytes through
 `keyboard::dispatch_scancode`, so the shell and applications use their existing
 input API. Polling performs no allocation or blocking waits. DMA memory is
 reserved outside process frames, the boot archive, and the RAM disk. Controller
-BARs above 4 GiB receive supervisor-only, uncached mappings.
+xHCI BARs above 4 GiB receive supervisor-only, uncached mappings.
 
 This initial driver supports direct root-port connections and USB2 hubs, up to
 16 device slots and five hub levels. Connect the keyboard before starting R2.
-Runtime attachment/reconnection, SuperSpeed hubs, EHCI/OHCI/UHCI input, USB
-mice/trackpads, keyboard LEDs, and keyboards requiring a custom report protocol
-are not supported. A Mac's built-in keyboard may remain on an EHCI-only port;
-an external boot-protocol keyboard on a switchable xHCI port is the first
-hardware test to try.
+Runtime attachment/reconnection, SuperSpeed hubs, OHCI/UHCI input, keyboard
+LEDs, and keyboards requiring a custom report protocol are not supported. The
+EHCI driver supports USB2 hubs and their full/low-speed children, including
+internal MacBook ports that cannot be switched to xHCI. Composite keyboard and
+trackpad interfaces each have their own input endpoint and state. See
+[USB mice and MacBook trackpads](mouse.md#usb-mice-and-macbook-trackpads) for
+controller limits and the Mid-2012 MacBook Pro trackpad path.
 
 Host tests cover HID reports and descriptors; the VM test boots an EFI image
 with PS/2 disabled and checks USB key presses, modifiers, arrows, repeat,
@@ -50,6 +53,7 @@ rustc tests/unit/main.rs --test --edition 2021 -o /tmp/r2-unit-tests
 /tmp/r2-unit-tests
 python3 tests/usb/qemu_keyboard.py
 python3 tests/usb/qemu_keyboard.py --hub
+python3 tests/usb/qemu_keyboard.py --controller ehci
 python3 tests/usb/qemu_keyboard.py --ps2
 ```
 

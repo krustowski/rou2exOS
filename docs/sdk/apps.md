@@ -47,7 +47,7 @@ Programs that use Ethernet need the [`ETH`](#networking) driver running first, s
 
 | App | Language | Description |
 |-----|----------|-------------|
-| [`MEMENTO`](memento.md) | C++ | Windowed desktop on the Memento UI toolkit: file manager, task and memory monitor, shell, clock, chat, IRC, MIDI player, web browser, Snake, Minesweeper, and Turbo C++ in a window. See [Memento (GUI)](memento.md). |
+| [`MEMENTO`](memento.md) | C++ | Windowed desktop on the Memento UI toolkit: file manager, task and memory monitor, shell, clock, chat, IRC, MIDI player, web browser, Snake and Minesweeper (hosted), and Turbo C++ in a window. See [Memento (GUI)](memento.md). |
 | [`JUG`](jug.md) | C++ | Program manager with a hosted Memento window and console commands: CDN catalog, verified ELF downloads, checksum registry, updates and instance restarts. |
 | [`R2WEB`](https://github.com/krustowski/rou2exOS-apps/tree/master/cpp/r2web) | C++ | The browser behind Memento's Web window, one process per window: HTTP/1.1 and HTTPS (BearSSL), HTML/CSS layout, forms, pictures and a little ES5 JavaScript (MuJS). See [Memento](memento.md#notes-on-individual-windows). |
 | [`MPEGPLAY`](https://github.com/krustowski/rou2exOS-apps/tree/master/cpp/mpegplay) | C++ | MPEG-1 video with MP2 sound through HD Audio, from files in `/mnt/tar/video` or HLS streams: in Memento's Video window, or full screen in true colour on the graphics kernel (F). |
@@ -55,7 +55,8 @@ Programs that use Ethernet need the [`ETH`](#networking) driver running first, s
 | [`TELEGRAM`](https://github.com/krustowski/rou2exOS-apps/tree/master/go/telegram) | Go | Bot API client in its own process, hosted by Memento; uses r2net/r2tls for HTTPS and shares clipboard, screenshots and notifications with the desktop. |
 | [`TCPP`](memento.md#notes-on-individual-windows) | C++ | Turbo C++ 23, the text-mode IDE, in Memento's Editor window or full screen; builds and runs `.C` files with [TCC](tcc.md). |
 | [`SPOTIFY`](https://github.com/krustowski/rou2exOS-apps/tree/master/go/spotify) | Go | Spotify client hosted in Memento (experimental): playlists from the Web API, and Premium tracks streamed, decrypted and decoded (Ogg Vorbis) to HD Audio on `r2`, over r2net and r2tls. Offers generated test tones without an account. |
-| [`SNAKE`](https://github.com/krustowski/rou2exOS-apps/tree/master/cpp/libc++r2/examples/snake) | C++ | Snake, built on libc++r2; keeps the score on the floppy. |
+| [`SNAKE`](https://github.com/krustowski/rou2exOS-apps/tree/master/cpp/snake) | C++ | Snake, built on libc++r2: full screen from the shell, or hosted in Memento's Snake window; keeps the score on the floppy. |
+| [`MINES`](https://github.com/krustowski/rou2exOS-apps/tree/master/go/mines) | Go | Minesweeper hosted in Memento's Mines window: three boards, a safe first click, chords, best times on the floppy. |
 | [`CUBE`](https://github.com/krustowski/rou2exOS-apps/tree/master/c/cube) | C | Rotating 3D cube in VGA mode 13h. |
 | [`GFXTEST`](https://github.com/krustowski/rou2exOS-apps/tree/master/c/gfxtest) | C | VGA mode 13h test. |
 | [`GFXDEMO`](https://github.com/krustowski/rou2exOS-apps/tree/master/go/gfxdemo) | Go | Plasma, bouncing balls and kernel-font text through whichever display path the machine has; reports the frame rate. |

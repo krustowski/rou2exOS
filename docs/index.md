@@ -71,7 +71,7 @@ documented for the current source tree.
 
 Please consult the [Build & Run](build.md) page to see options on how to run the system in QEMU locally.
 
-```
+```sh
 qemu-system-x86_64 -boot d -cdrom r2.iso -fda fat.img
 ```
 
